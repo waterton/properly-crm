@@ -42,8 +42,7 @@ export default async function handler(req, res) {
       contents: [{ parts: parts }],
       generationConfig: {
         temperature: 0.1,
-        maxOutputTokens: body.max_tokens || 2000,
-        responseMimeType: 'application/json'
+        maxOutputTokens: body.max_tokens || 2000
       }
     };
 
@@ -71,6 +70,7 @@ export default async function handler(req, res) {
       ? data.candidates[0].content.parts[0].text : '';
 
     console.log('Extracted text length:', text.length);
+    console.log('Text preview:', text.substring(0, 300));
 
     var converted = { content: [{ type: 'text', text: text }] };
 
