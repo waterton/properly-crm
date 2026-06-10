@@ -42,7 +42,7 @@ export default async function handler(req, res) {
       contents: [{ parts: parts }],
       generationConfig: {
         temperature: 0.1,
-        maxOutputTokens: body.max_tokens || 2000
+        maxOutputTokens: body.max_tokens || 8192
       }
     };
 
