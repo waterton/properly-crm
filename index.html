@@ -1778,7 +1778,7 @@ async function askTCQuestion(){
     + 'Give a clear, practical, concise answer. Be direct. Use bullet points if listing multiple items.';
 
   try{
-    var resp = await fetch('/.netlify/functions/claude', {
+    var resp = await fetch('/api/claude', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
       body: JSON.stringify({
@@ -1980,7 +1980,7 @@ function startScan(file){
       ];
     }
 
-    fetch('/.netlify/functions/claude', {
+    fetch('/api/claude', {
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body: JSON.stringify({
