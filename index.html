@@ -186,6 +186,38 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .team-cal-btn{display:flex;align-items:center;gap:6px;background:rgba(76,142,201,0.1);border:1px solid rgba(76,142,201,0.2);border-radius:6px;padding:6px 10px;font-size:12px;color:var(--buyer);cursor:pointer;text-decoration:none;transition:all 0.15s;width:100%;}
 .team-cal-btn:hover{background:rgba(76,142,201,0.2);}
 .assign-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:700;background:var(--surface2);color:var(--text2);}
+/* GMAIL */
+.gmail-layout{display:grid;grid-template-columns:300px 1fr;gap:0;height:calc(100vh - 120px);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
+.gmail-sidebar{border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;}
+.gmail-sidebar-hdr{padding:12px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-shrink:0;}
+.gmail-msg-list{overflow-y:auto;flex:1;}
+.gmail-msg-item{padding:11px 14px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.1s;}
+.gmail-msg-item:hover{background:var(--surface2);}
+.gmail-msg-item.active{background:rgba(201,168,76,0.08);border-left:3px solid var(--accent);}
+.gmail-msg-item.unread .gmail-msg-subject{font-weight:700;color:var(--text);}
+.gmail-msg-from{font-size:12px;font-weight:600;color:var(--text);margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.gmail-msg-subject{font-size:12px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.gmail-msg-snippet{font-size:11px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;}
+.gmail-msg-date{font-size:10px;color:var(--text3);white-space:nowrap;flex-shrink:0;}
+.gmail-thread{flex:1;overflow-y:auto;display:flex;flex-direction:column;}
+.gmail-thread-hdr{padding:16px 20px;border-bottom:1px solid var(--border);flex-shrink:0;}
+.gmail-thread-subject{font-size:16px;font-weight:700;color:var(--text);margin-bottom:6px;}
+.gmail-thread-meta{font-size:12px;color:var(--text3);}
+.gmail-message{padding:16px 20px;border-bottom:1px solid var(--border);}
+.gmail-message-hdr{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;}
+.gmail-message-from{font-size:13px;font-weight:600;color:var(--text);}
+.gmail-message-to{font-size:11px;color:var(--text3);}
+.gmail-message-date{font-size:11px;color:var(--text3);white-space:nowrap;}
+.gmail-message-body{font-size:13px;color:var(--text2);line-height:1.7;white-space:pre-wrap;word-break:break-word;}
+.gmail-attachment{display:inline-flex;align-items:center;gap:6px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:5px 10px;margin:4px 4px 0 0;font-size:12px;color:var(--text2);cursor:pointer;transition:all 0.15s;}
+.gmail-attachment:hover{border-color:var(--accent);color:var(--accent);}
+.gmail-compose{flex-shrink:0;border-top:1px solid var(--border);background:var(--surface);}
+.gmail-compose-hdr{padding:10px 16px;border-bottom:1px solid var(--border);font-size:13px;font-weight:600;color:var(--text);display:flex;align-items:center;justify-content:space-between;}
+.gmail-compose-body{padding:12px 16px;}
+.gmail-template-bar{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;}
+.gmail-template-btn{background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:3px 9px;font-size:11px;color:var(--text2);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all 0.15s;}
+.gmail-template-btn:hover{border-color:var(--accent);color:var(--accent);}
+.gmail-empty{display:flex;align-items:center;justify-content:center;flex:1;flex-direction:column;gap:12px;color:var(--text3);}
 .fab{position:fixed;bottom:24px;right:24px;width:52px;height:52px;border-radius:50%;background:var(--accent);border:none;cursor:pointer;font-size:26px;color:var(--bg);font-weight:700;box-shadow:0 4px 20px rgba(201,168,76,0.5);z-index:200;}
 /* Login CSS removed - auth disabled for testing */
 .mls-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;}
@@ -312,6 +344,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
       <button class="ni" id="nav-scanner"><svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/><path d="M9 13h6M9 17h6M9 9h1"/></svg>Doc Scanner</button>
       <div class="nav-sec">Team</div>
       <button class="ni" id="nav-team"><svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Team</button>
+      <button class="ni" id="nav-gmail"><svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>Gmail<span class="nbadge" id="nbGmail">0</span></button>
       <div class="nav-sec">MLS</div>
       <button class="ni" id="nav-mls"><svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg>MLS Search<span class="nbadge" style="background:var(--lead);font-size:9px;">LIVE</span></button>
     </nav>
@@ -642,6 +675,103 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
           <div class="mftr">
             <button class="btn btn-g" data-close="memberModal">Cancel</button>
             <button class="btn btn-p" id="btnSaveMember">Save Member</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- GMAIL PAGE -->
+      <div class="page" id="page-gmail">
+        <!-- Account selector bar -->
+        <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">
+          <div id="gmailAccountBar" style="display:flex;gap:8px;flex-wrap:wrap;flex:1;align-items:center;">
+            <!-- Account buttons rendered by JS -->
+          </div>
+          <button class="btn btn-p" id="btnGmailCompose" style="display:none;">+ Compose</button>
+          <button class="btn btn-g" id="btnGmailRefresh" style="display:none;">Refresh</button>
+        </div>
+
+        <!-- Not connected state -->
+        <div id="gmailNotConnected" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;text-align:center;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);">
+          <svg width="48" height="48" fill="none" stroke="var(--text3)" stroke-width="1.5" viewBox="0 0 24 24" style="margin-bottom:16px;"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+          <div style="font-size:16px;font-weight:600;color:var(--text);margin-bottom:8px;">Connect Gmail</div>
+          <div style="font-size:13px;color:var(--text3);max-width:400px;margin-bottom:20px;">Connect your Gmail account to view emails, reply to clients, and import documents directly into the CRM.</div>
+          <div id="gmailConnectButtons" style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;">
+            <!-- Connect buttons per team member rendered by JS -->
+          </div>
+        </div>
+
+        <!-- Connected Gmail layout -->
+        <div id="gmailConnected" style="display:none;">
+          <div class="gmail-layout" id="gmailLayout">
+            <!-- Sidebar: message list -->
+            <div class="gmail-sidebar">
+              <div class="gmail-sidebar-hdr">
+                <div style="flex:1;">
+                  <div style="font-size:13px;font-weight:600;color:var(--text);" id="gmailAccountEmail">Inbox</div>
+                  <div style="font-size:10px;color:var(--text3);margin-top:1px;" id="gmailMsgCount"></div>
+                </div>
+                <select id="gmailInboxFilter" class="fsel" style="font-size:11px;padding:3px 6px;width:100px;" onchange="loadGmailInbox()">
+                  <option value="in:inbox">Inbox</option>
+                  <option value="in:sent">Sent</option>
+                  <option value="is:unread">Unread</option>
+                  <option value="is:starred">Starred</option>
+                </select>
+              </div>
+              <div class="gmail-msg-list" id="gmailMsgList">
+                <div style="padding:20px;text-align:center;color:var(--text3);font-size:13px;">Loading emails...</div>
+              </div>
+            </div>
+            <!-- Thread / Compose panel -->
+            <div class="gmail-thread" id="gmailThread">
+              <div class="gmail-empty" id="gmailEmptyState">
+                <svg width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                <div>Select an email to read</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Compose Modal -->
+        <div class="modal-ov" id="composeModal">
+          <div class="modal" style="max-width:620px;">
+            <div class="mhdr"><div class="mtitle" id="composeTitle">New Email</div><button class="mx" data-close="composeModal">&#x2715;</button></div>
+            <div class="mbody">
+              <div class="fg"><label class="fl">From</label>
+                <select class="fsel" id="composeFrom">
+                  <option value="">Select account...</option>
+                </select>
+              </div>
+              <div class="fg"><label class="fl">To</label><input class="fi" id="composeTo" placeholder="recipient@email.com"></div>
+              <div class="fg"><label class="fl">Subject</label><input class="fi" id="composeSubject" placeholder="Subject..."></div>
+              <!-- Template bar -->
+              <div style="margin-bottom:8px;">
+                <div style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);margin-bottom:6px;">Templates</div>
+                <div class="gmail-template-bar">
+                  <button class="gmail-template-btn" data-tpl="new_buyer">New Buyer</button>
+                  <button class="gmail-template-btn" data-tpl="new_seller">New Seller</button>
+                  <button class="gmail-template-btn" data-tpl="showing_confirm">Showing Confirm</button>
+                  <button class="gmail-template-btn" data-tpl="under_contract">Under Contract</button>
+                  <button class="gmail-template-btn" data-tpl="closing_reminder">Closing Reminder</button>
+                  <button class="gmail-template-btn" data-tpl="post_close">Post-Close</button>
+                  <button class="gmail-template-btn" data-tpl="market_update">Market Update</button>
+                </div>
+              </div>
+              <div class="fg"><label class="fl">Message</label>
+                <textarea class="fi" id="composeBody" rows="10" style="resize:vertical;" placeholder="Write your message here..."></textarea>
+              </div>
+              <div style="font-size:11px;color:var(--text3);">Use {{firstName}}, {{lastName}}, {{propertyAddress}}, {{closingDate}}, {{agentName}} as merge fields.</div>
+              <!-- Link to contact for merge fields -->
+              <div class="fg" style="margin-top:8px;"><label class="fl">Link to Contact (for merge fields)</label>
+                <select class="fsel" id="composeLinkContact">
+                  <option value="">None</option>
+                </select>
+              </div>
+            </div>
+            <div class="mftr">
+              <button class="btn btn-g" data-close="composeModal">Cancel</button>
+              <button class="btn btn-g" id="btnSaveDraft">Save Draft</button>
+              <button class="btn btn-p" id="btnSendEmail">Send Email</button>
+            </div>
           </div>
         </div>
       </div>
@@ -1016,7 +1146,7 @@ function pl(p){return p==='hot'?'HOT':p==='warn'?'SOON':'OK';}
 function pb(p){return p==='hot'?'b-hot':p==='warn'?'b-warn':'b-ok';}
 function ge(id){return document.getElementById(id);}
 function ck(){var s=document.createElementNS('http://www.w3.org/2000/svg','svg');s.setAttribute('width','9');s.setAttribute('height','9');s.setAttribute('fill','none');s.setAttribute('stroke','#0d0f14');s.setAttribute('stroke-width','3');s.setAttribute('viewBox','0 0 24 24');var p=document.createElementNS('http://www.w3.org/2000/svg','polyline');p.setAttribute('points','20,6 9,17 4,12');s.appendChild(p);return s;}
-var pn={briefing:'Daily Briefing',dashboard:'Dashboard',pipeline:'Pipeline',contacts:'Contacts',followups:'Follow-ups',notes:'Notes',deadlines:'Deadlines',tc:'Transactions',scanner:'Doc Scanner',team:'Team',mls:'MLS Search'};
+var pn={briefing:'Daily Briefing',dashboard:'Dashboard',pipeline:'Pipeline',contacts:'Contacts',followups:'Follow-ups',notes:'Notes',deadlines:'Deadlines',tc:'Transactions',scanner:'Doc Scanner',team:'Team',gmail:'Gmail',mls:'MLS Search'};
 function sp(id){
   curPage=id;
   document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');});
@@ -1048,6 +1178,7 @@ function sp(id){
   else if(id==='tc')initTC();
   else if(id==='scanner')initScanner();
   else if(id==='team')initTeam();
+  else if(id==='gmail')initGmail();
   else if(id==='mls')initMLS();
 }
 function mkRow(cls){var d=document.createElement('div');d.className=cls;return d;}
@@ -3403,6 +3534,555 @@ function populateAssignDropdowns(){
   });
 }
 
+// -- GMAIL ---
+var gmailState = {
+  activeMemberId: null,
+  activeThreadId: null,
+  messages: [],
+  connectedAccounts: {},   // memberId -> {email, name}
+  composing: false,
+  replyToMessageId: null
+};
+
+// Email templates
+var EMAIL_TEMPLATES = {
+  new_buyer: {
+    subject: 'Welcome - Your Home Search Plan',
+    body: ['Hi {{firstName}},', '', 'Thank you for reaching out! I am excited to help you find your perfect home.', '', 'I would love to schedule a quick 15-minute call to learn more about what you are looking for. We can cover:', '- Your target neighborhoods and must-haves', '- Your timeline and budget range', '- The current market and what to expect', '', 'When would be a good time to connect?', '', 'Best regards,', '{{agentName}}', 'Palacios Baker Real Estate', '(801) 910-2296 | palaciosbaker.com'].join('\n')
+  },
+  new_seller: {
+    subject: 'Your Home Value - Next Steps',
+    body: ['Hi {{firstName}},', '', 'Thank you for reaching out about selling your home at {{propertyAddress}}!', '', 'I have prepared a market analysis for your area and would love to walk you through it. I will show you:', '- What comparable homes are selling for right now', '- How to position your home for maximum value', '- Our proven marketing strategy', '', 'Would you be available for a 20-minute call this week?', '', 'Best regards,', '{{agentName}}', 'Palacios Baker Real Estate'].join('\n')
+  },
+  showing_confirm: {
+    subject: 'Showing Confirmation - {{propertyAddress}}',
+    body: ['Hi {{firstName}},', '', 'Just confirming your showing at {{propertyAddress}}.', '', 'Please let me know if you have any questions before we meet. I look forward to seeing you there!', '', 'Best regards,', '{{agentName}}', 'Palacios Baker Real Estate'].join('\n')
+  },
+  under_contract: {
+    subject: 'We Are Under Contract! - Next Steps',
+    body: ['Hi {{firstName}},', '', 'Congratulations! We are officially under contract on {{propertyAddress}}.', '', 'Here are your key upcoming deadlines:', '- Earnest Money Due: Please confirm with your lender', '- Inspection Period: We will schedule this shortly', '- Financing Deadline: Work closely with your lender', '- Closing Date: {{closingDate}}', '', 'I will be in touch with updates every step of the way. Do not hesitate to reach out with any questions!', '', 'Best regards,', '{{agentName}}', 'Palacios Baker Real Estate'].join('\n')
+  },
+  closing_reminder: {
+    subject: 'Closing Reminder - {{propertyAddress}}',
+    body: ['Hi {{firstName}},', '', 'Just a friendly reminder that we are closing on {{propertyAddress}} on {{closingDate}}.', '', 'Please remember to:', '- Bring a valid government-issued ID', '- Confirm wire transfer details DIRECTLY with the title company by phone (never by email)', '- Do a final walkthrough the day before if possible', '', 'So excited for you! See you at closing.', '', 'Best regards,', '{{agentName}}', 'Palacios Baker Real Estate'].join('\n')
+  },
+  post_close: {
+    subject: 'Congratulations on Your New Home!',
+    body: ['Hi {{firstName}},', '', 'Congratulations on the closing of {{propertyAddress}}! It was such a pleasure working with you.', '', 'A few reminders as you settle in:', '- Change the locks on your new home', '- Update your address with USPS, your bank, and DMV', '- Keep your closing documents in a safe place', '', 'If you know anyone who is thinking about buying or selling, I would be honored by the referral.', '', 'Wishing you many happy years in your new home.', '', 'Warmly,', '{{agentName}}', 'Palacios Baker Real Estate'].join('\n')
+  },
+  market_update: {
+    subject: 'Utah County Market Update',
+    body: ['Hi {{firstName}},', '', 'I wanted to share a quick update on the Utah County real estate market.', '', 'The market continues to be active with strong buyer demand. If you are thinking about buying or selling, now is a great time to have a conversation.', '', 'I am always available for a no-pressure market consultation. Would you like to connect soon?', '', 'Best regards,', '{{agentName}}', 'Palacios Baker Real Estate', '(801) 910-2296'].join('\n')
+  }
+};
+
+function initGmail(){
+  renderGmailAccountBar();
+  // Check which accounts are connected
+  checkConnectedAccounts();
+}
+
+async function checkConnectedAccounts(){
+  // Check Supabase for stored tokens
+  if(!supaReady) return;
+  try{
+    var resp = await fetch(SUPA_URL + '/rest/v1/gmail_tokens?select=member_id,email,name', {
+      headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}
+    });
+    var tokens = await resp.json();
+    if(Array.isArray(tokens)){
+      tokens.forEach(function(t){
+        gmailState.connectedAccounts[t.member_id] = {email:t.email, name:t.name};
+      });
+    }
+    renderGmailAccountBar();
+    // Auto-load first connected account
+    var firstConnected = Object.keys(gmailState.connectedAccounts)[0];
+    if(firstConnected){
+      gmailState.activeMemberId = firstConnected;
+      ge('gmailNotConnected').style.display = 'none';
+      ge('gmailConnected').style.display = 'block';
+      ge('btnGmailCompose').style.display = 'inline-flex';
+      ge('btnGmailRefresh').style.display = 'inline-flex';
+      loadGmailInbox();
+    }
+  }catch(e){ console.log('checkConnectedAccounts error:', e); }
+}
+
+function renderGmailAccountBar(){
+  var bar = ge('gmailAccountBar');
+  var connectBtns = ge('gmailConnectButtons');
+  if(!bar) return;
+  bar.innerHTML = '';
+
+  // Show connected accounts as tabs
+  TM.forEach(function(m){
+    var acc = gmailState.connectedAccounts[String(m.id)];
+    if(acc){
+      var btn = document.createElement('button');
+      btn.style.cssText = 'display:flex;align-items:center;gap:7px;padding:6px 12px;border-radius:7px;border:1px solid '+(gmailState.activeMemberId==m.id?'var(--accent)':'var(--border)')+';background:'+(gmailState.activeMemberId==m.id?'rgba(201,168,76,0.1)':'var(--surface)')+';cursor:pointer;font-size:12px;font-family:DM Sans,sans-serif;color:var(--text);transition:all 0.15s;';
+      var av = document.createElement('div');
+      av.style.cssText = 'width:20px;height:20px;border-radius:50%;background:'+(m.color||'#C9A84C')+'33;color:'+(m.color||'#C9A84C')+';display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;flex-shrink:0;';
+      av.textContent = tmIni(m);
+      btn.appendChild(av);
+      var txt = document.createElement('div');
+      txt.innerHTML = '<div style="font-size:12px;font-weight:600;">' + m.first + '</div><div style="font-size:10px;color:var(--text3);">' + acc.email + '</div>';
+      btn.appendChild(txt);
+      var disBtn = document.createElement('button');
+      disBtn.style.cssText='background:none;border:none;color:var(--text3);cursor:pointer;font-size:14px;padding:0 0 0 4px;';
+      disBtn.title='Disconnect';
+      disBtn.textContent='x';
+      (function(mid){ disBtn.addEventListener('click', function(e){ e.stopPropagation(); disconnectGmail(mid); }); })(m.id);
+      btn.appendChild(disBtn);
+      (function(mid){ btn.addEventListener('click', function(){ switchGmailAccount(mid); }); })(m.id);
+      bar.appendChild(btn);
+    }
+  });
+
+  // Connect buttons for unconnected members
+  if(connectBtns){
+    connectBtns.innerHTML = '';
+    TM.forEach(function(m){
+      if(!gmailState.connectedAccounts[String(m.id)]){
+        var btn = document.createElement('button');
+        btn.className = 'btn btn-g';
+        btn.style.cssText += 'display:flex;align-items:center;gap:7px;';
+        btn.innerHTML = '<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg> Connect ' + m.first + "'s Gmail";
+        (function(mid){ btn.addEventListener('click', function(){ connectGmail(mid); }); })(m.id);
+        connectBtns.appendChild(btn);
+      }
+    });
+  }
+}
+
+async function connectGmail(memberId){
+  try{
+    var resp = await fetch('/api/gmail-auth?action=url&memberId=' + memberId);
+    var data = await resp.json();
+    if(data.error){ alert('Error: ' + data.error); return; }
+    // Open OAuth popup
+    var popup = window.open(data.url, 'gmail_auth', 'width=500,height=600,scrollbars=yes');
+    // Listen for callback
+    var handler = function(event){
+      if(event.data && event.data.type === 'gmail_connected'){
+        window.removeEventListener('message', handler);
+        gmailState.connectedAccounts[String(event.data.memberId)] = {email:event.data.email, name:event.data.name};
+        renderGmailAccountBar();
+        switchGmailAccount(event.data.memberId);
+        ge('gmailNotConnected').style.display = 'none';
+        ge('gmailConnected').style.display = 'block';
+        ge('btnGmailCompose').style.display = 'inline-flex';
+        ge('btnGmailRefresh').style.display = 'inline-flex';
+      } else if(event.data && event.data.type === 'gmail_error'){
+        window.removeEventListener('message', handler);
+        alert('Gmail connection failed: ' + event.data.error);
+      }
+    };
+    window.addEventListener('message', handler);
+  }catch(e){ alert('Connection error: ' + e.message); }
+}
+
+async function disconnectGmail(memberId){
+  if(!confirm('Disconnect Gmail for this account?')) return;
+  try{
+    await fetch('/api/gmail-auth', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'revoke',memberId:memberId})});
+    delete gmailState.connectedAccounts[String(memberId)];
+    renderGmailAccountBar();
+    if(gmailState.activeMemberId == memberId){
+      var nextAccount = Object.keys(gmailState.connectedAccounts)[0];
+      if(nextAccount){ switchGmailAccount(nextAccount); }
+      else { ge('gmailNotConnected').style.display='flex'; ge('gmailConnected').style.display='none'; ge('btnGmailCompose').style.display='none'; ge('btnGmailRefresh').style.display='none'; }
+    }
+  }catch(e){ alert('Error disconnecting: '+e.message); }
+}
+
+function switchGmailAccount(memberId){
+  gmailState.activeMemberId = memberId;
+  var acc = gmailState.connectedAccounts[String(memberId)];
+  if(acc) ge('gmailAccountEmail').textContent = acc.email;
+  renderGmailAccountBar();
+  loadGmailInbox();
+}
+
+async function loadGmailInbox(){
+  if(!gmailState.activeMemberId) return;
+  var filter = ge('gmailInboxFilter') ? ge('gmailInboxFilter').value : 'in:inbox';
+  ge('gmailMsgList').innerHTML = '<div style="padding:20px;text-align:center;color:var(--text3);font-size:13px;">Loading...</div>';
+  try{
+    var resp = await fetch('/api/gmail-api', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({action:'inbox', memberId:gmailState.activeMemberId, query:filter})
+    });
+    var data = await resp.json();
+    if(data.error){ ge('gmailMsgList').innerHTML='<div style="padding:20px;color:var(--danger);font-size:13px;">'+data.error+'</div>'; return; }
+    gmailState.messages = data.messages || [];
+    ge('gmailMsgCount').textContent = gmailState.messages.length + ' messages';
+    var unread = gmailState.messages.filter(function(m){return m.unread;}).length;
+    ge('nbGmail').textContent = unread || '';
+    renderGmailList();
+  }catch(e){ ge('gmailMsgList').innerHTML='<div style="padding:20px;color:var(--danger);font-size:13px;">Error loading emails: '+e.message+'</div>'; }
+}
+
+function renderGmailList(){
+  var el = ge('gmailMsgList');
+  el.innerHTML = '';
+  if(!gmailState.messages.length){ el.innerHTML='<div style="padding:20px;text-align:center;color:var(--text3);">No messages found.</div>'; return; }
+  gmailState.messages.forEach(function(msg){
+    var item = document.createElement('div');
+    item.className = 'gmail-msg-item' + (msg.unread?' unread':'') + (gmailState.activeThreadId===msg.threadId?' active':'');
+    var top = document.createElement('div');
+    top.style.cssText = 'display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:2px;';
+    var from = document.createElement('div');
+    from.className = 'gmail-msg-from';
+    // Extract just name from "Name <email>"
+    var fromMatch = msg.from.match(/^([^<]+)</);
+    from.textContent = fromMatch ? fromMatch[1].trim() : msg.from;
+    // Match to contact
+    var emailMatch = msg.from.match(/<(.+)>/);
+    var fromEmail = emailMatch ? emailMatch[1] : msg.from;
+    var matchedContact = C.find(function(c){ return c.email && c.email.toLowerCase()===fromEmail.toLowerCase(); });
+    if(matchedContact){
+      var tag = document.createElement('span');
+      tag.className = 'tag tag-'+matchedContact.type;
+      tag.style.fontSize='9px';
+      tag.textContent = matchedContact.first;
+      from.appendChild(tag);
+    }
+    var date = document.createElement('div');
+    date.className = 'gmail-msg-date';
+    date.textContent = formatGmailDate(msg.date);
+    top.appendChild(from); top.appendChild(date);
+    var subj = document.createElement('div');
+    subj.className = 'gmail-msg-subject';
+    subj.textContent = msg.subject;
+    var snip = document.createElement('div');
+    snip.className = 'gmail-msg-snippet';
+    snip.textContent = msg.snippet;
+    if(msg.hasAttachment){
+      var att = document.createElement('span');
+      att.style.cssText='color:var(--accent);font-size:10px;margin-left:4px;';
+      att.textContent='[attachment]';
+      subj.appendChild(att);
+    }
+    item.appendChild(top); item.appendChild(subj); item.appendChild(snip);
+    (function(m){ item.addEventListener('click', function(){ loadThread(m.threadId, m.id); }); })(msg);
+    el.appendChild(item);
+  });
+}
+
+function formatGmailDate(dateStr){
+  if(!dateStr) return '';
+  try{
+    var d = new Date(dateStr);
+    var now = new Date();
+    var isToday = d.toDateString()===now.toDateString();
+    if(isToday) return d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+    return d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+  }catch(e){ return dateStr; }
+}
+
+async function loadThread(threadId, messageId){
+  gmailState.activeThreadId = threadId;
+  renderGmailList(); // Update active state
+
+  var thread = ge('gmailThread');
+  thread.innerHTML = '<div class="gmail-empty"><div style="font-size:13px;color:var(--text3);">Loading thread...</div></div>';
+
+  try{
+    var resp = await fetch('/api/gmail-api', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({action:'thread', memberId:gmailState.activeMemberId, threadId:threadId})
+    });
+    var data = await resp.json();
+    if(data.error){ thread.innerHTML='<div class="gmail-empty" style="color:var(--danger);">'+data.error+'</div>'; return; }
+    renderThread(data.messages, threadId);
+  }catch(e){ thread.innerHTML='<div class="gmail-empty" style="color:var(--danger);">Error: '+e.message+'</div>'; }
+}
+
+function renderThread(messages, threadId){
+  var thread = ge('gmailThread');
+  thread.innerHTML = '';
+
+  if(!messages.length){ thread.innerHTML='<div class="gmail-empty">Empty thread.</div>'; return; }
+
+  var firstMsg = messages[0];
+  var hdr = document.createElement('div');
+  hdr.className = 'gmail-thread-hdr';
+  var subj = document.createElement('div');
+  subj.className = 'gmail-thread-subject';
+  subj.textContent = firstMsg.subject;
+
+  // Match contact
+  var emailMatch = firstMsg.from.match(/<(.+)>/);
+  var fromEmail = emailMatch ? emailMatch[1] : firstMsg.from;
+  var contact = C.find(function(c){ return c.email && c.email.toLowerCase()===fromEmail.toLowerCase(); });
+  if(contact){
+    var cLink = document.createElement('div');
+    cLink.style.cssText = 'margin-top:6px;display:flex;align-items:center;gap:8px;';
+    var cBadge = document.createElement('span');
+    cBadge.className = 'tag tag-'+contact.type;
+    cBadge.textContent = fn(contact);
+    var cBtn = document.createElement('button');
+    cBtn.className = 'btn btn-g';
+    cBtn.style.cssText = 'font-size:11px;padding:3px 8px;';
+    cBtn.textContent = 'View Contact';
+    (function(cid){ cBtn.addEventListener('click', function(){ vc(cid); }); })(contact.id);
+    cLink.appendChild(cBadge); cLink.appendChild(cBtn);
+    hdr.appendChild(subj); hdr.appendChild(cLink);
+  } else {
+    // Option to create contact from email
+    var newCBtn = document.createElement('button');
+    newCBtn.className = 'btn btn-g';
+    newCBtn.style.cssText = 'font-size:11px;padding:3px 8px;margin-top:6px;';
+    newCBtn.textContent = '+ Add as Contact';
+    (function(email, name){ newCBtn.addEventListener('click', function(){
+      var parts = name.replace(/<.*>/,'').trim().split(' ');
+      ge('fFirst').value = parts[0]||'';
+      ge('fLast').value = parts.slice(1).join(' ')||'';
+      ge('fEmail').value = email;
+      ge('fType').value = 'lead';
+      ge('addModal').classList.add('open');
+    }); })(fromEmail, firstMsg.from);
+    hdr.appendChild(subj); hdr.appendChild(newCBtn);
+  }
+  thread.appendChild(hdr);
+
+  // Messages
+  var msgContainer = document.createElement('div');
+  msgContainer.style.flex = '1';
+  msgContainer.style.overflowY = 'auto';
+
+  messages.forEach(function(msg){
+    var msgDiv = document.createElement('div');
+    msgDiv.className = 'gmail-message';
+
+    var msgHdr = document.createElement('div');
+    msgHdr.className = 'gmail-message-hdr';
+    var fromDiv = document.createElement('div');
+    var fromName = document.createElement('div');
+    fromName.className = 'gmail-message-from';
+    fromName.textContent = msg.from;
+    var toLine = document.createElement('div');
+    toLine.className = 'gmail-message-to';
+    toLine.textContent = 'To: ' + msg.to;
+    fromDiv.appendChild(fromName); fromDiv.appendChild(toLine);
+    var dateDiv = document.createElement('div');
+    dateDiv.className = 'gmail-message-date';
+    dateDiv.textContent = formatGmailDate(msg.date);
+    msgHdr.appendChild(fromDiv); msgHdr.appendChild(dateDiv);
+
+    // Body
+    var bodyDiv = document.createElement('div');
+    bodyDiv.className = 'gmail-message-body';
+    if(msg.bodyHtml){
+      var iframe = document.createElement('iframe');
+      iframe.style.cssText = 'width:100%;border:none;background:white;border-radius:6px;min-height:100px;';
+      iframe.srcdoc = msg.bodyHtml;
+      iframe.onload = function(){ try{ this.style.height = this.contentDocument.body.scrollHeight + 'px'; }catch(e){} };
+      bodyDiv.appendChild(iframe);
+    } else {
+      bodyDiv.textContent = msg.bodyText || msg.snippet || '';
+    }
+
+    // Attachments
+    if(msg.attachments && msg.attachments.length){
+      var attDiv = document.createElement('div');
+      attDiv.style.cssText = 'margin-top:12px;border-top:1px solid var(--border);padding-top:10px;';
+      var attLabel = document.createElement('div');
+      attLabel.style.cssText = 'font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);margin-bottom:6px;';
+      attLabel.textContent = 'Attachments';
+      attDiv.appendChild(attLabel);
+      msg.attachments.forEach(function(att){
+        var attBtn = document.createElement('div');
+        attBtn.className = 'gmail-attachment';
+        attBtn.innerHTML = '<svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>';
+        var attName = document.createElement('span');
+        attName.textContent = att.filename;
+        attBtn.appendChild(attName);
+        // Scan button for PDFs and images
+        if(att.mimeType && (att.mimeType.includes('pdf') || att.mimeType.includes('image'))){
+          var scanBtn = document.createElement('button');
+          scanBtn.style.cssText = 'margin-left:6px;background:var(--accent);border:none;border-radius:4px;padding:2px 7px;font-size:10px;color:var(--bg);cursor:pointer;font-family:DM Sans,sans-serif;font-weight:700;';
+          scanBtn.textContent = 'Scan';
+          (function(a, mid){ scanBtn.addEventListener('click', function(e){
+            e.stopPropagation();
+            importAttachmentToScanner(mid, a.attachmentId, a.filename, a.mimeType);
+          }); })(att, msg.id);
+          attBtn.appendChild(scanBtn);
+        }
+        attDiv.appendChild(attBtn);
+      });
+      msgDiv.appendChild(msgHdr); msgDiv.appendChild(bodyDiv); msgDiv.appendChild(attDiv);
+    } else {
+      msgDiv.appendChild(msgHdr); msgDiv.appendChild(bodyDiv);
+    }
+    msgContainer.appendChild(msgDiv);
+  });
+  thread.appendChild(msgContainer);
+
+  // Reply bar
+  var replyBar = document.createElement('div');
+  replyBar.className = 'gmail-compose';
+  var replyHdr = document.createElement('div');
+  replyHdr.className = 'gmail-compose-hdr';
+  var replyTitle = document.createElement('span');
+  replyTitle.textContent = 'Reply';
+  var replyExpand = document.createElement('button');
+  replyExpand.style.cssText = 'background:none;border:none;color:var(--text3);cursor:pointer;font-size:12px;font-family:DM Sans,sans-serif;';
+  replyExpand.textContent = 'Open in Composer';
+  var lastMsg = messages[messages.length-1];
+  (function(lm, tid){ replyExpand.addEventListener('click', function(){
+    openCompose({
+      to: lm.from,
+      subject: 'Re: ' + lm.subject,
+      threadId: tid,
+      replyToMessageId: lm.id
+    });
+  }); })(lastMsg, threadId);
+  replyHdr.appendChild(replyTitle); replyHdr.appendChild(replyExpand);
+
+  var replyBody = document.createElement('div');
+  replyBody.className = 'gmail-compose-body';
+  var replyTA = document.createElement('textarea');
+  replyTA.className = 'fi';
+  replyTA.rows = 3;
+  replyTA.style.resize = 'vertical';
+  replyTA.placeholder = 'Quick reply...';
+  var replySend = document.createElement('button');
+  replySend.className = 'btn btn-p';
+  replySend.style.cssText = 'margin-top:8px;font-size:13px;';
+  replySend.textContent = 'Send Reply';
+  (function(lm, tid, ta){ replySend.addEventListener('click', function(){
+    if(!ta.value.trim()){ alert('Please enter a reply.'); return; }
+    sendEmail({
+      to: lm.from,
+      subject: 'Re: ' + lm.subject,
+      body: ta.value.trim().replace(/\n/g,'<br>'),
+      threadId: tid,
+      replyTo: lm.id
+    }, function(){ ta.value=''; loadGmailInbox(); });
+  }); })(lastMsg, threadId, replyTA);
+  replyBody.appendChild(replyTA); replyBody.appendChild(replySend);
+  replyBar.appendChild(replyHdr); replyBar.appendChild(replyBody);
+  thread.appendChild(replyBar);
+}
+
+async function importAttachmentToScanner(messageId, attachmentId, filename, mimeType){
+  sp('scanner');
+  ge('scannerUploadArea').style.display='none';
+  ge('scannerProcessing').style.display='block';
+  ge('scannerHistory').style.display='none';
+  ge('scannerProcessingMsg').textContent = 'Importing ' + filename + '...';
+  try{
+    var resp = await fetch('/api/gmail-api', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({action:'attachment', memberId:gmailState.activeMemberId, messageId:messageId, attachmentId:attachmentId})
+    });
+    var data = await resp.json();
+    if(data.error){ showScannerError(data.error); return; }
+    // Create a fake file and start scan
+    var binary = atob(data.data.replace(/-/g,'+').replace(/_/g,'/'));
+    var bytes = new Uint8Array(binary.length);
+    for(var i=0;i<binary.length;i++) bytes[i]=binary.charCodeAt(i);
+    var blob = new Blob([bytes], {type: mimeType});
+    var file = new File([blob], filename, {type: mimeType});
+    startScan(file);
+  }catch(e){ showScannerError('Import failed: '+e.message); }
+}
+
+function openCompose(opts){
+  opts = opts||{};
+  ge('composeTitle').textContent = opts.replyToMessageId ? 'Reply' : 'New Email';
+  ge('composeTo').value = opts.to||'';
+  ge('composeSubject').value = opts.subject||'';
+  ge('composeBody').value = opts.body||'';
+  // Populate from accounts
+  var fromSel = ge('composeFrom');
+  fromSel.innerHTML = '';
+  Object.keys(gmailState.connectedAccounts).forEach(function(mid){
+    var acc = gmailState.connectedAccounts[mid];
+    var m = TM.find(function(x){ return String(x.id)===String(mid); });
+    var o = document.createElement('option');
+    o.value = mid;
+    o.textContent = (m?m.first+' - ':'')+acc.email;
+    fromSel.appendChild(o);
+  });
+  if(gmailState.activeMemberId) fromSel.value = gmailState.activeMemberId;
+  // Populate contact dropdown for merge fields
+  var cSel = ge('composeLinkContact');
+  cSel.innerHTML = '<option value="">None</option>';
+  C.forEach(function(c){ var o=document.createElement('option'); o.value=c.id; o.textContent=fn(c)+' ('+c.email+')'; cSel.appendChild(o); });
+  // Store reply info
+  ge('composeModal').setAttribute('data-thread-id', opts.threadId||'');
+  ge('composeModal').setAttribute('data-reply-to', opts.replyToMessageId||'');
+  om('composeModal');
+}
+
+function applyTemplate(tplKey){
+  var tpl = EMAIL_TEMPLATES[tplKey];
+  if(!tpl) return;
+  ge('composeSubject').value = tpl.subject;
+  // Apply merge fields
+  var body = tpl.body;
+  var cid = ge('composeLinkContact').value;
+  if(cid){
+    var c = gc(parseInt(cid));
+    if(c){
+      body = body.replace(/{{firstName}}/g, c.first||'');
+      body = body.replace(/{{lastName}}/g, c.last||'');
+      body = body.replace(/{{propertyAddress}}/g, c.property||'');
+      var tx2 = TX.find(function(t){ return t.contactId===c.id; });
+      if(tx2) body = body.replace(/{{closingDate}}/g, tx2.closingDate ? fd(tx2.closingDate) : '[closing date]');
+    }
+  }
+  var mid = ge('composeFrom').value;
+  var m = TM.find(function(x){ return String(x.id)===String(mid); });
+  if(m) body = body.replace(/{{agentName}}/g, m.first+' '+m.last);
+  ge('composeBody').value = body;
+}
+
+async function sendEmail(opts, callback){
+  var memberId = opts.memberId || gmailState.activeMemberId;
+  if(!memberId){ alert('Please select a Gmail account to send from.'); return; }
+  try{
+    var resp = await fetch('/api/gmail-api', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        action:'send', memberId:memberId,
+        to:opts.to, subject:opts.subject,
+        body:opts.body.replace(/\n/g,'<br>'),
+        threadId:opts.threadId||null,
+        replyTo:opts.replyTo||null
+      })
+    });
+    var data = await resp.json();
+    if(data.error){ alert('Send failed: '+data.error); return; }
+    if(callback) callback();
+    else { cm('composeModal'); alert('Email sent!'); loadGmailInbox(); }
+  }catch(e){ alert('Send error: '+e.message); }
+}
+
+async function sendComposedEmail(){
+  var to = ge('composeTo').value.trim();
+  var subject = ge('composeSubject').value.trim();
+  var body = ge('composeBody').value.trim();
+  var from = ge('composeFrom').value;
+  if(!to||!subject||!body){ alert('Please fill in To, Subject, and Message.'); return; }
+  if(!from){ alert('Please select which account to send from.'); return; }
+  var threadId = ge('composeModal').getAttribute('data-thread-id')||null;
+  var replyTo = ge('composeModal').getAttribute('data-reply-to')||null;
+  // Save to contact's notes
+  var cid = ge('composeLinkContact').value;
+  if(cid){
+    var noteText = 'Email sent to ' + to + ': ' + subject;
+    var nn={id:Date.now(),contactId:parseInt(cid),text:noteText,date:new Date().toISOString()};
+    N.push(nn); saveNote(nn);
+  }
+  ge('btnSendEmail').textContent='Sending...'; ge('btnSendEmail').disabled=true;
+  await sendEmail({to,subject,body,memberId:from,threadId,replyTo});
+  ge('btnSendEmail').textContent='Send Email'; ge('btnSendEmail').disabled=false;
+}
+
 // -- MLS SEARCH -------------------------------------------------------
 var mlsToken = '';
 var mlsLiveMode = false;
@@ -3850,6 +4530,7 @@ ge('nav-briefing').addEventListener('click',function(){sp('briefing');});
 ge('nav-tc').addEventListener('click',function(){sp('tc');});
 ge('nav-scanner').addEventListener('click',function(){sp('scanner');});
 ge('nav-team').addEventListener('click',function(){sp('team');});
+ge('nav-gmail').addEventListener('click',function(){sp('gmail');});
 ge('nav-mls').addEventListener('click',function(){sp('mls');});
 ge('btnSaveToken').addEventListener('click', connectMLSToken);
 ge('btnClearToken').addEventListener('click', disconnectMLS);
@@ -3985,6 +4666,13 @@ ge('btnSaveDL').addEventListener('click',svdl);
 ge('btnSaveDetNote').addEventListener('click',adn);
 ge('detOv').addEventListener('click',function(e){if(e.target===ge('detOv'))cd();});
 ge('searchBox').addEventListener('input',function(){if(curPage==='contacts')rc();});
+ge('btnGmailCompose').addEventListener('click', function(){ openCompose(); });
+ge('btnGmailRefresh').addEventListener('click', loadGmailInbox);
+ge('btnSendEmail').addEventListener('click', sendComposedEmail);
+ge('btnSaveDraft').addEventListener('click', function(){ alert('Draft saving coming soon!'); });
+document.querySelectorAll('.gmail-template-btn').forEach(function(btn){
+  btn.addEventListener('click', function(){ applyTemplate(this.getAttribute('data-tpl')); });
+});
 ge('btnAddMember').addEventListener('click', openAddMember);
 ge('btnSaveMember').addEventListener('click', saveMember);
 ge('btnTeamSettings').addEventListener('click', function(){ sp('team'); });
