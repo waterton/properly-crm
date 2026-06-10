@@ -19,7 +19,10 @@ export default async function handler(req, res) {
   } catch(e) {}
 
   // Exchange code for tokens via our gmail-auth function
-  const baseUrl = process.env.VERCEL_URL ? 'https://' + process.env.VERCEL_URL : process.env.APP_URL;
+  const baseUrl = process.env.APP_URL
+    || (process.env.VERCEL_URL ? 'https://' + process.env.VERCEL_URL : null)
+    || (req.headers.host ? 'https://' + req.headers.host : null)
+    || 'https://properly-crm.vercel.app';
   try {
     const resp = await fetch(baseUrl + '/api/gmail-auth', {
       method: 'POST',

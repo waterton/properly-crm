@@ -32,11 +32,23 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(200).end();
 
+  // Parse body for POST requests
+  if (req.method === 'POST' && typeof req.body === 'string') {
+    try { req.body = JSON.parse(req.body); } catch(e) {}
+  }
+
+  console.log('gmail-auth called:', req.method, 'action:', req.query.action || (req.body && req.body.action));
+
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
   const supaUrl = process.env.SUPA_URL;
   const supaKey = process.env.SUPA_KEY;
-  const baseUrl = process.env.VERCEL_URL ? 'https://' + process.env.VERCEL_URL : process.env.APP_URL;
+  // Build base URL - try multiple sources
+  var baseUrl = process.env.APP_URL
+    || (process.env.VERCEL_URL ? 'https://' + process.env.VERCEL_URL : null)
+    || (req.headers.host ? 'https://' + req.headers.host : null)
+    || 'https://properly-crm.vercel.app';
+  console.log('Using baseUrl:', baseUrl);
 
   if (!clientId || !clientSecret) {
     return res.status(500).json({ error: 'GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET not set' });

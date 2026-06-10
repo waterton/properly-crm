@@ -8,7 +8,10 @@ export default async function handler(req, res) {
   const { action, memberId, query, threadId, messageId, to, subject, body, attachmentId, replyTo } = req.body;
   const supaUrl = process.env.SUPA_URL;
   const supaKey = process.env.SUPA_KEY;
-  const baseUrl = process.env.VERCEL_URL ? 'https://' + process.env.VERCEL_URL : process.env.APP_URL;
+  const baseUrl = process.env.APP_URL
+    || (process.env.VERCEL_URL ? 'https://' + process.env.VERCEL_URL : null)
+    || (req.headers.host ? 'https://' + req.headers.host : null)
+    || 'https://properly-crm.vercel.app';
 
   try {
     // Get fresh access token
