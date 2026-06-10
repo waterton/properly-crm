@@ -3657,29 +3657,73 @@ function renderGmailAccountBar(){
 
 async function connectGmail(memberId){
   try{
+    // Show loading state
+    var connectBtns = ge('gmailConnectButtons');
+    if(connectBtns) connectBtns.innerHTML = '<div style="color:var(--text3);font-size:13px;">Connecting...</div>';
+
     var resp = await fetch('/api/gmail-auth?action=url&memberId=' + memberId);
+    if(!resp.ok){
+      var errText = await resp.text();
+      alert('Server error: ' + errText);
+      renderGmailAccountBar();
+      return;
+    }
     var data = await resp.json();
-    if(data.error){ alert('Error: ' + data.error); return; }
-    // Open OAuth popup
-    var popup = window.open(data.url, 'gmail_auth', 'width=500,height=600,scrollbars=yes');
-    // Listen for callback
+    if(data.error){
+      alert('Error getting auth URL: ' + data.error);
+      renderGmailAccountBar();
+      return;
+    }
+
+    // Try popup first, fall back to redirect if blocked
+    var popup = window.open(data.url, 'gmail_auth', 'width=550,height=650,scrollbars=yes,resizable=yes');
+
+    if(!popup || popup.closed || typeof popup.closed === 'undefined'){
+      // Popup was blocked - redirect in same tab with state
+      if(confirm('Popup was blocked. Click OK to open the Google sign-in page. After signing in you will be redirected back.')){
+        localStorage.setItem('gmail_connect_member', memberId);
+        window.location.href = data.url;
+      } else {
+        renderGmailAccountBar();
+      }
+      return;
+    }
+
+    // Listen for callback message from popup
     var handler = function(event){
-      if(event.data && event.data.type === 'gmail_connected'){
+      if(!event.data) return;
+      if(event.data.type === 'gmail_connected'){
         window.removeEventListener('message', handler);
         gmailState.connectedAccounts[String(event.data.memberId)] = {email:event.data.email, name:event.data.name};
         renderGmailAccountBar();
-        switchGmailAccount(event.data.memberId);
+        switchGmailAccount(String(event.data.memberId));
         ge('gmailNotConnected').style.display = 'none';
         ge('gmailConnected').style.display = 'block';
         ge('btnGmailCompose').style.display = 'inline-flex';
         ge('btnGmailRefresh').style.display = 'inline-flex';
-      } else if(event.data && event.data.type === 'gmail_error'){
+        alert('Gmail connected as ' + event.data.email + '!');
+      } else if(event.data.type === 'gmail_error'){
         window.removeEventListener('message', handler);
         alert('Gmail connection failed: ' + event.data.error);
+        renderGmailAccountBar();
       }
     };
     window.addEventListener('message', handler);
-  }catch(e){ alert('Connection error: ' + e.message); }
+
+    // Check if popup gets closed without completing
+    var checkClosed = setInterval(function(){
+      if(popup.closed){
+        clearInterval(checkClosed);
+        window.removeEventListener('message', handler);
+        // Re-render in case something changed
+        checkConnectedAccounts();
+      }
+    }, 1000);
+
+  }catch(e){
+    alert('Connection error: ' + e.message);
+    renderGmailAccountBar();
+  }
 }
 
 async function disconnectGmail(memberId){
