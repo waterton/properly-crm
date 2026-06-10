@@ -47,7 +47,11 @@ exports.handler = async function(event, context) {
 
     var geminiBody = {
       contents: [{ parts: parts }],
-      generationConfig: { temperature: 0.1, maxOutputTokens: body.max_tokens || 2000 }
+      generationConfig: {
+        temperature: 0.1,
+        maxOutputTokens: body.max_tokens || 2000,
+        responseMimeType: 'application/json'
+      }
     };
 
     var model = 'gemini-2.5-flash';
