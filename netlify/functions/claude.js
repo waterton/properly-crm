@@ -50,7 +50,7 @@ exports.handler = async function(event, context) {
       generationConfig: { temperature: 0.1, maxOutputTokens: body.max_tokens || 2000 }
     };
 
-    var model = 'gemini-2.5-flash-lite-preview-06-17';
+    var model = 'gemini-2.0-flash';
     var url = 'https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent?key=' + apiKey;
 
     console.log('Calling Gemini model:', model);
