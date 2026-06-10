@@ -1,0 +1,3143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Properly CRM</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0d0f14;--surface:#151820;--surface2:#1c2030;--surface3:#232840;--border:#2a2f45;--accent:#c9a84c;--accent2:#e8c97a;--text:#e8eaf0;--text2:#8b90a8;--text3:#5a5f78;--buyer:#4c8ec9;--seller:#c96b4c;--lead:#6bc97a;--danger:#c94c4c;--warn:#c9a84c;--radius:10px;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden;}
+::-webkit-scrollbar{width:5px;}::-webkit-scrollbar-track{background:var(--bg);}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+.app{display:flex;height:100vh;overflow:hidden;}
+.sidebar{width:220px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;transition:transform 0.3s;z-index:100;}
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 20px;height:56px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.content{flex:1;overflow-y:auto;padding:20px;}
+.logo{padding:20px 18px 16px;border-bottom:1px solid var(--border);}
+.logo-text{font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:2px;color:var(--accent);}
+.logo-sub{font-size:10px;color:var(--text3);letter-spacing:3px;text-transform:uppercase;}
+.nav{padding:14px 8px;flex:1;}
+.nav-sec{font-size:10px;color:var(--text3);letter-spacing:2px;text-transform:uppercase;padding:8px 10px 5px;margin-top:6px;}
+.ni{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:7px;cursor:pointer;font-size:14px;color:var(--text2);border:none;background:none;width:100%;text-align:left;margin-bottom:2px;transition:all 0.15s;}
+.ni:hover{background:var(--surface2);color:var(--text);}
+.ni.active{background:var(--surface3);color:var(--accent);}
+.nbadge{margin-left:auto;background:var(--accent);color:var(--bg);font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px;}
+.topbar-title{font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:1px;}
+.topbar-right{display:flex;align-items:center;gap:10px;}
+.sbox{background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:7px 11px;font-size:13px;color:var(--text);font-family:'DM Sans',sans-serif;width:160px;outline:none;}
+.sbox:focus{border-color:var(--accent);}
+.sbox::placeholder{color:var(--text3);}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;font-weight:500;cursor:pointer;border:none;transition:all 0.15s;}
+.btn-p{background:var(--accent);color:var(--bg);}
+.btn-p:hover{background:var(--accent2);}
+.btn-g{background:var(--surface2);color:var(--text2);border:1px solid var(--border);text-decoration:none;}
+.btn-g:hover{border-color:var(--accent);color:var(--accent);}
+.btn-d{background:rgba(201,76,76,0.12);color:var(--danger);border:1px solid rgba(201,76,76,0.3);}
+.hbtn{display:none;background:none;border:none;color:var(--text);cursor:pointer;padding:4px;}
+.page{display:none;}.page.active{display:block;}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px;}
+.scard{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;position:relative;overflow:hidden;}
+.scard::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;}
+.sc-b::before{background:var(--buyer);}
+.sc-s::before{background:var(--seller);}
+.sc-l::before{background:var(--lead);}
+.sc-d::before{background:var(--accent);}
+.slbl{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px;}
+.sval{font-family:'Bebas Neue',sans-serif;font-size:36px;line-height:1;}
+.ssub{font-size:11px;color:var(--text3);margin-top:3px;}
+.col2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;}
+.col3{display:grid;grid-template-columns:2fr 1fr;gap:14px;margin-bottom:14px;}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
+.card-hdr{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.card-title{font-size:13px;font-weight:600;}
+.tag{display:inline-flex;align-items:center;font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;text-transform:uppercase;}
+.tag-buyer{background:rgba(76,142,201,0.15);color:var(--buyer);}
+.tag-seller{background:rgba(201,107,76,0.15);color:var(--seller);}
+.tag-lead{background:rgba(107,201,122,0.15);color:var(--lead);}
+.badge{font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;display:inline-block;}
+.b-hot{background:rgba(201,76,76,0.2);color:var(--danger);}
+.b-warn{background:rgba(201,168,76,0.2);color:var(--warn);}
+.b-ok{background:rgba(107,201,122,0.15);color:var(--lead);}
+.dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.dot-r{background:var(--danger);box-shadow:0 0 5px var(--danger);}
+.dot-y{background:var(--warn);box-shadow:0 0 5px var(--warn);}
+.dot-g{background:var(--lead);}
+.note-item{padding:13px 18px;border-bottom:1px solid var(--border);}
+.note-item:last-child{border-bottom:none;}
+.note-hdr{display:flex;align-items:center;gap:8px;margin-bottom:5px;flex-wrap:wrap;}
+.note-text{font-size:13px;color:var(--text2);line-height:1.5;}
+.li{display:flex;align-items:center;gap:12px;padding:12px 18px;border-bottom:1px solid var(--border);}
+.li:last-child{border-bottom:none;}
+.fu-row{display:flex;align-items:flex-start;gap:12px;padding:12px 18px;border-bottom:1px solid var(--border);}
+.fu-row:last-child{border-bottom:none;}
+.chk{width:17px;height:17px;border-radius:4px;border:1.5px solid var(--border);flex-shrink:0;margin-top:2px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.15s;}
+.chk:hover{border-color:var(--accent);}
+.chk.done{background:var(--accent);border-color:var(--accent);}
+.dl-row{display:flex;align-items:center;gap:11px;padding:11px 18px;border-bottom:1px solid var(--border);}
+.dl-row:last-child{border-bottom:none;}
+.pcol{min-width:210px;flex-shrink:0;}
+.pcard{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px 13px;margin-bottom:9px;cursor:pointer;transition:all 0.15s;}
+.pcard:hover{border-color:var(--accent);transform:translateY(-1px);}
+.cgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:12px;}
+.cc{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;cursor:pointer;transition:all 0.15s;}
+.cc:hover{border-color:var(--accent);transform:translateY(-2px);}
+.av{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;}
+.av-buyer{background:rgba(76,142,201,0.2);color:var(--buyer);}
+.av-seller{background:rgba(201,107,76,0.2);color:var(--seller);}
+.av-lead{background:rgba(107,201,122,0.2);color:var(--lead);}
+.modal-ov{position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:1000;display:none;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(4px);}
+.modal-ov.open{display:flex;}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:12px;width:100%;max-width:500px;max-height:90vh;overflow-y:auto;}
+.mhdr{padding:20px 22px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.mtitle{font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:1px;color:var(--accent);}
+.mx{background:none;border:none;color:var(--text3);cursor:pointer;font-size:22px;line-height:1;}
+.mbody{padding:20px 22px;}
+.fg{margin-bottom:14px;}
+.fl{font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);margin-bottom:5px;display:block;}
+.fi{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:9px 11px;font-size:14px;color:var(--text);font-family:'DM Sans',sans-serif;outline:none;}
+.fi:focus{border-color:var(--accent);}
+.fsel{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:9px 11px;font-size:14px;color:var(--text);font-family:'DM Sans',sans-serif;outline:none;cursor:pointer;}
+.frow{display:grid;grid-template-columns:1fr 1fr;gap:11px;}
+.mftr{padding:14px 22px;border-top:1px solid var(--border);display:flex;gap:9px;justify-content:flex-end;}
+.sb-ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:99;}
+.sb-ov.open{display:block;}
+.empty{text-align:center;padding:36px 20px;color:var(--text3);font-size:14px;}
+.filter-btn{padding:5px 13px;border-radius:20px;font-size:12px;font-weight:500;cursor:pointer;border:1px solid var(--border);background:var(--surface2);color:var(--text2);transition:all 0.15s;font-family:'DM Sans',sans-serif;}
+.filter-btn.active,.filter-btn:hover{border-color:var(--accent);color:var(--accent);background:rgba(201,168,76,0.08);}
+.topbar-user{width:30px;height:30px;border-radius:50%;background:var(--accent);color:var(--bg);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;}
+/* TRANSACTION COORDINATOR */
+.tc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px;}
+.tc-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;cursor:pointer;transition:all 0.15s;}
+.tc-card:hover{border-color:var(--accent);transform:translateY(-2px);}
+.tc-card-header{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.tc-card-title{font-size:14px;font-weight:600;color:var(--text);}
+.tc-card-body{padding:12px 16px;}
+.tc-progress-bar{height:4px;background:var(--surface2);border-radius:2px;margin:8px 0;}
+.tc-progress-fill{height:4px;border-radius:2px;background:var(--accent);transition:width 0.3s;}
+.tc-step{display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);}
+.tc-step:last-child{border-bottom:none;}
+.tc-step-chk{width:18px;height:18px;border-radius:4px;border:1.5px solid var(--border);flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.15s;margin-top:1px;}
+.tc-step-chk:hover{border-color:var(--accent);}
+.tc-step-chk.done{background:var(--accent);border-color:var(--accent);}
+.tc-step-chk.urgent{border-color:var(--danger);}
+.tc-step-info{flex:1;}
+.tc-step-label{font-size:13px;color:var(--text);}
+.tc-step-label.done{text-decoration:line-through;color:var(--text3);}
+.tc-step-due{font-size:11px;color:var(--text3);margin-top:2px;}
+.tc-step-due.overdue{color:var(--danger);}
+.tc-step-due.soon{color:var(--warn);}
+.tc-type-badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;text-transform:uppercase;}
+.tc-buyer{background:rgba(76,142,201,0.15);color:var(--buyer);}
+.tc-seller{background:rgba(201,107,76,0.15);color:var(--seller);}
+.tc-det-ov{position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:550;display:none;backdrop-filter:blur(3px);}
+.tc-det-ov.open{display:flex;align-items:flex-start;justify-content:flex-end;}
+.tc-det-panel{background:var(--surface);width:100%;max-width:540px;height:100vh;overflow-y:auto;box-shadow:-6px 0 30px rgba(0,0,0,0.5);display:flex;flex-direction:column;}
+.tc-det-hdr{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;position:sticky;top:0;background:var(--surface);z-index:10;}
+.tc-phase-header{padding:10px 16px;background:var(--surface2);border-bottom:1px solid var(--border);font-size:10px;text-transform:uppercase;letter-spacing:2px;color:var(--text3);font-weight:700;}
+.tc-ai-box{background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:14px 16px;margin:14px 20px;}
+.tc-ai-input{display:flex;gap:8px;margin-bottom:10px;}
+.tc-ai-input input{flex:1;background:var(--surface);border:1px solid var(--border);border-radius:7px;padding:8px 11px;font-size:13px;color:var(--text);font-family:'DM Sans',sans-serif;outline:none;}
+.tc-ai-input input:focus{border-color:var(--accent);}
+.tc-ai-response{font-size:13px;color:var(--text2);line-height:1.6;white-space:pre-wrap;}
+/* DOCUMENT SCANNER */
+.scanner-drop{border:2px dashed var(--border);border-radius:12px;padding:36px 20px;text-align:center;cursor:pointer;transition:all 0.2s;background:var(--surface2);}
+.scanner-drop:hover,.scanner-drop.dragover{border-color:var(--accent);background:rgba(201,168,76,0.05);}
+.scanner-drop-icon{font-size:48px;margin-bottom:12px;color:var(--text3);}
+.scanner-drop-title{font-size:15px;font-weight:600;color:var(--text);margin-bottom:6px;}
+.scanner-drop-sub{font-size:12px;color:var(--text3);}
+.scanner-result{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;margin-top:18px;}
+.scanner-result-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid var(--border);}
+.scanner-result-title{font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:1px;color:var(--accent);}
+.scanner-doc-type{font-size:11px;font-weight:700;padding:3px 10px;border-radius:4px;text-transform:uppercase;background:rgba(76,142,201,0.15);color:var(--buyer);}
+.scanner-summary{background:var(--surface2);border-left:3px solid var(--accent);border-radius:0 8px 8px 0;padding:14px 16px;margin-bottom:16px;font-size:13px;color:var(--text2);line-height:1.7;}
+.scanner-fields{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;}
+.scanner-field{background:var(--surface2);border-radius:8px;padding:10px 12px;}
+.scanner-field-label{font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);margin-bottom:4px;}
+.scanner-field-val{font-size:13px;color:var(--text);font-weight:500;}
+.scanner-field-val.editable{background:var(--surface);border:1px solid var(--border);border-radius:5px;padding:4px 8px;width:100%;font-family:'DM Sans',sans-serif;color:var(--text);outline:none;}
+.scanner-field-val.editable:focus{border-color:var(--accent);}
+.scanner-deadlines{margin-bottom:16px;}
+.scanner-deadline-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);}
+.scanner-deadline-row:last-child{border-bottom:none;}
+.scanner-flags{background:rgba(201,76,76,0.08);border:1px solid rgba(201,76,76,0.2);border-radius:8px;padding:12px 14px;margin-bottom:16px;}
+.scanner-flag{display:flex;align-items:flex-start;gap:8px;padding:4px 0;font-size:13px;color:var(--text2);}
+.scanner-actions{display:flex;gap:10px;flex-wrap:wrap;padding-top:14px;border-top:1px solid var(--border);}
+.scanner-processing{text-align:center;padding:40px 20px;}
+.scanner-spinner{width:40px;height:40px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 16px;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.scanner-history-item{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--border);cursor:pointer;}
+.scanner-history-item:last-child{border-bottom:none;}
+.scanner-history-item:hover .scanner-history-title{color:var(--accent);}
+.scanner-history-title{font-size:13px;font-weight:600;color:var(--text);}
+.scanner-history-sub{font-size:11px;color:var(--text3);margin-top:2px;}
+.fab{position:fixed;bottom:24px;right:24px;width:52px;height:52px;border-radius:50%;background:var(--accent);border:none;cursor:pointer;font-size:26px;color:var(--bg);font-weight:700;box-shadow:0 4px 20px rgba(201,168,76,0.5);z-index:200;}
+/* Login CSS removed - auth disabled for testing */
+.mls-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;}
+.mls-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;cursor:pointer;transition:all 0.15s;}
+.mls-card:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 4px 20px rgba(0,0,0,0.3);}
+.mls-photo{width:100%;height:170px;object-fit:cover;background:var(--surface2);display:flex;align-items:center;justify-content:center;color:var(--text3);font-size:13px;}
+.mls-photo img{width:100%;height:170px;object-fit:cover;}
+.mls-card-body{padding:13px 14px;}
+.mls-price{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:0.5px;color:var(--accent);}
+.mls-addr{font-size:13px;font-weight:600;color:var(--text);margin:2px 0;}
+.mls-sub{font-size:11px;color:var(--text3);margin-bottom:8px;}
+.mls-stats{display:flex;gap:12px;font-size:12px;color:var(--text2);}
+.mls-stat{display:flex;align-items:center;gap:4px;}
+.mls-dom{font-size:10px;font-family:'DM Mono',monospace;padding:2px 6px;border-radius:4px;margin-left:auto;}
+.dom-new{background:rgba(107,201,122,0.15);color:var(--lead);}
+.dom-mid{background:rgba(201,168,76,0.15);color:var(--warn);}
+.dom-old{background:rgba(201,76,76,0.15);color:var(--danger);}
+.mls-card-footer{padding:10px 14px;border-top:1px solid var(--border);display:flex;gap:7px;}
+.mls-list-item{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:13px 16px;margin-bottom:9px;cursor:pointer;display:flex;gap:14px;align-items:center;transition:all 0.15s;}
+.mls-list-item:hover{border-color:var(--accent);}
+.mls-list-thumb{width:80px;height:60px;border-radius:6px;object-fit:cover;background:var(--surface2);flex-shrink:0;display:flex;align-items:center;justify-content:center;color:var(--text3);font-size:11px;}
+.mls-list-thumb img{width:80px;height:60px;border-radius:6px;object-fit:cover;}
+.mls-detail-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:600;display:none;backdrop-filter:blur(4px);}
+.mls-detail-overlay.open{display:flex;align-items:flex-start;justify-content:flex-end;}
+.mls-detail-panel{background:var(--surface);width:100%;max-width:520px;height:100vh;overflow-y:auto;box-shadow:-6px 0 30px rgba(0,0,0,0.5);}
+.mls-det-photos{width:100%;height:240px;background:var(--surface2);position:relative;overflow:hidden;}
+.mls-det-photos img{width:100%;height:240px;object-fit:cover;}
+.mls-det-body{padding:20px;}
+.mls-det-price{font-family:'Bebas Neue',sans-serif;font-size:32px;color:var(--accent);letter-spacing:1px;}
+.mls-det-addr{font-size:16px;font-weight:600;color:var(--text);margin:4px 0 2px;}
+.mls-det-sub{font-size:13px;color:var(--text3);margin-bottom:16px;}
+.mls-det-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px;}
+.mls-det-stat{background:var(--surface2);border-radius:8px;padding:10px;text-align:center;}
+.mls-det-stat-val{font-family:'Bebas Neue',sans-serif;font-size:22px;color:var(--text);}
+.mls-det-stat-lbl{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;}
+.mls-det-section{margin-bottom:16px;}
+.mls-det-sec-title{font-size:10px;text-transform:uppercase;letter-spacing:2px;color:var(--text3);margin-bottom:8px;}
+.mls-det-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.mls-det-field{font-size:12px;color:var(--text2);}
+.mls-det-field b{color:var(--text);}
+.bhero{background:linear-gradient(135deg,#1a1f35,#0d0f14);border:1px solid var(--border);border-radius:12px;padding:26px;margin-bottom:18px;}
+.bdate{font-size:10px;color:var(--text3);letter-spacing:2px;text-transform:uppercase;margin-bottom:5px;}
+.bgreet{font-family:'Bebas Neue',sans-serif;font-size:30px;letter-spacing:1px;margin-bottom:4px;}
+.bsub{font-size:13px;color:var(--text2);line-height:1.5;}
+.bstats{display:grid;grid-template-columns:repeat(3,1fr);gap:11px;margin-bottom:18px;}
+.bstat{background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:14px;text-align:center;}
+.bnum{font-family:'Bebas Neue',sans-serif;font-size:34px;line-height:1;}
+.bn-r{color:var(--danger);}.bn-y{color:var(--warn);}.bn-g{color:var(--lead);}
+.bslbl{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-top:2px;}
+.bsec{background:var(--surface);border:1px solid var(--border);border-radius:9px;margin-bottom:12px;overflow:hidden;}
+.bsechdr{padding:11px 16px;background:var(--surface2);border-bottom:1px solid var(--border);font-size:11px;font-weight:700;letter-spacing:0.5px;}
+.brow{display:flex;align-items:center;gap:11px;padding:10px 16px;border-bottom:1px solid var(--border);}
+.brow:last-child{border-bottom:none;}
+.brow-info{flex:1;}
+.brow-name{font-size:13px;font-weight:600;}
+.brow-sub{font-size:11px;color:var(--text3);margin-top:1px;}
+.brow-right{font-size:12px;color:var(--text2);flex-shrink:0;text-align:right;}
+.det-ov{position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:500;display:none;backdrop-filter:blur(3px);}
+.det-ov.open{display:flex;align-items:flex-start;justify-content:flex-end;}
+.det-panel{background:var(--surface);width:100%;max-width:440px;height:100vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:-6px 0 30px rgba(0,0,0,0.5);}
+.det-hdr{padding:16px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;flex-shrink:0;}
+.det-av{width:46px;height:46px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:700;flex-shrink:0;}
+.det-name{font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:1px;}
+.det-meta{font-size:11px;color:var(--text3);margin-top:2px;}
+.det-x{margin-left:auto;background:none;border:none;color:var(--text3);cursor:pointer;font-size:22px;line-height:1;flex-shrink:0;}
+.det-x:hover{color:var(--text);}
+.det-acts{padding:11px 18px;border-bottom:1px solid var(--border);display:flex;gap:7px;flex-wrap:wrap;flex-shrink:0;}
+.det-body{flex:1;overflow-y:auto;}
+.det-sec{border-bottom:1px solid var(--border);padding:14px 18px;}
+.det-sec-title{font-size:10px;text-transform:uppercase;letter-spacing:2px;color:var(--text3);margin-bottom:10px;}
+.det-field{display:flex;gap:9px;margin-bottom:8px;}
+.det-field:last-child{margin-bottom:0;}
+.det-flbl{font-size:11px;color:var(--text3);width:65px;flex-shrink:0;padding-top:1px;}
+.det-fval{font-size:13px;color:var(--text2);flex:1;word-break:break-word;}
+.det-fval a{color:var(--accent);text-decoration:none;}
+.stage-row{display:flex;gap:5px;flex-wrap:wrap;}
+.sp{padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);color:var(--text3);cursor:pointer;background:none;font-family:'DM Sans',sans-serif;transition:all 0.15s;}
+.sp.active{background:var(--accent);color:var(--bg);border-color:var(--accent);}
+.sp:hover:not(.active){border-color:var(--accent);color:var(--accent);}
+.det-note{padding:9px 0;border-bottom:1px solid var(--border);}
+.det-note:last-child{border-bottom:none;}
+.det-note-time{font-size:10px;color:var(--text3);margin-bottom:2px;}
+.det-note-text{font-size:13px;color:var(--text2);line-height:1.5;}
+.det-fu{display:flex;align-items:center;gap:9px;padding:8px 0;border-bottom:1px solid var(--border);}
+.det-fu:last-child{border-bottom:none;}
+.det-fu-chk{width:15px;height:15px;border-radius:3px;border:1.5px solid var(--border);flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.15s;}
+.det-fu-chk.done{background:var(--accent);border-color:var(--accent);}
+.det-note-inp{display:flex;gap:8px;padding:11px 18px;border-top:1px solid var(--border);background:var(--surface);flex-shrink:0;}
+.det-note-inp textarea{flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:7px 10px;font-size:13px;color:var(--text);font-family:'DM Sans',sans-serif;outline:none;resize:none;height:36px;transition:all 0.2s;}
+.det-note-inp textarea:focus{border-color:var(--accent);height:64px;}
+@media(max-width:768px){
+  .sidebar{position:fixed;left:0;top:0;bottom:0;transform:translateX(-100%);}
+  .sidebar.open{transform:translateX(0);box-shadow:4px 0 30px rgba(0,0,0,0.5);}
+  .hbtn{display:flex;}
+  .sbox{width:110px;}
+  .grid4{grid-template-columns:1fr 1fr;}
+  .col2,.col3{grid-template-columns:1fr;}
+  .cgrid{grid-template-columns:1fr;}
+  .frow{grid-template-columns:1fr;}
+  .content{padding:14px;}
+  .det-panel{max-width:100%;}
+}
+</style>
+</head>
+<body>
+<div class="app" id="mainApp">
+  <div class="sb-ov" id="sbOv"></div>
+  <aside class="sidebar" id="sidebar">
+    <div class="logo"><div class="logo-text">PROPERLY</div><div class="logo-sub">Real Estate CRM</div></div>
+    <nav class="nav">
+      <div class="nav-sec">Overview</div>
+      <button class="ni" id="nav-briefing"><svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>Daily Briefing</button>
+      <button class="ni active" id="nav-dashboard"><svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>Dashboard</button>
+      <button class="ni" id="nav-pipeline"><svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18"/></svg>Pipeline<span class="nbadge" id="nbPipeline">0</span></button>
+      <div class="nav-sec">Contacts</div>
+      <button class="ni" id="nav-contacts"><svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>All Contacts</button>
+      <button class="ni" id="nav-followups"><svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="9,11 12,14 22,4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Follow-ups<span class="nbadge" id="nbFollowups">0</span></button>
+      <button class="ni" id="nav-notes"><svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>Notes</button>
+      <div class="nav-sec">Tools</div>
+      <button class="ni" id="nav-deadlines"><svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Deadlines</button>
+      <div class="nav-sec">Transactions</div>
+      <button class="ni" id="nav-tc"><svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Transactions<span class="nbadge" id="nbTC">0</span></button>
+      <div class="nav-sec">AI Tools</div>
+      <button class="ni" id="nav-scanner"><svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/><path d="M9 13h6M9 17h6M9 9h1"/></svg>Doc Scanner</button>
+      <div class="nav-sec">MLS</div>
+      <button class="ni" id="nav-mls"><svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg>MLS Search<span class="nbadge" style="background:var(--lead);font-size:9px;">LIVE</span></button>
+    </nav>
+  </aside>
+  <div class="main">
+    <!-- SYNC STATUS BAR -->
+    <div id="syncBar" style="display:none;padding:7px 20px;border-bottom:1px solid var(--border);align-items:center;gap:8px;flex-shrink:0;transition:all 0.3s;"></div>
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button class="hbtn" id="hamburger"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
+        <div class="topbar-title" id="pageTitle">Dashboard</div>
+      </div>
+      <div class="topbar-right">
+        <input class="sbox" type="text" placeholder="Search..." id="searchBox">
+        <button class="btn btn-p" id="btnAdd">+ Add</button>
+        <div class="topbar-user" id="topbarUser" title="Sign out" style="cursor:pointer;">RE</div>
+      </div>
+    </div>
+    <div class="content">
+      <div class="page" id="page-briefing">
+        <div class="bhero"><div class="bdate" id="bDate"></div><div class="bgreet" id="bGreet"></div><div class="bsub" id="bSub"></div></div>
+        <div class="bstats">
+          <div class="bstat"><div class="bnum bn-r" id="bUrgNum">0</div><div class="bslbl">Urgent</div></div>
+          <div class="bstat"><div class="bnum bn-y" id="bTodayNum">0</div><div class="bslbl">Due Today</div></div>
+          <div class="bstat"><div class="bnum bn-g" id="bActiveNum">0</div><div class="bslbl">Active Deals</div></div>
+        </div>
+        <div class="bsec"><div class="bsechdr" style="color:var(--danger);">URGENT</div><div id="bUrgent"></div></div>
+        <div class="bsec"><div class="bsechdr" style="color:var(--warn);">FOLLOW-UPS DUE TODAY</div><div id="bFU"></div></div>
+        <div class="bsec"><div class="bsechdr">DEADLINES THIS WEEK</div><div id="bWeek"></div></div>
+        <div class="bsec"><div class="bsechdr">PIPELINE SNAPSHOT</div><div id="bSnap"></div></div>
+        <div class="bsec"><div class="bsechdr" style="color:var(--buyer);">ACTIVE TRANSACTIONS</div><div id="bTransactions"></div></div>
+      </div>
+      <div class="page active" id="page-dashboard">
+        <!-- Cloud Setup Banner (shown only when not connected) -->
+        <div id="setupBanner" style="background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:16px 18px;margin-bottom:20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+          <svg width="20" height="20" fill="none" stroke="var(--accent)" stroke-width="2" viewBox="0 0 24 24"><polyline points="16,17 21,12 16,7"/><path d="M21 12H9"/><path d="M9 18H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4"/></svg>
+          <div style="flex:1;">
+            <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:2px;">Connect Cloud Sync</div>
+            <div style="font-size:12px;color:var(--text3);">Paste your Supabase URL and key to sync across all devices in real time</div>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+            <input id="supaUrlInput" type="text" placeholder="https://xxx.supabase.co" value="https://fgkilooomlozhwfnvjze.supabase.co" style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:12px;color:var(--text);font-family:'DM Sans',sans-serif;outline:none;width:200px;">
+            <input id="supaKeyInput" type="password" placeholder="eyJ... anon key" value="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZna2lsb29vbWxvemh3Zm52anplIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA3NTc0NTIsImV4cCI6MjA5NjMzMzQ1Mn0.owQk8Vy3Vcs8n8c0sI0fXQYmjpAy14hev8lDt4g5iZE" style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:12px;color:var(--text);font-family:'DM Sans',sans-serif;outline:none;width:180px;">
+            <button class="btn btn-p" id="btnConnectSupa" style="padding:6px 14px;font-size:12px;">Connect</button>
+            <button class="btn btn-g" id="btnDisconnectSupa" style="padding:6px 14px;font-size:12px;display:none;">Disconnect</button>
+          </div>
+        </div>
+        <div class="grid4">
+          <div class="scard sc-b"><div class="slbl">Active Buyers</div><div class="sval" id="sBuyers">0</div><div class="ssub">in pipeline</div></div>
+          <div class="scard sc-s"><div class="slbl">Active Sellers</div><div class="sval" id="sSellers">0</div><div class="ssub">listed</div></div>
+          <div class="scard sc-l"><div class="slbl">New Leads</div><div class="sval" id="sLeads">0</div><div class="ssub">total</div></div>
+          <div class="scard sc-d"><div class="slbl">Closing Soon</div><div class="sval" id="sClosing">0</div><div class="ssub">30 days</div></div>
+        </div>
+        <div class="col3">
+          <div class="card"><div class="card-hdr"><div class="card-title">Recent Activity</div><button class="btn btn-g" id="btnViewNotes" style="padding:4px 9px;font-size:12px;">View all</button></div><div id="dRecent"></div></div>
+          <div class="card"><div class="card-hdr"><div class="card-title">Deadlines</div></div><div id="dDeadlines"></div></div>
+        </div>
+        <div class="col2">
+          <div class="card"><div class="card-hdr"><div class="card-title">Follow-ups Due</div><button class="btn btn-g" id="btnViewFU" style="padding:4px 9px;font-size:12px;">View all</button></div><div id="dFollowups"></div></div>
+          <div class="card"><div class="card-hdr"><div class="card-title">Pipeline</div></div><div id="dPipeline"></div></div>
+        </div>
+      </div>
+      <div class="page" id="page-pipeline">
+        <div class="card"><div class="card-hdr"><div class="card-title">Deal Pipeline</div><button class="btn btn-p" id="btnPipelineAdd">+ Add Deal</button></div><div style="display:flex;gap:12px;overflow-x:auto;padding:16px;" id="pBoard"></div></div>
+      </div>
+      <div class="page" id="page-contacts">
+        <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">
+          <button class="filter-btn active" data-filter="all">All</button>
+          <button class="filter-btn" data-filter="buyer">Buyers</button>
+          <button class="filter-btn" data-filter="seller">Sellers</button>
+          <button class="filter-btn" data-filter="lead">Leads</button>
+          <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn btn-g" id="btnImportCSV">&#8593; Import CSV</button>
+            <button class="btn btn-g" id="btnExportCSV">&#8595; Export CSV</button>
+            <button class="btn btn-p" id="btnContactAdd">+ Add Contact</button>
+          </div>
+          <input type="file" id="csvFileInput" accept=".csv" style="display:none;">
+        </div>
+        <div class="cgrid" id="cGrid"></div>
+      </div>
+      <div class="page" id="page-followups">
+        <div class="card"><div class="card-hdr"><div class="card-title">Follow-up Reminders</div><button class="btn btn-p" id="btnAddFU">+ Add Reminder</button></div><div id="fuList"></div></div>
+      </div>
+      <div class="page" id="page-notes">
+        <div class="card"><div class="card-hdr"><div class="card-title">All Notes</div><button class="btn btn-p" id="btnAddNote">+ Add Note</button></div><div id="nList"></div></div>
+      </div>
+      <div class="page" id="page-deadlines">
+        <div class="card"><div class="card-hdr"><div class="card-title">Transaction Deadlines</div><button class="btn btn-p" id="btnAddDL">+ Add Deadline</button></div><div id="dlList"></div></div>
+      </div>
+
+      <!-- TRANSACTION COORDINATOR PAGE -->
+      <div class="page" id="page-tc">
+        <div style="display:flex;gap:10px;margin-bottom:18px;flex-wrap:wrap;align-items:center;">
+          <div style="flex:1;">
+            <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:4px;">Active Transactions</div>
+            <div style="font-size:13px;color:var(--text2);">Track every deal from contract to close  -  and beyond.</div>
+          </div>
+          <button class="btn btn-p" id="btnNewTransaction">+ New Transaction</button>
+        </div>
+        <!-- Filter tabs -->
+        <div style="display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap;">
+          <button class="filter-btn active" data-tc-filter="all">All Active</button>
+          <button class="filter-btn" data-tc-filter="buyer">Buyer Deals</button>
+          <button class="filter-btn" data-tc-filter="seller">Seller Deals</button>
+          <button class="filter-btn" data-tc-filter="closed">Closed</button>
+        </div>
+        <div class="tc-grid" id="tcGrid"></div>
+      </div>
+
+      <!-- TC DETAIL PANEL -->
+      <div class="tc-det-ov" id="tcDetOv">
+        <div class="tc-det-panel">
+          <div class="tc-det-hdr">
+            <div>
+              <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:1px;color:var(--accent);" id="tcDetTitle">Transaction</div>
+              <div style="font-size:12px;color:var(--text3);margin-top:2px;" id="tcDetSub"></div>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <button class="btn btn-g" style="font-size:12px;padding:5px 11px;" id="tcDetEdit">Edit</button>
+              <button style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:22px;line-height:1;" id="tcDetClose">&#x2715;</button>
+            </div>
+          </div>
+          <!-- AI Ask Section -->
+          <div class="tc-ai-box">
+            <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px;">Ask About This Transaction</div>
+            <div class="tc-ai-input">
+              <input id="tcAiInput" placeholder="What's left to close? What's due this week? What are next steps?">
+              <button class="btn btn-p" id="btnTCAsk" style="padding:7px 14px;font-size:12px;">Ask</button>
+            </div>
+            <div class="tc-ai-response" id="tcAiResponse" style="display:none;"></div>
+          </div>
+          <div id="tcDetBody"></div>
+        </div>
+      </div>
+
+      <!-- NEW/EDIT TRANSACTION MODAL -->
+      <div class="modal-ov" id="tcModal">
+        <div class="modal" style="max-width:560px;">
+          <div class="mhdr"><div class="mtitle" id="tcModalTitle">New Transaction</div><button class="mx" data-close="tcModal">&#x2715;</button></div>
+          <div class="mbody">
+            <div class="frow">
+              <div class="fg"><label class="fl">Transaction Type</label>
+                <select class="fsel" id="tcType"><option value="buyer">Buyer</option><option value="seller">Seller</option></select>
+              </div>
+              <div class="fg"><label class="fl">Linked Contact</label>
+                <select class="fsel" id="tcContact"></select>
+              </div>
+            </div>
+            <div class="fg"><label class="fl">Property Address</label><input class="fi" id="tcAddress" placeholder="123 Oak Street, Salt Lake City UT 84101"></div>
+            <div class="frow">
+              <div class="fg"><label class="fl">Contract Date</label><input class="fi" id="tcContractDate" type="date"></div>
+              <div class="fg"><label class="fl">Closing Date</label><input class="fi" id="tcClosingDate" type="date"></div>
+            </div>
+            <div class="frow">
+              <div class="fg"><label class="fl">Sale Price</label><input class="fi" id="tcPrice" placeholder="$450,000"></div>
+              <div class="fg"><label class="fl">MLS #</label><input class="fi" id="tcMLS" placeholder="Optional"></div>
+            </div>
+            <div class="frow">
+              <div class="fg"><label class="fl">Earnest Money Due</label><input class="fi" id="tcEarnestDate" type="date"></div>
+              <div class="fg"><label class="fl">Due Diligence Deadline</label><input class="fi" id="tcDueDiligDate" type="date"></div>
+            </div>
+            <div class="frow">
+              <div class="fg"><label class="fl">Financing Deadline</label><input class="fi" id="tcFinancingDate" type="date"></div>
+              <div class="fg"><label class="fl">Appraisal Deadline</label><input class="fi" id="tcAppraisalDate" type="date"></div>
+            </div>
+            <div class="fg"><label class="fl">Lender Name</label><input class="fi" id="tcLender" placeholder="Lender name and contact"></div>
+            <div class="fg"><label class="fl">Title Company</label><input class="fi" id="tcTitle" placeholder="Title company name and contact"></div>
+            <div class="fg"><label class="fl">Notes</label><textarea class="fi" id="tcNotes" rows="2" placeholder="Additional notes..."></textarea></div>
+          </div>
+          <div class="mftr">
+            <button class="btn btn-g" data-close="tcModal">Cancel</button>
+            <button class="btn btn-p" id="btnSaveTransaction">Save Transaction</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- DOCUMENT SCANNER PAGE -->
+      <div class="page" id="page-scanner">
+        <div style="display:flex;gap:14px;margin-bottom:20px;flex-wrap:wrap;align-items:flex-start;">
+          <div style="flex:1;">
+            <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:4px;">AI Document Scanner</div>
+            <div style="font-size:13px;color:var(--text2);">Upload a REPC, addendum, inspection report, or any real estate document. AI extracts key data and imports directly into your CRM.</div>
+          </div>
+        </div>
+
+        <!-- Upload area -->
+        <div id="scannerUploadArea">
+          <div class="scanner-drop" id="scannerDrop">
+            <div class="scanner-drop-icon">
+              <svg width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/><path d="M9 13h6M9 17h6"/></svg>
+            </div>
+            <div class="scanner-drop-title">Drop document here or tap to upload</div>
+            <div class="scanner-drop-sub" style="margin-bottom:14px;">Supports PDF, JPG, PNG - REPC, Addenda, Inspection Reports, Title Docs, and more</div>
+            <button class="btn btn-p" id="btnScannerBrowse" style="pointer-events:none;">Choose File</button>
+          </div>
+          <input type="file" id="scannerFileInput" accept=".pdf,.jpg,.jpeg,.png,.webp" style="display:none;">
+
+          <!-- Doc type selector -->
+          <div style="margin-top:14px;background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:14px 18px;">
+            <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px;">Document Type (helps AI extract better)</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <button class="filter-btn active" data-doctype="auto">Auto-Detect</button>
+              <button class="filter-btn" data-doctype="repc">REPC</button>
+              <button class="filter-btn" data-doctype="addendum">Addendum</button>
+              <button class="filter-btn" data-doctype="inspection">Inspection Report</button>
+              <button class="filter-btn" data-doctype="title">Title Commitment</button>
+              <button class="filter-btn" data-doctype="hoa">HOA Docs</button>
+              <button class="filter-btn" data-doctype="other">Other</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Processing indicator -->
+        <div id="scannerProcessing" style="display:none;" class="scanner-processing">
+          <div class="scanner-spinner"></div>
+          <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:6px;" id="scannerProcessingMsg">Analyzing document...</div>
+          <div style="font-size:12px;color:var(--text3);">This usually takes 10-20 seconds</div>
+        </div>
+
+        <!-- Results area -->
+        <div id="scannerResults" style="display:none;"></div>
+
+        <!-- Scan history -->
+        <div id="scannerHistory" style="margin-top:24px;">
+          <div class="card">
+            <div class="card-hdr"><div class="card-title">Recent Scans</div></div>
+            <div id="scannerHistoryList"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- MLS SEARCH PAGE -->
+      <div class="page" id="page-mls">
+        <!-- Token Banner -->
+        <div id="mlsTokenBanner" style="background:rgba(201,168,76,0.1);border:1px solid var(--accent);border-radius:9px;padding:13px 18px;margin-bottom:18px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+          <svg width="16" height="16" fill="none" stroke="var(--accent)" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <div style="flex:1;font-size:13px;color:var(--text2);">Using <b style="color:var(--accent);">demo data</b>  -  paste your URE Bearer Token to go live</div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <input id="mlsTokenInput" type="password" placeholder="Paste Bearer Token here..." style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:12px;color:var(--text);font-family:'DM Sans',sans-serif;outline:none;width:220px;">
+            <button class="btn btn-p" id="btnSaveToken" style="padding:6px 14px;font-size:12px;">Connect</button>
+            <button class="btn btn-g" id="btnClearToken" style="padding:6px 14px;font-size:12px;display:none;">Disconnect</button>
+          </div>
+        </div>
+
+        <!-- Search Bar -->
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:16px 18px;margin-bottom:16px;">
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr auto;gap:10px;align-items:end;flex-wrap:wrap;">
+            <div><label style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);display:block;margin-bottom:5px;">City / Zip</label><input class="fi" id="mlsCity" placeholder="Salt Lake City..."></div>
+            <div><label style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);display:block;margin-bottom:5px;">Min Price</label><input class="fi" id="mlsMinPrice" placeholder="$200,000"></div>
+            <div><label style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);display:block;margin-bottom:5px;">Max Price</label><input class="fi" id="mlsMaxPrice" placeholder="$600,000"></div>
+            <div><label style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);display:block;margin-bottom:5px;">Min Beds</label><select class="fsel" id="mlsBeds" style="padding:9px 11px;"><option value="">Any</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5+</option></select></div>
+            <div><label style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);display:block;margin-bottom:5px;">Type</label><select class="fsel" id="mlsType" style="padding:9px 11px;"><option value="">Any</option><option value="Residential">Residential</option><option value="Condo">Condo/Townhouse</option><option value="Land">Land</option><option value="Commercial">Commercial</option></select></div>
+            <button class="btn btn-p" id="btnMLSSearch" style="height:38px;padding:0 20px;">Search</button>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
+            <button class="filter-btn active" data-mls-filter="active">Active</button>
+            <button class="filter-btn" data-mls-filter="pending">Pending</button>
+            <button class="filter-btn" data-mls-filter="sold">Recently Sold</button>
+            <button class="filter-btn" data-mls-filter="openhouse">Open Houses</button>
+            <div style="margin-left:auto;font-size:12px;color:var(--text3);display:flex;align-items:center;gap:6px;">
+              Sort: <select class="fsel" id="mlsSort" style="padding:4px 8px;font-size:12px;width:auto;">
+                <option value="price_asc">Price Low-High</option>
+                <option value="price_desc">Price High-Low</option>
+                <option value="dom_asc">Newest Listed</option>
+                <option value="dom_desc">Most Days on Market</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Results -->
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+          <div style="font-size:13px;color:var(--text2);" id="mlsResultCount"></div>
+          <div style="display:flex;gap:6px;">
+            <button id="mlsViewGrid" style="background:var(--accent);border:none;border-radius:5px;padding:5px 10px;cursor:pointer;color:var(--bg);">&#9634; Grid</button>
+            <button id="mlsViewList" style="background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:5px 10px;cursor:pointer;color:var(--text2);">&#9776; List</button>
+          </div>
+        </div>
+        <div id="mlsResults"></div>
+        <div id="mlsPagination" style="display:flex;justify-content:center;gap:8px;margin-top:20px;"></div>
+      </div>
+    </div>
+  </div>
+</div>
+<button class="fab" id="fab">+</button>
+
+<div class="modal-ov" id="csvModal">
+  <div class="modal" style="max-width:560px;">
+    <div class="mhdr"><div class="mtitle">Import CSV</div><button class="mx" data-close="csvModal">&#x2715;</button></div>
+    <div class="mbody">
+      <div id="csvStep1">
+        <p style="font-size:13px;color:var(--text2);margin-bottom:16px;">Upload a CSV file with your contacts. The first row should be headers.</p>
+        <p style="font-size:12px;color:var(--text3);margin-bottom:16px;">Expected columns (any order): <b style="color:var(--accent);">First Name, Last Name, Type, Phone, Email, Property, Stage, Price, Notes</b></p>
+        <div id="csvDropZone" style="border:2px dashed var(--border);border-radius:9px;padding:32px;text-align:center;cursor:pointer;transition:border 0.2s;">
+          <div style="font-size:32px;margin-bottom:8px;">&#128462;</div>
+          <div style="font-size:14px;color:var(--text2);margin-bottom:6px;">Drop your CSV file here</div>
+          <div style="font-size:12px;color:var(--text3);">or click to browse</div>
+        </div>
+      </div>
+      <div id="csvStep2" style="display:none;">
+        <div id="csvPreview"></div>
+      </div>
+    </div>
+    <div class="mftr">
+      <button class="btn btn-g" data-close="csvModal">Cancel</button>
+      <button class="btn btn-p" id="btnConfirmImport" style="display:none;">Import Contacts</button>
+    </div>
+  </div>
+</div>
+<div class="det-ov" id="detOv">
+  <div class="det-panel">
+    <div class="det-hdr" id="detHdr"></div>
+    <div class="det-acts" id="detActs"></div>
+    <div class="det-body" id="detBody"></div>
+    <div class="det-note-inp"><textarea id="detNoteTA" placeholder="Add a note..."></textarea><button class="btn btn-p" id="btnSaveDetNote" style="padding:7px 13px;">Save</button></div>
+  </div>
+</div>
+<div class="modal-ov" id="addModal">
+  <div class="modal">
+    <div class="mhdr"><div class="mtitle">Add Contact</div><button class="mx" data-close="addModal">&#x2715;</button></div>
+    <div class="mbody">
+      <div class="frow"><div class="fg"><label class="fl">First Name</label><input class="fi" id="fFirst" placeholder="Sarah"></div><div class="fg"><label class="fl">Last Name</label><input class="fi" id="fLast" placeholder="Johnson"></div></div>
+      <div class="fg"><label class="fl">Type</label><select class="fsel" id="fType"><option value="lead">Lead/Prospect</option><option value="buyer">Buyer</option><option value="seller">Seller</option></select></div>
+      <div class="fg"><label class="fl">Phone</label><input class="fi" id="fPhone" type="tel" placeholder="(555) 000-0000"></div>
+      <div class="fg"><label class="fl">Email</label><input class="fi" id="fEmail" type="email" placeholder="sarah@email.com"></div>
+      <div class="fg"><label class="fl">Property / Interest</label><input class="fi" id="fProp" placeholder="123 Oak St or Budget $400k-$500k"></div>
+      <div class="frow"><div class="fg"><label class="fl">Stage</label><select class="fsel" id="fStage"><option>New Lead</option><option>Contacted</option><option>Showing</option><option>Under Contract</option><option>Closed</option></select></div><div class="fg"><label class="fl">Price/Budget</label><input class="fi" id="fPrice" placeholder="$450,000"></div></div>
+      <div class="fg"><label class="fl">Notes</label><textarea class="fi" id="fNotes" rows="3" placeholder="Source, preferences..."></textarea></div>
+    </div>
+    <div class="mftr"><button class="btn btn-g" data-close="addModal">Cancel</button><button class="btn btn-p" id="btnSaveContact">Save Contact</button></div>
+  </div>
+</div>
+<div class="modal-ov" id="noteModal">
+  <div class="modal">
+    <div class="mhdr"><div class="mtitle">Add Note</div><button class="mx" data-close="noteModal">&#x2715;</button></div>
+    <div class="mbody"><div class="fg"><label class="fl">Contact</label><select class="fsel" id="nContact"></select></div><div class="fg"><label class="fl">Note</label><textarea class="fi" id="nText" rows="4" placeholder="Call recap, showing feedback..."></textarea></div></div>
+    <div class="mftr"><button class="btn btn-g" data-close="noteModal">Cancel</button><button class="btn btn-p" id="btnSaveNote">Save Note</button></div>
+  </div>
+</div>
+<div class="modal-ov" id="fuModal">
+  <div class="modal">
+    <div class="mhdr"><div class="mtitle">Add Follow-up</div><button class="mx" data-close="fuModal">&#x2715;</button></div>
+    <div class="mbody"><div class="fg"><label class="fl">Contact</label><select class="fsel" id="fuContact"></select></div><div class="fg"><label class="fl">Task</label><input class="fi" id="fuLabel" placeholder="Call to discuss offer..."></div><div class="fg"><label class="fl">Due Date</label><input class="fi" id="fuDate" type="date"></div><div class="fg"><label class="fl">Priority</label><select class="fsel" id="fuPri"><option value="hot">Hot - Do today</option><option value="warn">This week</option><option value="ok">No rush</option></select></div></div>
+    <div class="mftr"><button class="btn btn-g" data-close="fuModal">Cancel</button><button class="btn btn-p" id="btnSaveFU">Save</button></div>
+  </div>
+</div>
+<div class="modal-ov" id="dlModal">
+  <div class="modal">
+    <div class="mhdr"><div class="mtitle">Add Deadline</div><button class="mx" data-close="dlModal">&#x2715;</button></div>
+    <div class="mbody"><div class="fg"><label class="fl">Contact</label><select class="fsel" id="dlContact"></select></div><div class="fg"><label class="fl">Type</label><select class="fsel" id="dlType"><option>Inspection Period Ends</option><option>Appraisal Deadline</option><option>Financing Contingency</option><option>Closing Date</option><option>Offer Expiration</option><option>Final Walkthrough</option><option>Other</option></select></div><div class="fg"><label class="fl">Date</label><input class="fi" id="dlDate" type="date"></div></div>
+    <div class="mftr"><button class="btn btn-g" data-close="dlModal">Cancel</button><button class="btn btn-p" id="btnSaveDL">Save</button></div>
+  </div>
+</div>
+<!-- MLS DETAIL PANEL -->
+<div class="mls-detail-overlay" id="mlsDetOv">
+  <div class="mls-detail-panel" id="mlsDetPanel">
+    <div style="position:sticky;top:0;z-index:10;background:var(--surface);padding:12px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:1px;color:var(--accent);">Listing Detail</div>
+      <button id="mlsDetClose" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:22px;line-height:1;">&#x2715;</button>
+    </div>
+    <div id="mlsDetContent"></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+(function(){
+
+// -- SUPABASE CONFIG ---------------------------------------------------
+// Paste your Supabase URL and anon key here when you have them
+var SUPA_URL = 'https://fgkilooomlozhwfnvjze.supabase.co';
+var SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZna2lsb29vbWxvemh3Zm52anplIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA3NTc0NTIsImV4cCI6MjA5NjMzMzQ1Mn0.owQk8Vy3Vcs8n8c0sI0fXQYmjpAy14hev8lDt4g5iZE';
+var supa = null;
+var supaReady = false;
+
+function initSupabase(){
+  try{
+    if(SUPA_URL && SUPA_KEY && window.supabase){
+      supa = window.supabase.createClient(SUPA_URL, SUPA_KEY);
+      supaReady = true;
+      return true;
+    }
+  }catch(e){ console.log('Supabase init error:', e); }
+  return false;
+}
+
+// Auth disabled for testing
+
+var C=[],N=[],F=[],D=[],TX=[],curDet=null,curFilter='all',curPage='dashboard';
+
+// -- SAVE / LOAD -------------------------------------------------------
+function sv(){
+  try{
+    localStorage.setItem('crm_c',JSON.stringify(C));
+    localStorage.setItem('crm_n',JSON.stringify(N));
+    localStorage.setItem('crm_f',JSON.stringify(F));
+    localStorage.setItem('crm_d',JSON.stringify(D));
+    localStorage.setItem('crm_tx',JSON.stringify(TX));
+  }catch(e){}
+}
+
+// Supabase sync functions
+function dbSave(table, rows){
+  if(!supaReady) return;
+  // Clean rows - remove any undefined values that Supabase rejects
+  var cleanRows = JSON.parse(JSON.stringify(rows));
+  supa.from(table).upsert(cleanRows).then(function(r){
+    if(r.error){
+      console.log('DB save error on ' + table + ':', r.error.message);
+      showSyncStatus('error');
+    }
+  });
+}
+
+function dbDelete(table, id){
+  if(!supaReady) return;
+  supa.from(table).delete().eq('id', id).then(function(r){
+    if(r.error) console.log('DB delete error:', r.error);
+  });
+}
+
+async function loadFromDB(){
+  if(!supaReady) return false;
+  try{
+    showSyncStatus('loading');
+    var [rc, rn, rf, rd, rtx] = await Promise.all([
+      supa.from('contacts').select('*').order('added', {ascending:true}),
+      supa.from('notes').select('*').order('date', {ascending:true}),
+      supa.from('followups').select('*').order('date', {ascending:true}),
+      supa.from('deadlines').select('*').order('date', {ascending:true}),
+      supa.from('transactions').select('*')
+    ]);
+    // Log individual errors for debugging
+    if(rc.error) console.log('contacts load error:', rc.error.message);
+    if(rn.error) console.log('notes load error:', rn.error.message);
+    if(rf.error) console.log('followups load error:', rf.error.message);
+    if(rd.error) console.log('deadlines load error:', rd.error.message);
+    if(rtx && rtx.error) console.log('transactions load error:', rtx.error.message);
+    // If contacts failed it means RLS is blocking - show error
+    if(rc.error){
+      showSyncStatus('error');
+      return false;
+    }
+    // Load whatever succeeded
+    if(rc.data) C = rc.data;
+    if(rn.data) N = rn.data;
+    if(rf.data) F = rf.data;
+    if(rd.data) D = rd.data;
+    if(rtx && rtx.data) TX = rtx.data;
+    // Convert id strings to numbers if needed
+    C.forEach(function(c){ c.id = typeof c.id === 'string' ? parseInt(c.id)||c.id : c.id; });
+    N.forEach(function(n){ n.id = typeof n.id === 'string' ? parseInt(n.id)||n.id : n.id; n.contactId = typeof n.contactId === 'string' ? parseInt(n.contactId) : n.contactId; });
+    F.forEach(function(f){ f.id = typeof f.id === 'string' ? parseInt(f.id)||f.id : f.id; f.contactId = typeof f.contactId === 'string' ? parseInt(f.contactId) : f.contactId; });
+    D.forEach(function(d){ d.id = typeof d.id === 'string' ? parseInt(d.id)||d.id : d.id; d.contactId = typeof d.contactId === 'string' ? parseInt(d.contactId) : d.contactId; });
+    sv();
+    showSyncStatus('live');
+    return true;
+  }catch(e){ console.log('loadFromDB error:', e); showSyncStatus('error'); return false; }
+}
+
+function showSyncStatus(status){
+  var bar = document.getElementById('syncBar');
+  if(!bar) return;
+  if(status === 'live'){
+    bar.style.display = 'flex';
+    bar.style.background = 'rgba(107,201,122,0.12)';
+    bar.style.borderColor = 'var(--lead)';
+    bar.innerHTML = '<span style="color:var(--lead);">&#9679;</span>&nbsp;<span style="font-size:12px;color:var(--text2);">Synced to cloud  -  changes shared with all devices in real time</span>';
+  } else if(status === 'loading'){
+    bar.style.display = 'flex';
+    bar.style.background = 'rgba(201,168,76,0.1)';
+    bar.style.borderColor = 'var(--accent)';
+    bar.innerHTML = '<span style="color:var(--accent);">&#8635;</span>&nbsp;<span style="font-size:12px;color:var(--text2);">Connecting to cloud...</span>';
+  } else if(status === 'error'){
+    bar.style.display = 'flex';
+    bar.style.background = 'rgba(201,76,76,0.1)';
+    bar.style.borderColor = 'var(--danger)';
+    bar.innerHTML = '<span style="color:var(--danger);">&#9888;</span>&nbsp;<span style="font-size:12px;color:var(--text2);">Cloud sync error  -  using local data. Check your Supabase keys.</span>';
+  } else {
+    bar.style.display = 'none';
+  }
+}
+
+// Wrapped save functions that sync to Supabase
+function saveContact(c){ sv(); if(supaReady) dbSave('contacts', [c]); }
+function saveNote(n){ sv(); if(supaReady) dbSave('notes', [n]); }
+function saveFU(f){ sv(); if(supaReady) dbSave('followups', [f]); }
+function saveDL(d){ sv(); if(supaReady) dbSave('deadlines', [d]); }
+function deleteCfromDB(id){ if(supaReady){ supa.from('contacts').delete().eq('id',id); supa.from('notes').delete().eq('contactId',id); supa.from('followups').delete().eq('contactId',id); supa.from('deadlines').delete().eq('contactId',id); } }
+function deleteFUfromDB(id){ if(supaReady) supa.from('followups').delete().eq('id',id); }
+function updateContact(c){ sv(); if(supaReady) dbSave('contacts', [c]); }
+
+// Real-time subscription for live sync
+function subscribeRealtime(){
+  if(!supaReady) return;
+  supa.channel('crm-changes')
+    .on('postgres_changes', {event:'*', schema:'public'}, function(payload){
+      // Reload data when any change happens from another device
+      loadFromDB().then(function(ok){
+        if(ok && curPage) {
+          if(curPage==='dashboard') rd();
+          else if(curPage==='contacts') rc();
+          else if(curPage==='followups') rfu();
+          else if(curPage==='notes') rn();
+          else if(curPage==='deadlines') rdl();
+          else if(curPage==='briefing') rb();
+        }
+      });
+    }).subscribe();
+}
+function demo(){
+  var t=Date.now();
+  C=[
+    {id:1,first:'Marcus',last:'Thompson',type:'buyer',phone:'(555) 201-4433',email:'marcus.t@gmail.com',property:'Budget $480k-$550k, 3br',stage:'Showing',price:'$510,000',notes:'Pre-approved. Loves modern kitchens.',added:new Date(t-7*864e5).toISOString()},
+    {id:2,first:'Linda',last:'Reyes',type:'seller',phone:'(555) 388-9021',email:'linda.reyes@email.com',property:'4712 Maple Drive',stage:'Under Contract',price:'$625,000',notes:'Motivated seller, relocating for work.',added:new Date(t-14*864e5).toISOString()},
+    {id:3,first:'James',last:'Park',type:'lead',phone:'(555) 477-1102',email:'jpark@work.com',property:'Riverside area, 2-3br',stage:'New Lead',price:'$350,000',notes:'Found via Zillow. First-time buyer.',added:new Date(t-2*864e5).toISOString()},
+    {id:4,first:'Ava',last:'Mitchell',type:'buyer',phone:'(555) 590-3344',email:'ava.m@icloud.com',property:'22 Birchwood Lane',stage:'Under Contract',price:'$415,000',notes:'Closing soon. Inspection done.',added:new Date(t-20*864e5).toISOString()},
+    {id:5,first:'Carlos',last:'Vega',type:'lead',phone:'(555) 612-8800',email:'carlosvega@gmail.com',property:'Downtown condo $275k',stage:'Contacted',price:'$275,000',notes:'Investor. Cash buyer.',added:new Date(t-864e5).toISOString()},
+    {id:6,first:'Diane',last:'Foster',type:'seller',phone:'(555) 703-9910',email:'diane.foster@email.com',property:'89 Crestwood Blvd',stage:'New Lead',price:'$549,000',notes:'Inherited property, wants quick sale.',added:new Date(t-3*864e5).toISOString()},
+    {id:7,first:'Ryan',last:'Nguyen',type:'buyer',phone:'(555) 814-2267',email:'ryan.n@gmail.com',property:'4br, top school district',stage:'Contacted',price:'$650,000',notes:'Moving from out of state. Pre-approved $680k.',added:new Date(t-5*864e5).toISOString()},
+    {id:8,first:'Sofia',last:'Martinez',type:'lead',phone:'(555) 925-3381',email:'sofia.m@icloud.com',property:'Townhouse $200k-$250k',stage:'New Lead',price:'$225,000',notes:'First-time buyer. Needs lender referral.',added:new Date(t-864e5).toISOString()}
+  ];
+  N=[
+    {id:1,contactId:1,text:'Showed 3 homes on Oak St. Liked 14 Oak the most. Wants to revisit before making offer.',date:new Date(t-864e5).toISOString()},
+    {id:2,contactId:1,text:'Called to check in. Still deciding between 14 Oak and 22 Birch.',date:new Date(t-3*864e5).toISOString()},
+    {id:3,contactId:2,text:'Buyer inspection done. Minor HVAC issue - $2k credit agreed.',date:new Date(t-2*864e5).toISOString()},
+    {id:4,contactId:2,text:'Listing went live. 6 showings in first 48 hours. Received 2 offers.',date:new Date(t-10*864e5).toISOString()},
+    {id:5,contactId:3,text:'Called back James. Very interested. Sending pre-qual checklist.',date:new Date(t-3600e3).toISOString()},
+    {id:6,contactId:4,text:'Appraisal at value. Financing contingency cleared.',date:new Date(t-2*864e5).toISOString()},
+    {id:7,contactId:5,text:'Coffee meeting. Carlos is a cash buyer looking at multi-unit condos.',date:new Date(t-5*3600e3).toISOString()},
+    {id:8,contactId:7,text:'Virtual showing went well. Ryan loved Maplewood listing.',date:new Date(t-7200e3).toISOString()}
+  ];
+  F=[
+    {id:1,contactId:1,label:'Call Marcus - decision on 14 Oak St offer',date:new Date(t).toISOString().split('T')[0],pri:'hot',done:false},
+    {id:2,contactId:3,label:'Send James pre-qual checklist',date:new Date(t).toISOString().split('T')[0],pri:'hot',done:false},
+    {id:3,contactId:2,label:'Follow up after buyer inspection',date:new Date(t).toISOString().split('T')[0],pri:'hot',done:false},
+    {id:4,contactId:5,label:'Send Carlos condo listings',date:new Date(t+864e5).toISOString().split('T')[0],pri:'warn',done:false},
+    {id:5,contactId:7,label:'Schedule in-person showing for Ryan',date:new Date(t+864e5).toISOString().split('T')[0],pri:'warn',done:false},
+    {id:6,contactId:6,label:'Call Diane about listing strategy',date:new Date(t+2*864e5).toISOString().split('T')[0],pri:'warn',done:false},
+    {id:7,contactId:8,label:'Send Sofia lender contact info',date:new Date(t+2*864e5).toISOString().split('T')[0],pri:'ok',done:false}
+  ];
+  D=[
+    {id:1,contactId:2,type:'Inspection Period Ends',date:new Date(t+864e5).toISOString().split('T')[0]},
+    {id:2,contactId:2,type:'Financing Contingency',date:new Date(t+3*864e5).toISOString().split('T')[0]},
+    {id:3,contactId:4,type:'Closing Date',date:new Date(t+10*864e5).toISOString().split('T')[0]},
+    {id:4,contactId:4,type:'Final Walkthrough',date:new Date(t+9*864e5).toISOString().split('T')[0]},
+    {id:5,contactId:1,type:'Offer Expiration',date:new Date(t+2*864e5).toISOString().split('T')[0]},
+    {id:6,contactId:7,type:'Pre-Approval Expires',date:new Date(t+14*864e5).toISOString().split('T')[0]}
+  ];
+  sv();
+}
+function ini(c){return (c.first[0]+c.last[0]).toUpperCase();}
+function fn(c){return c.first+' '+c.last;}
+function gc(id){for(var i=0;i<C.length;i++){if(C[i].id===id)return C[i];}return null;}
+function du(s){var d=new Date(s);d.setHours(0,0,0,0);var n=new Date();n.setHours(0,0,0,0);return Math.round((d-n)/864e5);}
+function rt(iso){var m=Math.round((Date.now()-new Date(iso))/60000);if(m<1)return 'just now';if(m<60)return m+'m ago';if(m<1440)return Math.round(m/60)+'h ago';return Math.round(m/1440)+'d ago';}
+function fd(s){return new Date(s).toLocaleDateString('en-US',{month:'short',day:'numeric'});}
+function tod(){return new Date().toISOString().split('T')[0];}
+function dc(n){return n<=3?'dot-r':n<=7?'dot-y':'dot-g';}
+function pl(p){return p==='hot'?'HOT':p==='warn'?'SOON':'OK';}
+function pb(p){return p==='hot'?'b-hot':p==='warn'?'b-warn':'b-ok';}
+function ge(id){return document.getElementById(id);}
+function ck(){var s=document.createElementNS('http://www.w3.org/2000/svg','svg');s.setAttribute('width','9');s.setAttribute('height','9');s.setAttribute('fill','none');s.setAttribute('stroke','#0d0f14');s.setAttribute('stroke-width','3');s.setAttribute('viewBox','0 0 24 24');var p=document.createElementNS('http://www.w3.org/2000/svg','polyline');p.setAttribute('points','20,6 9,17 4,12');s.appendChild(p);return s;}
+var pn={briefing:'Daily Briefing',dashboard:'Dashboard',pipeline:'Pipeline',contacts:'Contacts',followups:'Follow-ups',notes:'Notes',deadlines:'Deadlines',tc:'Transactions',scanner:'Doc Scanner',mls:'MLS Search'};
+function sp(id){
+  curPage=id;
+  document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');});
+  document.querySelectorAll('.ni').forEach(function(n){n.classList.remove('active');});
+  var pg=ge('page-'+id);if(pg)pg.classList.add('active');
+  var nv=ge('nav-'+id);if(nv)nv.classList.add('active');
+  ge('pageTitle').textContent=pn[id]||id;
+  csb();
+  if(id==='briefing')rb();
+  else if(id==='dashboard')rd();
+  else if(id==='pipeline')rp();
+  else if(id==='contacts')rc();
+  else if(id==='followups')rfu();
+  else if(id==='notes')rn();
+  else if(id==='deadlines')rdl();
+  else if(id==='tc')initTC();
+  else if(id==='scanner')initScanner();
+  else if(id==='mls')initMLS();
+}
+function mkRow(cls){var d=document.createElement('div');d.className=cls;return d;}
+function mkDiv(style,text){var d=document.createElement('div');if(style)d.style.cssText=style;if(text!==undefined)d.textContent=text;return d;}
+function mkBtn(cls,text,style){var b=document.createElement('button');b.className=cls;b.textContent=text;if(style)b.style.cssText=style;return b;}
+function mkDot(cls){var d=document.createElement('div');d.className='dot '+cls;return d;}
+function mkBadge(pri){var s=document.createElement('span');s.className='badge '+pb(pri);s.textContent=pl(pri);return s;}
+
+function rb(){
+  var h=new Date().getHours();
+  var g=h<12?'Good Morning':h<17?'Good Afternoon':'Good Evening';
+  var days=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  var months=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  var now=new Date();
+  ge('bDate').textContent=days[now.getDay()]+', '+months[now.getMonth()]+' '+now.getDate()+', '+now.getFullYear();
+  ge('bGreet').textContent=g+'!';
+  var td=tod();
+  var tFU=F.filter(function(f){return !f.done&&f.date===td;});
+  var oFU=F.filter(function(f){return !f.done&&f.date<td;});
+  var uDL=D.filter(function(d){return du(d.date)<=0;});
+  var wDL=D.filter(function(d){var n=du(d.date);return n>0&&n<=7;});
+  var act=C.filter(function(c){return c.stage!=='Closed';});
+  var urg=uDL.length+oFU.length;
+  ge('bUrgNum').textContent=urg;
+  ge('bTodayNum').textContent=tFU.length;
+  ge('bActiveNum').textContent=act.length;
+  var msgs=[];
+  if(urg>0)msgs.push(urg+' urgent item'+(urg>1?'s':''));
+  if(tFU.length>0)msgs.push(tFU.length+' follow-up'+(tFU.length>1?'s':'')+' due today');
+  ge('bSub').textContent=msgs.length?'You have '+msgs.join(' and ')+'.':'No urgent items today. Great work!';
+  var uEl=ge('bUrgent');uEl.innerHTML='';
+  if(!urg){uEl.innerHTML='<div class="empty" style="padding:14px;">No urgent items!</div>';}
+  else{
+    uDL.forEach(function(d){var c=gc(d.contactId);var n=du(d.date);var row=mkRow('brow');row.appendChild(mkDot('dot-r'));var info=mkRow('brow-info');info.appendChild(mkDiv('font-size:13px;font-weight:600;',d.type));info.appendChild(mkDiv('font-size:11px;color:var(--text3);',c?fn(c):'Unknown'));row.appendChild(info);row.appendChild(mkDiv('font-size:12px;color:var(--danger);',n<0?Math.abs(n)+'d overdue':'TODAY'));uEl.appendChild(row);});
+    oFU.forEach(function(f){var c=gc(f.contactId);var row=mkRow('brow');row.appendChild(mkDot('dot-r'));var info=mkRow('brow-info');info.appendChild(mkDiv('font-size:13px;font-weight:600;',f.label));info.appendChild(mkDiv('font-size:11px;color:var(--text3);',c?fn(c):'Unknown'));row.appendChild(info);row.appendChild(mkDiv('font-size:12px;color:var(--danger);',fd(f.date)));uEl.appendChild(row);});
+  }
+  var fEl=ge('bFU');fEl.innerHTML='';
+  if(!tFU.length){fEl.innerHTML='<div class="empty" style="padding:14px;">No follow-ups due today.</div>';}
+  else tFU.forEach(function(f){var c=gc(f.contactId);var row=mkRow('brow');var chk=mkRow('chk'+(f.done?' done':''));if(f.done)chk.appendChild(ck());(function(id){chk.addEventListener('click',function(){tfu(id);rb();});})(f.id);row.appendChild(chk);var info=mkRow('brow-info');info.appendChild(mkDiv('font-size:13px;font-weight:600;',f.label));info.appendChild(mkDiv('font-size:11px;color:var(--text3);',c?fn(c):''));row.appendChild(info);row.appendChild(mkBadge(f.pri));fEl.appendChild(row);});
+  var wEl=ge('bWeek');wEl.innerHTML='';
+  if(!wDL.length){wEl.innerHTML='<div class="empty" style="padding:14px;">No deadlines this week.</div>';}
+  else wDL.slice().sort(function(a,b){return new Date(a.date)-new Date(b.date);}).forEach(function(d){var c=gc(d.contactId);var n=du(d.date);var row=mkRow('brow');row.appendChild(mkDot(n<=3?'dot-y':'dot-g'));var info=mkRow('brow-info');info.appendChild(mkDiv('font-size:13px;font-weight:600;',d.type));info.appendChild(mkDiv('font-size:11px;color:var(--text3);',c?fn(c):''));row.appendChild(info);row.appendChild(mkDiv('font-size:12px;color:var(--text2);',fd(d.date)+' ('+n+'d)'));wEl.appendChild(row);});
+  var sEl=ge('bSnap');sEl.innerHTML='';
+  ['New Lead','Contacted','Showing','Under Contract'].forEach(function(s){var cnt=C.filter(function(c){return c.stage===s;}).length;var row=mkRow('brow');var info=mkRow('brow-info');info.appendChild(mkDiv('font-size:13px;font-weight:600;',s));row.appendChild(info);row.appendChild(mkDiv('font-family:monospace;font-size:22px;font-weight:700;color:var(--accent);',cnt));sEl.appendChild(row);});
+}
+
+function rd(){
+  ge('sBuyers').textContent=C.filter(function(c){return c.type==='buyer';}).length;
+  ge('sSellers').textContent=C.filter(function(c){return c.type==='seller';}).length;
+  ge('sLeads').textContent=C.filter(function(c){return c.type==='lead';}).length;
+  ge('sClosing').textContent=D.filter(function(d){var n=du(d.date);return n>=0&&n<=30;}).length;
+  var rEl=ge('dRecent');rEl.innerHTML='';
+  var rec=N.slice().sort(function(a,b){return new Date(b.date)-new Date(a.date);}).slice(0,4);
+  if(!rec.length){rEl.innerHTML='<div class="empty">No notes yet</div>';}
+  else rec.forEach(function(note){var c=gc(note.contactId);var d=mkRow('note-item');var h=mkRow('note-hdr');var b=document.createElement('b');b.style.fontSize='12px';b.textContent=c?fn(c):'Unknown';var ts=mkDiv('font-size:11px;color:var(--text3);margin-left:6px;',rt(note.date));h.appendChild(b);h.appendChild(ts);d.appendChild(h);d.appendChild(mkDiv('note-text',note.text));rEl.appendChild(d);});
+  var dlEl=ge('dDeadlines');dlEl.innerHTML='';
+  var dl=D.slice().sort(function(a,b){return new Date(a.date)-new Date(b.date);}).slice(0,5);
+  if(!dl.length){dlEl.innerHTML='<div class="empty">No deadlines</div>';}
+  else dl.forEach(function(d){var c=gc(d.contactId);var n=du(d.date);var lbl=n<0?'Overdue':n===0?'Today':n+'d';var row=mkRow('dl-row');row.appendChild(mkDot(dc(n)));var info=mkDiv('flex:1;');info.appendChild(mkDiv('font-size:13px;',d.type));info.appendChild(mkDiv('font-size:11px;color:var(--text3);',c?fn(c):''));row.appendChild(info);row.appendChild(mkDiv('font-family:monospace;font-size:12px;color:var(--text2);',lbl));dlEl.appendChild(row);});
+  var fuEl=ge('dFollowups');fuEl.innerHTML='';
+  var pend=F.filter(function(f){return !f.done;}).slice(0,4);
+  if(!pend.length){fuEl.innerHTML='<div class="empty">All caught up!</div>';}
+  else pend.forEach(function(f){var c=gc(f.contactId);var row=mkRow('fu-row');var chk=mkRow('chk'+(f.done?' done':''));if(f.done)chk.appendChild(ck());(function(id){chk.addEventListener('click',function(){tfu(id);rd();});})(f.id);var info=mkDiv('flex:1;');info.appendChild(mkDiv('font-size:13px;',f.label));info.appendChild(mkDiv('font-size:11px;color:var(--text3);',(c?fn(c):'')+' - '+fd(f.date)));row.appendChild(chk);row.appendChild(info);row.appendChild(mkBadge(f.pri));fuEl.appendChild(row);});
+  var pipEl=ge('dPipeline');pipEl.innerHTML='';
+  ['New Lead','Contacted','Showing','Under Contract'].forEach(function(s){var cnt=C.filter(function(c){return c.stage===s;}).length;var row=mkRow('li');row.appendChild(mkDiv('flex:1;font-size:13px;font-weight:600;',s));row.appendChild(mkDiv('font-family:monospace;font-size:22px;font-weight:700;color:var(--accent);',cnt));pipEl.appendChild(row);});
+  ge('nbFollowups').textContent=F.filter(function(f){return !f.done;}).length;
+  ge('nbPipeline').textContent=C.filter(function(c){return c.stage!=='Closed';}).length;
+}
+
+function rp(){
+  var board=ge('pBoard');board.innerHTML='';
+  ['New Lead','Contacted','Showing','Under Contract','Closed'].forEach(function(s){
+    var sc=C.filter(function(c){return c.stage===s;});
+    var col=mkDiv('min-width:210px;flex-shrink:0;');
+    var hdr=mkDiv('font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);margin-bottom:10px;display:flex;justify-content:space-between;',s);
+    var badge=mkDiv('background:var(--surface3);color:var(--text2);font-size:10px;padding:1px 6px;border-radius:8px;',sc.length);
+    hdr.appendChild(badge);col.appendChild(hdr);
+    sc.forEach(function(c){
+      var card=mkDiv('background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px 13px;margin-bottom:9px;cursor:pointer;transition:all 0.15s;');
+      (function(id){card.addEventListener('click',function(){vc(id);});})(c.id);
+      card.addEventListener('mouseenter',function(){this.style.borderColor='var(--accent)';this.style.transform='translateY(-1px)';});
+      card.addEventListener('mouseleave',function(){this.style.borderColor='var(--border)';this.style.transform='none';});
+      var tg=document.createElement('span');tg.className='tag tag-'+c.type;tg.style.marginBottom='5px';tg.style.display='inline-block';tg.textContent=c.type;
+      card.appendChild(tg);
+      card.appendChild(mkDiv('font-size:13px;font-weight:600;margin-bottom:2px;',fn(c)));
+      card.appendChild(mkDiv('font-size:11px;color:var(--text2);margin-bottom:7px;',c.property||'-'));
+      var foot=mkDiv('display:flex;justify-content:space-between;');
+      foot.appendChild(mkDiv('font-family:monospace;font-size:12px;color:var(--accent);',c.price||'-'));
+      foot.appendChild(mkDiv('font-size:10px;color:var(--text3);',rt(c.added)));
+      card.appendChild(foot);col.appendChild(card);
+    });
+    board.appendChild(col);
+  });
+}
+
+function rc(){
+  var list=curFilter==='all'?C:C.filter(function(c){return c.type===curFilter;});
+  var q=ge('searchBox').value.toLowerCase();
+  if(q)list=list.filter(function(c){return fn(c).toLowerCase().indexOf(q)>=0||(c.email||'').toLowerCase().indexOf(q)>=0||(c.phone||'').indexOf(q)>=0;});
+  var grid=ge('cGrid');grid.innerHTML='';
+  if(!list.length){grid.innerHTML='<div class="empty" style="grid-column:1/-1">No contacts found</div>';return;}
+  list.forEach(function(c){
+    var card=mkDiv('background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;cursor:pointer;transition:all 0.15s;');
+    (function(id){card.addEventListener('click',function(){vc(id);});})(c.id);
+    card.addEventListener('mouseenter',function(){this.style.borderColor='var(--accent)';this.style.transform='translateY(-2px)';});
+    card.addEventListener('mouseleave',function(){this.style.borderColor='var(--border)';this.style.transform='none';});
+    var top=mkDiv('display:flex;align-items:center;gap:11px;margin-bottom:11px;');
+    var av=mkDiv('av av-'+c.type,ini(c));
+    av.className='av av-'+c.type;
+    var nb=mkDiv('');
+    nb.appendChild(mkDiv('font-size:15px;font-weight:600;',fn(c)));
+    var td=mkDiv('margin-top:2px;');
+    var tg=document.createElement('span');tg.className='tag tag-'+c.type;tg.textContent=c.type;td.appendChild(tg);
+    nb.appendChild(td);top.appendChild(av);top.appendChild(nb);card.appendChild(top);
+    var dets=mkDiv('display:flex;flex-direction:column;gap:3px;');
+    if(c.phone)dets.appendChild(mkDiv('font-size:12px;color:var(--text2);',c.phone));
+    if(c.email)dets.appendChild(mkDiv('font-size:12px;color:var(--text2);',c.email));
+    if(c.property)dets.appendChild(mkDiv('font-size:12px;color:var(--text2);',c.property));
+    card.appendChild(dets);
+    var foot=mkDiv('margin-top:11px;padding-top:9px;border-top:1px solid var(--border);display:flex;justify-content:space-between;');
+    var ss=mkDiv('font-size:11px;color:var(--text3);','Stage: ');
+    var sb=document.createElement('b');sb.style.color='var(--accent)';sb.textContent=c.stage;ss.appendChild(sb);
+    foot.appendChild(ss);
+    if(c.price)foot.appendChild(mkDiv('font-family:monospace;font-size:12px;color:var(--text2);',c.price));
+    card.appendChild(foot);grid.appendChild(card);
+  });
+}
+
+function vc(id){
+  curDet=id;var c=gc(id);if(!c)return;
+  var stgs=['New Lead','Contacted','Showing','Under Contract','Closed'];
+  var hdr=ge('detHdr');hdr.innerHTML='';
+  var av=mkDiv('det-av av-'+c.type,ini(c));av.className='det-av av-'+c.type;
+  var nd=mkDiv('');nd.appendChild(mkDiv('det-name',fn(c)));nd.children[0].className='det-name';
+  var mt=mkDiv('det-meta','');mt.className='det-meta';var tg=document.createElement('span');tg.className='tag tag-'+c.type;tg.textContent=c.type;mt.appendChild(tg);mt.appendChild(document.createTextNode(' Added '+rt(c.added)));nd.appendChild(mt);
+  var xb=mkBtn('det-x','\u2715','');xb.addEventListener('click',cd);
+  hdr.appendChild(av);hdr.appendChild(nd);hdr.appendChild(xb);
+  var acts=ge('detActs');acts.innerHTML='';
+  if(c.phone){var a1=document.createElement('a');a1.href='tel:'+c.phone;a1.className='btn btn-g';a1.style.cssText='font-size:12px;padding:5px 11px;';a1.textContent='Call';acts.appendChild(a1);}
+  if(c.phone){var a2=document.createElement('a');a2.href='sms:'+c.phone;a2.className='btn btn-g';a2.style.cssText='font-size:12px;padding:5px 11px;';a2.textContent='Text';acts.appendChild(a2);}
+  if(c.email){var a3=document.createElement('a');a3.href='mailto:'+c.email;a3.className='btn btn-g';a3.style.cssText='font-size:12px;padding:5px 11px;';a3.textContent='Email';acts.appendChild(a3);}
+  var fb=mkBtn('btn btn-g','+ FU','font-size:12px;padding:5px 11px;');(function(cid){fb.addEventListener('click',function(){ofc(cid);});})(id);acts.appendChild(fb);
+  var db=mkBtn('btn btn-g','+ DL','font-size:12px;padding:5px 11px;');(function(cid){db.addEventListener('click',function(){odc(cid);});})(id);acts.appendChild(db);
+  var delb=mkBtn('btn btn-d','Delete','font-size:12px;padding:5px 11px;margin-left:auto;');(function(cid){delb.addEventListener('click',function(){delc(cid);});})(id);acts.appendChild(delb);
+  var body=ge('detBody');body.innerHTML='';
+  var isec=mksec('Contact Info');
+  if(c.phone)isec.appendChild(mkfld('Phone',c.phone,'tel:'+c.phone,''));
+  if(c.email)isec.appendChild(mkfld('Email',c.email,'mailto:'+c.email,''));
+  if(c.property)isec.appendChild(mkfld('Property',c.property,null,''));
+  if(c.price)isec.appendChild(mkfld('Price',c.price,null,'color:var(--accent);font-family:monospace;'));
+  if(c.notes)isec.appendChild(mkfld('Notes',c.notes,null,''));
+  body.appendChild(isec);
+  var ssec=mksec('Stage');var sr=mkRow('stage-row');
+  stgs.forEach(function(s){var b=mkBtn('sp'+(c.stage===s?' active':''),s,'');(function(cid,stage){b.addEventListener('click',function(){ss(cid,stage);});})(id,s);sr.appendChild(b);});
+  ssec.appendChild(sr);body.appendChild(ssec);
+  var dlsec=mksec('Deadlines');
+  var dlab=mkBtn('','+ Add','background:none;border:none;color:var(--accent);cursor:pointer;font-size:11px;margin-left:8px;');
+  (function(cid){dlab.addEventListener('click',function(){odc(cid);});})(id);dlsec.querySelector('.det-sec-title').appendChild(dlab);
+  var cDL=D.filter(function(d){return d.contactId===id;}).sort(function(a,b){return new Date(a.date)-new Date(b.date);});
+  if(!cDL.length)dlsec.appendChild(mkDiv('font-size:12px;color:var(--text3);padding:4px 0;','None yet.'));
+  else cDL.forEach(function(d){var n=du(d.date);var row=mkRow('dl-row');row.style.padding='7px 0';row.appendChild(mkDot(dc(n)));row.appendChild(mkDiv('flex:1;font-size:12px;',d.type));row.appendChild(mkDiv('font-family:monospace;font-size:12px;color:var(--text2);',fd(d.date)));dlsec.appendChild(row);});
+  body.appendChild(dlsec);
+  var fusec=mksec('Follow-ups');
+  var fuab=mkBtn('','+ Add','background:none;border:none;color:var(--accent);cursor:pointer;font-size:11px;margin-left:8px;');
+  (function(cid){fuab.addEventListener('click',function(){ofc(cid);});})(id);fusec.querySelector('.det-sec-title').appendChild(fuab);
+  var cFU=F.filter(function(f){return f.contactId===id;}).sort(function(a,b){return new Date(a.date)-new Date(b.date);});
+  if(!cFU.length)fusec.appendChild(mkDiv('font-size:12px;color:var(--text3);padding:4px 0;','None yet.'));
+  else cFU.forEach(function(f){var row=mkRow('det-fu');var chk=mkRow('det-fu-chk'+(f.done?' done':''));if(f.done)chk.appendChild(ck());(function(fid,cid){chk.addEventListener('click',function(){tfu(fid);vc(cid);});})(f.id,id);var lbl=mkDiv('flex:1;font-size:13px;'+(f.done?'text-decoration:line-through;color:var(--text3);':''),f.label);var dt=mkDiv('font-size:11px;color:var(--text3);',fd(f.date));row.appendChild(chk);row.appendChild(lbl);row.appendChild(dt);fusec.appendChild(row);});
+  body.appendChild(fusec);
+  var nsec=mksec('Notes');
+  var cN=N.filter(function(n){return n.contactId===id;}).sort(function(a,b){return new Date(b.date)-new Date(a.date);});
+  if(!cN.length)nsec.appendChild(mkDiv('font-size:12px;color:var(--text3);','No notes yet. Add one below.'));
+  else cN.forEach(function(n){var d=mkRow('det-note');d.appendChild(mkDiv('det-note-time',new Date(n.date).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})));d.children[0].className='det-note-time';var t=mkDiv('det-note-text',n.text);t.className='det-note-text';d.appendChild(t);nsec.appendChild(d);});
+  body.appendChild(nsec);
+  ge('detOv').classList.add('open');
+}
+function mksec(title){var s=mkRow('det-sec');var t=mkDiv('det-sec-title',title);t.className='det-sec-title';s.appendChild(t);return s;}
+function mkfld(lbl,val,href,style){var r=mkRow('det-field');var l=mkDiv('det-flbl',lbl);l.className='det-flbl';var v=mkDiv('det-fval','');v.className='det-fval';if(style)v.style.cssText=style;if(href){var a=document.createElement('a');a.href=href;a.textContent=val;v.appendChild(a);}else v.textContent=val;r.appendChild(l);r.appendChild(v);return r;}
+function cd(){ge('detOv').classList.remove('open');curDet=null;}
+function ss(id,stage){var c=gc(id);if(!c)return;c.stage=stage;updateContact(c);vc(id);rd();if(curPage==='pipeline')rp();}
+function delc(id){if(!confirm('Delete this contact?'))return;C=C.filter(function(c){return c.id!==id;});N=N.filter(function(n){return n.contactId!==id;});F=F.filter(function(f){return f.contactId!==id;});D=D.filter(function(d){return d.contactId!==id;});sv();deleteCfromDB(id);cd();rd();if(curPage==='contacts')rc();}
+
+function rfu(){
+  var el=ge('fuList');el.innerHTML='';
+  var sorted=F.slice().sort(function(a,b){return new Date(a.date)-new Date(b.date);});
+  if(!sorted.length){el.innerHTML='<div class="empty">No follow-ups yet.</div>';return;}
+  sorted.forEach(function(f){var c=gc(f.contactId);var row=mkRow('fu-row');var chk=mkRow('chk'+(f.done?' done':''));if(f.done)chk.appendChild(ck());(function(id){chk.addEventListener('click',function(){tfu(id);rfu();});})(f.id);var info=mkDiv('flex:1;');info.appendChild(mkDiv('font-size:13px;'+(f.done?'text-decoration:line-through;color:var(--text3);':''),f.label));info.appendChild(mkDiv('font-size:11px;color:var(--text3);',(c?fn(c):'Unknown')+' - '+fd(f.date)));var right=mkDiv('display:flex;align-items:center;gap:7px;');right.appendChild(mkBadge(f.pri));var del=mkBtn('','\u00d7','background:none;border:none;color:var(--text3);cursor:pointer;font-size:18px;line-height:1;');(function(id){del.addEventListener('click',function(){F=F.filter(function(f){return f.id!==id;});sv();rfu();});})(f.id);right.appendChild(del);row.appendChild(chk);row.appendChild(info);row.appendChild(right);el.appendChild(row);});
+  ge('nbFollowups').textContent=F.filter(function(f){return !f.done;}).length;
+}
+function tfu(id){var f=F.find(function(x){return x.id===id;});if(f){f.done=!f.done;sv();if(supaReady) dbSave('followups',[f]);}}
+
+function rn(){
+  var el=ge('nList');el.innerHTML='';
+  var sorted=N.slice().sort(function(a,b){return new Date(b.date)-new Date(a.date);});
+  if(!sorted.length){el.innerHTML='<div class="empty">No notes yet.</div>';return;}
+  sorted.forEach(function(note){var c=gc(note.contactId);var d=mkRow('note-item');var h=mkRow('note-hdr');var av=mkDiv('av av-'+(c?c.type:'lead'),c?ini(c):'?');av.className='av av-'+(c?c.type:'lead');av.style.cssText='width:26px;height:26px;font-size:10px;';var b=document.createElement('b');b.style.fontSize='12px';b.textContent=c?fn(c):'Unknown';h.appendChild(av);h.appendChild(b);if(c){var tg=document.createElement('span');tg.className='tag tag-'+c.type;tg.textContent=c.type;h.appendChild(tg);}h.appendChild(mkDiv('font-size:11px;color:var(--text3);',rt(note.date)));d.appendChild(h);d.appendChild(mkDiv('note-text',note.text));el.appendChild(d);});
+}
+
+function rdl(){
+  var el=ge('dlList');el.innerHTML='';
+  var sorted=D.slice().sort(function(a,b){return new Date(a.date)-new Date(b.date);});
+  if(!sorted.length){el.innerHTML='<div class="empty">No deadlines yet.</div>';return;}
+  sorted.forEach(function(d){var c=gc(d.contactId);var n=du(d.date);var lbl=n<0?Math.abs(n)+'d overdue':n===0?'TODAY':n+' days';var row=mkRow('dl-row');row.appendChild(mkDot(dc(n)));var info=mkDiv('flex:1;');info.appendChild(mkDiv('font-size:13px;',d.type));info.appendChild(mkDiv('font-size:11px;color:var(--text3);',(c?fn(c):'Unknown')+(c&&c.property?' - '+c.property:'')));row.appendChild(info);var right=mkDiv('text-align:right;');right.appendChild(mkDiv('font-family:monospace;font-size:12px;color:var(--text2);',fd(d.date)));right.appendChild(mkDiv('font-size:11px;color:'+(n<=3?'var(--danger)':'var(--text3)')+';',lbl));row.appendChild(right);el.appendChild(row);});
+}
+
+function om(id){ge(id).classList.add('open');}
+function cm(id){ge(id).classList.remove('open');}
+function fs(sid){var sel=ge(sid);sel.innerHTML='';C.forEach(function(c){var o=document.createElement('option');o.value=c.id;o.textContent=fn(c)+' ('+c.type+')';sel.appendChild(o);});}
+function ofc(id){fs('fuContact');ge('fuContact').value=id;ge('fuDate').value=tod();om('fuModal');}
+function odc(id){fs('dlContact');ge('dlContact').value=id;ge('dlDate').value=tod();om('dlModal');}
+
+function svc(){var first=ge('fFirst').value.trim();var last=ge('fLast').value.trim();if(!first||!last){alert('Please enter a name.');return;}var nc={id:Date.now(),first:first,last:last,type:ge('fType').value,phone:ge('fPhone').value,email:ge('fEmail').value,property:ge('fProp').value,stage:ge('fStage').value,price:ge('fPrice').value,notes:ge('fNotes').value,added:new Date().toISOString()};C.push(nc);saveContact(nc);cm('addModal');['fFirst','fLast','fPhone','fEmail','fProp','fPrice','fNotes'].forEach(function(x){ge(x).value='';});rd();if(curPage==='contacts')rc();if(curPage==='pipeline')rp();}
+function svn(){var text=ge('nText').value.trim();if(!text)return;var nn={id:Date.now(),contactId:parseInt(ge('nContact').value),text:text,date:new Date().toISOString()};N.push(nn);saveNote(nn);cm('noteModal');ge('nText').value='';rn();rd();}
+function svfu(){var lbl=ge('fuLabel').value.trim();if(!lbl)return;var nf={id:Date.now(),contactId:parseInt(ge('fuContact').value),label:lbl,date:ge('fuDate').value,pri:ge('fuPri').value,done:false};F.push(nf);saveFU(nf);cm('fuModal');ge('fuLabel').value='';rfu();rd();if(curDet)vc(curDet);}
+function svdl(){var nd={id:Date.now(),contactId:parseInt(ge('dlContact').value),type:ge('dlType').value,date:ge('dlDate').value};D.push(nd);saveDL(nd);cm('dlModal');rdl();rd();if(curDet)vc(curDet);}
+function adn(){var text=ge('detNoteTA').value.trim();if(!text||!curDet)return;var nn={id:Date.now(),contactId:curDet,text:text,date:new Date().toISOString()};N.push(nn);saveNote(nn);ge('detNoteTA').value='';vc(curDet);rd();}
+
+function tsb(){ge('sidebar').classList.toggle('open');ge('sbOv').classList.toggle('open');}
+function csb(){ge('sidebar').classList.remove('open');ge('sbOv').classList.remove('open');}
+
+// -- CSV IMPORT / EXPORT ----------------------------------------------
+var csvParsed = [];
+
+function exportCSV(){
+  var headers = ['First Name','Last Name','Type','Phone','Email','Property','Stage','Price','Notes','Added'];
+  var rows = [headers.join(',')];
+  C.forEach(function(c){
+    var row = [
+      csvQ(c.first), csvQ(c.last), csvQ(c.type||''), csvQ(c.phone||''),
+      csvQ(c.email||''), csvQ(c.property||''), csvQ(c.stage||''),
+      csvQ(c.price||''), csvQ(c.notes||''), csvQ(c.added||'')
+    ];
+    rows.push(row.join(','));
+  });
+  var blob = new Blob([rows.join('\n')], {type:'text/csv'});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'properly-crm-contacts.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function csvQ(val){
+  var s = String(val).replace(/"/g, '""');
+  if(s.indexOf(',') >= 0 || s.indexOf('"') >= 0 || s.indexOf('\n') >= 0) s = '"' + s + '"';
+  return s;
+}
+
+function openImport(){
+  ge('csvStep1').style.display = 'block';
+  ge('csvStep2').style.display = 'none';
+  ge('btnConfirmImport').style.display = 'none';
+  csvParsed = [];
+  om('csvModal');
+}
+
+function parseCSV(text){
+  var lines = text.trim().split('\n');
+  if(lines.length < 2) return [];
+  var headers = lines[0].split(',').map(function(h){ return h.trim().toLowerCase().replace(/[^a-z ]/g,''); });
+  var results = [];
+  for(var i = 1; i < lines.length; i++){
+    var cols = csvSplit(lines[i]);
+    if(!cols.length) continue;
+    var obj = {};
+    headers.forEach(function(h, idx){ obj[h] = (cols[idx]||'').trim(); });
+    // Map flexible header names
+    var c = {
+      id: Date.now() + i,
+      first: obj['first name'] || obj['firstname'] || obj['first'] || '',
+      last:  obj['last name']  || obj['lastname']  || obj['last']  || '',
+      type:  normalizeType(obj['type'] || obj['contact type'] || 'lead'),
+      phone: obj['phone'] || obj['phone number'] || obj['mobile'] || '',
+      email: obj['email'] || obj['email address'] || '',
+      property: obj['property'] || obj['address'] || obj['interest'] || '',
+      stage: normalizeStage(obj['stage'] || obj['status'] || 'New Lead'),
+      price: obj['price'] || obj['budget'] || obj['price budget'] || '',
+      notes: obj['notes'] || obj['note'] || obj['comments'] || '',
+      added: new Date().toISOString()
+    };
+    if(c.first || c.last || c.email || c.phone) results.push(c);
+  }
+  return results;
+}
+
+function csvSplit(line){
+  var result = [], cur = '', inQ = false;
+  for(var i = 0; i < line.length; i++){
+    var ch = line[i];
+    if(ch === '"'){ if(inQ && line[i+1] === '"'){ cur += '"'; i++; } else inQ = !inQ; }
+    else if(ch === ',' && !inQ){ result.push(cur); cur = ''; }
+    else cur += ch;
+  }
+  result.push(cur);
+  return result;
+}
+
+function normalizeType(t){
+  t = (t||'').toLowerCase().trim();
+  if(t === 'buyer') return 'buyer';
+  if(t === 'seller') return 'seller';
+  return 'lead';
+}
+
+function normalizeStage(s){
+  s = (s||'').trim();
+  var stages = ['New Lead','Contacted','Showing','Under Contract','Closed'];
+  for(var i = 0; i < stages.length; i++){
+    if(stages[i].toLowerCase() === s.toLowerCase()) return stages[i];
+  }
+  return 'New Lead';
+}
+
+function showCSVPreview(contacts){
+  csvParsed = contacts;
+  var preview = ge('csvPreview');
+  preview.innerHTML = '';
+  var msg = document.createElement('p');
+  msg.style.cssText = 'font-size:13px;color:var(--text2);margin-bottom:12px;';
+  msg.textContent = 'Found ';
+  var b = document.createElement('b');
+  b.style.color = 'var(--accent)';
+  b.textContent = contacts.length + ' contact' + (contacts.length !== 1 ? 's' : '');
+  msg.appendChild(b);
+  msg.appendChild(document.createTextNode(' ready to import:'));
+  preview.appendChild(msg);
+  var wrap = document.createElement('div');
+  wrap.style.cssText = 'max-height:280px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;';
+  var table = document.createElement('table');
+  table.style.cssText = 'width:100%;border-collapse:collapse;font-size:12px;';
+  var thead = document.createElement('thead');
+  var hrow = document.createElement('tr');
+  hrow.style.background = 'var(--surface2)';
+  ['Name','Type','Phone','Stage'].forEach(function(h){
+    var th = document.createElement('th');
+    th.style.cssText = 'padding:8px 10px;text-align:left;color:var(--text3);font-weight:600;';
+    th.textContent = h;
+    hrow.appendChild(th);
+  });
+  thead.appendChild(hrow);
+  table.appendChild(thead);
+  var tbody = document.createElement('tbody');
+  contacts.forEach(function(c, i){
+    var tr = document.createElement('tr');
+    tr.style.background = i % 2 === 0 ? 'var(--surface)' : 'var(--surface2)';
+    var td1 = document.createElement('td');
+    td1.style.cssText = 'padding:7px 10px;color:var(--text);';
+    td1.textContent = (c.first + ' ' + c.last).trim();
+    var td2 = document.createElement('td');
+    td2.style.padding = '7px 10px';
+    var tg = document.createElement('span');
+    tg.className = 'tag tag-' + c.type;
+    tg.textContent = c.type;
+    td2.appendChild(tg);
+    var td3 = document.createElement('td');
+    td3.style.cssText = 'padding:7px 10px;color:var(--text2);';
+    td3.textContent = c.phone || '-';
+    var td4 = document.createElement('td');
+    td4.style.cssText = 'padding:7px 10px;color:var(--text2);';
+    td4.textContent = c.stage;
+    tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td3); tr.appendChild(td4);
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  wrap.appendChild(table);
+  preview.appendChild(wrap);
+  ge('csvStep1').style.display = 'none';
+  ge('csvStep2').style.display = 'block';
+  ge('btnConfirmImport').style.display = 'inline-flex';
+}
+
+function confirmImport(){
+  var dupes = 0;
+  var toSave = [];
+  csvParsed.forEach(function(nc){
+    var exists = C.some(function(c){ return c.email && c.email === nc.email; });
+    if(exists){ dupes++; return; }
+    // Ensure unique numeric id and required fields
+    nc.id = Date.now() + Math.floor(Math.random()*100000);
+    nc.added = nc.added || new Date().toISOString();
+    nc.stage = nc.stage || 'New Lead';
+    nc.type = nc.type || 'lead';
+    C.push(nc);
+    toSave.push(nc);
+  });
+  sv();
+  // Save all imported contacts to Supabase in one batch
+  if(supaReady && toSave.length){
+    dbSave('contacts', toSave);
+  }
+  cm('csvModal');
+  rd();
+  if(curPage === 'contacts') rc();
+  var msg = 'Imported ' + (csvParsed.length - dupes) + ' contact' + ((csvParsed.length - dupes) !== 1 ? 's' : '') + '.';
+  if(dupes > 0) msg += ' Skipped ' + dupes + ' duplicate' + (dupes > 1 ? 's' : '') + ' (same email).';
+  alert(msg);
+}
+
+// -- TRANSACTION COORDINATOR ------------------------------------------
+var TX = [];
+var curTx = null;
+var tcFilter = 'all';
+
+// Checklist templates based on your actual Palacios Baker forms
+var TC_TEMPLATES = {
+  buyer: [
+    {phase:'Form 1 - Buyer Intake', steps:[
+      {label:'Collect contact information (name, phone, email)',key:'bi_contact'},
+      {label:'Add to CRM / Follow Up Boss',key:'bi_crm'},
+      {label:'Discuss timeline and budget',key:'bi_budget'},
+      {label:'Review buying process with buyer',key:'bi_process'},
+      {label:'Send Buyer Guide',key:'bi_guide'},
+      {label:'Assign lender / connect with lender',key:'bi_lender'},
+      {label:'Pre-approval received',key:'bi_preapproval'},
+      {label:'Down payment funds verified',key:'bi_downpayment'},
+      {label:'Create MLS search and set alerts',key:'bi_mls'},
+      {label:'Schedule buyer consultation',key:'bi_consult'},
+      {label:'Buyer agreement signed',key:'bi_agreement'},
+      {label:'Next follow-up date set',key:'bi_followup'}
+    ]},
+    {phase:'Home Search', steps:[
+      {label:'Showings scheduled',key:'hs_showings'},
+      {label:'Disclosures reviewed with buyer',key:'hs_disclosures'},
+      {label:'Favorites narrowed down',key:'hs_favorites'},
+      {label:'CMA reviewed for target property',key:'hs_cma'}
+    ]},
+    {phase:'Form 4 - Under Contract', steps:[
+      {label:'Offer submitted and docs uploaded in Dotloop',key:'uc_offer'},
+      {label:'Earnest money delivered',key:'uc_earnest',hasDate:true,dateKey:'tcEarnestDate'},
+      {label:'Due diligence deadline tracked',key:'uc_duedilig',hasDate:true,dateKey:'tcDueDiligDate'},
+      {label:'Financing deadline tracked',key:'uc_financing',hasDate:true,dateKey:'tcFinancingDate'},
+      {label:'Appraisal deadline tracked',key:'uc_appraisal',hasDate:true,dateKey:'tcAppraisalDate'},
+      {label:'Inspection ordered',key:'uc_insp_ordered'},
+      {label:'Inspection completed',key:'uc_insp_done'},
+      {label:'Inspection report received',key:'uc_insp_report'},
+      {label:'Repairs negotiated',key:'uc_repairs'},
+      {label:'Addendum signed',key:'uc_addendum'},
+      {label:'Appraisal ordered',key:'uc_appr_ordered'},
+      {label:'Appraisal received',key:'uc_appr_received'},
+      {label:'Loan application submitted',key:'uc_loan_app'},
+      {label:'Appraisal completed',key:'uc_appr_done'},
+      {label:'Clear to close received',key:'uc_ctc'},
+      {label:'Final loan approval',key:'uc_loan_final'},
+      {label:'Title company confirmed',key:'uc_title'},
+      {label:'Title commitment received',key:'uc_title_commit'},
+      {label:'Utilities / accounts reviewed',key:'uc_utilities'},
+      {label:'Signing date and time set',key:'uc_signing'},
+      {label:'Final walkthrough scheduled',key:'uc_walkthrough'},
+      {label:'Funds to close confirmed',key:'uc_funds'},
+      {label:'Recording confirmed',key:'uc_recording'},
+      {label:'Keys / access confirmed',key:'uc_keys'}
+    ]},
+    {phase:'Closing & Post-Close', steps:[
+      {label:'Settlement statement reviewed',key:'cl_settlement'},
+      {label:'Closing appointment arranged',key:'cl_appt'},
+      {label:'Closing gift arranged',key:'cl_gift'},
+      {label:'Keys delivered',key:'cl_keys'},
+      {label:'Home warranty reviewed (if applicable)',key:'cl_warranty'},
+      {label:'Possession arranged',key:'cl_possession'}
+    ]},
+    {phase:'Form 5 - Post-Closing Follow-Up', steps:[
+      {label:'Closing gift delivered',key:'pc_gift'},
+      {label:'Thank you / appreciation sent',key:'pc_thankyou'},
+      {label:'Review requested (Google / Social)',key:'pc_review'},
+      {label:'Testimonial requested',key:'pc_testimonial'},
+      {label:'Referral requested',key:'pc_referral'},
+      {label:'Moved to Past Client in Follow Up Boss',key:'pc_fub'},
+      {label:'Home anniversary added',key:'pc_anniversary'},
+      {label:'Birthday added (if known)',key:'pc_birthday'},
+      {label:'Tags updated (Past Client)',key:'pc_tags'},
+      {label:'Nurture / long-term campaign started',key:'pc_nurture'},
+      {label:'7-Day follow-up completed',key:'pc_7day'},
+      {label:'30-Day follow-up completed',key:'pc_30day'},
+      {label:'90-Day homeowner check-in completed',key:'pc_90day'},
+      {label:'6-Month follow-up completed',key:'pc_6mo'},
+      {label:'1-Year / Anniversary check-in completed',key:'pc_1year'}
+    ]}
+  ],
+  seller: [
+    {phase:'Form 2 - Seller Intake', steps:[
+      {label:'Collect contact info (name, phone, email)',key:'si_contact'},
+      {label:'Add to CRM / Follow Up Boss',key:'si_crm'},
+      {label:'Confirm preferred contact method',key:'si_contact_method'},
+      {label:'Mortgage statement received',key:'si_mortgage'},
+      {label:'HELOC statement received (if applicable)',key:'si_heloc'},
+      {label:'HOA documents and contact info received',key:'si_hoa'},
+      {label:'Property tax information collected',key:'si_tax'},
+      {label:'Utility averages collected',key:'si_utilities'},
+      {label:'List of upgrades and improvements received',key:'si_upgrades'},
+      {label:'Trust / probate documents (if applicable)',key:'si_trust'},
+      {label:'Existing survey (if available)',key:'si_survey'},
+      {label:'Solar information collected (if applicable)',key:'si_solar'},
+      {label:'Existing leases collected (if applicable)',key:'si_leases'},
+      {label:'Home warranty information collected',key:'si_warranty'},
+      {label:'Open title / request preliminary title report',key:'si_title'},
+      {label:'Request ownership verification and lien search',key:'si_liens'},
+      {label:'Request estimated seller net sheet',key:'si_netsheet'},
+      {label:'Review payoff balances and closing costs',key:'si_payoff'},
+      {label:'Discuss timeline and moving plans',key:'si_timeline'},
+      {label:'Seller disclosures sent',key:'si_disclosures'},
+      {label:'Next follow-up date set',key:'si_followup'}
+    ]},
+    {phase:'Form 3 - Listing Go-Live Checklist', steps:[
+      {label:'Listing agreement signed',key:'lg_agreement'},
+      {label:'Seller disclosures completed',key:'lg_disclosures'},
+      {label:'Title opened',key:'lg_title'},
+      {label:'Payoff requested',key:'lg_payoff'},
+      {label:'CMA prepared and pricing strategy set',key:'lg_cma'},
+      {label:'Staging consultation completed',key:'lg_staging'},
+      {label:'Photography scheduled',key:'lg_photo_sched'},
+      {label:'Photos received and approved',key:'lg_photos'},
+      {label:'Drone photos completed',key:'lg_drone'},
+      {label:'Floor plan completed',key:'lg_floorplan'},
+      {label:'TikTok / Reels video created',key:'lg_video'},
+      {label:'MLS data input and verified',key:'lg_mls'},
+      {label:'Lockbox installed',key:'lg_lockbox'},
+      {label:'Sign installed',key:'lg_sign'},
+      {label:'Property brochures created',key:'lg_brochures'},
+      {label:'Showing instructions confirmed',key:'lg_showing_instr'},
+      {label:'MLS activated',key:'lg_mls_live'},
+      {label:'Just Listed announcement sent',key:'lg_announcement'},
+      {label:'Facebook post published',key:'lg_facebook'},
+      {label:'Instagram post published',key:'lg_instagram'},
+      {label:'Email blast to database sent',key:'lg_email'},
+      {label:'Agent to agent notification sent',key:'lg_agent_notify'},
+      {label:'Open house scheduled',key:'lg_openhouse'},
+      {label:'Listing ads launched',key:'lg_ads'},
+      {label:'Property flyers delivered',key:'lg_flyers'}
+    ]},
+    {phase:'Under Contract - Seller Side', steps:[
+      {label:'Offer received and reviewed',key:'suc_offer'},
+      {label:'Offer summary / net sheet prepared',key:'suc_netsheet'},
+      {label:'Offer accepted / countered',key:'suc_accepted'},
+      {label:'Earnest money received',key:'suc_earnest'},
+      {label:'Due diligence deadline tracked',key:'suc_duedilig',hasDate:true,dateKey:'tcDueDiligDate'},
+      {label:'Financing deadline tracked',key:'suc_financing',hasDate:true,dateKey:'tcFinancingDate'},
+      {label:'Appraisal deadline tracked',key:'suc_appraisal',hasDate:true,dateKey:'tcAppraisalDate'},
+      {label:'Inspection ordered by buyer',key:'suc_insp'},
+      {label:'Inspection report received',key:'suc_insp_report'},
+      {label:'Repair negotiations completed',key:'suc_repairs'},
+      {label:'Addendum signed',key:'suc_addendum'},
+      {label:'Appraisal completed',key:'suc_appr'},
+      {label:'Title commitment received',key:'suc_title'},
+      {label:'Utilities / accounts reviewed',key:'suc_utilities'},
+      {label:'Signing date and time set',key:'suc_signing'},
+      {label:'Final walkthrough scheduled',key:'suc_walkthrough'},
+      {label:'Funds to close confirmed',key:'suc_funds'},
+      {label:'Recording confirmed',key:'suc_recording'},
+      {label:'Keys / access confirmed',key:'suc_keys'}
+    ]},
+    {phase:'Closing & Post-Close', steps:[
+      {label:'Settlement statement reviewed',key:'scl_settlement'},
+      {label:'Closing appointment confirmed',key:'scl_appt'},
+      {label:'Proceeds / wire confirmed',key:'scl_proceeds'},
+      {label:'Closing gift delivered',key:'scl_gift'}
+    ]},
+    {phase:'Form 5 - Post-Closing Follow-Up', steps:[
+      {label:'Thank you / appreciation sent',key:'spc_thankyou'},
+      {label:'Review requested (Google / Social)',key:'spc_review'},
+      {label:'Testimonial requested',key:'spc_testimonial'},
+      {label:'Referral requested',key:'spc_referral'},
+      {label:'Moved to Past Client in Follow Up Boss',key:'spc_fub'},
+      {label:'Notes updated with closing info',key:'spc_notes'},
+      {label:'Home anniversary added',key:'spc_anniversary'},
+      {label:'Birthday added (if known)',key:'spc_birthday'},
+      {label:'Tags updated (Past Client)',key:'spc_tags'},
+      {label:'Nurture / long-term campaign started',key:'spc_nurture'},
+      {label:'7-Day follow-up completed',key:'spc_7day'},
+      {label:'30-Day follow-up completed',key:'spc_30day'},
+      {label:'90-Day check-in completed',key:'spc_90day'},
+      {label:'6-Month follow-up completed',key:'spc_6mo'},
+      {label:'1-Year / Anniversary check-in',key:'spc_1year'}
+    ]}
+  ]
+};
+
+function saveTX(tx){ sv(); if(supaReady && tx) dbSave('transactions', [tx]); }
+
+function initTC(){
+  renderTC();
+  updateNbTC();
+}
+
+function updateNbTC(){
+  var active = TX.filter(function(t){ return t.status !== 'closed'; }).length;
+  ge('nbTC').textContent = active;
+}
+
+function tcProgress(tx){
+  var template = TC_TEMPLATES[tx.type] || TC_TEMPLATES['buyer'];
+  var total = 0, done = 0;
+  template.forEach(function(phase){
+    phase.steps.forEach(function(step){
+      total++;
+      if(tx.steps && tx.steps[step.key]) done++;
+    });
+  });
+  return total > 0 ? Math.round((done/total)*100) : 0;
+}
+
+function tcNextSteps(tx){
+  var template = TC_TEMPLATES[tx.type] || TC_TEMPLATES['buyer'];
+  var next = [];
+  for(var i=0;i<template.length;i++){
+    var phase = template[i];
+    for(var j=0;j<phase.steps.length;j++){
+      var step = phase.steps[j];
+      if(!tx.steps || !tx.steps[step.key]){
+        next.push({phase:phase.phase, label:step.label});
+        if(next.length >= 3) return next;
+      }
+    }
+  }
+  return next;
+}
+
+function renderTC(){
+  var grid = ge('tcGrid');
+  grid.innerHTML = '';
+  var list = tcFilter === 'all' ? TX.filter(function(t){ return t.status !== 'closed'; })
+    : tcFilter === 'closed' ? TX.filter(function(t){ return t.status === 'closed'; })
+    : TX.filter(function(t){ return t.type === tcFilter && t.status !== 'closed'; });
+
+  if(!list.length){
+    grid.innerHTML = '<div class="empty" style="grid-column:1/-1">No transactions yet. Click <b>+ New Transaction</b> to get started.</div>';
+    return;
+  }
+
+  list.forEach(function(tx){
+    var prog = tcProgress(tx);
+    var next = tcNextSteps(tx);
+    var c = gc(tx.contactId);
+    var daysToClose = tx.closingDate ? du(tx.closingDate) : null;
+
+    var card = document.createElement('div');
+    card.className = 'tc-card';
+    (function(txId){ card.addEventListener('click', function(){ openTCDetail(txId); }); })(tx.id);
+
+    var hdr = document.createElement('div');
+    hdr.className = 'tc-card-header';
+    var tl = document.createElement('div');
+    tl.style.flex = '1';
+    var title = document.createElement('div');
+    title.className = 'tc-card-title';
+    title.textContent = tx.address || 'No address';
+    var sub = document.createElement('div');
+    sub.style.cssText = 'font-size:11px;color:var(--text3);margin-top:2px;';
+    sub.textContent = c ? fn(c) : 'Unknown client';
+    tl.appendChild(title); tl.appendChild(sub);
+    var badge = document.createElement('span');
+    badge.className = 'tc-type-badge tc-' + tx.type;
+    badge.textContent = tx.type;
+    hdr.appendChild(tl); hdr.appendChild(badge);
+    card.appendChild(hdr);
+
+    var body = document.createElement('div');
+    body.className = 'tc-card-body';
+
+    // Progress bar
+    var progRow = document.createElement('div');
+    progRow.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;';
+    var progLbl = document.createElement('div');
+    progLbl.style.cssText = 'font-size:11px;color:var(--text3);';
+    progLbl.textContent = prog + '% complete';
+    var progPct = document.createElement('div');
+    progPct.style.cssText = 'font-family:monospace;font-size:11px;color:var(--accent);';
+    progPct.textContent = prog + '%';
+    progRow.appendChild(progLbl); progRow.appendChild(progPct);
+    var bar = document.createElement('div');
+    bar.className = 'tc-progress-bar';
+    var fill = document.createElement('div');
+    fill.className = 'tc-progress-fill';
+    fill.style.width = prog + '%';
+    fill.style.background = prog >= 100 ? 'var(--lead)' : prog >= 50 ? 'var(--accent)' : 'var(--buyer)';
+    bar.appendChild(fill);
+    body.appendChild(progRow); body.appendChild(bar);
+
+    // Key dates
+    if(tx.closingDate || tx.price){
+      var dates = document.createElement('div');
+      dates.style.cssText = 'display:flex;gap:12px;margin:10px 0 8px;flex-wrap:wrap;';
+      if(tx.price){ var p=document.createElement('div'); p.style.cssText='font-size:12px;'; p.innerHTML='<span style="color:var(--text3);">Price:</span> <b style="color:var(--accent);">'+tx.price+'</b>'; dates.appendChild(p); }
+      if(tx.closingDate){
+        var d=document.createElement('div'); d.style.cssText='font-size:12px;';
+        var n=daysToClose;
+        var color = n < 0 ? 'var(--danger)' : n <= 7 ? 'var(--warn)' : 'var(--lead)';
+        var lbl = n < 0 ? Math.abs(n)+'d overdue' : n === 0 ? 'TODAY' : n+'d to close';
+        d.innerHTML='<span style="color:var(--text3);">Close:</span> <b style="color:'+color+';">'+lbl+'</b>';
+        dates.appendChild(d);
+      }
+      body.appendChild(dates);
+    }
+
+    // Next steps preview
+    if(next.length){
+      var nextDiv = document.createElement('div');
+      nextDiv.style.cssText = 'margin-top:8px;padding-top:8px;border-top:1px solid var(--border);';
+      var nextLbl = document.createElement('div');
+      nextLbl.style.cssText = 'font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px;';
+      nextLbl.textContent = 'Next Steps';
+      nextDiv.appendChild(nextLbl);
+      next.slice(0,2).forEach(function(ns){
+        var row = document.createElement('div');
+        row.style.cssText = 'font-size:12px;color:var(--text2);padding:3px 0;display:flex;align-items:flex-start;gap:6px;';
+        row.innerHTML = '<span style="color:var(--accent);flex-shrink:0;">&#8250;</span>' + ns.label;
+        nextDiv.appendChild(row);
+      });
+      body.appendChild(nextDiv);
+    }
+
+    card.appendChild(body);
+    grid.appendChild(card);
+  });
+
+  updateNbTC();
+}
+
+function openTCDetail(id){
+  curTx = id;
+  var tx = TX.find(function(t){ return t.id === id; });
+  if(!tx) return;
+  var c = gc(tx.contactId);
+
+  ge('tcDetTitle').textContent = tx.address || 'Transaction';
+  ge('tcDetSub').textContent = (c ? fn(c) : 'Unknown') + ' | ' + tx.type.toUpperCase() + (tx.price ? ' | ' + tx.price : '') + (tx.closingDate ? ' | Close: ' + fd(tx.closingDate) : '');
+
+  var body = ge('tcDetBody');
+  body.innerHTML = '';
+
+  // Info section
+  var infoSec = document.createElement('div');
+  infoSec.style.cssText = 'padding:14px 20px;border-bottom:1px solid var(--border);display:flex;flex-wrap:wrap;gap:10px;';
+  var fields = [
+    ['MLS #', tx.mlsNum||'-'],
+    ['Lender', tx.lender||'-'],
+    ['Title Co', tx.titleCo||'-'],
+    ['Contract', tx.contractDate ? fd(tx.contractDate) : '-'],
+    ['Close', tx.closingDate ? fd(tx.closingDate) : '-'],
+    ['Earnest Due', tx.earnestDate ? fd(tx.earnestDate) : '-'],
+    ['Due Diligence', tx.dueDiligDate ? fd(tx.dueDiligDate) : '-'],
+    ['Financing', tx.financingDate ? fd(tx.financingDate) : '-'],
+    ['Appraisal', tx.appraisalDate ? fd(tx.appraisalDate) : '-']
+  ];
+  fields.forEach(function(f){
+    var d = document.createElement('div');
+    d.style.cssText = 'font-size:12px;min-width:120px;';
+    d.innerHTML = '<span style="color:var(--text3);">' + f[0] + ':</span> <b style="color:var(--text);">' + f[1] + '</b>';
+    infoSec.appendChild(d);
+  });
+  body.appendChild(infoSec);
+
+  // Progress
+  var prog = tcProgress(tx);
+  var progSec = document.createElement('div');
+  progSec.style.cssText = 'padding:12px 20px;border-bottom:1px solid var(--border);';
+  var progBar = document.createElement('div');
+  progBar.className = 'tc-progress-bar';
+  var progFill = document.createElement('div');
+  progFill.className = 'tc-progress-fill';
+  progFill.style.width = prog + '%';
+  progFill.style.background = prog >= 100 ? 'var(--lead)' : prog >= 50 ? 'var(--accent)' : 'var(--buyer)';
+  progBar.appendChild(progFill);
+  var progLbl = document.createElement('div');
+  progLbl.style.cssText = 'font-size:12px;color:var(--text3);margin-top:4px;';
+  progLbl.textContent = prog + '% complete across all checklist items';
+  progSec.appendChild(progBar); progSec.appendChild(progLbl);
+  body.appendChild(progSec);
+
+  // Checklist phases
+  var template = TC_TEMPLATES[tx.type] || TC_TEMPLATES['buyer'];
+  template.forEach(function(phase){
+    var doneInPhase = phase.steps.filter(function(s){ return tx.steps && tx.steps[s.key]; }).length;
+    var phaseHdr = document.createElement('div');
+    phaseHdr.className = 'tc-phase-header';
+    phaseHdr.innerHTML = phase.phase + ' <span style="float:right;font-size:10px;color:var(--accent);">' + doneInPhase + '/' + phase.steps.length + '</span>';
+    body.appendChild(phaseHdr);
+
+    phase.steps.forEach(function(step){
+      var isDone = tx.steps && tx.steps[step.key];
+      var row = document.createElement('div');
+      row.className = 'tc-step';
+      row.style.padding = '9px 20px';
+
+      var chk = document.createElement('div');
+      chk.className = 'tc-step-chk' + (isDone ? ' done' : '');
+      if(isDone){
+        var sv2 = document.createElementNS('http://www.w3.org/2000/svg','svg');
+        sv2.setAttribute('width','9'); sv2.setAttribute('height','9');
+        sv2.setAttribute('fill','none'); sv2.setAttribute('stroke','#0d0f14');
+        sv2.setAttribute('stroke-width','3'); sv2.setAttribute('viewBox','0 0 24 24');
+        var poly = document.createElementNS('http://www.w3.org/2000/svg','polyline');
+        poly.setAttribute('points','20,6 9,17 4,12');
+        sv2.appendChild(poly); chk.appendChild(sv2);
+      }
+      (function(txId, stepKey, chkEl){
+        chk.addEventListener('click', function(){
+          var t = TX.find(function(x){ return x.id === txId; });
+          if(!t) return;
+          if(!t.steps) t.steps = {};
+          t.steps[stepKey] = !t.steps[stepKey];
+          saveTX(tx);
+          openTCDetail(txId);
+          renderTC();
+          updateNbTC();
+        });
+      })(id, step.key, chk);
+
+      var info = document.createElement('div');
+      info.className = 'tc-step-info';
+      var lbl = document.createElement('div');
+      lbl.className = 'tc-step-label' + (isDone ? ' done' : '');
+      lbl.textContent = step.label;
+      info.appendChild(lbl);
+
+      // Show relevant date if this step has one
+      if(step.hasDate && tx[step.dateKey.replace('tc','').toLowerCase()+'Date']){
+        var dateVal = tx[step.dateKey.replace('tc','').toLowerCase()+'Date'];
+        if(dateVal){
+          var n = du(dateVal);
+          var due = document.createElement('div');
+          due.className = 'tc-step-due' + (n < 0 ? ' overdue' : n <= 3 ? ' soon' : '');
+          due.textContent = n < 0 ? Math.abs(n)+'d overdue ('+fd(dateVal)+')' : n === 0 ? 'Due TODAY' : 'Due in '+n+'d ('+fd(dateVal)+')';
+          info.appendChild(due);
+        }
+      }
+
+      row.appendChild(chk); row.appendChild(info);
+      body.appendChild(row);
+    });
+  });
+
+  // Notes
+  if(tx.notes){
+    var notesSec = document.createElement('div');
+    notesSec.style.cssText = 'padding:14px 20px;border-top:1px solid var(--border);';
+    notesSec.innerHTML = '<div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:2px;margin-bottom:6px;">Notes</div><div style="font-size:13px;color:var(--text2);">'+tx.notes+'</div>';
+    body.appendChild(notesSec);
+  }
+
+  ge('tcDetOv').classList.add('open');
+  ge('tcAiResponse').style.display = 'none';
+  ge('tcAiInput').value = '';
+}
+
+// AI Status Query
+async function askTCQuestion(){
+  var txId = curTx;
+  var tx = TX.find(function(t){ return t.id === txId; });
+  if(!tx) return;
+  var question = ge('tcAiInput').value.trim();
+  if(!question) return;
+
+  var btn = ge('btnTCAsk');
+  btn.textContent = '...';
+  btn.disabled = true;
+  ge('tcAiResponse').style.display = 'block';
+  ge('tcAiResponse').textContent = 'Thinking...';
+
+  var template = TC_TEMPLATES[tx.type] || TC_TEMPLATES['buyer'];
+  var doneItems = [], pendingItems = [], urgentItems = [];
+  template.forEach(function(phase){
+    phase.steps.forEach(function(step){
+      if(tx.steps && tx.steps[step.key]){
+        doneItems.push(phase.phase + ': ' + step.label);
+      } else {
+        pendingItems.push(phase.phase + ': ' + step.label);
+        if(step.hasDate){
+          var dateKey = step.dateKey.replace('tc','').replace('Date','').toLowerCase() + 'Date';
+          if(tx[dateKey]){
+            var n = du(tx[dateKey]);
+            if(n <= 3) urgentItems.push(step.label + ' (due in ' + n + ' days)');
+          }
+        }
+      }
+    });
+  });
+
+  var c = gc(tx.contactId);
+  var NL = '\n';
+  var context = 'You are a transaction coordinator AI for Palacios Baker Real Estate in Utah.' + NL
+    + 'Transaction: ' + (tx.address||'Unknown address') + NL
+    + 'Type: ' + tx.type + ' transaction' + NL
+    + 'Client: ' + (c ? fn(c) : 'Unknown') + NL
+    + 'Sale Price: ' + (tx.price||'Not set') + NL
+    + 'Contract Date: ' + (tx.contractDate||'Not set') + NL
+    + 'Closing Date: ' + (tx.closingDate||'Not set') + NL
+    + 'Earnest Money Due: ' + (tx.earnestDate||'Not set') + NL
+    + 'Due Diligence Deadline: ' + (tx.dueDiligDate||'Not set') + NL
+    + 'Financing Deadline: ' + (tx.financingDate||'Not set') + NL
+    + 'Appraisal Deadline: ' + (tx.appraisalDate||'Not set') + NL
+    + 'Lender: ' + (tx.lender||'Not set') + NL
+    + 'Title Company: ' + (tx.titleCo||'Not set') + NL
+    + 'Progress: ' + tcProgress(tx) + '% complete' + NL + NL
+    + 'COMPLETED STEPS (' + doneItems.length + '):' + NL + doneItems.join(NL) + NL + NL
+    + 'PENDING STEPS (' + pendingItems.length + '):' + NL + pendingItems.join(NL) + NL + NL
+    + (urgentItems.length ? 'URGENT / UPCOMING DEADLINES:' + NL + urgentItems.join(NL) + NL + NL : '')
+    + 'Agent question: ' + question + NL + NL
+    + 'Give a clear, practical, concise answer. Be direct. Use bullet points if listing multiple items.';
+
+  try{
+    var resp = await fetch('/.netlify/functions/claude', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 600,
+        messages: [{role:'user', content: context}]
+      })
+    });
+    var data = await resp.json();
+    var answer = data.content && data.content[0] ? data.content[0].text : 'Unable to get a response.';
+    ge('tcAiResponse').textContent = answer;
+  }catch(e){
+    ge('tcAiResponse').textContent = 'Error connecting to AI. Check your connection and try again.';
+  }
+  btn.textContent = 'Ask';
+  btn.disabled = false;
+}
+
+function openNewTxModal(){
+  ge('tcModalTitle').textContent = 'New Transaction';
+  ge('btnSaveTransaction').setAttribute('data-edit-id','');
+  ge('tcType').value = 'buyer';
+  ge('tcContact').innerHTML = '';
+  C.forEach(function(c){ var o=document.createElement('option'); o.value=c.id; o.textContent=fn(c)+' ('+c.type+')'; ge('tcContact').appendChild(o); });
+  ['tcAddress','tcPrice','tcMLS','tcLender','tcTitle','tcNotes'].forEach(function(x){ ge(x).value=''; });
+  ['tcContractDate','tcClosingDate','tcEarnestDate','tcDueDiligDate','tcFinancingDate','tcAppraisalDate'].forEach(function(x){ ge(x).value=''; });
+  cm('tcModal');
+  ge('tcModal').classList.add('open');
+}
+
+function saveTransaction(){
+  var editId = ge('btnSaveTransaction').getAttribute('data-edit-id');
+  var tx;
+  if(editId){
+    tx = TX.find(function(t){ return t.id == editId; });
+    if(!tx) return;
+  } else {
+    tx = {id: Date.now(), steps: {}, status: 'active'};
+    TX.push(tx);
+  }
+  tx.type = ge('tcType').value;
+  tx.contactId = parseInt(ge('tcContact').value);
+  tx.address = ge('tcAddress').value.trim();
+  tx.price = ge('tcPrice').value.trim();
+  tx.mlsNum = ge('tcMLS').value.trim();
+  tx.lender = ge('tcLender').value.trim();
+  tx.titleCo = ge('tcTitle').value.trim();
+  tx.notes = ge('tcNotes').value.trim();
+  tx.contractDate = ge('tcContractDate').value;
+  tx.closingDate = ge('tcClosingDate').value;
+  tx.earnestDate = ge('tcEarnestDate').value;
+  tx.dueDiligDate = ge('tcDueDiligDate').value;
+  tx.financingDate = ge('tcFinancingDate').value;
+  tx.appraisalDate = ge('tcAppraisalDate').value;
+
+  // Auto-create deadlines in the main deadline tracker
+  var dateMap = [
+    {type:'Earnest Money Due', key:'earnestDate'},
+    {type:'Due Diligence Deadline', key:'dueDiligDate'},
+    {type:'Financing Deadline', key:'financingDate'},
+    {type:'Appraisal Deadline', key:'appraisalDate'},
+    {type:'Closing Date', key:'closingDate'}
+  ];
+  dateMap.forEach(function(dm){
+    if(tx[dm.key]){
+      var exists = D.find(function(d){ return d.contactId===tx.contactId && d.type===dm.type; });
+      if(!exists){
+        var nd = {id: Date.now()+Math.random(), contactId:tx.contactId, type:dm.type, date:tx[dm.key]};
+        D.push(nd);
+        saveDL(nd);
+      }
+    }
+  });
+
+  saveTX(tx);
+  cm('tcModal');
+  renderTC();
+  updateNbTC();
+  rd();
+  if(curTx && curTx === tx.id) openTCDetail(tx.id);
+}
+
+// Add TC to briefing
+function getTCBriefingItems(){
+  var items = [];
+  var today = tod();
+  TX.filter(function(t){ return t.status !== 'closed'; }).forEach(function(tx){
+    var c = gc(tx.contactId);
+    var name = c ? fn(c) : 'Unknown';
+    // Check urgent deadlines
+    var dateChecks = [
+      {label:'Earnest Money Due', key:'earnestDate'},
+      {label:'Due Diligence', key:'dueDiligDate'},
+      {label:'Financing Deadline', key:'financingDate'},
+      {label:'Appraisal Deadline', key:'appraisalDate'},
+      {label:'Closing Date', key:'closingDate'}
+    ];
+    dateChecks.forEach(function(dc){
+      if(tx[dc.key]){
+        var n = du(tx[dc.key]);
+        if(n <= 3 && n >= -1){
+          items.push({name: name, address: tx.address, label: dc.label, days: n, urgent: n <= 0});
+        }
+      }
+    });
+    // Next pending step
+    var next = tcNextSteps(tx);
+    if(next.length) items.push({name: name, address: tx.address, nextStep: next[0].label, type:'nextstep'});
+  });
+  return items;
+}
+
+// -- DOCUMENT SCANNER ---
+var scannerDocType = 'auto';
+var scannerHistory = [];
+var lastScanResult = null;
+
+function initScanner(){
+  renderScannerHistory();
+}
+
+function renderScannerHistory(){
+  var el = ge('scannerHistoryList');
+  if(!el) return;
+  if(!scannerHistory.length){
+    el.innerHTML = '<div class="empty">No documents scanned yet.</div>';
+    return;
+  }
+  el.innerHTML = '';
+  scannerHistory.slice().reverse().forEach(function(s){
+    var row = document.createElement('div');
+    row.className = 'scanner-history-item';
+    var icon = document.createElement('div');
+    icon.style.cssText = 'width:36px;height:36px;background:var(--surface2);border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0;color:var(--accent);';
+    icon.innerHTML = '<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>';
+    var info = document.createElement('div');
+    info.style.flex = '1';
+    info.innerHTML = '<div class="scanner-history-title">' + (s.docType||'Document') + ' - ' + (s.address||'Unknown property') + '</div>'
+      + '<div class="scanner-history-sub">' + new Date(s.scannedAt).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}) + ' - ' + (s.imported ? 'Imported to CRM' : 'Not imported') + '</div>';
+    var badge = document.createElement('span');
+    badge.className = 'badge ' + (s.imported ? 'b-ok' : 'b-warn');
+    badge.textContent = s.imported ? 'Imported' : 'Pending';
+    row.appendChild(icon); row.appendChild(info); row.appendChild(badge);
+    el.appendChild(row);
+  });
+}
+
+function startScan(file){
+  if(!file) return;
+  var maxSize = 20 * 1024 * 1024; // 20MB
+  if(file.size > maxSize){ alert('File too large. Please use a file under 20MB.'); return; }
+
+  ge('scannerUploadArea').style.display = 'none';
+  ge('scannerResults').style.display = 'none';
+  ge('scannerProcessing').style.display = 'block';
+  ge('scannerHistory').style.display = 'none';
+
+  var docTypeHints = {
+    auto: 'Analyze this real estate document and determine what type it is.',
+    repc: 'This is a Utah REPC (Real Estate Purchase Contract).',
+    addendum: 'This is a real estate addendum or amendment.',
+    inspection: 'This is a property inspection report.',
+    title: 'This is a title commitment or title report.',
+    hoa: 'This is an HOA document.',
+    other: 'This is a real estate related document.'
+  };
+
+  var hint = docTypeHints[scannerDocType] || docTypeHints['auto'];
+  var isPDF = file.type === 'application/pdf';
+
+  var processingMsgs = [
+    'Analyzing document...',
+    'Extracting key information...',
+    'Identifying deadlines and dates...',
+    'Generating summary...'
+  ];
+  var msgIdx = 0;
+  var msgTimer = setInterval(function(){
+    msgIdx = (msgIdx + 1) % processingMsgs.length;
+    var el = ge('scannerProcessingMsg');
+    if(el) el.textContent = processingMsgs[msgIdx];
+  }, 3000);
+
+  var reader = new FileReader();
+  reader.onload = function(e){
+    var base64 = e.target.result.split(',')[1];
+    var mediaType = file.type || 'image/jpeg';
+
+    var msgContent;
+    if(isPDF){
+      msgContent = [
+        {type:'document', source:{type:'base64', media_type:'application/pdf', data:base64}},
+        {type:'text', text: buildScannerPrompt(hint)}
+      ];
+    } else {
+      msgContent = [
+        {type:'image', source:{type:'base64', media_type:mediaType, data:base64}},
+        {type:'text', text: buildScannerPrompt(hint)}
+      ];
+    }
+
+    fetch('/.netlify/functions/claude', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        model:'claude-sonnet-4-20250514',
+        max_tokens:2000,
+        messages:[{role:'user', content:msgContent}]
+      })
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      clearInterval(msgTimer);
+      if(!data.content || !data.content[0]){
+        showScannerError('No response from AI. Please try again.');
+        return;
+      }
+      var text = data.content[0].text;
+      try{
+        // Strip markdown code fences if present
+        var clean = text.replace(/```json[\s\S]?/g,'').replace(/```/g,'').trim();
+        var result = JSON.parse(clean);
+        lastScanResult = result;
+        result.scannedAt = new Date().toISOString();
+        result.fileName = file.name;
+        scannerHistory.push(result);
+        try{ localStorage.setItem('scanner_history', JSON.stringify(scannerHistory.slice(-20))); }catch(e){}
+        showScannerResults(result);
+      }catch(parseErr){
+        console.log('Parse error:', parseErr, 'Raw:', text);
+        // AI responded but not as JSON - show raw response
+        showScannerRawResult(text);
+      }
+    })
+    .catch(function(err){
+      clearInterval(msgTimer);
+      showScannerError('Connection error: ' + err.message);
+    });
+  };
+  reader.readAsDataURL(file);
+}
+
+function buildScannerPrompt(hint){
+  var lines = [
+    hint,
+    'Analyze this document carefully and extract all available information.',
+    'Return ONLY a valid JSON object (no markdown, no explanation) with these fields:',
+    '{',
+    '  "docType": "REPC|Addendum|Inspection Report|Title Commitment|HOA Docs|Other",',
+    '  "summary": "3-5 sentence plain English summary of what this document is and its key points",',
+    '  "address": "full property address",',
+    '  "buyerName": "buyer name(s)",',
+    '  "sellerName": "seller name(s)",',
+    '  "purchasePrice": "price as string e.g. $450,000",',
+    '  "loanAmount": "loan amount if present",',
+    '  "earnestMoney": "earnest money amount",',
+    '  "contractDate": "YYYY-MM-DD or empty string",',
+    '  "closingDate": "YYYY-MM-DD or empty string",',
+    '  "earnestMoneyDeadline": "YYYY-MM-DD or empty string",',
+    '  "dueDiligenceDeadline": "YYYY-MM-DD or empty string",',
+    '  "financingDeadline": "YYYY-MM-DD or empty string",',
+    '  "appraisalDeadline": "YYYY-MM-DD or empty string",',
+    '  "settlementDeadline": "YYYY-MM-DD or empty string",',
+    '  "lenderName": "lender name if present",',
+    '  "titleCompany": "title company if present",',
+    '  "mlsNumber": "MLS number if present",',
+    '  "contingencies": ["list", "of", "contingencies"],',
+    '  "redFlags": ["any items needing attention", "unusual clauses", "tight deadlines"],',
+    '  "keyChanges": "for addenda only - what changed from original contract",',
+    '  "inspectionItems": ["for inspection reports - major items found"],',
+    '  "spanishSummary": "same summary in Spanish"',
+    '}',
+    'If a field is not found use an empty string.',
+    'For dates always use YYYY-MM-DD format.',
+    'Be thorough - this data will be imported into a real estate CRM.'
+  ];
+  return lines.join('\n');
+}
+
+function showScannerResults(r){
+  ge('scannerProcessing').style.display = 'none';
+  ge('scannerHistory').style.display = 'block';
+
+  var res = ge('scannerResults');
+  res.style.display = 'block';
+  res.innerHTML = '';
+
+  var card = document.createElement('div');
+  card.className = 'scanner-result';
+
+  // Header
+  var hdr = document.createElement('div');
+  hdr.className = 'scanner-result-header';
+  var titleDiv = document.createElement('div');
+  var title = document.createElement('div');
+  title.className = 'scanner-result-title';
+  title.textContent = r.docType || 'Document';
+  var addr = document.createElement('div');
+  addr.style.cssText = 'font-size:13px;color:var(--text2);margin-top:3px;';
+  addr.textContent = r.address || 'Address not found';
+  titleDiv.appendChild(title); titleDiv.appendChild(addr);
+  var typeB = document.createElement('span');
+  typeB.className = 'scanner-doc-type';
+  typeB.textContent = r.docType || 'Document';
+  hdr.appendChild(titleDiv); hdr.appendChild(typeB);
+  card.appendChild(hdr);
+
+  // Summary
+  if(r.summary){
+    var sumDiv = document.createElement('div');
+    sumDiv.className = 'scanner-summary';
+    var sumLabel = document.createElement('div');
+    sumLabel.style.cssText = 'font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);margin-bottom:6px;';
+    sumLabel.textContent = 'Summary';
+    var sumText = document.createElement('div');
+    sumText.textContent = r.summary;
+    sumDiv.appendChild(sumLabel); sumDiv.appendChild(sumText);
+    card.appendChild(sumDiv);
+  }
+
+  // Spanish summary
+  if(r.spanishSummary){
+    var spDiv = document.createElement('div');
+    spDiv.className = 'scanner-summary';
+    spDiv.style.borderLeftColor = 'var(--seller)';
+    var spLabel = document.createElement('div');
+    spLabel.style.cssText = 'font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);margin-bottom:6px;';
+    spLabel.textContent = 'Resumen en Espanol';
+    var spText = document.createElement('div');
+    spText.textContent = r.spanishSummary;
+    spDiv.appendChild(spLabel); spDiv.appendChild(spText);
+    card.appendChild(spDiv);
+  }
+
+  // Key fields grid - editable
+  var fieldsLabel = document.createElement('div');
+  fieldsLabel.style.cssText = 'font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);margin-bottom:8px;';
+  fieldsLabel.textContent = 'Extracted Data (edit before importing)';
+  card.appendChild(fieldsLabel);
+
+  var fields = document.createElement('div');
+  fields.className = 'scanner-fields';
+  var fieldDefs = [
+    {label:'Buyer Name', key:'buyerName', id:'sc_buyer'},
+    {label:'Seller Name', key:'sellerName', id:'sc_seller'},
+    {label:'Purchase Price', key:'purchasePrice', id:'sc_price'},
+    {label:'Earnest Money', key:'earnestMoney', id:'sc_earnest_amt'},
+    {label:'Lender', key:'lenderName', id:'sc_lender'},
+    {label:'Title Company', key:'titleCompany', id:'sc_title'},
+    {label:'MLS Number', key:'mlsNumber', id:'sc_mls'},
+    {label:'Loan Amount', key:'loanAmount', id:'sc_loan'}
+  ];
+  fieldDefs.forEach(function(f){
+    var fDiv = document.createElement('div');
+    fDiv.className = 'scanner-field';
+    var lbl = document.createElement('div');
+    lbl.className = 'scanner-field-label';
+    lbl.textContent = f.label;
+    var val = document.createElement('input');
+    val.className = 'scanner-field-val editable';
+    val.id = f.id;
+    val.value = r[f.key] || '';
+    val.placeholder = 'Not found';
+    fDiv.appendChild(lbl); fDiv.appendChild(val);
+    fields.appendChild(fDiv);
+  });
+  card.appendChild(fields);
+
+  // Deadlines section
+  var dlLabel = document.createElement('div');
+  dlLabel.style.cssText = 'font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);margin-bottom:8px;margin-top:4px;';
+  dlLabel.textContent = 'Key Dates & Deadlines (edit before importing)';
+  card.appendChild(dlLabel);
+
+  var dlDiv = document.createElement('div');
+  dlDiv.className = 'scanner-deadlines';
+  dlDiv.style.cssText = 'background:var(--surface2);border-radius:9px;padding:12px 14px;';
+  var deadlineDefs = [
+    {label:'Contract Date', key:'contractDate', id:'sc_contract'},
+    {label:'Earnest Money Due', key:'earnestMoneyDeadline', id:'sc_earnest_date'},
+    {label:'Due Diligence Deadline', key:'dueDiligenceDeadline', id:'sc_duedilig'},
+    {label:'Financing Deadline', key:'financingDeadline', id:'sc_financing'},
+    {label:'Appraisal Deadline', key:'appraisalDeadline', id:'sc_appraisal'},
+    {label:'Closing / Settlement Date', key:'settlementDeadline', id:'sc_closing'}
+  ];
+  deadlineDefs.forEach(function(d){
+    var row = document.createElement('div');
+    row.className = 'scanner-deadline-row';
+    var dot = document.createElement('div');
+    dot.className = 'dot ' + (r[d.key] ? 'dot-g' : 'dot-r');
+    var lbl = document.createElement('div');
+    lbl.style.cssText = 'flex:1;font-size:13px;color:var(--text);';
+    lbl.textContent = d.label;
+    var inp = document.createElement('input');
+    inp.id = d.id;
+    inp.type = 'date';
+    inp.value = r[d.key] || '';
+    inp.style.cssText = 'background:var(--surface);border:1px solid var(--border);border-radius:5px;padding:4px 8px;font-size:12px;color:var(--text);font-family:DM Sans,sans-serif;outline:none;';
+    inp.addEventListener('focus', function(){ this.style.borderColor='var(--accent)'; });
+    inp.addEventListener('blur', function(){ this.style.borderColor='var(--border)'; });
+    row.appendChild(dot); row.appendChild(lbl); row.appendChild(inp);
+    dlDiv.appendChild(row);
+  });
+  card.appendChild(dlDiv);
+
+  // Red flags
+  if(r.redFlags && r.redFlags.length){
+    var flagDiv = document.createElement('div');
+    flagDiv.className = 'scanner-flags';
+    flagDiv.style.marginTop = '12px';
+    var flagTitle = document.createElement('div');
+    flagTitle.style.cssText = 'font-size:11px;font-weight:700;color:var(--danger);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;';
+    flagTitle.textContent = 'Items Needing Attention';
+    flagDiv.appendChild(flagTitle);
+    r.redFlags.forEach(function(flag){
+      var f = document.createElement('div');
+      f.className = 'scanner-flag';
+      f.innerHTML = '<span style="color:var(--danger);flex-shrink:0;">!</span>' + flag;
+      flagDiv.appendChild(f);
+    });
+    card.appendChild(flagDiv);
+  }
+
+  // Key changes (addenda)
+  if(r.keyChanges){
+    var chgDiv = document.createElement('div');
+    chgDiv.style.cssText = 'background:rgba(76,142,201,0.08);border:1px solid rgba(76,142,201,0.2);border-radius:8px;padding:12px 14px;margin-top:12px;';
+    chgDiv.innerHTML = '<div style="font-size:11px;font-weight:700;color:var(--buyer);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Changes from Original Contract</div>'
+      + '<div style="font-size:13px;color:var(--text2);">' + r.keyChanges + '</div>';
+    card.appendChild(chgDiv);
+  }
+
+  // Inspection items
+  if(r.inspectionItems && r.inspectionItems.length){
+    var inspDiv = document.createElement('div');
+    inspDiv.style.cssText = 'margin-top:12px;';
+    var inspTitle = document.createElement('div');
+    inspTitle.style.cssText = 'font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);margin-bottom:8px;';
+    inspTitle.textContent = 'Major Inspection Items';
+    inspDiv.appendChild(inspTitle);
+    r.inspectionItems.forEach(function(item){
+      var i = document.createElement('div');
+      i.style.cssText = 'font-size:13px;color:var(--text2);padding:4px 0;border-bottom:1px solid var(--border);display:flex;gap:8px;';
+      i.innerHTML = '<span style="color:var(--warn);">-</span>' + item;
+      inspDiv.appendChild(i);
+    });
+    card.appendChild(inspDiv);
+  }
+
+  // Link to existing contact / transaction
+  var linkDiv = document.createElement('div');
+  linkDiv.style.cssText = 'margin-top:14px;padding-top:12px;border-top:1px solid var(--border);';
+  var linkLabel = document.createElement('div');
+  linkLabel.style.cssText = 'font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px;';
+  linkLabel.textContent = 'Link to Existing Transaction (optional)';
+  var txSel = document.createElement('select');
+  txSel.id = 'sc_link_tx';
+  txSel.className = 'fsel';
+  txSel.style.marginBottom = '0';
+  var blankOpt = document.createElement('option');
+  blankOpt.value = '';
+  blankOpt.textContent = '-- Create new transaction --';
+  txSel.appendChild(blankOpt);
+  TX.forEach(function(tx){
+    var c2 = gc(tx.contactId);
+    var opt = document.createElement('option');
+    opt.value = tx.id;
+    opt.textContent = (tx.address||'Unknown') + (c2?' - '+fn(c2):'');
+    txSel.appendChild(opt);
+  });
+  linkDiv.appendChild(linkLabel); linkDiv.appendChild(txSel);
+  card.appendChild(linkDiv);
+
+  // Action buttons
+  var actions = document.createElement('div');
+  actions.className = 'scanner-actions';
+
+  var importBtn = document.createElement('button');
+  importBtn.className = 'btn btn-p';
+  importBtn.style.fontSize = '14px';
+  importBtn.textContent = 'Import to CRM';
+  importBtn.addEventListener('click', function(){ importScanToTC(r); });
+
+  var newScanBtn = document.createElement('button');
+  newScanBtn.className = 'btn btn-g';
+  newScanBtn.textContent = 'Scan Another Document';
+  newScanBtn.addEventListener('click', function(){
+    ge('scannerUploadArea').style.display = 'block';
+    ge('scannerResults').style.display = 'none';
+    ge('scannerHistory').style.display = 'block';
+    ge('scannerFileInput').value = '';
+  });
+
+  var copyBtn = document.createElement('button');
+  copyBtn.className = 'btn btn-g';
+  copyBtn.textContent = 'Copy Summary';
+  copyBtn.addEventListener('click', function(){
+    var NL2 = '\n';
+    var txt = (r.docType||'Document') + NL2 + (r.address||'') + NL2 + NL2 + (r.summary||'') + NL2 + NL2 + 'Espanol:' + NL2 + (r.spanishSummary||'');
+    navigator.clipboard && navigator.clipboard.writeText(txt);
+    copyBtn.textContent = 'Copied!';
+    setTimeout(function(){ copyBtn.textContent = 'Copy Summary'; }, 2000);
+  });
+
+  actions.appendChild(importBtn); actions.appendChild(newScanBtn); actions.appendChild(copyBtn);
+  card.appendChild(actions);
+  res.appendChild(card);
+  renderScannerHistory();
+}
+
+function importScanToTC(r){
+  // Get edited values from the form fields
+  var address = ge('sc_buyer') ? (r.address||'') : (r.address||'');
+  var buyerName = ge('sc_buyer') ? ge('sc_buyer').value : (r.buyerName||'');
+  var price = ge('sc_price') ? ge('sc_price').value : (r.purchasePrice||'');
+  var lender = ge('sc_lender') ? ge('sc_lender').value : (r.lenderName||'');
+  var titleCo = ge('sc_title') ? ge('sc_title').value : (r.titleCompany||'');
+  var mlsNum = ge('sc_mls') ? ge('sc_mls').value : (r.mlsNumber||'');
+  var contractDate = ge('sc_contract') ? ge('sc_contract').value : (r.contractDate||'');
+  var closingDate = ge('sc_closing') ? ge('sc_closing').value : (r.settlementDeadline||'');
+  var earnestDate = ge('sc_earnest_date') ? ge('sc_earnest_date').value : (r.earnestMoneyDeadline||'');
+  var dueDiligDate = ge('sc_duedilig') ? ge('sc_duedilig').value : (r.dueDiligenceDeadline||'');
+  var financingDate = ge('sc_financing') ? ge('sc_financing').value : (r.financingDeadline||'');
+  var appraisalDate = ge('sc_appraisal') ? ge('sc_appraisal').value : (r.appraisalDeadline||'');
+  var linkTxId = ge('sc_link_tx') ? ge('sc_link_tx').value : '';
+
+  // Check if linking to existing transaction
+  if(linkTxId){
+    var existing = TX.find(function(t){ return t.id == linkTxId; });
+    if(existing){
+      // Update existing transaction with scanned data
+      if(closingDate) existing.closingDate = closingDate;
+      if(earnestDate) existing.earnestDate = earnestDate;
+      if(dueDiligDate) existing.dueDiligDate = dueDiligDate;
+      if(financingDate) existing.financingDate = financingDate;
+      if(appraisalDate) existing.appraisalDate = appraisalDate;
+      if(lender) existing.lender = lender;
+      if(titleCo) existing.titleCo = titleCo;
+      if(price) existing.price = price;
+      saveTX(existing);
+
+      // Add scan summary as a note on the linked contact
+      if(existing.contactId){
+        var noteText = 'Document scanned: ' + (r.docType||'Document') + '. ' + (r.summary||'');
+        var newNote = {id:Date.now(), contactId:existing.contactId, text:noteText, date:new Date().toISOString()};
+        N.push(newNote); saveNote(newNote);
+      }
+
+      // Mark scan as imported
+      r.imported = true;
+      renderScannerHistory();
+      alert('Transaction updated with scanned data! Deadlines have been added.');
+      sp('tc');
+      return;
+    }
+  }
+
+  // Create new transaction
+  // Try to find or create contact from buyer name
+  var contactId = null;
+  if(buyerName){
+    var parts = buyerName.trim().split(' ');
+    var firstName = parts[0] || 'Unknown';
+    var lastName = parts.slice(1).join(' ') || 'Client';
+    // Check if contact exists
+    var found = C.find(function(c){
+      return (c.first.toLowerCase() === firstName.toLowerCase() && c.last.toLowerCase() === lastName.toLowerCase());
+    });
+    if(found){
+      contactId = found.id;
+    } else {
+      // Create new contact
+      var newC = {
+        id: Date.now(),
+        first: firstName, last: lastName,
+        type: 'buyer', phone: '', email: '',
+        property: address, stage: 'Under Contract',
+        price: price, notes: 'Created from document scan.',
+        added: new Date().toISOString()
+      };
+      C.push(newC); saveContact(newC);
+      contactId = newC.id;
+    }
+  }
+
+  var txType = (r.docType && r.docType.toLowerCase().indexOf('list') >= 0) ? 'seller' : 'buyer';
+  var newTX = {
+    id: Date.now(),
+    contactId: contactId,
+    type: txType,
+    address: address,
+    price: price,
+    mlsNum: mlsNum,
+    lender: lender,
+    titleCo: titleCo,
+    notes: 'Imported from document scan: ' + (r.docType||'Document') + '. ' + (r.summary||'').substring(0,200),
+    status: 'active',
+    steps: {},
+    contractDate: contractDate,
+    closingDate: closingDate,
+    earnestDate: earnestDate,
+    dueDiligDate: dueDiligDate,
+    financingDate: financingDate,
+    appraisalDate: appraisalDate
+  };
+  TX.push(newTX);
+  saveTX(newTX);
+
+  // Also create main deadlines
+  var dateMap = [
+    {type:'Earnest Money Due', val:earnestDate},
+    {type:'Due Diligence Deadline', val:dueDiligDate},
+    {type:'Financing Deadline', val:financingDate},
+    {type:'Appraisal Deadline', val:appraisalDate},
+    {type:'Closing Date', val:closingDate}
+  ];
+  dateMap.forEach(function(dm){
+    if(dm.val && contactId){
+      var nd = {id:Date.now()+Math.random(), contactId:contactId, type:dm.type, date:dm.val};
+      D.push(nd); saveDL(nd);
+    }
+  });
+
+  // Add note to contact
+  if(contactId){
+    var scanNote = {id:Date.now()+1, contactId:contactId, text:'Document scanned: ' + (r.docType||'Document') + '. ' + (r.summary||''), date:new Date().toISOString()};
+    N.push(scanNote); saveNote(scanNote);
+  }
+
+  r.imported = true;
+  renderScannerHistory();
+  rd(); renderTC();
+  alert('Transaction created successfully! Check the Transactions tab.');
+  sp('tc');
+}
+
+function showScannerRawResult(text){
+  ge('scannerProcessing').style.display = 'none';
+  ge('scannerHistory').style.display = 'block';
+  var res = ge('scannerResults');
+  res.style.display = 'block';
+  res.innerHTML = '';
+  var card = document.createElement('div');
+  card.className = 'scanner-result';
+  var title = document.createElement('div');
+  title.className = 'scanner-result-title';
+  title.textContent = 'Document Analysis';
+  card.appendChild(title);
+  var sum = document.createElement('div');
+  sum.className = 'scanner-summary';
+  sum.style.marginTop = '12px';
+  sum.textContent = text;
+  card.appendChild(sum);
+  var copyBtn = document.createElement('button');
+  copyBtn.className = 'btn btn-g';
+  copyBtn.style.marginTop = '12px';
+  copyBtn.textContent = 'Copy Text';
+  copyBtn.addEventListener('click', function(){ navigator.clipboard && navigator.clipboard.writeText(text); copyBtn.textContent='Copied!'; setTimeout(function(){ copyBtn.textContent='Copy Text'; },2000); });
+  var newScanBtn = document.createElement('button');
+  newScanBtn.className = 'btn btn-p';
+  newScanBtn.style.cssText = 'margin-top:12px;margin-left:8px;';
+  newScanBtn.textContent = 'Scan Another';
+  newScanBtn.addEventListener('click', function(){ ge('scannerUploadArea').style.display='block'; ge('scannerResults').style.display='none'; ge('scannerFileInput').value=''; });
+  card.appendChild(copyBtn); card.appendChild(newScanBtn);
+  res.appendChild(card);
+}
+
+function showScannerError(msg){
+  ge('scannerProcessing').style.display = 'none';
+  ge('scannerUploadArea').style.display = 'block';
+  ge('scannerHistory').style.display = 'block';
+  alert('Scanner error: ' + msg);
+}
+
+// -- MLS SEARCH -------------------------------------------------------
+var mlsToken = '';
+var mlsLiveMode = false;
+var mlsCurrentPage = 0;
+var mlsPageSize = 12;
+var mlsAllResults = [];
+var mlsViewMode = 'grid';
+var mlsStatusFilter = 'active';
+
+var MLS_DEMO = [
+  {id:'1001',address:'1842 E Millcreek Way',city:'Salt Lake City',state:'UT',zip:'84106',price:485000,beds:4,baths:2.5,sqft:2340,lot:'0.18 acres',dom:5,status:'Active',type:'Residential',year:1987,garage:2,desc:'Beautifully updated rambler in the heart of Millcreek. New kitchen with quartz countertops, stainless appliances. Finished basement with mother-in-law apartment potential. Large backyard with mature trees.',photo:'',listingNum:'URE-1001',agent:'Sarah Christensen',office:'Windermere Real Estate',lat:40.6882,lng:-111.8291},
+  {id:'1002',address:'3245 S Highland Dr',city:'Salt Lake City',state:'UT',zip:'84106',price:625000,beds:5,baths:3,sqft:3100,lot:'0.22 acres',dom:12,status:'Active',type:'Residential',year:1995,garage:2,desc:'Stunning two-story in Sugar House area. Grand entry, vaulted ceilings, gourmet kitchen. Master suite with spa bath. Deck overlooking professionally landscaped yard. Minutes from I-15.',photo:'',listingNum:'URE-1002',agent:'Mike Torres',office:'KW Salt Lake City',lat:40.7089,lng:-111.8647},
+  {id:'1003',address:'892 N 200 W',city:'Provo',state:'UT',zip:'84601',price:319000,beds:3,baths:2,sqft:1680,lot:'0.15 acres',dom:3,status:'Active',type:'Residential',year:1962,garage:1,desc:'Charming brick rambler near BYU. Updated kitchen and bathrooms. Hardwood floors throughout main level. Fully fenced yard. Close to shopping, schools, and freeway access.',photo:'',listingNum:'URE-1003',agent:'Jenny Park',office:'Equity Real Estate',lat:40.2338,lng:-111.6585},
+  {id:'1004',address:'547 E 300 S Unit 4B',city:'Salt Lake City',state:'UT',zip:'84102',price:289000,beds:2,baths:1,sqft:980,lot:'N/A',dom:18,status:'Active',type:'Condo',year:2005,garage:1,desc:'Modern downtown condo with city views. Open concept living, stainless kitchen, in-unit laundry. Building amenities include rooftop deck, gym, and secure parking.',photo:'',listingNum:'URE-1004',agent:'Dan Ellis',office:'Coldwell Banker',lat:40.7608,lng:-111.8910},
+  {id:'1005',address:'11234 S 700 E',city:'Sandy',state:'UT',zip:'84070',price:558000,beds:4,baths:3.5,sqft:2890,lot:'0.20 acres',dom:7,status:'Active',type:'Residential',year:2003,garage:3,desc:'Immaculate 2-story in desirable Sandy neighborhood. Updated throughout, granite counters, hardwood floors. Bonus room upstairs. 3-car garage. Walking distance to top-rated schools.',photo:'',listingNum:'URE-1005',agent:'Lisa Wang',office:'REMAX Advantage',lat:40.5915,lng:-111.8766},
+  {id:'1006',address:'2901 W 3500 S',city:'West Valley City',state:'UT',zip:'84119',price:399000,beds:4,baths:2,sqft:1950,lot:'0.19 acres',dom:22,status:'Active',type:'Residential',year:1978,garage:2,desc:'Great investment opportunity or family home. Updated bathrooms, new roof 2022, newer HVAC. Large lot with RV parking. Easy freeway access to downtown SLC.',photo:'',listingNum:'URE-1006',agent:'Carlos Mendez',office:'Century 21 Everest',lat:40.6963,lng:-111.9390},
+  {id:'1007',address:'445 N 100 E',city:'American Fork',state:'UT',zip:'84003',price:445000,beds:3,baths:2.5,sqft:2100,lot:'0.16 acres',dom:1,status:'Active',type:'Residential',year:2018,garage:2,desc:'Nearly new home in quiet cul-de-sac. Open concept floor plan, 9ft ceilings, smart home features. Quartz counters, farmhouse sink, mudroom. Stunning mountain views.',photo:'',listingNum:'URE-1007',agent:'Amy Johnson',office:'Utah Select Real Estate',lat:40.3774,lng:-111.7969},
+  {id:'1008',address:'7823 S 1300 E',city:'Midvale',state:'UT',zip:'84047',price:389000,beds:3,baths:2,sqft:1780,lot:'0.17 acres',dom:14,status:'Active',type:'Residential',year:1968,garage:2,desc:'Well-maintained brick home on tree-lined street. Kitchen remodeled 2021, newer windows and flooring. Basement family room, storage room, cold storage. Mature yard.',photo:'',listingNum:'URE-1008',agent:'Tom Bradley',office:'Summit Sothebys',lat:40.6185,lng:-111.8936},
+  {id:'1009',address:'156 W 800 N',city:'Orem',state:'UT',zip:'84057',price:349000,beds:3,baths:2,sqft:1560,lot:'0.12 acres',dom:9,status:'Active',type:'Residential',year:1982,garage:1,desc:'Move-in ready rancher near UVU and freeway. Updated kitchen, new carpet, fresh paint throughout. Covered patio, storage shed. Great starter home or investment.',photo:'',listingNum:'URE-1009',agent:'Rachel Davis',office:'Homie',lat:40.2969,lng:-111.6946},
+  {id:'1010',address:'3390 E 6200 S',city:'Cottonwood Heights',state:'UT',zip:'84121',price:729000,beds:5,baths:4,sqft:3650,lot:'0.28 acres',dom:4,status:'Active',type:'Residential',year:1999,garage:3,desc:'Spacious executive home at the base of the mountains. Chef kitchen with double ovens, center island. Master suite with fireplace and jetted tub. Walk-out basement. Minutes to ski resorts.',photo:'',listingNum:'URE-1010',agent:'Mark Stevens',office:'Windermere Real Estate',lat:40.6196,lng:-111.8102},
+  {id:'1011',address:'680 W Jordan Pkwy',city:'South Jordan',state:'UT',zip:'84095',price:519000,beds:4,baths:3,sqft:2700,lot:'0.21 acres',dom:11,status:'Pending',type:'Residential',year:2008,garage:2,desc:'Popular Daybreak community home. Open plan with great room concept. Formal dining, office/den. Master with soaking tub and walk-in closet. Central park and pool access.',photo:'',listingNum:'URE-1011',agent:'Stephanie Hill',office:'KW Salt Lake City',lat:40.5622,lng:-111.9296},
+  {id:'1012',address:'922 E 400 S Unit 12',city:'Salt Lake City',state:'UT',zip:'84102',price:274000,beds:1,baths:1,sqft:740,lot:'N/A',dom:30,status:'Pending',type:'Condo',year:1988,garage:1,desc:'Updated condo in vibrant 9th and 9th neighborhood. Bamboo floors, updated kitchen, private patio. HOA covers water, sewer, trash, exterior. Walk to shops and restaurants.',photo:'',listingNum:'URE-1012',agent:'Jake Brown',office:'Urban Utah Homes',lat:40.7517,lng:-111.8786}
+];
+
+function initMLS(){
+  mlsAllResults = MLS_DEMO.slice();
+  renderMLSResults();
+  updateMLSTokenUI();
+}
+
+function updateMLSTokenUI(){
+  var banner = ge('mlsTokenBanner');
+  var clearBtn = ge('btnClearToken');
+  var saveBtn = ge('btnSaveToken');
+  if(mlsLiveMode){
+    banner.style.background = 'rgba(107,201,122,0.1)';
+    banner.style.borderColor = 'var(--lead)';
+    banner.querySelector('div').innerHTML = '<b style="color:var(--lead);">LIVE</b>  -  Connected to UtahRealEstate.com MLS API';
+    saveBtn.style.display = 'none';
+    clearBtn.style.display = 'inline-flex';
+    ge('mlsTokenInput').style.display = 'none';
+  } else {
+    banner.style.background = 'rgba(201,168,76,0.1)';
+    banner.style.borderColor = 'var(--accent)';
+    saveBtn.style.display = 'inline-flex';
+    clearBtn.style.display = 'none';
+    ge('mlsTokenInput').style.display = 'inline-block';
+  }
+}
+
+function connectMLSToken(){
+  var token = ge('mlsTokenInput').value.trim();
+  if(!token){ alert('Please paste your Bearer Token first.'); return; }
+  mlsToken = token;
+  mlsLiveMode = true;
+  try{ localStorage.setItem('mls_token', token); }catch(e){}
+  updateMLSTokenUI();
+  searchMLS();
+}
+
+function disconnectMLS(){
+  mlsToken = '';
+  mlsLiveMode = false;
+  try{ localStorage.removeItem('mls_token'); }catch(e){}
+  mlsAllResults = MLS_DEMO.slice();
+  updateMLSTokenUI();
+  renderMLSResults();
+}
+
+function searchMLS(){
+  if(mlsLiveMode){
+    fetchMLSLive();
+  } else {
+    var city = ge('mlsCity').value.trim().toLowerCase();
+    var minP = parsePrice(ge('mlsMinPrice').value);
+    var maxP = parsePrice(ge('mlsMaxPrice').value);
+    var beds = ge('mlsBeds').value;
+    var type = ge('mlsType').value;
+    var results = MLS_DEMO.filter(function(l){
+      if(city && l.city.toLowerCase().indexOf(city) < 0 && l.zip.indexOf(city) < 0 && l.address.toLowerCase().indexOf(city) < 0) return false;
+      if(minP && l.price < minP) return false;
+      if(maxP && l.price > maxP) return false;
+      if(beds && beds !== '5+' && l.beds < parseInt(beds)) return false;
+      if(beds === '5+' && l.beds < 5) return false;
+      if(type && l.type !== type) return false;
+      if(mlsStatusFilter === 'active' && l.status !== 'Active') return false;
+      if(mlsStatusFilter === 'pending' && l.status !== 'Pending') return false;
+      return true;
+    });
+    sortMLS(results);
+    mlsAllResults = results;
+    mlsCurrentPage = 0;
+    renderMLSResults();
+  }
+}
+
+function parsePrice(s){
+  if(!s) return 0;
+  return parseInt(s.replace(/[$,]/g,'')) || 0;
+}
+
+function sortMLS(results){
+  var sort = ge('mlsSort').value;
+  results.sort(function(a,b){
+    if(sort === 'price_asc') return a.price - b.price;
+    if(sort === 'price_desc') return b.price - a.price;
+    if(sort === 'dom_asc') return a.dom - b.dom;
+    if(sort === 'dom_desc') return b.dom - a.dom;
+    return 0;
+  });
+}
+
+function fetchMLSLive(){
+  var city = ge('mlsCity').value.trim();
+  var minP = parsePrice(ge('mlsMinPrice').value);
+  var maxP = parsePrice(ge('mlsMaxPrice').value);
+  var beds = ge('mlsBeds').value;
+
+  var filters = [];
+  var statusMap = {active:'Active',pending:'Pending',sold:'Closed'};
+  var statusVal = statusMap[mlsStatusFilter] || 'Active';
+  filters.push('StandardStatus eq ' + statusVal);
+  if(city) filters.push('(City eq ' + city + ' or PostalCode eq ' + city + ')');
+  if(minP) filters.push('ListPrice ge ' + minP);
+  if(maxP) filters.push('ListPrice le ' + maxP);
+  if(beds && beds !== '') filters.push('BedroomsTotal ge ' + parseInt(beds));
+
+  var url = 'https://resoapi.utahrealestate.com/reso/odata/Property?$top=50&$orderby=ModificationTimestamp desc';
+  if(filters.length) url += '&$filter=' + encodeURIComponent(filters.join(' and '));
+  url += '&$select=ListingKeyNumeric,ListPrice,StreetNumber,StreetName,StreetSuffix,City,StateOrProvince,PostalCode,BedroomsTotal,BathroomsTotalInteger,LivingArea,LotSizeArea,DaysOnMarket,StandardStatus,PropertyType,YearBuilt,GarageSpaces,PublicRemarks,ListAgentFullName,ListOfficeName';
+
+  ge('mlsResults').innerHTML = '<div class="empty">Searching MLS...</div>';
+
+  fetch(url, {headers:{Authorization:'Bearer '+mlsToken, Accept:'application/json'}})
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      if(!data.value){ ge('mlsResults').innerHTML = '<div class="empty">No results. Check your token or search criteria.</div>'; return; }
+      mlsAllResults = data.value.map(function(p){
+        return {
+          id: String(p.ListingKeyNumeric),
+          address: (p.StreetNumber||'') + ' ' + (p.StreetName||'') + ' ' + (p.StreetSuffix||''),
+          city: p.City || '', state: p.StateOrProvince || 'UT', zip: p.PostalCode || '',
+          price: p.ListPrice || 0, beds: p.BedroomsTotal || 0, baths: p.BathroomsTotalInteger || 0,
+          sqft: p.LivingArea || 0, lot: p.LotSizeArea ? p.LotSizeArea + ' acres' : 'N/A',
+          dom: p.DaysOnMarket || 0, status: p.StandardStatus || '',
+          type: p.PropertyType || '', year: p.YearBuilt || '',
+          garage: p.GarageSpaces || 0, desc: p.PublicRemarks || '',
+          photo: '', listingNum: 'URE-'+p.ListingKeyNumeric,
+          agent: p.ListAgentFullName || '', office: p.ListOfficeName || ''
+        };
+      });
+      mlsCurrentPage = 0;
+      renderMLSResults();
+    })
+    .catch(function(err){
+      ge('mlsResults').innerHTML = '<div class="empty" style="color:var(--danger);">API error: ' + err.message + '<br>Check your Bearer Token and try again.</div>';
+    });
+}
+
+function renderMLSResults(){
+  var total = mlsAllResults.length;
+  var start = mlsCurrentPage * mlsPageSize;
+  var page = mlsAllResults.slice(start, start + mlsPageSize);
+  ge('mlsResultCount').textContent = total + ' listing' + (total !== 1 ? 's' : '') + ' found' + (mlsLiveMode ? ' (Live MLS)' : ' (Demo)');
+  var res = ge('mlsResults');
+  res.innerHTML = '';
+  if(!total){ res.innerHTML = '<div class="empty">No listings match your search. Try adjusting the filters.</div>'; ge('mlsPagination').innerHTML=''; return; }
+  if(mlsViewMode === 'grid'){
+    var grid = document.createElement('div');
+    grid.className = 'mls-grid';
+    page.forEach(function(l){ grid.appendChild(mkMLSCard(l)); });
+    res.appendChild(grid);
+  } else {
+    page.forEach(function(l){ res.appendChild(mkMLSListItem(l)); });
+  }
+  renderMLSPagination(total);
+}
+
+function fmtPrice(p){ return '$' + p.toLocaleString(); }
+function fmtSqft(s){ return s ? s.toLocaleString() + ' sqft' : 'N/A'; }
+function domClass(d){ return d <= 7 ? 'dom-new' : d <= 30 ? 'dom-mid' : 'dom-old'; }
+function domLabel(d){ return d === 0 ? 'NEW' : d + 'd'; }
+
+function mkMLSCard(l){
+  var card = document.createElement('div');
+  card.className = 'mls-card';
+  (function(listing){ card.addEventListener('click', function(){ openMLSDetail(listing); }); })(l);
+
+  var photoDiv = document.createElement('div');
+  photoDiv.className = 'mls-photo';
+  photoDiv.style.cssText = 'width:100%;height:170px;background:var(--surface2);display:flex;align-items:center;justify-content:center;position:relative;';
+  var photoPlaceholder = document.createElement('div');
+  photoPlaceholder.style.cssText = 'text-align:center;color:var(--text3);';
+  photoPlaceholder.innerHTML = '<svg width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg><div style="font-size:11px;margin-top:4px;">No Photo</div>';
+  photoDiv.appendChild(photoPlaceholder);
+
+  var domBadge = document.createElement('div');
+  domBadge.className = 'mls-dom ' + domClass(l.dom);
+  domBadge.style.cssText = 'position:absolute;top:8px;right:8px;font-size:10px;font-family:monospace;padding:2px 7px;border-radius:4px;font-weight:700;';
+  domBadge.textContent = domLabel(l.dom);
+  photoDiv.appendChild(domBadge);
+
+  var statusBadge = document.createElement('div');
+  statusBadge.style.cssText = 'position:absolute;top:8px;left:8px;font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;text-transform:uppercase;';
+  statusBadge.style.background = l.status === 'Active' ? 'rgba(107,201,122,0.9)' : 'rgba(201,168,76,0.9)';
+  statusBadge.style.color = '#0d0f14';
+  statusBadge.textContent = l.status;
+  photoDiv.appendChild(statusBadge);
+  card.appendChild(photoDiv);
+
+  var body = document.createElement('div');
+  body.className = 'mls-card-body';
+  var price = document.createElement('div');
+  price.className = 'mls-price';
+  price.textContent = fmtPrice(l.price);
+  var addr = document.createElement('div');
+  addr.className = 'mls-addr';
+  addr.textContent = l.address;
+  var sub = document.createElement('div');
+  sub.className = 'mls-sub';
+  sub.textContent = l.city + ', ' + l.state + ' ' + l.zip;
+  var stats = document.createElement('div');
+  stats.className = 'mls-stats';
+  stats.innerHTML = '<span class="mls-stat"><b>' + l.beds + '</b>&nbsp;bd</span>'
+    + '<span class="mls-stat"><b>' + l.baths + '</b>&nbsp;ba</span>'
+    + '<span class="mls-stat"><b>' + (l.sqft ? l.sqft.toLocaleString() : 'N/A') + '</b>&nbsp;sqft</span>';
+  body.appendChild(price); body.appendChild(addr); body.appendChild(sub); body.appendChild(stats);
+  card.appendChild(body);
+
+  var footer = document.createElement('div');
+  footer.className = 'mls-card-footer';
+  var attachBtn = document.createElement('button');
+  attachBtn.className = 'btn btn-g';
+  attachBtn.style.cssText = 'font-size:11px;padding:4px 9px;';
+  attachBtn.textContent = 'Attach to Client';
+  (function(listing){ attachBtn.addEventListener('click', function(e){ e.stopPropagation(); openAttachModal(listing); }); })(l);
+  var detailBtn = document.createElement('button');
+  detailBtn.className = 'btn btn-p';
+  detailBtn.style.cssText = 'font-size:11px;padding:4px 9px;margin-left:auto;';
+  detailBtn.textContent = 'View Details';
+  (function(listing){ detailBtn.addEventListener('click', function(e){ e.stopPropagation(); openMLSDetail(listing); }); })(l);
+  footer.appendChild(attachBtn); footer.appendChild(detailBtn);
+  card.appendChild(footer);
+  return card;
+}
+
+function mkMLSListItem(l){
+  var item = document.createElement('div');
+  item.className = 'mls-list-item';
+  (function(listing){ item.addEventListener('click', function(){ openMLSDetail(listing); }); })(l);
+
+  var thumb = document.createElement('div');
+  thumb.className = 'mls-list-thumb';
+  thumb.innerHTML = '<svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>';
+
+  var info = document.createElement('div');
+  info.style.flex = '1';
+  var price = document.createElement('div');
+  price.style.cssText = 'font-family:Bebas Neue,sans-serif;font-size:18px;color:var(--accent);';
+  price.textContent = fmtPrice(l.price);
+  var addr = document.createElement('div');
+  addr.style.cssText = 'font-size:13px;font-weight:600;color:var(--text);';
+  addr.textContent = l.address + ', ' + l.city + ' ' + l.zip;
+  var stats = document.createElement('div');
+  stats.style.cssText = 'font-size:12px;color:var(--text2);margin-top:3px;';
+  stats.textContent = l.beds + ' bd | ' + l.baths + ' ba | ' + fmtSqft(l.sqft) + ' | ' + domLabel(l.dom) + ' on market';
+  info.appendChild(price); info.appendChild(addr); info.appendChild(stats);
+
+  var right = document.createElement('div');
+  right.style.cssText = 'display:flex;flex-direction:column;gap:6px;align-items:flex-end;flex-shrink:0;';
+  var domDiv = document.createElement('div');
+  domDiv.className = 'mls-dom ' + domClass(l.dom);
+  domDiv.textContent = domLabel(l.dom);
+  var attachBtn = document.createElement('button');
+  attachBtn.className = 'btn btn-g';
+  attachBtn.style.cssText = 'font-size:11px;padding:4px 9px;';
+  attachBtn.textContent = 'Attach';
+  (function(listing){ attachBtn.addEventListener('click', function(e){ e.stopPropagation(); openAttachModal(listing); }); })(l);
+  right.appendChild(domDiv); right.appendChild(attachBtn);
+
+  item.appendChild(thumb); item.appendChild(info); item.appendChild(right);
+  return item;
+}
+
+function renderMLSPagination(total){
+  var pages = Math.ceil(total / mlsPageSize);
+  var pag = ge('mlsPagination');
+  pag.innerHTML = '';
+  if(pages <= 1) return;
+  for(var i = 0; i < pages; i++){
+    var btn = document.createElement('button');
+    btn.style.cssText = 'padding:5px 11px;border-radius:5px;border:1px solid var(--border);cursor:pointer;font-size:13px;font-family:DM Sans,sans-serif;transition:all 0.15s;';
+    btn.style.background = i === mlsCurrentPage ? 'var(--accent)' : 'var(--surface2)';
+    btn.style.color = i === mlsCurrentPage ? 'var(--bg)' : 'var(--text2)';
+    btn.textContent = i + 1;
+    (function(page){ btn.addEventListener('click', function(){ mlsCurrentPage = page; renderMLSResults(); window.scrollTo(0,0); }); })(i);
+    pag.appendChild(btn);
+  }
+}
+
+function openMLSDetail(l){
+  var content = ge('mlsDetContent');
+  content.innerHTML = '';
+
+  var photoSection = document.createElement('div');
+  photoSection.className = 'mls-det-photos';
+  photoSection.innerHTML = '<div style="width:100%;height:240px;background:var(--surface2);display:flex;align-items:center;justify-content:center;flex-direction:column;color:var(--text3);"><svg width="48" height="48" fill="none" stroke="currentColor" stroke-width="1" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg><div style="margin-top:8px;font-size:13px;">Photos load with live MLS token</div></div>';
+  content.appendChild(photoSection);
+
+  var body = document.createElement('div');
+  body.className = 'mls-det-body';
+
+  var price = document.createElement('div');
+  price.className = 'mls-det-price';
+  price.textContent = fmtPrice(l.price);
+
+  var addr = document.createElement('div');
+  addr.className = 'mls-det-addr';
+  addr.textContent = l.address;
+
+  var sub = document.createElement('div');
+  sub.className = 'mls-det-sub';
+  sub.textContent = l.city + ', ' + l.state + ' ' + l.zip + ' | MLS# ' + l.listingNum;
+
+  var statsGrid = document.createElement('div');
+  statsGrid.className = 'mls-det-stats';
+  [['Beds', l.beds], ['Baths', l.baths], ['Sqft', l.sqft ? l.sqft.toLocaleString() : 'N/A'], ['DOM', domLabel(l.dom)]].forEach(function(s){
+    var stat = document.createElement('div');
+    stat.className = 'mls-det-stat';
+    stat.innerHTML = '<div class="mls-det-stat-val">' + s[1] + '</div><div class="mls-det-stat-lbl">' + s[0] + '</div>';
+    statsGrid.appendChild(stat);
+  });
+
+  var detailsSec = document.createElement('div');
+  detailsSec.className = 'mls-det-section';
+  var detTitle = document.createElement('div');
+  detTitle.className = 'mls-det-sec-title';
+  detTitle.textContent = 'Property Details';
+  var detGrid = document.createElement('div');
+  detGrid.className = 'mls-det-grid';
+  [['Type', l.type], ['Year Built', l.year], ['Garage', l.garage + ' car'], ['Lot Size', l.lot], ['Status', l.status], ['Price/sqft', l.sqft ? '$'+Math.round(l.price/l.sqft) : 'N/A']].forEach(function(f){
+    var field = document.createElement('div');
+    field.className = 'mls-det-field';
+    field.innerHTML = f[0] + ': <b>' + f[1] + '</b>';
+    detGrid.appendChild(field);
+  });
+  detailsSec.appendChild(detTitle); detailsSec.appendChild(detGrid);
+
+  var descSec = document.createElement('div');
+  descSec.className = 'mls-det-section';
+  var descTitle = document.createElement('div');
+  descTitle.className = 'mls-det-sec-title';
+  descTitle.textContent = 'Description';
+  var descText = document.createElement('div');
+  descText.style.cssText = 'font-size:13px;color:var(--text2);line-height:1.6;';
+  descText.textContent = l.desc || 'No description available.';
+  descSec.appendChild(descTitle); descSec.appendChild(descText);
+
+  var agentSec = document.createElement('div');
+  agentSec.className = 'mls-det-section';
+  var agentTitle = document.createElement('div');
+  agentTitle.className = 'mls-det-sec-title';
+  agentTitle.textContent = 'Listing Agent';
+  var agentText = document.createElement('div');
+  agentText.style.cssText = 'font-size:13px;color:var(--text2);';
+  agentText.textContent = (l.agent || 'N/A') + (l.office ? ' | ' + l.office : '');
+  agentSec.appendChild(agentTitle); agentSec.appendChild(agentText);
+
+  var actions = document.createElement('div');
+  actions.style.cssText = 'display:flex;gap:9px;flex-wrap:wrap;margin-top:18px;padding-top:16px;border-top:1px solid var(--border);';
+  var attachBtn = document.createElement('button');
+  attachBtn.className = 'btn btn-p';
+  attachBtn.textContent = 'Attach to Client';
+  (function(listing){ attachBtn.addEventListener('click', function(){ openAttachModal(listing); }); })(l);
+  var shareBtn = document.createElement('button');
+  shareBtn.className = 'btn btn-g';
+  shareBtn.textContent = 'Copy Listing #';
+  shareBtn.addEventListener('click', function(){ navigator.clipboard && navigator.clipboard.writeText(l.listingNum); shareBtn.textContent = 'Copied!'; setTimeout(function(){ shareBtn.textContent = 'Copy Listing #'; }, 2000); });
+  actions.appendChild(attachBtn); actions.appendChild(shareBtn);
+
+  body.appendChild(price); body.appendChild(addr); body.appendChild(sub);
+  body.appendChild(statsGrid); body.appendChild(detailsSec);
+  body.appendChild(descSec); body.appendChild(agentSec); body.appendChild(actions);
+  content.appendChild(body);
+  ge('mlsDetOv').classList.add('open');
+}
+
+function openAttachModal(listing){
+  var modal = document.createElement('div');
+  modal.className = 'modal-ov open';
+  modal.style.zIndex = '1100';
+  var inner = document.createElement('div');
+  inner.className = 'modal';
+  inner.style.maxWidth = '420px';
+  var hdr = document.createElement('div');
+  hdr.className = 'mhdr';
+  hdr.innerHTML = '<div class="mtitle">Attach to Client</div>';
+  var x = document.createElement('button');
+  x.className = 'mx';
+  x.textContent = 'x';
+  x.addEventListener('click', function(){ document.body.removeChild(modal); });
+  hdr.appendChild(x);
+  var bod = document.createElement('div');
+  bod.className = 'mbody';
+  var info = document.createElement('p');
+  info.style.cssText = 'font-size:13px;color:var(--text2);margin-bottom:14px;';
+  info.textContent = 'Attach ' + listing.address + ' (' + fmtPrice(listing.price) + ') to:';
+  var selLabel = document.createElement('label');
+  selLabel.className = 'fl';
+  selLabel.textContent = 'Select Client';
+  var sel = document.createElement('select');
+  sel.className = 'fsel';
+  C.filter(function(c){ return c.type === 'buyer' || c.type === 'lead'; }).forEach(function(c){
+    var opt = document.createElement('option');
+    opt.value = c.id;
+    opt.textContent = fn(c) + ' (' + c.type + ')';
+    sel.appendChild(opt);
+  });
+  bod.appendChild(info); bod.appendChild(selLabel); bod.appendChild(sel);
+  var ftr = document.createElement('div');
+  ftr.className = 'mftr';
+  var cancelBtn = document.createElement('button');
+  cancelBtn.className = 'btn btn-g';
+  cancelBtn.textContent = 'Cancel';
+  cancelBtn.addEventListener('click', function(){ document.body.removeChild(modal); });
+  var saveBtn = document.createElement('button');
+  saveBtn.className = 'btn btn-p';
+  saveBtn.textContent = 'Attach Listing';
+  saveBtn.addEventListener('click', function(){
+    var cid = parseInt(sel.value);
+    var note = 'Interested listing: ' + listing.address + ', ' + listing.city + ' ' + listing.zip + ' | ' + fmtPrice(listing.price) + ' | ' + listing.beds + 'bd/' + listing.baths + 'ba | ' + fmtSqft(listing.sqft) + ' | MLS# ' + listing.listingNum;
+    N.push({id:Date.now(), contactId:cid, text:note, date:new Date().toISOString()});
+    sv();
+    document.body.removeChild(modal);
+    alert('Listing attached to ' + (fn(gc(cid))||'client') + ' as a note!');
+  });
+  ftr.appendChild(cancelBtn); ftr.appendChild(saveBtn);
+  inner.appendChild(hdr); inner.appendChild(bod); inner.appendChild(ftr);
+  modal.appendChild(inner);
+  modal.addEventListener('click', function(e){ if(e.target === modal) document.body.removeChild(modal); });
+  document.body.appendChild(modal);
+}
+
+ge('nav-briefing').addEventListener('click',function(){sp('briefing');});
+ge('nav-tc').addEventListener('click',function(){sp('tc');});
+ge('nav-scanner').addEventListener('click',function(){sp('scanner');});
+ge('nav-mls').addEventListener('click',function(){sp('mls');});
+ge('btnSaveToken').addEventListener('click', connectMLSToken);
+ge('btnClearToken').addEventListener('click', disconnectMLS);
+ge('btnMLSSearch').addEventListener('click', searchMLS);
+ge('mlsDetClose').addEventListener('click', function(){ ge('mlsDetOv').classList.remove('open'); });
+ge('mlsDetOv').addEventListener('click', function(e){ if(e.target === ge('mlsDetOv')) ge('mlsDetOv').classList.remove('open'); });
+ge('mlsViewGrid').addEventListener('click', function(){ mlsViewMode='grid'; ge('mlsViewGrid').style.background='var(--accent)'; ge('mlsViewGrid').style.color='var(--bg)'; ge('mlsViewList').style.background='var(--surface2)'; ge('mlsViewList').style.color='var(--text2)'; renderMLSResults(); });
+ge('mlsViewList').addEventListener('click', function(){ mlsViewMode='list'; ge('mlsViewList').style.background='var(--accent)'; ge('mlsViewList').style.color='var(--bg)'; ge('mlsViewGrid').style.background='var(--surface2)'; ge('mlsViewGrid').style.color='var(--text2)'; renderMLSResults(); });
+document.querySelectorAll('[data-mls-filter]').forEach(function(b){
+  b.addEventListener('click', function(){
+    mlsStatusFilter = b.getAttribute('data-mls-filter');
+    document.querySelectorAll('[data-mls-filter]').forEach(function(x){ x.classList.remove('active'); });
+    b.classList.add('active');
+    searchMLS();
+  });
+});
+ge('mlsTokenInput').addEventListener('keydown', function(e){ if(e.key === 'Enter') connectMLSToken(); });
+try{ var saved = localStorage.getItem('mls_token'); if(saved){ mlsToken=saved; mlsLiveMode=true; } }catch(e){}
+
+// -- SUPABASE CONNECT --------------------------------------------------
+function connectSupa(){
+  var url = ge('supaUrlInput').value.trim();
+  var key = ge('supaKeyInput').value.trim();
+  if(!url || !key){ alert('Please enter both your Supabase URL and anon key.'); return; }
+  SUPA_URL = url; SUPA_KEY = key;
+  try{ localStorage.setItem('supa_url', url); localStorage.setItem('supa_key', key); }catch(e){}
+  if(initSupabase()){
+    updateSupaBanner(true);
+    loadFromDB().then(function(ok){
+      if(ok){ rd(); subscribeRealtime(); }
+      else{ alert('Connected but could not load data. Check your keys and make sure the database tables exist.'); }
+    });
+  } else {
+    alert('Could not connect. Check your URL and key.');
+  }
+}
+
+function disconnectSupa(){
+  SUPA_URL=''; SUPA_KEY=''; supa=null; supaReady=false;
+  try{ localStorage.removeItem('supa_url'); localStorage.removeItem('supa_key'); }catch(e){}
+  updateSupaBanner(false);
+  showSyncStatus('off');
+  ge('syncBar').style.display='none';
+}
+
+function updateSupaBanner(connected){
+  var banner = ge('setupBanner');
+  var connectBtn = ge('btnConnectSupa');
+  var disconnectBtn = ge('btnDisconnectSupa');
+  var urlInput = ge('supaUrlInput');
+  var keyInput = ge('supaKeyInput');
+  if(connected){
+    banner.style.background = 'rgba(107,201,122,0.08)';
+    banner.style.borderColor = 'var(--lead)';
+    banner.querySelector('div > div:first-child').textContent = 'Cloud Sync Active';
+    banner.querySelector('div > div:last-child').textContent = 'Your data is synced across all devices in real time';
+    connectBtn.style.display = 'none';
+    disconnectBtn.style.display = 'inline-flex';
+    urlInput.style.display = 'none';
+    keyInput.style.display = 'none';
+  } else {
+    banner.style.background = 'var(--surface)';
+    banner.style.borderColor = 'var(--border)';
+    banner.querySelector('div > div:first-child').textContent = 'Connect Cloud Sync';
+    banner.querySelector('div > div:last-child').textContent = 'Paste your Supabase URL and key to sync across all devices in real time';
+    connectBtn.style.display = 'inline-flex';
+    disconnectBtn.style.display = 'none';
+    urlInput.style.display = 'inline-block';
+    keyInput.style.display = 'inline-block';
+  }
+}
+
+ge('btnConnectSupa').addEventListener('click', connectSupa);
+ge('btnDisconnectSupa').addEventListener('click', disconnectSupa);
+ge('supaKeyInput').addEventListener('keydown', function(e){ if(e.key==='Enter') connectSupa(); });
+
+// -- STARTUP ----------------------------------------------------------
+(async function startup(){
+  try{
+    initSupabase();
+    if(!supaReady){
+      var banner = ge('setupBanner');
+      if(banner) banner.style.display = 'none';
+      // Try loading from localStorage first
+      try{
+        var lc = localStorage.getItem('crm_c');
+        if(lc){ C=JSON.parse(lc); N=JSON.parse(localStorage.getItem('crm_n')||'[]'); F=JSON.parse(localStorage.getItem('crm_f')||'[]'); D=JSON.parse(localStorage.getItem('crm_d')||'[]'); TX=JSON.parse(localStorage.getItem('crm_tx')||'[]'); }
+        else demo();
+      }catch(e2){ demo(); }
+      rd(); return;
+    }
+    // Supabase ready - show connected banner
+    updateSupaBanner(true);
+    showSyncStatus('loading');
+    var ok = await loadFromDB();
+    if(!ok){
+      // DB failed - fall back to localStorage
+      try{
+        var lc2 = localStorage.getItem('crm_c');
+        if(lc2){ C=JSON.parse(lc2); N=JSON.parse(localStorage.getItem('crm_n')||'[]'); F=JSON.parse(localStorage.getItem('crm_f')||'[]'); D=JSON.parse(localStorage.getItem('crm_d')||'[]'); TX=JSON.parse(localStorage.getItem('crm_tx')||'[]'); }
+        else demo();
+      }catch(e3){ demo(); }
+    }
+    rd();
+    if(ok) subscribeRealtime();
+  }catch(e){
+    console.log('Startup error:', e);
+    try{ var lc3=localStorage.getItem('crm_c'); if(lc3) C=JSON.parse(lc3); else demo(); }catch(e4){ demo(); }
+    rd();
+  }
+})();
+ge('nav-dashboard').addEventListener('click',function(){sp('dashboard');});
+ge('nav-pipeline').addEventListener('click',function(){sp('pipeline');});
+ge('nav-contacts').addEventListener('click',function(){sp('contacts');});
+ge('nav-followups').addEventListener('click',function(){sp('followups');});
+ge('nav-notes').addEventListener('click',function(){sp('notes');});
+ge('nav-deadlines').addEventListener('click',function(){sp('deadlines');});
+ge('hamburger').addEventListener('click',tsb);
+ge('sbOv').addEventListener('click',csb);
+ge('fab').addEventListener('click',function(){om('addModal');});
+ge('btnAdd').addEventListener('click',function(){om('addModal');});
+ge('btnPipelineAdd').addEventListener('click',function(){om('addModal');});
+ge('btnContactAdd').addEventListener('click',function(){om('addModal');});
+ge('btnAddFU').addEventListener('click',function(){fs('fuContact');ge('fuDate').value=tod();om('fuModal');});
+ge('btnAddNote').addEventListener('click',function(){fs('nContact');om('noteModal');});
+ge('btnAddDL').addEventListener('click',function(){fs('dlContact');ge('dlDate').value=tod();om('dlModal');});
+ge('btnViewNotes').addEventListener('click',function(){sp('notes');});
+ge('btnViewFU').addEventListener('click',function(){sp('followups');});
+ge('btnSaveContact').addEventListener('click',svc);
+ge('btnSaveNote').addEventListener('click',svn);
+ge('btnSaveFU').addEventListener('click',svfu);
+ge('btnSaveDL').addEventListener('click',svdl);
+ge('btnSaveDetNote').addEventListener('click',adn);
+ge('detOv').addEventListener('click',function(e){if(e.target===ge('detOv'))cd();});
+ge('searchBox').addEventListener('input',function(){if(curPage==='contacts')rc();});
+
+// Scanner event listeners
+ge('scannerDrop').addEventListener('click', function(){ ge('scannerFileInput').click(); });
+ge('scannerBrowse') && ge('scannerBrowse').addEventListener('click', function(e){ e.stopPropagation(); ge('scannerFileInput').click(); });
+ge('scannerFileInput').addEventListener('change', function(){
+  if(this.files[0]) startScan(this.files[0]);
+});
+ge('scannerDrop').addEventListener('dragover', function(e){
+  e.preventDefault(); this.classList.add('dragover');
+});
+ge('scannerDrop').addEventListener('dragleave', function(){
+  this.classList.remove('dragover');
+});
+ge('scannerDrop').addEventListener('drop', function(e){
+  e.preventDefault(); this.classList.remove('dragover');
+  if(e.dataTransfer.files[0]) startScan(e.dataTransfer.files[0]);
+});
+document.querySelectorAll('[data-doctype]').forEach(function(b){
+  b.addEventListener('click', function(){
+    scannerDocType = b.getAttribute('data-doctype');
+    document.querySelectorAll('[data-doctype]').forEach(function(x){ x.classList.remove('active'); });
+    b.classList.add('active');
+  });
+});
+// Load scanner history from localStorage
+try{
+  var sh = localStorage.getItem('scanner_history');
+  if(sh) scannerHistory = JSON.parse(sh);
+}catch(e){}
+ge('btnNewTransaction').addEventListener('click', openNewTxModal);
+ge('btnSaveTransaction').addEventListener('click', saveTransaction);
+ge('btnTCAsk').addEventListener('click', askTCQuestion);
+ge('tcAiInput').addEventListener('keydown', function(e){ if(e.key==='Enter') askTCQuestion(); });
+ge('tcDetClose').addEventListener('click', function(){ ge('tcDetOv').classList.remove('open'); curTx=null; });
+ge('tcDetOv').addEventListener('click', function(e){ if(e.target===ge('tcDetOv')){ ge('tcDetOv').classList.remove('open'); curTx=null; }});
+ge('tcDetEdit').addEventListener('click', function(){
+  if(!curTx) return;
+  var tx = TX.find(function(t){ return t.id===curTx; });
+  if(!tx) return;
+  ge('tcModalTitle').textContent = 'Edit Transaction';
+  ge('btnSaveTransaction').setAttribute('data-edit-id', tx.id);
+  ge('tcType').value = tx.type||'buyer';
+  ge('tcContact').innerHTML = '';
+  C.forEach(function(c){ var o=document.createElement('option'); o.value=c.id; o.textContent=fn(c)+' ('+c.type+')'; ge('tcContact').appendChild(o); });
+  ge('tcContact').value = tx.contactId||'';
+  ge('tcAddress').value = tx.address||'';
+  ge('tcPrice').value = tx.price||'';
+  ge('tcMLS').value = tx.mlsNum||'';
+  ge('tcLender').value = tx.lender||'';
+  ge('tcTitle').value = tx.titleCo||'';
+  ge('tcNotes').value = tx.notes||'';
+  ge('tcContractDate').value = tx.contractDate||'';
+  ge('tcClosingDate').value = tx.closingDate||'';
+  ge('tcEarnestDate').value = tx.earnestDate||'';
+  ge('tcDueDiligDate').value = tx.dueDiligDate||'';
+  ge('tcFinancingDate').value = tx.financingDate||'';
+  ge('tcAppraisalDate').value = tx.appraisalDate||'';
+  ge('tcModal').classList.add('open');
+});
+document.querySelectorAll('[data-tc-filter]').forEach(function(b){
+  b.addEventListener('click', function(){
+    tcFilter = b.getAttribute('data-tc-filter');
+    document.querySelectorAll('[data-tc-filter]').forEach(function(x){ x.classList.remove('active'); });
+    b.classList.add('active');
+    renderTC();
+  });
+});
+
+// Auth disabled for testing - topbar user icon is decorative
+ge('btnExportCSV').addEventListener('click', exportCSV);
+ge('btnImportCSV').addEventListener('click', openImport);
+ge('btnConfirmImport').addEventListener('click', confirmImport);
+
+// CSV drop zone
+var dropZone = ge('csvDropZone');
+dropZone.addEventListener('click', function(){ ge('csvFileInput').click(); });
+dropZone.addEventListener('dragover', function(e){ e.preventDefault(); this.style.borderColor='var(--accent)'; this.style.background='rgba(201,168,76,0.05)'; });
+dropZone.addEventListener('dragleave', function(){ this.style.borderColor='var(--border)'; this.style.background=''; });
+dropZone.addEventListener('drop', function(e){
+  e.preventDefault(); this.style.borderColor='var(--border)'; this.style.background='';
+  var file = e.dataTransfer.files[0];
+  if(file) readCSVFile(file);
+});
+ge('csvFileInput').addEventListener('change', function(){
+  if(this.files[0]) readCSVFile(this.files[0]);
+  this.value = '';
+});
+
+function readCSVFile(file){
+  var reader = new FileReader();
+  reader.onload = function(e){
+    var contacts = parseCSV(e.target.result);
+    if(!contacts.length){ alert('No valid contacts found. Check that your CSV has headers and data rows.'); return; }
+    showCSVPreview(contacts);
+  };
+  reader.readAsText(file);
+}
+document.querySelectorAll('[data-close]').forEach(function(b){b.addEventListener('click',function(){cm(b.getAttribute('data-close'));});});
+document.querySelectorAll('.modal-ov').forEach(function(m){m.addEventListener('click',function(e){if(e.target===m)m.classList.remove('open');});});
+document.querySelectorAll('.filter-btn').forEach(function(b){b.addEventListener('click',function(){curFilter=b.getAttribute('data-filter');document.querySelectorAll('.filter-btn').forEach(function(x){x.classList.remove('active');});b.classList.add('active');rc();});});
+
+demo();
+rd();
+})();
+</script>
+</body>
+</html>
