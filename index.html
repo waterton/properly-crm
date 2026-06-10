@@ -700,51 +700,73 @@ function sv(){
 // Supabase sync functions
 function dbSave(table, rows){
   if(!supaReady) return;
-  // Clean rows - remove any undefined values that Supabase rejects
   var cleanRows = JSON.parse(JSON.stringify(rows));
-  supa.from(table).upsert(cleanRows).then(function(r){
-    if(r.error){
-      console.log('DB save error on ' + table + ':', r.error.message);
+  var headers = {
+    'apikey': SUPA_KEY,
+    'Authorization': 'Bearer ' + SUPA_KEY,
+    'Content-Type': 'application/json',
+    'Prefer': 'resolution=merge-duplicates'
+  };
+  fetch(SUPA_URL + '/rest/v1/' + table, {
+    method: 'POST',
+    headers: headers,
+    body: JSON.stringify(cleanRows)
+  }).then(function(r){
+    if(!r.ok){
+      r.text().then(function(t){ console.log('DB save error on ' + table + ':', t); });
       showSyncStatus('error');
     }
-  });
+  }).catch(function(e){ console.log('DB save fetch error:', e.message); });
 }
 
 function dbDelete(table, id){
   if(!supaReady) return;
-  supa.from(table).delete().eq('id', id).then(function(r){
-    if(r.error) console.log('DB delete error:', r.error);
-  });
+  var headers = {
+    'apikey': SUPA_KEY,
+    'Authorization': 'Bearer ' + SUPA_KEY,
+    'Content-Type': 'application/json'
+  };
+  fetch(SUPA_URL + '/rest/v1/' + table + '?id=eq.' + id, {
+    method: 'DELETE',
+    headers: headers
+  }).catch(function(e){ console.log('DB delete error:', e.message); });
 }
 
 async function loadFromDB(){
   if(!supaReady) return false;
   try{
     showSyncStatus('loading');
-    var [rc, rn, rf, rd, rtx] = await Promise.all([
-      supa.from('contacts').select('*').order('added', {ascending:true}),
-      supa.from('notes').select('*').order('date', {ascending:true}),
-      supa.from('followups').select('*').order('date', {ascending:true}),
-      supa.from('deadlines').select('*').order('date', {ascending:true}),
-      supa.from('transactions').select('*')
+
+    // Use direct fetch to Supabase REST API to avoid DataCloneError
+    var headers = {
+      'apikey': SUPA_KEY,
+      'Authorization': 'Bearer ' + SUPA_KEY,
+      'Content-Type': 'application/json'
+    };
+    var base = SUPA_URL + '/rest/v1/';
+
+    var results = await Promise.all([
+      fetch(base + 'contacts?order=added.asc', {headers:headers}).then(function(r){return r.json();}),
+      fetch(base + 'notes?order=date.asc', {headers:headers}).then(function(r){return r.json();}),
+      fetch(base + 'followups?order=date.asc', {headers:headers}).then(function(r){return r.json();}),
+      fetch(base + 'deadlines?order=date.asc', {headers:headers}).then(function(r){return r.json();}),
+      fetch(base + 'transactions?order=created_at.asc', {headers:headers}).then(function(r){return r.json();})
     ]);
-    // Log individual errors for debugging
-    if(rc.error) console.log('contacts load error:', rc.error.message);
-    if(rn.error) console.log('notes load error:', rn.error.message);
-    if(rf.error) console.log('followups load error:', rf.error.message);
-    if(rd.error) console.log('deadlines load error:', rd.error.message);
-    if(rtx && rtx.error) console.log('transactions load error:', rtx.error.message);
-    // If contacts failed it means RLS is blocking - show error
-    if(rc.error){
-      showSyncStatus('error');
-      return false;
-    }
-    // Load whatever succeeded
-    if(rc.data) C = rc.data;
-    if(rn.data) N = rn.data;
-    if(rf.data) F = rf.data;
-    if(rd.data) D = rd.data;
-    if(rtx && rtx.data) TX = rtx.data;
+
+    var rc = results[0], rn = results[1], rf = results[2], rd = results[3], rtx = results[4];
+
+    // Check for errors (Supabase returns {code, message} on error)
+    if(rc && rc.code){ console.log('contacts load error:', rc.message); showSyncStatus('error'); return false; }
+    if(rn && rn.code) console.log('notes load error:', rn.message);
+    if(rf && rf.code) console.log('followups load error:', rf.message);
+    if(rd && rd.code) console.log('deadlines load error:', rd.message);
+    if(rtx && rtx.code) console.log('transactions load error:', rtx.message);
+
+    if(Array.isArray(rc)) C = rc;
+    if(Array.isArray(rn)) N = rn;
+    if(Array.isArray(rf)) F = rf;
+    if(Array.isArray(rd)) D = rd;
+    if(Array.isArray(rtx)) TX = rtx;
     // Convert id strings to numbers if needed
     C.forEach(function(c){ c.id = typeof c.id === 'string' ? parseInt(c.id)||c.id : c.id; });
     N.forEach(function(n){ n.id = typeof n.id === 'string' ? parseInt(n.id)||n.id : n.id; n.contactId = typeof n.contactId === 'string' ? parseInt(n.contactId) : n.contactId; });
@@ -784,27 +806,39 @@ function saveContact(c){ sv(); if(supaReady) dbSave('contacts', [c]); }
 function saveNote(n){ sv(); if(supaReady) dbSave('notes', [n]); }
 function saveFU(f){ sv(); if(supaReady) dbSave('followups', [f]); }
 function saveDL(d){ sv(); if(supaReady) dbSave('deadlines', [d]); }
-function deleteCfromDB(id){ if(supaReady){ supa.from('contacts').delete().eq('id',id); supa.from('notes').delete().eq('contactId',id); supa.from('followups').delete().eq('contactId',id); supa.from('deadlines').delete().eq('contactId',id); } }
-function deleteFUfromDB(id){ if(supaReady) supa.from('followups').delete().eq('id',id); }
+function deleteCfromDB(id){
+  if(!supaReady) return;
+  var h = {'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY};
+  fetch(SUPA_URL+'/rest/v1/contacts?id=eq.'+id,{method:'DELETE',headers:h});
+  fetch(SUPA_URL+'/rest/v1/notes?contactId=eq.'+id,{method:'DELETE',headers:h});
+  fetch(SUPA_URL+'/rest/v1/followups?contactId=eq.'+id,{method:'DELETE',headers:h});
+  fetch(SUPA_URL+'/rest/v1/deadlines?contactId=eq.'+id,{method:'DELETE',headers:h});
+}
+function deleteFUfromDB(id){
+  if(!supaReady) return;
+  var h = {'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY};
+  fetch(SUPA_URL+'/rest/v1/followups?id=eq.'+id,{method:'DELETE',headers:h});
+}
 function updateContact(c){ sv(); if(supaReady) dbSave('contacts', [c]); }
 
 // Real-time subscription for live sync
 function subscribeRealtime(){
   if(!supaReady) return;
-  supa.channel('crm-changes')
-    .on('postgres_changes', {event:'*', schema:'public'}, function(payload){
-      // Reload data when any change happens from another device
-      loadFromDB().then(function(ok){
-        if(ok && curPage) {
-          if(curPage==='dashboard') rd();
-          else if(curPage==='contacts') rc();
-          else if(curPage==='followups') rfu();
-          else if(curPage==='notes') rn();
-          else if(curPage==='deadlines') rdl();
-          else if(curPage==='briefing') rb();
-        }
-      });
-    }).subscribe();
+  // Use polling every 30 seconds as fallback for real-time sync
+  // This avoids the DataCloneError from Supabase's websocket implementation
+  setInterval(function(){
+    loadFromDB().then(function(ok){
+      if(ok && curPage){
+        if(curPage==='dashboard') rd();
+        else if(curPage==='contacts') rc();
+        else if(curPage==='followups') rfu();
+        else if(curPage==='notes') rn();
+        else if(curPage==='deadlines') rdl();
+        else if(curPage==='briefing') rb();
+        else if(curPage==='tc') renderTC();
+      }
+    });
+  }, 30000); // Poll every 30 seconds
 }
 function demo(){
   var t=Date.now();
@@ -2003,18 +2037,17 @@ function startScan(file){
       }
       var text = data.content[0].text;
       try{
-        // Strip all markdown fencing variations
+        console.log('Raw text from Gemini (first 200):', text.substring(0,200));
         var clean = text.trim();
-        // Remove ```json ... ``` blocks
-        if(clean.indexOf('```') !== -1){
-          clean = clean.replace(/```json/g,'').replace(/```/g,'').trim();
-        }
-        // Find the first { and last } to extract just the JSON object
+        // Remove markdown fencing
+        clean = clean.replace(/```json/gi,'').replace(/```/g,'').trim();
+        // Find JSON object boundaries
         var firstBrace = clean.indexOf('{');
         var lastBrace = clean.lastIndexOf('}');
-        if(firstBrace !== -1 && lastBrace !== -1){
+        if(firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace){
           clean = clean.substring(firstBrace, lastBrace + 1);
         }
+        console.log('Clean JSON (first 200):', clean.substring(0,200));
         var result = JSON.parse(clean);
         lastScanResult = result;
         result.scannedAt = new Date().toISOString();
@@ -2431,6 +2464,16 @@ function importScanToTC(r){
 }
 
 function showScannerRawResult(text){
+  // One final attempt to parse JSON from anywhere in the text
+  try{
+    var fb = text.indexOf('{');
+    var lb = text.lastIndexOf('}');
+    if(fb !== -1 && lb > fb){
+      var attempt = JSON.parse(text.substring(fb, lb+1));
+      if(attempt && attempt.docType){ showScannerResults(attempt); return; }
+    }
+  }catch(e2){}
+
   ge('scannerProcessing').style.display = 'none';
   ge('scannerHistory').style.display = 'block';
   var res = ge('scannerResults');
