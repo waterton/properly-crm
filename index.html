@@ -1992,14 +1992,18 @@ function startScan(file){
     .then(function(r){ return r.json(); })
     .then(function(data){
       clearInterval(msgTimer);
+      console.log('Gemini raw response:', JSON.stringify(data).substring(0,500));
+      if(data.error){
+        showScannerError('Gemini API error: ' + (data.error.message || JSON.stringify(data.error)));
+        return;
+      }
       if(!data.content || !data.content[0]){
-        showScannerError('No response from AI. Please try again.');
+        showScannerError('No response from AI. Raw: ' + JSON.stringify(data).substring(0,200));
         return;
       }
       var text = data.content[0].text;
       try{
-        // Strip markdown code fences if present
-        var clean = text.replace(/```json[\s\S]?/g,'').replace(/```/g,'').trim();
+        var clean = text.replace(/```json[\s\S]*?```/g, function(m){ return m.replace(/```json/,'').replace(/```/,''); }).replace(/```/g,'').trim();
         var result = JSON.parse(clean);
         lastScanResult = result;
         result.scannedAt = new Date().toISOString();
