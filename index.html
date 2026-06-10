@@ -2003,7 +2003,18 @@ function startScan(file){
       }
       var text = data.content[0].text;
       try{
-        var clean = text.replace(/```json[\s\S]*?```/g, function(m){ return m.replace(/```json/,'').replace(/```/,''); }).replace(/```/g,'').trim();
+        // Strip all markdown fencing variations
+        var clean = text.trim();
+        // Remove ```json ... ``` blocks
+        if(clean.indexOf('```') !== -1){
+          clean = clean.replace(/```json/g,'').replace(/```/g,'').trim();
+        }
+        // Find the first { and last } to extract just the JSON object
+        var firstBrace = clean.indexOf('{');
+        var lastBrace = clean.lastIndexOf('}');
+        if(firstBrace !== -1 && lastBrace !== -1){
+          clean = clean.substring(firstBrace, lastBrace + 1);
+        }
         var result = JSON.parse(clean);
         lastScanResult = result;
         result.scannedAt = new Date().toISOString();
