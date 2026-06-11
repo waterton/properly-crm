@@ -1583,7 +1583,23 @@ function rfu(){
   var el=ge('fuList');el.innerHTML='';
   var sorted=F.slice().sort(function(a,b){return new Date(a.date)-new Date(b.date);});
   if(!sorted.length){el.innerHTML='<div class="empty">No follow-ups yet.</div>';return;}
-  sorted.forEach(function(f){var c=gc(f.contactId);var row=mkRow('fu-row');var chk=mkRow('chk'+(f.done?' done':''));if(f.done)chk.appendChild(ck());(function(id){chk.addEventListener('click',function(){tfu(id);rfu();});})(f.id);var info=mkDiv('flex:1;');info.appendChild(mkDiv('font-size:18px;'+(f.done?'text-decoration:line-through;color:var(--text3);':''),f.label));info.appendChild(mkDiv('font-size:18px;color:var(--text3);',(c?fn(c):'Unknown')+' - '+fd(f.date)));var right=mkDiv('display:flex;align-items:center;gap:7px;');right.appendChild(mkBadge(f.pri));var del=mkBtn('','\u00d7','background:none;border:none;color:var(--text3);cursor:pointer;font-size:18px;line-height:1;');(function(id){del.addEventListener('click',function(){F=F.filter(function(f){return f.id!==id;});sv();if(supaReady) fetch(SUPA_URL+'/rest/v1/followups?id=eq.'+id,{method:'DELETE',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}});rfu();rd();});})(f.id);right.appendChild(del);row.appendChild(chk);row.appendChild(info);row.appendChild(right);el.appendChild(row);});
+  sorted.forEach(function(f){var c=gc(f.contactId);var row=mkRow('fu-row');var chk=mkRow('chk'+(f.done?' done':''));if(f.done)chk.appendChild(ck());(function(id){chk.addEventListener('click',function(){tfu(id);rfu();});})(f.id);var info=mkDiv('flex:1;');info.appendChild(mkDiv('font-size:18px;'+(f.done?'text-decoration:line-through;color:var(--text3);':''),f.label));info.appendChild(mkDiv('font-size:18px;color:var(--text3);',(c?fn(c):'Unknown')+' - '+fd(f.date)));var right=mkDiv('display:flex;align-items:center;gap:7px;');right.appendChild(mkBadge(f.pri));var del=mkBtn('','\u00d7','background:none;border:none;color:var(--text3);cursor:pointer;font-size:18px;line-height:1;');// GCal sync for follow-up
+    var gcalFuBtn=document.createElement('button');
+    gcalFuBtn.style.cssText='background:rgba(76,142,201,0.1);border:1px solid rgba(76,142,201,0.2);border-radius:5px;padding:3px 8px;cursor:pointer;font-size:14px;color:var(--buyer);font-family:DM Sans,sans-serif;';
+    gcalFuBtn.textContent='+ GCal';
+    gcalFuBtn.title='Add to Google Calendar';
+    (function(fu){ gcalFuBtn.addEventListener('click',function(e){
+      e.stopPropagation();
+      var c6=gc(fu.contactId);
+      syncToGCal({
+        title:fu.label+(c6?' - '+fn(c6):''),
+        date:fu.date,time:'',type:'followup',
+        clientName:c6?fn(c6):'',
+        notes:'Follow-up from Properly CRM'
+      }, fu.assignedTo);
+    }); })(f);
+    right.appendChild(gcalFuBtn);
+    (function(id){del.addEventListener('click',function(){F=F.filter(function(f){return f.id!==id;});sv();if(supaReady) fetch(SUPA_URL+'/rest/v1/followups?id=eq.'+id,{method:'DELETE',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}});rfu();rd();});})(f.id);right.appendChild(del);row.appendChild(chk);row.appendChild(info);row.appendChild(right);el.appendChild(row);});
   ge('nbFollowups').textContent=F.filter(function(f){return !f.done;}).length;
 }
 function tfu(id){var f=F.find(function(x){return x.id===id;});if(f){f.done=!f.done;sv();if(supaReady) dbSave('followups',[f]);}}
@@ -1801,6 +1817,23 @@ function rdl(){
       right2.appendChild(dates2);
 
       var editBtn2=document.createElement('button');
+      // GCal sync button
+      var gcalDlBtn=document.createElement('button');
+      gcalDlBtn.style.cssText='background:rgba(76,142,201,0.1);border:1px solid rgba(76,142,201,0.2);border-radius:5px;padding:4px 8px;cursor:pointer;font-size:14px;color:var(--buyer);font-family:DM Sans,sans-serif;white-space:nowrap;';
+      gcalDlBtn.textContent='+ GCal';
+      gcalDlBtn.title='Add to Google Calendar';
+      (function(dl2){ gcalDlBtn.addEventListener('click',function(e){
+        e.stopPropagation();
+        var c5=gc(dl2.contactId);
+        syncToGCal({
+          title:dl2.type+(c5?' - '+fn(c5):''),
+          date:dl2.date,time:'',type:'deadline',
+          clientName:c5?fn(c5):'',
+          notes:'Deadline from Properly CRM'
+        }, dl2.assignedTo);
+      }); })(d);
+      right2.appendChild(gcalDlBtn);
+
       editBtn2.style.cssText='background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:4px 8px;cursor:pointer;font-size:18px;color:var(--text2);font-family:DM Sans,sans-serif;';
       editBtn2.textContent='Edit';
       (function(dl){ editBtn2.addEventListener('click',function(e){ e.stopPropagation(); openEditDL(dl); }); })(d);
@@ -2587,6 +2620,50 @@ function openTCDetail(id){
     body.appendChild(notesSec);
   }
 
+  // GCal sync section in TC detail
+  var gcalTxSec = document.createElement('div');
+  gcalTxSec.style.cssText = 'padding:12px 20px;border-top:1px solid var(--border);';
+  var gcalTxTitle = document.createElement('div');
+  gcalTxTitle.style.cssText = 'font-size:14px;color:var(--text3);margin-bottom:8px;';
+  gcalTxTitle.textContent = 'Sync to Google Calendar';
+  gcalTxSec.appendChild(gcalTxTitle);
+
+  var gcalBtnRow = document.createElement('div');
+  gcalBtnRow.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;';
+
+  var txDateDefs = [
+    {key:'closingDate',label:'Closing Date',type:'closing'},
+    {key:'earnestDate',label:'Earnest Money Due',type:'deadline'},
+    {key:'dueDiligDate',label:'Due Diligence',type:'deadline'},
+    {key:'financingDate',label:'Financing Deadline',type:'deadline'},
+    {key:'appraisalDate',label:'Appraisal Deadline',type:'deadline'}
+  ];
+
+  txDateDefs.forEach(function(td){
+    if(!tx[td.key]) return;
+    var btn = document.createElement('button');
+    btn.className = 'btn btn-g';
+    btn.style.cssText += 'font-size:14px;padding:5px 10px;';
+    btn.innerHTML = '+ ' + td.label;
+    btn.title = 'Add ' + td.label + ' to Google Calendar';
+    var c7=gc(tx.contactId);
+    (function(dateKey, lbl, typ){
+      btn.addEventListener('click', function(){
+        syncToGCal({
+          title:lbl+': '+(tx.address||(c7?fn(c7):'Unknown')),
+          date:tx[dateKey],time:'09:00',type:typ,
+          clientName:c7?fn(c7):'',
+          address:tx.address||'',
+          notes:'Transaction deadline from Properly CRM'
+        }, tx.assignedTo);
+      });
+    })(td.key, td.label, td.type);
+    gcalBtnRow.appendChild(btn);
+  });
+
+  gcalTxSec.appendChild(gcalBtnRow);
+  body.appendChild(gcalTxSec);
+
   ge('tcDetOv').classList.add('open');
   ge('tcAiResponse').style.display = 'none';
   ge('tcAiInput').value = '';
@@ -3364,6 +3441,101 @@ function showScannerError(msg){
   alert('Scanner error: ' + msg);
 }
 
+// -- GOOGLE CALENDAR SYNC ---
+async function syncToGCal(eventData, memberId){
+  // Find which member to sync to
+  var mid = memberId;
+
+  // If no member specified, ask which account
+  if(!mid){
+    var connected = Object.keys(gmailState.connectedAccounts);
+    if(!connected.length){
+      alert('No Gmail/Calendar connected. Go to Gmail tab and connect your account first.');
+      return;
+    }
+    if(connected.length === 1){
+      mid = connected[0];
+    } else {
+      // Show picker
+      var names = connected.map(function(id){
+        var m = TM.find(function(x){ return String(x.id)===String(id); });
+        var acc = gmailState.connectedAccounts[id];
+        return (m ? m.first+' '+m.last : 'Member '+id) + ' (' + (acc?acc.email:'') + ')';
+      });
+      var NL4='\n';
+      var choice = connected[parseInt(prompt('Add to which calendar?' + NL4 + names.map(function(n,i){ return (i+1)+'. '+n; }).join(NL4) + NL4+NL4+'Enter number:'))-1];
+      if(!choice) return;
+      mid = choice;
+    }
+  }
+
+  // Check account is connected
+  if(!gmailState.connectedAccounts[String(mid)]){
+    // Try to find any connected account
+    var anyConnected = Object.keys(gmailState.connectedAccounts)[0];
+    if(!anyConnected){
+      alert('Please connect Gmail first. Go to the Gmail tab and click Connect Gmail.');
+      return;
+    }
+    mid = anyConnected;
+  }
+
+  var btn = event && event.target;
+  var origText = btn ? btn.textContent : '';
+  if(btn){ btn.textContent = 'Adding...'; btn.disabled = true; }
+
+  try{
+    var resp = await fetch('/api/gcal', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({action:'create', memberId:mid, event:eventData})
+    });
+    var respText = await resp.text();
+    var data;
+    try{ data = JSON.parse(respText); }
+    catch(e){ alert('Calendar sync error: ' + respText.substring(0,100)); return; }
+
+    if(data.error){
+      // If scope error, need to reconnect
+      if(data.error.includes('scope') || data.error.includes('permission') || data.error.includes('Calendar')){
+        alert('Calendar access not authorized. Please disconnect and reconnect Gmail to grant calendar permissions.');
+      } else {
+        alert('Calendar sync error: ' + data.error);
+      }
+      return;
+    }
+
+    if(btn){ btn.textContent = 'Added!'; btn.style.background='rgba(107,201,122,0.2)'; btn.style.color='var(--lead)'; btn.style.borderColor='var(--lead)'; }
+    setTimeout(function(){ if(btn){ btn.textContent=origText; btn.disabled=false; btn.style.background=''; btn.style.color=''; btn.style.borderColor=''; } }, 3000);
+
+    // Show link to Google Calendar event
+    if(data.link){
+      var openLink = confirm('Event added to Google Calendar! Open it now?');
+      if(openLink) window.open(data.link, '_blank');
+    }
+
+  }catch(e){
+    alert('Sync error: ' + e.message);
+    if(btn){ btn.textContent=origText; btn.disabled=false; }
+  }
+}
+
+function syncEventToGCal(ev){
+  // Convert CRM event to syncable format
+  var c = ev.data && ev.data.contactId ? gc(ev.data.contactId) : null;
+  var eventData = {
+    title: ev.label,
+    date: ev.data.date || (ev.data.date),
+    time: ev.time || (ev.data && ev.data.time) || '',
+    endTime: ev.data && ev.data.endTime || '',
+    type: ev.type.replace('ev-',''),
+    clientName: c ? fn(c) : '',
+    address: ev.data && ev.data.address || '',
+    notes: ev.data && ev.data.notes || ''
+  };
+  syncToGCal(eventData, ev.memberId || (ev.data && ev.data.memberId) || null);
+}
+
 // -- CALENDAR ---
 var CAL = {
   view: 'month',
@@ -3880,6 +4052,14 @@ function openCalEventDetail(ev){
     (function(txId){ goBtn3.addEventListener('click', function(){ sp('tc'); openTCDetail(txId); ge('calDetOv').classList.remove('open'); }); })(ev.data.id);
     actions.appendChild(goBtn3);
   }
+
+  // Google Calendar sync button for all event types
+  var gcalBtn = document.createElement('button');
+  gcalBtn.className = 'btn btn-g';
+  gcalBtn.style.cssText += 'display:flex;align-items:center;gap:6px;';
+  gcalBtn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> Add to Google Cal';
+  (function(e){ gcalBtn.addEventListener('click', function(){ syncEventToGCal(e); }); })(ev);
+  actions.appendChild(gcalBtn);
 
   var closeBtn = document.createElement('button');
   closeBtn.className = 'btn btn-g';

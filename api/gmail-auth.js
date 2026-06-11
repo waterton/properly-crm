@@ -1,4 +1,4 @@
-// Gmail OAuth handler
+// Gmail OAuth + Calendar handler v2
 // Handles: /api/gmail-auth?action=url&memberId=X  -> returns auth URL
 //          /api/gmail-auth?action=callback&code=X&memberId=X -> exchanges code for tokens
 //          /api/gmail-auth?action=refresh&memberId=X -> refreshes access token
@@ -8,7 +8,8 @@ const SCOPES = [
   'https://www.googleapis.com/auth/gmail.readonly',
   'https://www.googleapis.com/auth/gmail.send',
   'https://www.googleapis.com/auth/gmail.compose',
-  'https://www.googleapis.com/auth/gmail.modify'
+  'https://www.googleapis.com/auth/gmail.modify',
+  'https://www.googleapis.com/auth/calendar'
 ].join(' ');
 
 // In-memory token store per member (Vercel functions are stateless so we use Supabase)
@@ -41,8 +42,8 @@ export default async function handler(req, res) {
 
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-  const supaUrl = process.env.SUPA_URL;
-  const supaKey = process.env.SUPA_KEY;
+  const supaUrl = process.env.SUPA_URL || 'https://fgkilooomlozhwfnvjze.supabase.co';
+  const supaKey = process.env.SUPA_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZna2lsb29vbWxvemh3Zm52anplIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA3NTc0NTIsImV4cCI6MjA5NjMzMzQ1Mn0.owQk8Vy3Vcs8n8c0sI0fXQYmjpAy14hev8lDt4g5iZE';
   // Build base URL - try multiple sources
   var baseUrl = process.env.APP_URL
     || (process.env.VERCEL_URL ? 'https://' + process.env.VERCEL_URL : null)
