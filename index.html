@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-  <meta name="version" content="3.9">
+  <meta name="version" content="4.0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>Properly CRM</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -540,7 +540,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
       <div class="topbar-right">
         <input class="sbox" type="text" placeholder="Search..." id="searchBox">
         <button class="btn btn-p" id="btnAdd">+ Add</button>
-        <div style="font-size:11px;color:var(--text3);margin-right:4px;">v3.9</div>
+        <div style="font-size:11px;color:var(--text3);margin-right:4px;">v4.0</div>
         <div class="topbar-user" id="topbarUser" title="Click to sign out" style="cursor:pointer;position:relative;" id="topbarUserBtn">RE</div>
       </div>
     </div>
@@ -6468,6 +6468,14 @@ function showLoginMsg(msg){
 
 async function signInWithGoogle(){
   clearLoginMessages();
+  // Make sure Supabase is ready
+  if(!supaReady || !supa){
+    initSupabase();
+    if(!supaReady || !supa){
+      showLoginErr('Connection not ready. Please refresh the page and try again.');
+      return;
+    }
+  }
   ge('btnGoogleLogin').textContent = 'Signing in...';
   ge('btnGoogleLogin').disabled = true;
   try{
@@ -6486,6 +6494,13 @@ async function signInWithGoogle(){
 
 async function signInWithEmail(){
   clearLoginMessages();
+  if(!supaReady || !supa){
+    initSupabase();
+    if(!supaReady || !supa){
+      showLoginErr('Connection not ready. Please refresh the page and try again.');
+      return;
+    }
+  }
   var email = ge('loginEmail').value.trim();
   var password = ge('loginPassword').value;
   if(!email || !password){ showLoginErr('Please enter your email and password.'); return; }
