@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-  <meta name="version" content="4.1">
+  <meta name="version" content="4.2">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>Properly CRM</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -540,7 +540,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
       <div class="topbar-right">
         <input class="sbox" type="text" placeholder="Search..." id="searchBox">
         <button class="btn btn-p" id="btnAdd">+ Add</button>
-        <div style="font-size:11px;color:var(--text3);margin-right:4px;">v4.1</div>
+        <div style="font-size:11px;color:var(--text3);margin-right:4px;">v4.2</div>
         <div class="topbar-user" id="topbarUser" title="Click to sign out" style="cursor:pointer;position:relative;" id="topbarUserBtn">RE</div>
       </div>
     </div>
@@ -6568,38 +6568,29 @@ async function startup(){
     // This ensures we catch the OAuth redirect token in the URL hash
     supa.auth.onAuthStateChange(function(event, session){
       console.log('Auth event:', event, 'user:', session && session.user && session.user.email);
-      if(event === 'SIGNED_IN' && session && session.user){
-        onAuthSuccess(session.user);
+      if((event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') && session && session.user){
+        if(!currentUser){
+          onAuthSuccess(session.user);
+        }
       } else if(event === 'SIGNED_OUT'){
         currentUser = null;
         showLoginScreen();
       } else if(event === 'PASSWORD_RECOVERY'){
         showLoginScreen();
         showLoginMsg('Enter your new password below.');
-      } else if(event === 'TOKEN_REFRESHED' && session){
-        currentUser = session.user;
       }
     });
 
-    // Check for OAuth redirect in URL hash
-    if(window.location.hash && window.location.hash.includes('access_token')){
-      // Supabase will handle this via onAuthStateChange above
-      // Just show login screen while it processes
-      showLoginScreen();
-      showLoginMsg('Completing sign in...');
-      // Clean up URL
-      setTimeout(function(){
-        window.history.replaceState(null, '', window.location.pathname);
-      }, 2000);
-      return;
-    }
-
-    // Check for existing session
+    // Check for existing session (also handles OAuth redirect tokens in URL hash)
     var sessionResult = await supa.auth.getSession();
     var session = sessionResult.data && sessionResult.data.session;
+    console.log('getSession result:', session ? 'has session' : 'no session', session && session.user && session.user.email);
 
     if(session && session.user){
       onAuthSuccess(session.user);
+    } else if(window.location.hash && window.location.hash.includes('access_token')){
+      // OAuth redirect - show "completing sign in" while onAuthStateChange fires
+      showLoginMsg('Completing sign in...');
     } else {
       showLoginScreen();
     }
