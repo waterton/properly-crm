@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-  <meta name="version" content="3.0">
+  <meta name="version" content="3.1">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Properly CRM</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -411,7 +411,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
       <div class="topbar-right">
         <input class="sbox" type="text" placeholder="Search..." id="searchBox">
         <button class="btn btn-p" id="btnAdd">+ Add</button>
-        <div style="font-size:11px;color:var(--text3);margin-right:4px;">v3.0</div>
+        <div style="font-size:11px;color:var(--text3);margin-right:4px;">v3.1</div>
         <div class="topbar-user" id="topbarUser" title="Sign out" style="cursor:pointer;">RE</div>
       </div>
     </div>
@@ -4507,16 +4507,18 @@ function initGmail(){
 }
 
 async function checkConnectedAccounts(){
-  // Check Supabase for stored tokens
-  if(!supaReady) return;
+  // Check Supabase for stored tokens - use hardcoded values as fallback
+  var supaU = SUPA_URL || 'https://fgkilooomlozhwfnvjze.supabase.co';
+  var supaK = SUPA_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZna2lsb29vbWxvemh3Zm52anplIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA3NTc0NTIsImV4cCI6MjA5NjMzMzQ1Mn0.owQk8Vy3Vcs8n8c0sI0fXQYmjpAy14hev8lDt4g5iZE';
+  if(!supaU) return;
   try{
-    var resp = await fetch(SUPA_URL + '/rest/v1/gmail_tokens?select=member_id,email,name', {
-      headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}
+    var resp = await fetch(supaU + '/rest/v1/gmail_tokens?select=member_id,email,name', {
+      headers:{'apikey':supaK,'Authorization':'Bearer '+supaK}
     });
     var tokens = await resp.json();
     if(Array.isArray(tokens)){
       tokens.forEach(function(t){
-        gmailState.connectedAccounts[t.member_id] = {email:t.email, name:t.name};
+        gmailState.connectedAccounts[String(t.member_id)] = {email:t.email, name:t.name};
       });
     }
     renderGmailAccountBar();
