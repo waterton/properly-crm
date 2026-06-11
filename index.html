@@ -58,6 +58,12 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .tag-buyer{background:rgba(76,142,201,0.15);color:var(--buyer);}
 .tag-seller{background:rgba(201,107,76,0.15);color:var(--seller);}
 .tag-lead{background:rgba(107,201,122,0.15);color:var(--lead);}
+.tag-prospect{background:rgba(107,201,122,0.15);color:var(--lead);}
+.tag-agent{background:rgba(150,100,210,0.15);color:#9664d2;}
+.tag-lender{background:rgba(76,180,201,0.15);color:#4cb4c9;}
+.tag-title{background:rgba(201,140,76,0.15);color:#c98c4c;}
+.tag-vendor{background:rgba(160,160,160,0.15);color:#a0a0a0;}
+.tag-other{background:rgba(120,120,120,0.15);color:#909090;}
 .badge{font-size:16px;font-weight:700;padding:2px 7px;border-radius:4px;display:inline-block;}
 .b-hot{background:rgba(201,76,76,0.2);color:var(--danger);}
 .b-warn{background:rgba(201,168,76,0.2);color:var(--warn);}
@@ -89,6 +95,12 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .av-buyer{background:rgba(76,142,201,0.2);color:var(--buyer);}
 .av-seller{background:rgba(201,107,76,0.2);color:var(--seller);}
 .av-lead{background:rgba(107,201,122,0.2);color:var(--lead);}
+.av-prospect{background:rgba(107,201,122,0.2);color:var(--lead);}
+.av-agent{background:rgba(150,100,210,0.2);color:#9664d2;}
+.av-lender{background:rgba(76,180,201,0.2);color:#4cb4c9;}
+.av-title{background:rgba(201,140,76,0.2);color:#c98c4c;}
+.av-vendor{background:rgba(160,160,160,0.2);color:#a0a0a0;}
+.av-other{background:rgba(120,120,120,0.2);color:#909090;}
 .modal-ov{position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:1000;display:none;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(4px);}
 .modal-ov.open{display:flex;}
 .modal{background:var(--surface);border:1px solid var(--border);border-radius:12px;width:100%;max-width:500px;max-height:90vh;overflow-y:auto;}
@@ -578,7 +590,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
         <div class="grid4">
           <div class="scard sc-b"><div class="slbl">Active Buyers</div><div class="sval" id="sBuyers">0</div><div class="ssub">in pipeline</div></div>
           <div class="scard sc-s"><div class="slbl">Active Sellers</div><div class="sval" id="sSellers">0</div><div class="ssub">listed</div></div>
-          <div class="scard sc-l"><div class="slbl">New Leads</div><div class="sval" id="sLeads">0</div><div class="ssub">total</div></div>
+          <div class="scard sc-l"><div class="slbl">Prospects</div><div class="sval" id="sLeads">0</div><div class="ssub">total</div></div>
           <div class="scard sc-d"><div class="slbl">Closing Soon</div><div class="sval" id="sClosing">0</div><div class="ssub">30 days</div></div>
         </div>
         <div class="col3">
@@ -594,11 +606,16 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
         <div class="card"><div class="card-hdr"><div class="card-title">Deal Pipeline</div><button class="btn btn-p" id="btnPipelineAdd">+ Add Deal</button></div><div style="display:flex;gap:12px;overflow-x:auto;padding:16px;" id="pBoard"></div></div>
       </div>
       <div class="page" id="page-contacts">
-        <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">
+        <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center;">
           <button class="filter-btn active" data-filter="all">All</button>
           <button class="filter-btn" data-filter="buyer">Buyers</button>
           <button class="filter-btn" data-filter="seller">Sellers</button>
-          <button class="filter-btn" data-filter="lead">Leads</button>
+          <button class="filter-btn" data-filter="prospect">Prospects</button>
+          <button class="filter-btn" data-filter="agent">Agents</button>
+          <button class="filter-btn" data-filter="lender">Lenders</button>
+          <button class="filter-btn" data-filter="title">Title</button>
+          <button class="filter-btn" data-filter="vendor">Vendors</button>
+          <button class="filter-btn" data-filter="other">Other</button>
           <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;">
             <button class="btn btn-g" id="btnImportCSV">&#8593; Import CSV</button>
             <button class="btn btn-g" id="btnExportCSV">&#8595; Export CSV</button>
@@ -606,7 +623,9 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
           </div>
           <input type="file" id="csvFileInput" accept=".csv" style="display:none;">
         </div>
-        <div class="cgrid" id="cGrid"></div>
+        <div class="card" style="padding:0;">
+          <div id="cGrid"></div>
+        </div>
       </div>
       <div class="page" id="page-followups">
         <div class="card"><div class="card-hdr"><div class="card-title">Follow-up Reminders</div><button class="btn btn-p" id="btnAddFU">+ Add Reminder</button></div><div id="fuList"></div></div>
@@ -1239,7 +1258,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
     <div class="mhdr"><div class="mtitle">Add Contact</div><button class="mx" data-close="addModal">&#x2715;</button></div>
     <div class="mbody">
       <div class="frow"><div class="fg"><label class="fl">First Name</label><input class="fi" id="fFirst" placeholder="Sarah"></div><div class="fg"><label class="fl">Last Name</label><input class="fi" id="fLast" placeholder="Johnson"></div></div>
-      <div class="fg"><label class="fl">Type</label><select class="fsel" id="fType"><option value="lead">Lead/Prospect</option><option value="buyer">Buyer</option><option value="seller">Seller</option></select></div>
+      <div class="fg"><label class="fl">Type</label><select class="fsel" id="fType"><option value="prospect">Prospect</option><option value="buyer">Buyer</option><option value="seller">Seller</option><option value="agent">Agent/Broker</option><option value="lender">Loan Officer/Lender</option><option value="title">Title Company</option><option value="vendor">Vendor</option><option value="other">Other</option></select></div>
       <div class="fg"><label class="fl">Phone</label><input class="fi" id="fPhone" type="tel" placeholder="(555) 000-0000"></div>
       <div class="fg"><label class="fl">Email</label><input class="fi" id="fEmail" type="email" placeholder="sarah@email.com"></div>
       <div class="fg"><label class="fl">Property / Interest</label><input class="fi" id="fProp" placeholder="123 Oak St or Budget $400k-$500k"></div>
@@ -1669,7 +1688,7 @@ function rb(){
 function rd(){
   ge('sBuyers').textContent=C.filter(function(c){return c.type==='buyer';}).length;
   ge('sSellers').textContent=C.filter(function(c){return c.type==='seller';}).length;
-  ge('sLeads').textContent=C.filter(function(c){return c.type==='lead';}).length;
+  ge('sLeads').textContent=C.filter(function(c){return c.type==='prospect'||c.type==='lead';}).length;
   ge('sClosing').textContent=D.filter(function(d){var n=du(d.date);return n>=0&&n<=30;}).length;
   var rEl=ge('dRecent');rEl.innerHTML='';
   var rec=N.slice().sort(function(a,b){return new Date(b.date)-new Date(a.date);}).slice(0,4);
@@ -1783,35 +1802,70 @@ function rp(){
 }
 
 function rc(){
-  var list=curFilter==='all'?C:C.filter(function(c){return c.type===curFilter;});
+  var filter = curFilter==='all' ? null : curFilter;
+  // treat stored 'lead' as 'prospect' for filtering
+  var list = filter
+    ? C.filter(function(c){ var t=c.type==='lead'?'prospect':c.type; return t===filter; })
+    : C.slice();
   var q=ge('searchBox').value.toLowerCase();
-  if(q)list=list.filter(function(c){return fn(c).toLowerCase().indexOf(q)>=0||(c.email||'').toLowerCase().indexOf(q)>=0||(c.phone||'').indexOf(q)>=0;});
+  if(q) list=list.filter(function(c){return fn(c).toLowerCase().indexOf(q)>=0||(c.email||'').toLowerCase().indexOf(q)>=0||(c.phone||'').indexOf(q)>=0;});
+  // sort alphabetically by last name then first
+  list.sort(function(a,b){
+    var la=(a.last||'').toLowerCase(), lb=(b.last||'').toLowerCase();
+    if(la!==lb) return la<lb?-1:1;
+    return (a.first||'').toLowerCase()<(b.first||'').toLowerCase()?-1:1;
+  });
   var grid=ge('cGrid');grid.innerHTML='';
-  if(!list.length){grid.innerHTML='<div class="empty" style="grid-column:1/-1">No contacts found</div>';return;}
+  if(!list.length){
+    var empty=mkDiv('padding:24px;text-align:center;color:var(--text3);font-size:16px;','No contacts found.');
+    grid.appendChild(empty); return;
+  }
+  // letter dividers
+  var lastLetter='';
   list.forEach(function(c){
-    var card=mkDiv('background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;cursor:pointer;transition:all 0.15s;');
-    (function(id){card.addEventListener('click',function(){vc(id);});})(c.id);
-    card.addEventListener('mouseenter',function(){this.style.borderColor='var(--accent)';this.style.transform='translateY(-2px)';});
-    card.addEventListener('mouseleave',function(){this.style.borderColor='var(--border)';this.style.transform='none';});
-    var top=mkDiv('display:flex;align-items:center;gap:11px;margin-bottom:11px;');
-    var av=mkDiv('av av-'+c.type,ini(c));
-    av.className='av av-'+c.type;
-    var nb=mkDiv('');
-    nb.appendChild(mkDiv('font-size:18px;font-weight:600;',fn(c)));
-    var td=mkDiv('margin-top:2px;');
-    var tg=document.createElement('span');tg.className='tag tag-'+c.type;tg.textContent=c.type;td.appendChild(tg);
-    nb.appendChild(td);top.appendChild(av);top.appendChild(nb);card.appendChild(top);
-    var dets=mkDiv('display:flex;flex-direction:column;gap:3px;');
-    if(c.phone)dets.appendChild(mkDiv('font-size:18px;color:var(--text2);',c.phone));
-    if(c.email)dets.appendChild(mkDiv('font-size:18px;color:var(--text2);',c.email));
-    if(c.property)dets.appendChild(mkDiv('font-size:18px;color:var(--text2);',c.property));
-    card.appendChild(dets);
-    var foot=mkDiv('margin-top:11px;padding-top:9px;border-top:1px solid var(--border);display:flex;justify-content:space-between;');
-    var ss=mkDiv('font-size:18px;color:var(--text3);','Stage: ');
-    var sb=document.createElement('b');sb.style.color='var(--accent)';sb.textContent=c.stage;ss.appendChild(sb);
-    foot.appendChild(ss);
-    if(c.price)foot.appendChild(mkDiv('font-family:monospace;font-size:18px;color:var(--text2);',c.price));
-    card.appendChild(foot);grid.appendChild(card);
+    var letter=(c.last||c.first||'#').charAt(0).toUpperCase();
+    if(letter!==lastLetter){
+      lastLetter=letter;
+      var div=mkDiv('padding:8px 18px 4px;font-size:12px;font-weight:700;letter-spacing:2px;color:var(--text3);border-bottom:1px solid var(--border);background:var(--surface2);',letter);
+      grid.appendChild(div);
+    }
+    var row=document.createElement('div');
+    row.style.cssText='display:flex;align-items:center;gap:12px;padding:11px 18px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.12s;';
+    row.addEventListener('mouseenter',function(){this.style.background='var(--surface2)';});
+    row.addEventListener('mouseleave',function(){this.style.background='';});
+    (function(id){row.addEventListener('click',function(){vc(id);});})(c.id);
+
+    // avatar
+    var av=document.createElement('div');
+    var displayType=c.type==='lead'?'prospect':c.type;
+    av.className='av av-'+displayType;
+    av.style.cssText='width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0;';
+    av.textContent=ini(c);
+    row.appendChild(av);
+
+    // name + type badge
+    var info=mkDiv('flex:1;min-width:0;');
+    info.appendChild(mkDiv('font-size:16px;font-weight:600;color:var(--text);',fn(c)));
+    var sub=mkDiv('display:flex;align-items:center;gap:8px;margin-top:2px;');
+    var tg=document.createElement('span');
+    tg.className='tag tag-'+displayType;
+    tg.style.cssText='font-size:12px;padding:1px 7px;';
+    tg.textContent=displayType;
+    sub.appendChild(tg);
+    if(c.stage && (c.type==='buyer'||c.type==='seller'||c.type==='prospect'||c.type==='lead')){
+      var stg=mkDiv('font-size:13px;color:var(--text3);',c.stage);
+      sub.appendChild(stg);
+    }
+    info.appendChild(sub);
+    row.appendChild(info);
+
+    // contact details
+    var dets=mkDiv('display:flex;flex-direction:column;align-items:flex-end;gap:2px;flex-shrink:0;');
+    if(c.phone) dets.appendChild(mkDiv('font-size:13px;color:var(--text2);',c.phone));
+    if(c.email) dets.appendChild(mkDiv('font-size:13px;color:var(--text3);',c.email));
+    row.appendChild(dets);
+
+    grid.appendChild(row);
   });
 }
 
@@ -1839,6 +1893,19 @@ function vc(id){
   if(c.price)isec.appendChild(mkfld('Price',c.price,null,'color:var(--accent);font-family:monospace;'));
   if(c.notes)isec.appendChild(mkfld('Notes',c.notes,null,''));
   body.appendChild(isec);
+  var tsec=mksec('Type');var tr=mkRow('stage-row');tr.style.flexWrap='wrap';
+  [['prospect','Prospect'],['buyer','Buyer'],['seller','Seller'],['agent','Agent'],['lender','Lender'],['title','Title'],['vendor','Vendor'],['other','Other']].forEach(function(pair){
+    var t=pair[0],lbl=pair[1];
+    var b=mkBtn('sp'+((c.type===t||(!c.type&&t==='prospect'))?' active':''),lbl,'');
+    (function(cid,type){b.addEventListener('click',function(){
+      var ct=gc(cid);if(!ct)return;
+      ct.type=type;updateContact(ct);vc(cid);
+      rd();if(curPage==='contacts')rc();if(curPage==='pipeline')rp();
+    });})(id,t);
+    tr.appendChild(b);
+  });
+  tsec.appendChild(tr);body.appendChild(tsec);
+
   var ssec=mksec('Stage');var sr=mkRow('stage-row');
   stgs.forEach(function(s){var b=mkBtn('sp'+(c.stage===s?' active':''),s,'');(function(cid,stage){b.addEventListener('click',function(){ss(cid,stage);});})(id,s);sr.appendChild(b);});
   ssec.appendChild(sr);body.appendChild(ssec);
@@ -2230,7 +2297,7 @@ function openEditContact(id){
   ge('btnSaveContact') && ge('btnSaveContact').setAttribute('data-edit-id', id);
   ge('fFirst').value = c.first||'';
   ge('fLast').value = c.last||'';
-  ge('fType').value = c.type||'lead';
+  ge('fType').value = c.type||'prospect';
   ge('fPhone').value = c.phone||'';
   ge('fEmail').value = c.email||'';
   ge('fProp').value = c.property||'';
@@ -2369,7 +2436,7 @@ function parseCSV(text){
       id: Date.now() + i,
       first: obj['first name'] || obj['firstname'] || obj['first'] || '',
       last:  obj['last name']  || obj['lastname']  || obj['last']  || '',
-      type:  normalizeType(obj['type'] || obj['contact type'] || 'lead'),
+      type:  normalizeType(obj['type'] || obj['contact type'] || 'prospect'),
       phone: obj['phone'] || obj['phone number'] || obj['mobile'] || '',
       email: obj['email'] || obj['email address'] || '',
       property: obj['property'] || obj['address'] || obj['interest'] || '',
@@ -2399,7 +2466,13 @@ function normalizeType(t){
   t = (t||'').toLowerCase().trim();
   if(t === 'buyer') return 'buyer';
   if(t === 'seller') return 'seller';
-  return 'lead';
+  if(t === 'agent' || t === 'broker' || t === 'agent/broker') return 'agent';
+  if(t === 'lender' || t === 'loan officer' || t === 'lo') return 'lender';
+  if(t === 'title' || t === 'title company') return 'title';
+  if(t === 'vendor') return 'vendor';
+  if(t === 'other') return 'other';
+  if(t === 'lead' || t === 'prospect') return 'prospect';
+  return 'prospect';
 }
 
 function normalizeStage(s){
@@ -2479,7 +2552,7 @@ function confirmImport(){
     nc.id = Date.now() + Math.floor(Math.random()*100000);
     nc.added = nc.added || new Date().toISOString();
     nc.stage = nc.stage || 'New Lead';
-    nc.type = nc.type || 'lead';
+    nc.type = nc.type || 'prospect';
     C.push(nc);
     toSave.push(nc);
   });
@@ -5823,7 +5896,7 @@ function renderThread(messages, threadId){
       ge('fFirst').value = parts[0]||'';
       ge('fLast').value = parts.slice(1).join(' ')||'';
       ge('fEmail').value = email;
-      ge('fType').value = 'lead';
+      ge('fType').value = 'prospect';
       ge('addModal').classList.add('open');
     }); })(fromEmail, firstMsg.from);
     hdr.appendChild(subj); hdr.appendChild(newCBtn);
@@ -6478,7 +6551,7 @@ function openAttachModal(listing){
   selLabel.textContent = 'Select Client';
   var sel = document.createElement('select');
   sel.className = 'fsel';
-  C.filter(function(c){ return c.type === 'buyer' || c.type === 'lead'; }).forEach(function(c){
+  C.filter(function(c){ return c.type === 'buyer' || c.type === 'prospect' || c.type === 'lead'; }).forEach(function(c){
     var opt = document.createElement('option');
     opt.value = c.id;
     opt.textContent = fn(c) + ' (' + c.type + ')';
