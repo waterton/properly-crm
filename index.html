@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-  <meta name="version" content="3.2">
+  <meta name="version" content="3.3">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Properly CRM</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -244,6 +244,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .cal-event.ev-followup{background:rgba(107,201,122,0.25);color:#6bc97a;}
 .cal-event.ev-transaction{background:rgba(201,168,76,0.25);color:var(--accent);}
 .cal-event.ev-custom{background:rgba(76,142,201,0.25);color:#7ab8f5;}
+.cal-event.ev-gcal{background:rgba(167,139,250,0.25);color:#a78bfa;}
 .cal-event.ev-overdue{background:rgba(201,76,76,0.5);color:#ff6666;font-weight:700;}
 /* Week view */
 .cal-week-grid{display:grid;grid-template-columns:60px repeat(7,1fr);border-left:1px solid var(--border);border-top:1px solid var(--border);}
@@ -411,7 +412,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
       <div class="topbar-right">
         <input class="sbox" type="text" placeholder="Search..." id="searchBox">
         <button class="btn btn-p" id="btnAdd">+ Add</button>
-        <div style="font-size:11px;color:var(--text3);margin-right:4px;">v3.2</div>
+        <div style="font-size:11px;color:var(--text3);margin-right:4px;">v3.3</div>
         <div class="topbar-user" id="topbarUser" title="Sign out" style="cursor:pointer;">RE</div>
       </div>
     </div>
@@ -680,6 +681,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
             <span style="display:flex;align-items:center;gap:5px;font-size:13px;color:var(--text3);"><span style="width:10px;height:10px;border-radius:2px;background:rgba(107,201,122,0.5);display:inline-block;"></span>Follow-ups</span>
             <span style="display:flex;align-items:center;gap:5px;font-size:13px;color:var(--text3);"><span style="width:10px;height:10px;border-radius:2px;background:rgba(201,168,76,0.5);display:inline-block;"></span>Transactions</span>
             <span style="display:flex;align-items:center;gap:5px;font-size:13px;color:var(--text3);"><span style="width:10px;height:10px;border-radius:2px;background:rgba(76,142,201,0.5);display:inline-block;"></span>Custom Events</span>
+            <span style="display:flex;align-items:center;gap:5px;font-size:13px;color:var(--text3);"><span style="width:10px;height:10px;border-radius:2px;background:rgba(167,139,250,0.5);display:inline-block;"></span>Google Calendar</span>
+            <button id="btnRefreshGCal" style="margin-left:auto;background:none;border:1px solid var(--border);border-radius:5px;padding:3px 10px;cursor:pointer;font-size:13px;color:var(--text3);font-family:DM Sans,sans-serif;" title="Refresh Google Calendar events">&#x21bb; Sync GCal</button>
           </div>
           <!-- Calendar body -->
           <div class="cal-body" id="calBody"></div>
@@ -3543,7 +3546,10 @@ var CAL = {
   month: new Date().getMonth(),
   selectedDate: null,
   filterMembers: {},  // memberId -> true/false
-  events: []  // custom events: [{id,title,date,time,endTime,type,memberId,contactId,notes}]
+  events: [],         // custom events: [{id,title,date,time,endTime,type,memberId,contactId,notes}]
+  gcalEvents: [],     // events fetched from Google Calendar
+  gcalLoading: false,
+  gcalLastFetch: 0
 };
 
 function initCalendar(){
@@ -3553,10 +3559,77 @@ function initCalendar(){
     if(saved) CAL.events = JSON.parse(saved);
   }catch(e){}
 
+  // Load cached GCal events
+  try{
+    var gcalSaved = localStorage.getItem('crm_gcal_events');
+    if(gcalSaved) CAL.gcalEvents = JSON.parse(gcalSaved);
+  }catch(e){}
+
   // Init member filters - all on by default
   TM.forEach(function(m){ CAL.filterMembers[m.id] = true; });
 
   renderCalMemberFilters();
+  renderCalendar();
+
+  // Fetch Google Calendar events in background
+  fetchGCalEvents();
+}
+
+async function fetchGCalEvents(){
+  if(CAL.gcalLoading) return;
+  // Only refetch if more than 5 mins old
+  if(Date.now() - CAL.gcalLastFetch < 300000 && CAL.gcalEvents.length) return;
+
+  var connected = Object.keys(gmailState.connectedAccounts);
+  if(!connected.length){
+    // Try loading from Supabase directly
+    if(!supaReady) return;
+    try{
+      var resp = await fetch(SUPA_URL + '/rest/v1/gmail_tokens?select=member_id,email', {
+        headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}
+      });
+      var tokens = await resp.json();
+      if(Array.isArray(tokens)) tokens.forEach(function(t){
+        connected.push(String(t.member_id));
+      });
+    }catch(e){ return; }
+  }
+  if(!connected.length) return;
+
+  CAL.gcalLoading = true;
+  var allEvents = [];
+
+  // Fetch from each connected account
+  await Promise.all(connected.map(async function(mid){
+    try{
+      var resp = await fetch('/api/gcal', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({action:'list', memberId:mid})
+      });
+      var text = await resp.text();
+      var data;
+      try{ data = JSON.parse(text); }catch(e){ return; }
+      if(data.error){ console.log('GCal fetch error:', data.error); return; }
+      if(data.events){
+        data.events.forEach(function(ev){
+          ev.memberId = mid;
+          ev.fromGCal = true;
+          ev.gcalMemberEmail = gmailState.connectedAccounts[mid] ? gmailState.connectedAccounts[mid].email : '';
+          allEvents.push(ev);
+        });
+      }
+    }catch(e){ console.log('GCal fetch error:', e.message); }
+  }));
+
+  CAL.gcalEvents = allEvents;
+  CAL.gcalLastFetch = Date.now();
+  CAL.gcalLoading = false;
+
+  // Cache locally
+  try{ localStorage.setItem('crm_gcal_events', JSON.stringify(allEvents)); }catch(e){}
+
+  // Re-render with new events
   renderCalendar();
 }
 
@@ -3687,11 +3760,28 @@ function getEventsForDate(dateStr){
     }
   });
 
+  // Google Calendar events
+  CAL.gcalEvents.forEach(function(ev){
+    if(ev.date === dateStr){
+      var m = TM.find(function(x){ return String(x.id)===String(ev.memberId); });
+      events.push({
+        type: 'ev-gcal',
+        label: ev.title,
+        time: ev.time || '',
+        data: ev,
+        dataType: 'gcal',
+        memberId: ev.memberId || null,
+        color: '#a78bfa',
+        gcalLink: ev.link
+      });
+    }
+  });
+
   // Filter by member
   var anyActive = Object.values(CAL.filterMembers).some(function(v){ return v; });
   if(anyActive){
     events = events.filter(function(ev){
-      if(!ev.memberId) return true; // unassigned shows for everyone
+      if(!ev.memberId) return true;
       return CAL.filterMembers[ev.memberId];
     });
   }
@@ -4038,6 +4128,30 @@ function openCalEventDetail(ev){
     goBtn2.textContent = 'View Follow-ups';
     goBtn2.addEventListener('click', function(){ sp('followups'); ge('calDetOv').classList.remove('open'); });
     actions.appendChild(goBtn2);
+
+  } else if(ev.dataType === 'gcal'){
+    var gcalEv = ev.data;
+    var memberInfo = '';
+    if(ev.memberId){
+      var mGcal = TM.find(function(x){ return String(x.id)===String(ev.memberId); });
+      memberInfo = mGcal ? mGcal.first + ' ' + mGcal.last : '';
+    }
+    body.innerHTML = '<div style="font-size:15px;color:var(--text2);">'
+      + (gcalEv.time ? '<div style="margin-bottom:8px;"><b style="color:var(--text);">Time:</b> ' + gcalEv.time + (gcalEv.endTime ? ' - ' + gcalEv.endTime : '') + '</div>' : '')
+      + (gcalEv.location ? '<div style="margin-bottom:8px;"><b style="color:var(--text);">Location:</b> ' + gcalEv.location + '</div>' : '')
+      + (gcalEv.description ? '<div style="margin-bottom:8px;"><b style="color:var(--text);">Description:</b> ' + gcalEv.description.substring(0,200) + '</div>' : '')
+      + (memberInfo ? '<div style="margin-bottom:8px;"><b style="color:var(--text);">Calendar:</b> ' + memberInfo + (gcalEv.gcalMemberEmail ? ' (' + gcalEv.gcalMemberEmail + ')' : '') + '</div>' : '')
+      + '<div style="margin-top:8px;font-size:13px;color:var(--text3);">From Google Calendar</div>'
+      + '</div>';
+    if(gcalEv.link){
+      var openGcalBtn = document.createElement('a');
+      openGcalBtn.href = gcalEv.link;
+      openGcalBtn.target = '_blank';
+      openGcalBtn.className = 'btn btn-p';
+      openGcalBtn.style.cssText += 'text-decoration:none;';
+      openGcalBtn.textContent = 'Open in Google Calendar';
+      actions.appendChild(openGcalBtn);
+    }
 
   } else if(ev.dataType === 'transaction' || ev.dataType === 'txdate'){
     var c4 = gc(ev.data.contactId);
@@ -5687,6 +5801,14 @@ ge('calNext').addEventListener('click', function(){
 ge('calToday').addEventListener('click', function(){
   CAL.month=new Date().getMonth(); CAL.year=new Date().getFullYear();
   CAL.selectedDate=tod(); renderCalendar();
+});
+ge('btnRefreshGCal').addEventListener('click', function(){
+  CAL.gcalLastFetch = 0; // Force refetch
+  this.textContent = 'Syncing...';
+  var btn = this;
+  fetchGCalEvents().then(function(){
+    btn.textContent = 'Sync GCal';
+  });
 });
 document.querySelectorAll('[data-cal-view]').forEach(function(btn){
   btn.addEventListener('click', function(){
