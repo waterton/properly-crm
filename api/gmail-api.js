@@ -25,6 +25,8 @@ export default async function handler(req, res) {
   if (!clientId || !clientSecret) return res.status(500).json({ error: 'GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET environment variables not set in Vercel' });
 
   try {
+    console.log('=== gmail-api START ===', action, memberId, 'supaUrl:', supaUrl ? supaUrl.substring(0,30) : 'MISSING');
+
     // Get token directly from Supabase instead of calling another function
     const tokenResp = await fetch(supaUrl + '/rest/v1/gmail_tokens?member_id=eq.' + memberId, {
       headers: {
@@ -89,10 +91,8 @@ export default async function handler(req, res) {
 
     if (action === 'inbox') {
       const q = query || 'in:inbox';
-      console.log('Fetching inbox, query:', q);
       const listResp = await fetch(`${gmailBase}/messages?maxResults=20&q=${encodeURIComponent(q)}`, { headers });
       const listRawText = await listResp.text();
-      console.log('List response status:', listResp.status, 'preview:', listRawText.substring(0, 200));
       let listData;
       try { listData = JSON.parse(listRawText); } catch(e) {
         return res.status(500).json({ error: 'Gmail list parse error: ' + listRawText.substring(0, 200) });
@@ -100,22 +100,32 @@ export default async function handler(req, res) {
       if (listData.error) return res.status(400).json({ error: listData.error.message });
       if (!listData.messages) return res.status(200).json({ messages: [] });
 
+      // Fetch first message to test structure, then rest in parallel
+      const firstMsgResp = await fetch(`${gmailBase}/messages/${listData.messages[0].id}?format=metadata`, { headers });
+      const firstMsgRaw = await firstMsgResp.text();
+      let firstMsg;
+      try { firstMsg = JSON.parse(firstMsgRaw); } catch(e) {
+        return res.status(500).json({ error: 'First message parse error: ' + firstMsgRaw.substring(0, 200) });
+      }
+
+      // Return debug info if requested
+      if (query === 'debug') {
+        return res.status(200).json({
+          debug: true,
+          firstMessageKeys: Object.keys(firstMsg || {}),
+          firstMessagePayloadKeys: Object.keys((firstMsg && firstMsg.payload) || {}),
+          firstMessageHeaders: (firstMsg && firstMsg.payload && firstMsg.payload.headers) || [],
+          firstMessageRaw: JSON.stringify(firstMsg).substring(0, 500)
+        });
+      }
+
       const msgs = await Promise.all(
         listData.messages.slice(0, 15).map(async (m) => {
-          // Use format=metadata without header filter - gets all headers
           const msgResp = await fetch(`${gmailBase}/messages/${m.id}?format=metadata`, { headers });
-          const msgData = await msgResp.json();
-          return msgData;
+          const msgRaw = await msgResp.text();
+          try { return JSON.parse(msgRaw); } catch(e) { return null; }
         })
       );
-
-      // Log first message for debugging
-      console.log('MSG COUNT:', msgs.length);
-      if (msgs.length > 0) {
-        const m0 = msgs[0];
-        console.log('MSG0 keys:', JSON.stringify(Object.keys(m0 || {})));
-        console.log('MSG0 raw (first 300):', JSON.stringify(m0).substring(0, 300));
-      }
 
       const parsed = msgs.filter(m => m && m.id).map(m => {
         const hdrs = {};
