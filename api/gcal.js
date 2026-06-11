@@ -1,3 +1,11 @@
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: '20mb'
+    }
+  }
+};
+
 // Google Calendar API - create, update, delete events
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');

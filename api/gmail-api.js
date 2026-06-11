@@ -1,3 +1,11 @@
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: '20mb'
+    }
+  }
+};
+
 // Gmail API proxy v2.1 - handles inbox, threads, send, attachments
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -106,17 +114,6 @@ export default async function handler(req, res) {
       let firstMsg;
       try { firstMsg = JSON.parse(firstMsgRaw); } catch(e) {
         return res.status(500).json({ error: 'First message parse error: ' + firstMsgRaw.substring(0, 200) });
-      }
-
-      // Return debug info if requested
-      if (query === 'debug') {
-        return res.status(200).json({
-          debug: true,
-          firstMessageKeys: Object.keys(firstMsg || {}),
-          firstMessagePayloadKeys: Object.keys((firstMsg && firstMsg.payload) || {}),
-          firstMessageHeaders: (firstMsg && firstMsg.payload && firstMsg.payload.headers) || [],
-          firstMessageRaw: JSON.stringify(firstMsg).substring(0, 500)
-        });
       }
 
       const msgs = await Promise.all(
