@@ -695,9 +695,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
           <svg width="48" height="48" fill="none" stroke="var(--text3)" stroke-width="1.5" viewBox="0 0 24 24" style="margin-bottom:16px;"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
           <div style="font-size:16px;font-weight:600;color:var(--text);margin-bottom:8px;">Connect Gmail</div>
           <div style="font-size:13px;color:var(--text3);max-width:400px;margin-bottom:20px;">Connect your Gmail account to view emails, reply to clients, and import documents directly into the CRM.</div>
-          <div id="gmailConnectButtons" style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;">
-            <!-- Connect buttons per team member rendered by JS -->
-          </div>
+          <div id="gmailConnectButtons" style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;"></div>
+          <div style="margin-top:20px;font-size:12px;color:var(--text3);">Make sure popups are allowed for this site in your browser settings.</div>
         </div>
 
         <!-- Connected Gmail layout -->
@@ -3629,9 +3628,9 @@ function renderGmailAccountBar(){
       txt.innerHTML = '<div style="font-size:12px;font-weight:600;">' + m.first + '</div><div style="font-size:10px;color:var(--text3);">' + acc.email + '</div>';
       btn.appendChild(txt);
       var disBtn = document.createElement('button');
-      disBtn.style.cssText='background:none;border:none;color:var(--text3);cursor:pointer;font-size:14px;padding:0 0 0 4px;';
-      disBtn.title='Disconnect';
-      disBtn.textContent='x';
+      disBtn.style.cssText='background:rgba(201,76,76,0.1);border:1px solid rgba(201,76,76,0.2);border-radius:4px;color:var(--danger);cursor:pointer;font-size:10px;padding:2px 5px;margin-left:4px;font-family:DM Sans,sans-serif;';
+      disBtn.title='Disconnect Gmail';
+      disBtn.textContent='Disconnect';
       (function(mid){ disBtn.addEventListener('click', function(e){ e.stopPropagation(); disconnectGmail(mid); }); })(m.id);
       btn.appendChild(disBtn);
       (function(mid){ btn.addEventListener('click', function(){ switchGmailAccount(mid); }); })(m.id);
@@ -3757,7 +3756,13 @@ async function loadGmailInbox(){
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({action:'inbox', memberId:gmailState.activeMemberId, query:filter})
     });
-    var data = await resp.json();
+    var respText = await resp.text();
+    var data;
+    try{ data = JSON.parse(respText); }
+    catch(e){
+      ge('gmailMsgList').innerHTML='<div style="padding:20px;color:var(--danger);font-size:13px;">API error ('+resp.status+'): '+respText.substring(0,200)+'</div>';
+      return;
+    }
     if(data.error){ ge('gmailMsgList').innerHTML='<div style="padding:20px;color:var(--danger);font-size:13px;">'+data.error+'</div>'; return; }
     gmailState.messages = data.messages || [];
     ge('gmailMsgCount').textContent = gmailState.messages.length + ' messages';
@@ -3837,7 +3842,10 @@ async function loadThread(threadId, messageId){
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({action:'thread', memberId:gmailState.activeMemberId, threadId:threadId})
     });
-    var data = await resp.json();
+    var respText2 = await resp.text();
+    var data;
+    try{ data = JSON.parse(respText2); }
+    catch(e){ thread.innerHTML='<div class="gmail-empty" style="color:var(--danger);">API error ('+resp.status+'): '+respText2.substring(0,200)+'</div>'; return; }
     if(data.error){ thread.innerHTML='<div class="gmail-empty" style="color:var(--danger);">'+data.error+'</div>'; return; }
     renderThread(data.messages, threadId);
   }catch(e){ thread.innerHTML='<div class="gmail-empty" style="color:var(--danger);">Error: '+e.message+'</div>'; }
