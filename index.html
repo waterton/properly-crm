@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+  if(!silent && <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -620,11 +620,18 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
             <span style="font-size:13px;color:var(--text3);">Sort:</span>
             <button class="filter-btn active" id="sortByLast" style="padding:4px 10px;font-size:13px;">Last</button>
             <button class="filter-btn" id="sortByFirst" style="padding:4px 10px;font-size:13px;">First</button>
+            <button class="btn btn-g" id="btnMergeContacts" style="display:none;">Merge Selected</button>
             <button class="btn btn-g" id="btnImportCSV">&#8593; Import CSV</button>
             <button class="btn btn-g" id="btnExportCSV">&#8595; Export CSV</button>
             <button class="btn btn-p" id="btnContactAdd">+ Add Contact</button>
           </div>
           <input type="file" id="csvFileInput" accept=".csv" style="display:none;">
+        </div>
+        <div id="bulkBar" style="display:none;background:rgba(201,76,76,0.1);border:1px solid rgba(201,76,76,0.3);border-radius:9px;padding:10px 16px;margin-bottom:12px;display:none;align-items:center;gap:12px;flex-wrap:wrap;">
+          <span style="font-size:15px;color:var(--text2);" id="bulkCount">0 selected</span>
+          <button class="btn btn-g" id="btnSelectAll" style="padding:5px 12px;font-size:14px;">Select All</button>
+          <button class="btn btn-g" id="btnClearSel" style="padding:5px 12px;font-size:14px;">Clear</button>
+          <button class="btn" id="btnDeleteSelected" style="padding:5px 12px;font-size:14px;background:rgba(201,76,76,0.15);color:var(--danger);border:1px solid rgba(201,76,76,0.3);border-radius:7px;cursor:pointer;font-family:DM Sans,sans-serif;">Delete Selected</button>
         </div>
         <div class="card" style="padding:0;">
           <div id="cGrid"></div>
@@ -1272,6 +1279,16 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
     <div class="mftr"><button class="btn btn-g" data-close="addModal">Cancel</button><button class="btn btn-p" id="btnSaveContact">Save Contact</button></div>
   </div>
 </div>
+<div class="modal-ov" id="mergeModal">
+  <div class="modal" style="max-width:680px;">
+    <div class="mhdr"><div class="mtitle">Merge Contacts</div><button class="mx" data-close="mergeModal">&#x2715;</button></div>
+    <div class="mbody" id="mergeModalBody" style="padding:0;"></div>
+    <div class="mftr">
+      <button class="btn btn-g" data-close="mergeModal">Cancel</button>
+      <button class="btn btn-p" id="btnConfirmMerge">Merge &amp; Save</button>
+    </div>
+  </div>
+</div>
 <div class="modal-ov" id="campaignModal">
   <div class="modal" style="max-width:640px;">
     <div class="mhdr"><div class="mtitle" id="campModalTitle">New Campaign</div><button class="mx" data-close="campaignModal">&#x2715;</button></div>
@@ -1395,6 +1412,7 @@ async function getAuthHeaders(extra) {
 var C=[],N=[],F=[],D=[],TX=[],TM=[],curDet=null,curFilter='all',curPage='dashboard';
 var CAMP=[],ENR=[],SENDLOG=[];
 var curSort='last'; // 'last' or 'first'
+var selectedContacts = new Set();
 // TM = Team Members: [{id, first, last, role, email, phone, color, calLink}]
 
 // -- SAVE / LOAD -------------------------------------------------------
@@ -1620,7 +1638,7 @@ function sp(id){
   if(id==='briefing')rb();
   else if(id==='dashboard')rd();
   else if(id==='pipeline')rp();
-  else if(id==='contacts')rc();
+  else if(id==='contacts'){ selectedContacts.clear(); updateBulkBar(); rc(); }
   else if(id==='followups')rfu();
   else if(id==='notes')rn();
 
@@ -1806,6 +1824,134 @@ function rp(){
   });
 }
 
+function updateBulkBar(){
+  var bar=ge('bulkBar');
+  if(!bar) return;
+  if(selectedContacts.size>0){
+    bar.style.display='flex';
+    ge('bulkCount').textContent=selectedContacts.size+' selected';
+  } else {
+    bar.style.display='none';
+  }
+  // show merge button only when exactly 2 selected
+  var mb=ge('btnMergeContacts');
+  if(mb) mb.style.display = selectedContacts.size===2 ? 'inline-flex' : 'none';
+}
+
+function openMergeModal(){
+  var ids=Array.from(selectedContacts);
+  if(ids.length!==2) return;
+  var a=gc(ids[0]), b=gc(ids[1]);
+  if(!a||!b) return;
+  var body=ge('mergeModalBody'); body.innerHTML='';
+
+  var fields=[
+    {key:'first',label:'First Name'},
+    {key:'last',label:'Last Name'},
+    {key:'type',label:'Type'},
+    {key:'phone',label:'Phone'},
+    {key:'email',label:'Email'},
+    {key:'property',label:'Property'},
+    {key:'stage',label:'Stage'},
+    {key:'price',label:'Price'},
+    {key:'closeDate',label:'Closing Date'},
+    {key:'notes',label:'Notes'}
+  ];
+
+  var tbl=document.createElement('table');
+  tbl.style.cssText='width:100%;border-collapse:collapse;font-size:14px;';
+  var thead=document.createElement('thead');
+  var hr=document.createElement('tr');
+  hr.style.background='var(--surface2)';
+  ['Field',a.first+' '+a.last,b.first+' '+b.last].forEach(function(h,i){
+    var th=document.createElement('th');
+    th.style.cssText='padding:10px 12px;text-align:left;color:var(--text3);font-weight:600;font-size:13px;'+(i>0?'cursor:pointer;':'');
+    th.textContent=h;
+    if(i===1){ (function(){ th.title='Click to select all from this contact'; th.addEventListener('click',function(){ tbl.querySelectorAll('input[data-side="a"]').forEach(function(r){r.checked=true;}); }); })(); }
+    if(i===2){ (function(){ th.title='Click to select all from this contact'; th.addEventListener('click',function(){ tbl.querySelectorAll('input[data-side="b"]').forEach(function(r){r.checked=true;}); }); })(); }
+    hr.appendChild(th);
+  });
+  thead.appendChild(hr); tbl.appendChild(thead);
+
+  var tbody=document.createElement('tbody');
+  fields.forEach(function(f,fi){
+    var va=a[f.key]||'', vb=b[f.key]||'';
+    if(!va&&!vb) return; // skip empty fields
+    var tr=document.createElement('tr');
+    tr.style.borderBottom='1px solid var(--border)';
+
+    var tdl=document.createElement('td');
+    tdl.style.cssText='padding:9px 12px;color:var(--text3);font-size:13px;font-weight:600;white-space:nowrap;';
+    tdl.textContent=f.label; tr.appendChild(tdl);
+
+    [['a',va,ids[0]],['b',vb,ids[1]]].forEach(function(side){
+      var td=document.createElement('td'); td.style.cssText='padding:9px 12px;';
+      var lbl=document.createElement('label');
+      lbl.style.cssText='display:flex;align-items:flex-start;gap:8px;cursor:pointer;';
+      var radio=document.createElement('input');
+      radio.type='radio'; radio.name='merge_'+f.key; radio.value=side[0];
+      radio.setAttribute('data-side',side[0]);
+      radio.setAttribute('data-key',f.key);
+      radio.style.cssText='margin-top:2px;flex-shrink:0;accent-color:var(--accent);';
+      // default: pick whichever side has a value; prefer 'a' if both have
+      if(side[0]==='a' && va) radio.checked=true;
+      else if(side[0]==='b' && vb && !va) radio.checked=true;
+      var span=document.createElement('span');
+      span.style.cssText='font-size:14px;color:'+(side[1]?'var(--text)':'var(--text3)')+';';
+      span.textContent=side[1]||'(empty)';
+      lbl.appendChild(radio); lbl.appendChild(span); td.appendChild(lbl); tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  });
+  tbl.appendChild(tbody); body.appendChild(tbl);
+
+  // store which ids we're merging
+  ge('btnConfirmMerge').setAttribute('data-a', ids[0]);
+  ge('btnConfirmMerge').setAttribute('data-b', ids[1]);
+  om('mergeModal');
+}
+
+function confirmMerge(){
+  var btn=ge('btnConfirmMerge');
+  var idA=parseInt(btn.getAttribute('data-a'))||btn.getAttribute('data-a');
+  var idB=parseInt(btn.getAttribute('data-b'))||btn.getAttribute('data-b');
+  var a=gc(idA), b=gc(idB); if(!a||!b) return;
+
+  // build merged contact based on radio selections
+  var merged=JSON.parse(JSON.stringify(a)); // start with A
+  var radios=ge('mergeModalBody').querySelectorAll('input[type="radio"]:checked');
+  radios.forEach(function(r){
+    var key=r.getAttribute('data-key');
+    var src=r.value==='a'?a:b;
+    merged[key]=src[key]||'';
+  });
+
+  // re-attach all notes/followups/deadlines from B to A
+  N.forEach(function(n){ if(String(n.contactId)===String(idB)) n.contactId=idA; });
+  F.forEach(function(f){ if(String(f.contactId)===String(idB)) f.contactId=idA; });
+  D.forEach(function(d){ if(String(d.contactId)===String(idB)) d.contactId=idA; });
+
+  // update A, delete B
+  var idx=C.findIndex(function(c){ return c.id===idA; });
+  if(idx>=0) C[idx]=merged;
+  updateContact(merged);
+  if(supaReady){ dbSave('notes',N.filter(function(n){return n.contactId===idA;})); dbSave('followups',F.filter(function(f){return f.contactId===idA;})); dbSave('deadlines',D.filter(function(d){return d.contactId===idA;})); }
+  delc(idB, true);
+
+  selectedContacts.clear(); updateBulkBar();
+  cm('mergeModal'); rc(); rd();
+  alert('Contacts merged.');
+}
+
+function deleteSelectedContacts(){
+  if(!selectedContacts.size) return;
+  if(!confirm('Delete '+selectedContacts.size+' contact(s) and all their notes, follow-ups, and deadlines?')) return;
+  selectedContacts.forEach(function(id){ delc(id, true); });
+  selectedContacts.clear();
+  updateBulkBar();
+  rc(); rd();
+}
+
 function rc(){
   var filter = curFilter==='all' ? null : curFilter;
   // treat stored 'lead' as 'prospect' for filtering
@@ -1839,10 +1985,35 @@ function rc(){
       grid.appendChild(mkDiv('padding:8px 18px 4px;font-size:12px;font-weight:700;letter-spacing:2px;color:var(--text3);border-bottom:1px solid var(--border);background:var(--surface2);',letter));
     }
     var row=document.createElement('div');
-    row.style.cssText='display:flex;align-items:center;gap:12px;padding:11px 18px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.12s;';
-    row.addEventListener('mouseenter',function(){this.style.background='var(--surface2)';});
-    row.addEventListener('mouseleave',function(){this.style.background='';});
-    (function(id){row.addEventListener('click',function(){vc(id);});})(c.id);
+    var isSelected = selectedContacts.has(c.id);
+    row.style.cssText='display:flex;align-items:center;gap:12px;padding:11px 18px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.12s;'+(isSelected?'background:rgba(201,76,76,0.07);':'');
+    row.addEventListener('mouseenter',function(){if(!selectedContacts.has(c.id))this.style.background='var(--surface2)';});
+    row.addEventListener('mouseleave',function(){if(!selectedContacts.has(c.id))this.style.background='';});
+
+    // checkbox
+    var chkWrap=document.createElement('div');
+    chkWrap.style.cssText='width:18px;height:18px;flex-shrink:0;display:flex;align-items:center;justify-content:center;';
+    var chk=document.createElement('input');
+    chk.type='checkbox'; chk.style.cssText='width:15px;height:15px;cursor:pointer;accent-color:var(--danger);';
+    chk.checked=isSelected;
+    (function(cid,r,cb){
+      chk.addEventListener('change',function(e){
+        e.stopPropagation();
+        if(cb.checked){ selectedContacts.add(cid); r.style.background='rgba(201,76,76,0.07)'; }
+        else { selectedContacts.delete(cid); r.style.background=''; }
+        updateBulkBar();
+      });
+      r.addEventListener('click',function(e){
+        if(e.target===cb) return;
+        if(selectedContacts.size>0){
+          e.preventDefault();
+          if(selectedContacts.has(cid)){ selectedContacts.delete(cid); cb.checked=false; r.style.background=''; }
+          else { selectedContacts.add(cid); cb.checked=true; r.style.background='rgba(201,76,76,0.07)'; }
+          updateBulkBar();
+        } else { vc(cid); }
+      });
+    })(c.id, row, chk);
+    chkWrap.appendChild(chk); row.appendChild(chkWrap);
 
     // name + badges
     var info=mkDiv('flex:1;min-width:0;');
@@ -2014,7 +2185,7 @@ function mksec(title){var s=mkRow('det-sec');var t=mkDiv('det-sec-title',title);
 function mkfld(lbl,val,href,style){var r=mkRow('det-field');var l=mkDiv('det-flbl',lbl);l.className='det-flbl';var v=mkDiv('det-fval','');v.className='det-fval';if(style)v.style.cssText=style;if(href){var a=document.createElement('a');a.href=href;a.textContent=val;v.appendChild(a);}else v.textContent=val;r.appendChild(l);r.appendChild(v);return r;}
 function cd(){ge('detOv').classList.remove('open');curDet=null;}
 function ss(id,stage){var c=gc(id);if(!c)return;c.stage=stage;updateContact(c);autoEnrollOnStage(c,stage);vc(id);rd();if(curPage==='pipeline')rp();}
-function delc(id){if(!confirm('Delete this contact?'))return;C=C.filter(function(c){return c.id!==id;});N=N.filter(function(n){return n.contactId!==id;});F=F.filter(function(f){return f.contactId!==id;});D=D.filter(function(d){return d.contactId!==id;});sv();deleteCfromDB(id);cd();rd();if(curPage==='contacts')rc();}
+function delc(id, silent){if(!silent&&!confirm('Delete this contact?'))return;C=C.filter(function(c){return c.id!==id;});N=N.filter(function(n){return n.contactId!==id;});F=F.filter(function(f){return f.contactId!==id;});D=D.filter(function(d){return d.contactId!==id;});sv();deleteCfromDB(id);if(!silent){cd();rd();if(curPage==='contacts')rc();}}
 
 function rfu(){
   var el=ge('fuList');el.innerHTML='';
@@ -2491,89 +2662,117 @@ function normalizeStage(s){
   return 'New Lead';
 }
 
+function findDupe(nc){
+  // match by email (if both have one) OR by first+last name (case-insensitive)
+  var em = (nc.email||'').toLowerCase().trim();
+  var nm = (nc.first+' '+nc.last).toLowerCase().trim();
+  for(var i=0;i<C.length;i++){
+    var c=C[i];
+    if(em && c.email && c.email.toLowerCase().trim()===em) return c;
+    if(nm && (c.first+' '+c.last).toLowerCase().trim()===nm) return c;
+  }
+  return null;
+}
+
+// per-row import decision: 'skip' | 'import'
+var csvDecisions = {};
+
 function showCSVPreview(contacts){
   csvParsed = contacts;
+  csvDecisions = {};
   var preview = ge('csvPreview');
   preview.innerHTML = '';
-  var msg = document.createElement('p');
-  msg.style.cssText = 'font-size:18px;color:var(--text2);margin-bottom:12px;';
-  msg.textContent = 'Found ';
-  var b = document.createElement('b');
-  b.style.color = 'var(--accent)';
-  b.textContent = contacts.length + ' contact' + (contacts.length !== 1 ? 's' : '');
-  msg.appendChild(b);
-  msg.appendChild(document.createTextNode(' ready to import:'));
-  preview.appendChild(msg);
+
+  var newCount=0, dupeCount=0;
+  contacts.forEach(function(c){ if(findDupe(c)) dupeCount++; else newCount++; });
+
+  var summary = document.createElement('div');
+  summary.style.cssText = 'font-size:15px;color:var(--text2);margin-bottom:12px;display:flex;gap:16px;flex-wrap:wrap;';
+  summary.innerHTML = '<span><b style="color:var(--lead);">'+newCount+' new</b> ready to import</span>'
+    + (dupeCount ? '<span><b style="color:var(--warn);">'+dupeCount+' duplicates</b> found - choose action per row</span>' : '');
+  preview.appendChild(summary);
+
   var wrap = document.createElement('div');
-  wrap.style.cssText = 'max-height:280px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;';
+  wrap.style.cssText = 'max-height:320px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;';
   var table = document.createElement('table');
-  table.style.cssText = 'width:100%;border-collapse:collapse;font-size:18px;';
+  table.style.cssText = 'width:100%;border-collapse:collapse;font-size:14px;';
   var thead = document.createElement('thead');
   var hrow = document.createElement('tr');
   hrow.style.background = 'var(--surface2)';
-  ['Name','Type','Phone','Stage'].forEach(function(h){
+  ['Name','Type','Phone','Status','Action'].forEach(function(h){
     var th = document.createElement('th');
-    th.style.cssText = 'padding:8px 10px;text-align:left;color:var(--text3);font-weight:600;';
+    th.style.cssText = 'padding:8px 10px;text-align:left;color:var(--text3);font-weight:600;font-size:13px;';
     th.textContent = h;
     hrow.appendChild(th);
   });
-  thead.appendChild(hrow);
-  table.appendChild(thead);
+  thead.appendChild(hrow); table.appendChild(thead);
   var tbody = document.createElement('tbody');
+
   contacts.forEach(function(c, i){
+    var dupe = findDupe(c);
     var tr = document.createElement('tr');
-    tr.style.background = i % 2 === 0 ? 'var(--surface)' : 'var(--surface2)';
-    var td1 = document.createElement('td');
-    td1.style.cssText = 'padding:7px 10px;color:var(--text);';
-    td1.textContent = (c.first + ' ' + c.last).trim();
-    var td2 = document.createElement('td');
-    td2.style.padding = '7px 10px';
-    var tg = document.createElement('span');
-    tg.className = 'tag tag-' + c.type;
-    tg.textContent = c.type;
-    td2.appendChild(tg);
-    var td3 = document.createElement('td');
-    td3.style.cssText = 'padding:7px 10px;color:var(--text2);';
-    td3.textContent = c.phone || '-';
-    var td4 = document.createElement('td');
-    td4.style.cssText = 'padding:7px 10px;color:var(--text2);';
-    td4.textContent = c.stage;
-    tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td3); tr.appendChild(td4);
+    tr.style.cssText = 'border-bottom:1px solid var(--border);'+(dupe?'background:rgba(201,168,76,0.05);':'');
+
+    var td1=document.createElement('td'); td1.style.cssText='padding:8px 10px;color:var(--text);';
+    td1.textContent=(c.first+' '+c.last).trim()||(c.email||'');
+    if(dupe){
+      var dupNote=document.createElement('div');
+      dupNote.style.cssText='font-size:12px;color:var(--warn);margin-top:2px;';
+      dupNote.textContent='Matches: '+(dupe.first+' '+dupe.last).trim()+(dupe.email?' ('+dupe.email+')':'');
+      td1.appendChild(dupNote);
+    }
+
+    var td2=document.createElement('td'); td2.style.padding='8px 10px';
+    if(c.type){ var tg=document.createElement('span'); tg.className='tag tag-'+c.type; tg.style.fontSize='12px'; tg.textContent=c.type; td2.appendChild(tg); }
+
+    var td3=document.createElement('td'); td3.style.cssText='padding:8px 10px;color:var(--text2);font-size:13px;';
+    td3.textContent=c.phone||'-';
+
+    var td4=document.createElement('td'); td4.style.cssText='padding:8px 10px;color:var(--text2);font-size:13px;';
+    td4.textContent=c.stage||'-';
+
+    var td5=document.createElement('td'); td5.style.cssText='padding:8px 10px;';
+    if(dupe){
+      var sel=document.createElement('select'); sel.className='fsel';
+      sel.style.cssText='font-size:13px;padding:3px 6px;';
+      [['skip','Skip (keep existing)'],['import','Import as new']].forEach(function(opt){
+        var o=document.createElement('option'); o.value=opt[0]; o.textContent=opt[1]; sel.appendChild(o);
+      });
+      sel.value='skip';
+      csvDecisions[i]='skip';
+      (function(idx){ sel.addEventListener('change',function(){ csvDecisions[idx]=this.value; }); })(i);
+      td5.appendChild(sel);
+    } else {
+      csvDecisions[i]='import';
+      var badge=document.createElement('span');
+      badge.style.cssText='font-size:12px;color:var(--lead);font-weight:600;';
+      badge.textContent='Import';
+      td5.appendChild(badge);
+    }
+
+    tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td3); tr.appendChild(td4); tr.appendChild(td5);
     tbody.appendChild(tr);
   });
-  table.appendChild(tbody);
-  wrap.appendChild(table);
-  preview.appendChild(wrap);
+
+  table.appendChild(tbody); wrap.appendChild(table); preview.appendChild(wrap);
   ge('csvStep1').style.display = 'none';
   ge('csvStep2').style.display = 'block';
   ge('btnConfirmImport').style.display = 'inline-flex';
 }
 
 function confirmImport(){
-  var dupes = 0;
-  var toSave = [];
-  csvParsed.forEach(function(nc){
-    var exists = C.some(function(c){ return c.email && c.email === nc.email; });
-    if(exists){ dupes++; return; }
-    // Ensure unique numeric id and required fields
+  var toSave=[], skipped=0;
+  csvParsed.forEach(function(nc, i){
+    if(csvDecisions[i]==='skip'){ skipped++; return; }
     nc.id = Date.now() + Math.floor(Math.random()*100000);
     nc.added = nc.added || new Date().toISOString();
-    nc.stage = nc.stage || 'New Lead';
-    nc.type = nc.type || 'prospect';
-    C.push(nc);
-    toSave.push(nc);
+    C.push(nc); toSave.push(nc);
   });
   sv();
-  // Save all imported contacts to Supabase in one batch
-  if(supaReady && toSave.length){
-    dbSave('contacts', toSave);
-  }
+  if(supaReady && toSave.length) dbSave('contacts', toSave);
   cm('csvModal');
-  rd();
-  if(curPage === 'contacts') rc();
-  var msg = 'Imported ' + (csvParsed.length - dupes) + ' contact' + ((csvParsed.length - dupes) !== 1 ? 's' : '') + '.';
-  if(dupes > 0) msg += ' Skipped ' + dupes + ' duplicate' + (dupes > 1 ? 's' : '') + ' (same email).';
-  alert(msg);
+  rd(); if(curPage==='contacts') rc();
+  alert('Imported '+toSave.length+' contact'+(toSave.length!==1?'s':'')+'.'+(skipped?' Skipped '+skipped+'.':''));
 }
 
 // -- TRANSACTION COORDINATOR ------------------------------------------
@@ -6603,6 +6802,16 @@ ge('sortByLast').addEventListener('click',function(){
   ge('sortByLast').classList.add('active'); ge('sortByFirst').classList.remove('active');
   rc();
 });
+ge('btnSelectAll').addEventListener('click',function(){
+  C.forEach(function(c){ selectedContacts.add(c.id); });
+  updateBulkBar(); rc();
+});
+ge('btnClearSel').addEventListener('click',function(){
+  selectedContacts.clear(); updateBulkBar(); rc();
+});
+ge('btnDeleteSelected').addEventListener('click', deleteSelectedContacts);
+ge('btnMergeContacts').addEventListener('click', openMergeModal);
+ge('btnConfirmMerge').addEventListener('click', confirmMerge);
 ge('sortByFirst').addEventListener('click',function(){
   curSort='first';
   ge('sortByFirst').classList.add('active'); ge('sortByLast').classList.remove('active');
