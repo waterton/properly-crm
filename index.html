@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-  <meta name="version" content="3.7">
+  <meta name="version" content="3.8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>Properly CRM</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -335,6 +335,21 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .card-field-label{font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:2px;}
 .card-field-input{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:14px;color:var(--text);font-family:'DM Sans',sans-serif;outline:none;width:100%;}
 .card-field-input:focus{border-color:var(--accent);}
+/* AUTH / LOGIN */
+.login-screen{position:fixed;inset:0;background:var(--bg);z-index:9999;display:none;align-items:center;justify-content:center;padding:20px;}
+.login-screen.visible{display:flex;}
+.login-box{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:40px 36px;width:100%;max-width:400px;box-shadow:0 20px 60px rgba(0,0,0,0.5);}
+.login-logo{font-family:'Bebas Neue',sans-serif;font-size:40px;letter-spacing:3px;color:var(--accent);text-align:center;margin-bottom:4px;}
+.login-tagline{font-size:11px;color:var(--text3);letter-spacing:3px;text-transform:uppercase;text-align:center;margin-bottom:28px;}
+.login-divider{display:flex;align-items:center;gap:12px;margin:18px 0;}
+.login-divider-line{flex:1;height:1px;background:var(--border);}
+.login-divider-text{font-size:12px;color:var(--text3);}
+.login-err{background:rgba(201,76,76,0.12);border:1px solid rgba(201,76,76,0.3);border-radius:7px;padding:10px 14px;font-size:14px;color:var(--danger);margin-bottom:14px;display:none;}
+.login-msg{background:rgba(107,201,122,0.12);border:1px solid rgba(107,201,122,0.3);border-radius:7px;padding:10px 14px;font-size:14px;color:var(--lead);margin-bottom:14px;display:none;}
+.google-btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:11px;background:white;border:1px solid #dadce0;border-radius:8px;cursor:pointer;font-size:15px;font-weight:600;color:#3c4043;font-family:'DM Sans',sans-serif;transition:all 0.15s;}
+.google-btn:hover{background:#f8f8f8;box-shadow:0 1px 6px rgba(0,0,0,0.2);}
+.google-btn svg{width:20px;height:20px;}
+.login-footer{margin-top:24px;padding-top:18px;border-top:1px solid var(--border);font-size:12px;color:var(--text3);text-align:center;}
 .fab{position:fixed;bottom:24px;right:24px;width:52px;height:52px;border-radius:50%;background:var(--accent);border:none;cursor:pointer;font-size:26px;color:var(--bg);font-weight:700;box-shadow:0 4px 20px rgba(201,168,76,0.5);z-index:200;}
 /* Login CSS removed - auth disabled for testing */
 .mls-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;}
@@ -440,7 +455,52 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 </style>
 </head>
 <body>
-<div class="app" id="mainApp">
+<!-- LOGIN SCREEN -->
+<div class="login-screen" id="loginScreen">
+  <div class="login-box">
+    <div class="login-logo">PROPERLY</div>
+    <div class="login-tagline">Palacios Baker Real Estate CRM</div>
+
+    <div class="login-err" id="loginErr"></div>
+    <div class="login-msg" id="loginMsg"></div>
+
+    <!-- Google OAuth -->
+    <button class="google-btn" id="btnGoogleLogin">
+      <svg viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+      Sign in with Google
+    </button>
+
+    <div class="login-divider">
+      <div class="login-divider-line"></div>
+      <div class="login-divider-text">or use email</div>
+      <div class="login-divider-line"></div>
+    </div>
+
+    <!-- Email/Password -->
+    <div id="loginEmailForm">
+      <div class="fg"><label class="fl">Email</label><input class="fi" id="loginEmail" type="email" placeholder="you@email.com" autocomplete="email"></div>
+      <div class="fg"><label class="fl">Password</label><input class="fi" id="loginPassword" type="password" placeholder="Your password" autocomplete="current-password"></div>
+      <button class="btn btn-p" id="btnEmailLogin" style="width:100%;justify-content:center;padding:12px;font-size:16px;margin-top:4px;">Sign In</button>
+      <div style="text-align:center;margin-top:12px;">
+        <button id="btnForgotPassword" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:13px;font-family:DM Sans,sans-serif;text-decoration:underline;">Forgot password?</button>
+      </div>
+    </div>
+
+    <!-- Forgot password form -->
+    <div id="loginResetForm" style="display:none;">
+      <div style="font-size:14px;color:var(--text2);margin-bottom:12px;">Enter your email and we will send you a reset link.</div>
+      <div class="fg"><label class="fl">Email</label><input class="fi" id="resetEmail" type="email" placeholder="you@email.com"></div>
+      <button class="btn btn-p" id="btnSendReset" style="width:100%;justify-content:center;padding:12px;font-size:16px;">Send Reset Link</button>
+      <div style="text-align:center;margin-top:12px;">
+        <button id="btnBackToLogin" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:13px;font-family:DM Sans,sans-serif;text-decoration:underline;">Back to sign in</button>
+      </div>
+    </div>
+
+    <div class="login-footer">Palacios Baker Real Estate &mdash; Private &amp; Confidential</div>
+  </div>
+</div>
+
+<div class="app" id="mainApp" style="display:none;">
   <div class="sb-ov" id="sbOv"></div>
   <aside class="sidebar" id="sidebar">
     <div class="logo"><div class="logo-text">PROPERLY</div><div class="logo-sub">Real Estate CRM</div></div>
@@ -480,8 +540,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
       <div class="topbar-right">
         <input class="sbox" type="text" placeholder="Search..." id="searchBox">
         <button class="btn btn-p" id="btnAdd">+ Add</button>
-        <div style="font-size:11px;color:var(--text3);margin-right:4px;">v3.7</div>
-        <div class="topbar-user" id="topbarUser" title="Sign out" style="cursor:pointer;">RE</div>
+        <div style="font-size:11px;color:var(--text3);margin-right:4px;">v3.8</div>
+        <div class="topbar-user" id="topbarUser" title="Click to sign out" style="cursor:pointer;position:relative;" id="topbarUserBtn">RE</div>
       </div>
     </div>
     <div class="content">
@@ -6367,40 +6427,148 @@ ge('btnDisconnectSupa').addEventListener('click', disconnectSupa);
 ge('supaKeyInput').addEventListener('keydown', function(e){ if(e.key==='Enter') connectSupa(); });
 
 // -- STARTUP ----------------------------------------------------------
-(async function startup(){
+// -- AUTH SYSTEM --
+var currentUser = null;
+
+function showLoginScreen(){
+  ge('loginScreen').classList.add('visible');
+  ge('mainApp').style.display = 'none';
+  clearLoginMessages();
+}
+
+function showApp(user){
+  currentUser = user;
+  ge('loginScreen').classList.remove('visible');
+  ge('mainApp').style.display = 'flex';
+  // Set topbar initials
+  var initials = user.email ? user.email.substring(0,2).toUpperCase() : 'PB';
+  // Try to match to team member
+  var tm = TM.find(function(m){ return m.email && m.email.toLowerCase() === user.email.toLowerCase(); });
+  if(tm) initials = (tm.first.charAt(0) + tm.last.charAt(0)).toUpperCase();
+  ge('topbarUser').textContent = initials;
+  ge('topbarUser').title = user.email + ' (click to sign out)';
+}
+
+function clearLoginMessages(){
+  ge('loginErr').style.display = 'none';
+  ge('loginMsg').style.display = 'none';
+}
+
+function showLoginErr(msg){
+  ge('loginErr').textContent = msg;
+  ge('loginErr').style.display = 'block';
+  ge('loginMsg').style.display = 'none';
+}
+
+function showLoginMsg(msg){
+  ge('loginMsg').textContent = msg;
+  ge('loginMsg').style.display = 'block';
+  ge('loginErr').style.display = 'none';
+}
+
+async function signInWithGoogle(){
+  clearLoginMessages();
+  ge('btnGoogleLogin').textContent = 'Signing in...';
+  ge('btnGoogleLogin').disabled = true;
+  try{
+    var result = await supa.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: window.location.origin + window.location.pathname,
+        queryParams: { access_type: 'offline', prompt: 'consent' }
+      }
+    });
+    if(result.error){ showLoginErr(result.error.message); }
+  }catch(e){ showLoginErr('Google sign in failed: ' + e.message); }
+  ge('btnGoogleLogin').innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg> Sign in with Google';
+  ge('btnGoogleLogin').disabled = false;
+}
+
+async function signInWithEmail(){
+  clearLoginMessages();
+  var email = ge('loginEmail').value.trim();
+  var password = ge('loginPassword').value;
+  if(!email || !password){ showLoginErr('Please enter your email and password.'); return; }
+  var btn = ge('btnEmailLogin');
+  btn.textContent = 'Signing in...'; btn.disabled = true;
+  try{
+    var result = await supa.auth.signInWithPassword({ email: email, password: password });
+    if(result.error){ showLoginErr(result.error.message); }
+    else { onAuthSuccess(result.data.user); }
+  }catch(e){ showLoginErr('Sign in failed: ' + e.message); }
+  btn.textContent = 'Sign In'; btn.disabled = false;
+}
+
+async function sendPasswordReset(){
+  clearLoginMessages();
+  var email = ge('resetEmail').value.trim();
+  if(!email){ showLoginErr('Please enter your email address.'); return; }
+  var result = await supa.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.origin + window.location.pathname
+  });
+  if(result.error){ showLoginErr(result.error.message); }
+  else { showLoginMsg('Reset link sent! Check your email.'); }
+}
+
+async function signOut(){
+  if(!confirm('Sign out of Properly CRM?')) return;
+  await supa.auth.signOut();
+  currentUser = null;
+  C=[]; N=[]; F=[]; D=[]; TX=[];
+  showLoginScreen();
+}
+
+function onAuthSuccess(user){
+  showApp(user);
+  loadFromDB().then(function(ok){
+    if(!ok && !C.length) demo();
+    rd();
+    subscribeRealtime();
+    updateNbTC();
+  });
+}
+
+async function startup(){
   try{
     initSupabase();
     if(!supaReady){
+      // No Supabase - run in demo mode
       var banner = ge('setupBanner');
       if(banner) banner.style.display = 'none';
-      // Try loading from localStorage first
-      try{
-        var lc = localStorage.getItem('crm_c');
-        if(lc){ C=JSON.parse(lc); N=JSON.parse(localStorage.getItem('crm_n')||'[]'); F=JSON.parse(localStorage.getItem('crm_f')||'[]'); D=JSON.parse(localStorage.getItem('crm_d')||'[]'); TX=JSON.parse(localStorage.getItem('crm_tx')||'[]'); }
-        else demo();
-      }catch(e2){ demo(); }
+      try{ var lc=localStorage.getItem('crm_c'); if(lc){ C=JSON.parse(lc); N=JSON.parse(localStorage.getItem('crm_n')||'[]'); F=JSON.parse(localStorage.getItem('crm_f')||'[]'); D=JSON.parse(localStorage.getItem('crm_d')||'[]'); TX=JSON.parse(localStorage.getItem('crm_tx')||'[]'); } else demo(); }catch(e2){ demo(); }
+      ge('mainApp').style.display = 'flex';
       rd(); return;
     }
-    // Supabase ready - show connected banner
-    updateSupaBanner(true);
-    showSyncStatus('loading');
-    var ok = await loadFromDB();
-    if(!ok){
-      // DB failed - fall back to localStorage
-      try{
-        var lc2 = localStorage.getItem('crm_c');
-        if(lc2){ C=JSON.parse(lc2); N=JSON.parse(localStorage.getItem('crm_n')||'[]'); F=JSON.parse(localStorage.getItem('crm_f')||'[]'); D=JSON.parse(localStorage.getItem('crm_d')||'[]'); TX=JSON.parse(localStorage.getItem('crm_tx')||'[]'); }
-        else demo();
-      }catch(e3){ demo(); }
+
+    // Check for existing session
+    var sessionResult = await supa.auth.getSession();
+    var session = sessionResult.data && sessionResult.data.session;
+
+    if(session && session.user){
+      onAuthSuccess(session.user);
+    } else {
+      showLoginScreen();
     }
-    rd();
-    if(ok) subscribeRealtime();
+
+    // Listen for auth state changes
+    supa.auth.onAuthStateChange(function(event, session){
+      if(event === 'SIGNED_IN' && session){
+        onAuthSuccess(session.user);
+      } else if(event === 'SIGNED_OUT'){
+        showLoginScreen();
+      } else if(event === 'PASSWORD_RECOVERY'){
+        showLoginScreen();
+        showLoginMsg('Enter your new password below.');
+      }
+    });
+
   }catch(e){
     console.log('Startup error:', e);
-    try{ var lc3=localStorage.getItem('crm_c'); if(lc3) C=JSON.parse(lc3); else demo(); }catch(e4){ demo(); }
+    try{ var lc2=localStorage.getItem('crm_c'); if(lc2) C=JSON.parse(lc2); else demo(); }catch(e4){ demo(); }
+    ge('mainApp').style.display = 'flex';
     rd();
   }
-})();
+}
 ge('nav-dashboard').addEventListener('click',function(){sp('dashboard');});
 ge('nav-pipeline').addEventListener('click',function(){sp('pipeline');});
 ge('nav-contacts').addEventListener('click',function(){sp('contacts');});
@@ -6425,6 +6593,25 @@ ge('btnSaveDL').addEventListener('click',svdl);
 ge('btnSaveDetNote').addEventListener('click',adn);
 ge('detOv').addEventListener('click',function(e){if(e.target===ge('detOv'))cd();});
 ge('searchBox').addEventListener('input',function(){if(curPage==='contacts')rc();});
+
+// Auth event listeners
+ge('btnGoogleLogin').addEventListener('click', signInWithGoogle);
+ge('btnEmailLogin').addEventListener('click', signInWithEmail);
+ge('loginPassword').addEventListener('keydown', function(e){ if(e.key==='Enter') signInWithEmail(); });
+ge('loginEmail').addEventListener('keydown', function(e){ if(e.key==='Enter') ge('loginPassword').focus(); });
+ge('btnForgotPassword').addEventListener('click', function(){
+  ge('loginEmailForm').style.display = 'none';
+  ge('loginResetForm').style.display = 'block';
+  ge('resetEmail').value = ge('loginEmail').value;
+  clearLoginMessages();
+});
+ge('btnBackToLogin').addEventListener('click', function(){
+  ge('loginResetForm').style.display = 'none';
+  ge('loginEmailForm').style.display = 'block';
+  clearLoginMessages();
+});
+ge('btnSendReset').addEventListener('click', sendPasswordReset);
+ge('topbarUser').addEventListener('click', signOut);
 
 // Card Scanner listeners
 ge('btnCardUpload').addEventListener('click', function(){ ge('cardFileInput').click(); });
