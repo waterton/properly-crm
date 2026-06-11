@@ -5,36 +5,80 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  const { action, memberId, query, threadId, messageId, to, subject, body, attachmentId, replyTo } = req.body;
+  // Parse body if string
+  if (typeof req.body === 'string') {
+    try { req.body = JSON.parse(req.body); } catch(e) {}
+  }
+
+  const { action, memberId, query, threadId, messageId, to, subject, body, attachmentId, replyTo } = req.body || {};
   const supaUrl = process.env.SUPA_URL;
   const supaKey = process.env.SUPA_KEY;
-  const baseUrl = process.env.APP_URL
-    || (process.env.VERCEL_URL ? 'https://' + process.env.VERCEL_URL : null)
-    || (req.headers.host ? 'https://' + req.headers.host : null)
-    || 'https://properly-crm.vercel.app';
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+
+  console.log('gmail-api called:', action, 'memberId:', memberId);
+
+  if (!memberId) return res.status(400).json({ error: 'memberId required' });
 
   try {
-    // Get fresh access token
-    const authResp = await fetch(baseUrl + '/api/gmail-auth', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'refresh', memberId })
+    // Get token directly from Supabase instead of calling another function
+    const tokenResp = await fetch(supaUrl + '/rest/v1/gmail_tokens?member_id=eq.' + memberId, {
+      headers: {
+        'apikey': supaKey,
+        'Authorization': 'Bearer ' + supaKey
+      }
     });
-    const authData = await authResp.json();
-    if (!authData.access_token) return res.status(401).json({ error: 'Not connected. Please connect Gmail first.' });
-    const token = authData.access_token;
+    const tokenData = await tokenResp.json();
+    console.log('Token lookup status:', tokenResp.status, 'found:', tokenData && tokenData.length);
+
+    if (!tokenData || !tokenData[0]) {
+      return res.status(401).json({ error: 'Gmail not connected. Please connect Gmail first.' });
+    }
+
+    let tokenRecord = tokenData[0];
+    let accessToken = tokenRecord.access_token;
+
+    // Refresh token if expired or close to expiry
+    if (!accessToken || Date.now() >= (tokenRecord.expires_at - 60000)) {
+      console.log('Refreshing token...');
+      if (!tokenRecord.refresh_token) {
+        return res.status(401).json({ error: 'No refresh token. Please reconnect Gmail.' });
+      }
+      const refreshResp = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          refresh_token: tokenRecord.refresh_token,
+          client_id: clientId,
+          client_secret: clientSecret,
+          grant_type: 'refresh_token'
+        }).toString()
+      });
+      const newTokens = await refreshResp.json();
+      if (newTokens.error) {
+        return res.status(401).json({ error: 'Token refresh failed: ' + newTokens.error_description });
+      }
+      accessToken = newTokens.access_token;
+      tokenRecord.access_token = accessToken;
+      tokenRecord.expires_at = Date.now() + ((newTokens.expires_in || 3600) * 1000);
+      // Save updated token
+      await fetch(supaUrl + '/rest/v1/gmail_tokens', {
+        method: 'POST',
+        headers: { 'apikey': supaKey, 'Authorization': 'Bearer ' + supaKey, 'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates' },
+        body: JSON.stringify([tokenRecord])
+      });
+    }
 
     const gmailBase = 'https://gmail.googleapis.com/gmail/v1/users/me';
-    const headers = { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' };
+    const headers = { 'Authorization': 'Bearer ' + accessToken, 'Content-Type': 'application/json' };
 
     if (action === 'inbox') {
-      // Fetch recent emails
       const q = query || 'in:inbox';
-      const listResp = await fetch(`${gmailBase}/messages?maxResults=25&q=${encodeURIComponent(q)}`, { headers });
+      const listResp = await fetch(`${gmailBase}/messages?maxResults=20&q=${encodeURIComponent(q)}`, { headers });
       const listData = await listResp.json();
+      if (listData.error) return res.status(400).json({ error: listData.error.message });
       if (!listData.messages) return res.status(200).json({ messages: [] });
 
-      // Fetch message details in parallel (limit to 15)
       const msgs = await Promise.all(
         listData.messages.slice(0, 15).map(async (m) => {
           const msgResp = await fetch(`${gmailBase}/messages/${m.id}?format=metadata&metadataHeaders=From,To,Subject,Date`, { headers });
@@ -42,9 +86,10 @@ export default async function handler(req, res) {
         })
       );
 
-      const parsed = msgs.map(m => {
+      const parsed = msgs.filter(m => m && m.id).map(m => {
         const hdrs = {};
-        (m.payload && m.payload.headers || []).forEach(h => { hdrs[h.name] = h.value; });
+        ((m.payload && m.payload.headers) || []).forEach(h => { hdrs[h.name] = h.value; });
+        const hasParts = m.payload && m.payload.parts;
         return {
           id: m.id,
           threadId: m.threadId,
@@ -54,38 +99,38 @@ export default async function handler(req, res) {
           date: hdrs['Date'] || '',
           snippet: m.snippet || '',
           unread: m.labelIds && m.labelIds.includes('UNREAD'),
-          hasAttachment: m.payload && m.payload.parts && m.payload.parts.some(p => p.filename && p.filename.length > 0)
+          hasAttachment: hasParts && m.payload.parts.some(p => p.filename && p.filename.length > 0)
         };
       });
       return res.status(200).json({ messages: parsed });
     }
 
     if (action === 'thread') {
-      // Get full thread
       const tResp = await fetch(`${gmailBase}/threads/${threadId}?format=full`, { headers });
       const tData = await tResp.json();
+      if (tData.error) return res.status(400).json({ error: tData.error.message });
 
       const messages = (tData.messages || []).map(m => {
         const hdrs = {};
-        (m.payload && m.payload.headers || []).forEach(h => { hdrs[h.name] = h.value; });
+        ((m.payload && m.payload.headers) || []).forEach(h => { hdrs[h.name] = h.value; });
 
-        // Extract body
         let bodyText = '';
         let bodyHtml = '';
         const extractBody = (part) => {
+          if (!part) return;
           if (part.mimeType === 'text/plain' && part.body && part.body.data) {
-            bodyText = Buffer.from(part.body.data, 'base64').toString('utf8');
+            try { bodyText = Buffer.from(part.body.data, 'base64').toString('utf8'); } catch(e) {}
           }
           if (part.mimeType === 'text/html' && part.body && part.body.data) {
-            bodyHtml = Buffer.from(part.body.data, 'base64').toString('utf8');
+            try { bodyHtml = Buffer.from(part.body.data, 'base64').toString('utf8'); } catch(e) {}
           }
           if (part.parts) part.parts.forEach(extractBody);
         };
         if (m.payload) extractBody(m.payload);
 
-        // Get attachments
         const attachments = [];
         const getAttachments = (part) => {
+          if (!part) return;
           if (part.filename && part.filename.length > 0 && part.body) {
             attachments.push({ filename: part.filename, mimeType: part.mimeType, attachmentId: part.body.attachmentId, size: part.body.size });
           }
@@ -93,63 +138,61 @@ export default async function handler(req, res) {
         };
         if (m.payload) getAttachments(m.payload);
 
-        return {
-          id: m.id,
-          from: hdrs['From'] || '',
-          to: hdrs['To'] || '',
-          subject: hdrs['Subject'] || '',
-          date: hdrs['Date'] || '',
-          bodyText, bodyHtml, attachments,
-          unread: m.labelIds && m.labelIds.includes('UNREAD')
-        };
+        return { id: m.id, from: hdrs['From'] || '', to: hdrs['To'] || '', subject: hdrs['Subject'] || '', date: hdrs['Date'] || '', bodyText, bodyHtml, attachments, unread: m.labelIds && m.labelIds.includes('UNREAD') };
       });
 
-      // Mark as read
-      await fetch(`${gmailBase}/messages/${messages[messages.length-1].id}/modify`, {
-        method: 'POST', headers,
-        body: JSON.stringify({ removeLabelIds: ['UNREAD'] })
-      });
-
+      // Mark thread as read
+      if (messages.length) {
+        await fetch(`${gmailBase}/messages/${messages[messages.length-1].id}/modify`, {
+          method: 'POST', headers,
+          body: JSON.stringify({ removeLabelIds: ['UNREAD'] })
+        });
+      }
       return res.status(200).json({ messages });
     }
 
     if (action === 'attachment') {
-      // Fetch attachment data for scanning
       const attResp = await fetch(`${gmailBase}/messages/${messageId}/attachments/${attachmentId}`, { headers });
       const attData = await attResp.json();
+      if (attData.error) return res.status(400).json({ error: attData.error.message });
       return res.status(200).json({ data: attData.data, size: attData.size });
     }
 
     if (action === 'send') {
-      // Send email
       const emailLines = [
         'To: ' + to,
         'Subject: ' + subject,
         'Content-Type: text/html; charset=utf-8',
         'MIME-Version: 1.0',
         '',
-        body
+        body || ''
       ];
       if (replyTo) {
-        emailLines.unshift('In-Reply-To: ' + replyTo);
         emailLines.unshift('References: ' + replyTo);
+        emailLines.unshift('In-Reply-To: ' + replyTo);
       }
-      const raw = Buffer.from(emailLines.join('\r\n')).toString('base64')
-        .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      const raw = Buffer.from(emailLines.join('\r\n'))
+        .toString('base64')
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/, '');
+
+      const sendBody = { raw };
+      if (threadId) sendBody.threadId = threadId;
 
       const sendResp = await fetch(`${gmailBase}/messages/send`, {
         method: 'POST', headers,
-        body: JSON.stringify({ raw, ...(threadId ? { threadId } : {}) })
+        body: JSON.stringify(sendBody)
       });
       const sendData = await sendResp.json();
       if (sendData.error) return res.status(400).json({ error: sendData.error.message });
       return res.status(200).json({ success: true, messageId: sendData.id });
     }
 
-    return res.status(400).json({ error: 'Unknown action' });
+    return res.status(400).json({ error: 'Unknown action: ' + action });
 
   } catch (err) {
-    console.error('gmail-api error:', err);
+    console.error('gmail-api error:', err.message, err.stack);
     return res.status(500).json({ error: err.message });
   }
 }
