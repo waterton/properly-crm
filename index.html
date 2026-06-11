@@ -1270,7 +1270,7 @@ function initSupabase(){
           detectSessionInUrl: true,
           persistSession: true,
           autoRefreshToken: true,
-          flowType: 'implicit'
+          flowType: 'pkce'
         }
       });
       supaReady = true;
@@ -1278,6 +1278,30 @@ function initSupabase(){
     }
   }catch(e){ console.log('Supabase init error:', e); }
   return false;
+}
+
+// -- AUTH HEADERS HELPER ------------------------------------------
+// Always use the live session JWT for Supabase REST calls so RLS
+// policies (which check auth.role() = 'authenticated') pass correctly.
+// Falls back to anon key only when no session exists (should not happen
+// in normal use once auth is live).
+async function getAuthHeaders(extra) {
+  var token = SUPA_KEY; // fallback
+  if(supaReady && supa) {
+    try {
+      var sd = await supa.auth.getSession();
+      if(sd && sd.data && sd.data.session && sd.data.session.access_token) {
+        token = sd.data.session.access_token;
+      }
+    } catch(e) { /* use fallback */ }
+  }
+  var h = {
+    'apikey': SUPA_KEY,
+    'Authorization': 'Bearer ' + token,
+    'Content-Type': 'application/json'
+  };
+  if(extra) { Object.keys(extra).forEach(function(k){ h[k] = extra[k]; }); }
+  return h;
 }
 
 // Auth disabled for testing
@@ -1301,12 +1325,7 @@ function sv(){
 function dbSave(table, rows){
   if(!supaReady) return;
   var cleanRows = JSON.parse(JSON.stringify(rows));
-  var headers = {
-    'apikey': SUPA_KEY,
-    'Authorization': 'Bearer ' + SUPA_KEY,
-    'Content-Type': 'application/json',
-    'Prefer': 'resolution=merge-duplicates'
-  };
+  getAuthHeaders({'Prefer': 'resolution=merge-duplicates'}).then(function(headers){
   fetch(SUPA_URL + '/rest/v1/' + table, {
     method: 'POST',
     headers: headers,
@@ -1317,19 +1336,17 @@ function dbSave(table, rows){
       showSyncStatus('error');
     }
   }).catch(function(e){ console.log('DB save fetch error:', e.message); });
+  }); // end getAuthHeaders
 }
 
 function dbDelete(table, id){
   if(!supaReady) return;
-  var headers = {
-    'apikey': SUPA_KEY,
-    'Authorization': 'Bearer ' + SUPA_KEY,
-    'Content-Type': 'application/json'
-  };
-  fetch(SUPA_URL + '/rest/v1/' + table + '?id=eq.' + id, {
-    method: 'DELETE',
-    headers: headers
-  }).catch(function(e){ console.log('DB delete error:', e.message); });
+  getAuthHeaders().then(function(headers){
+    fetch(SUPA_URL + '/rest/v1/' + table + '?id=eq.' + id, {
+      method: 'DELETE',
+      headers: headers
+    }).catch(function(e){ console.log('DB delete error:', e.message); });
+  });
 }
 
 async function loadFromDB(){
@@ -1338,11 +1355,7 @@ async function loadFromDB(){
     showSyncStatus('loading');
 
     // Use direct fetch to Supabase REST API to avoid DataCloneError
-    var headers = {
-      'apikey': SUPA_KEY,
-      'Authorization': 'Bearer ' + SUPA_KEY,
-      'Content-Type': 'application/json'
-    };
+    var headers = await getAuthHeaders();
     var base = SUPA_URL + '/rest/v1/';
 
     var results = await Promise.all([
@@ -1408,16 +1421,18 @@ function saveFU(f){ sv(); if(supaReady) dbSave('followups', [f]); }
 function saveDL(d){ sv(); if(supaReady) dbSave('deadlines', [d]); }
 function deleteCfromDB(id){
   if(!supaReady) return;
-  var h = {'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY};
-  fetch(SUPA_URL+'/rest/v1/contacts?id=eq.'+id,{method:'DELETE',headers:h});
-  fetch(SUPA_URL+'/rest/v1/notes?contactId=eq.'+id,{method:'DELETE',headers:h});
-  fetch(SUPA_URL+'/rest/v1/followups?contactId=eq.'+id,{method:'DELETE',headers:h});
-  fetch(SUPA_URL+'/rest/v1/deadlines?contactId=eq.'+id,{method:'DELETE',headers:h});
+  getAuthHeaders().then(function(h){
+    fetch(SUPA_URL+'/rest/v1/contacts?id=eq.'+id,{method:'DELETE',headers:h});
+    fetch(SUPA_URL+'/rest/v1/notes?contactId=eq.'+id,{method:'DELETE',headers:h});
+    fetch(SUPA_URL+'/rest/v1/followups?contactId=eq.'+id,{method:'DELETE',headers:h});
+    fetch(SUPA_URL+'/rest/v1/deadlines?contactId=eq.'+id,{method:'DELETE',headers:h});
+  });
 }
 function deleteFUfromDB(id){
   if(!supaReady) return;
-  var h = {'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY};
-  fetch(SUPA_URL+'/rest/v1/followups?id=eq.'+id,{method:'DELETE',headers:h});
+  getAuthHeaders().then(function(h){
+    fetch(SUPA_URL+'/rest/v1/followups?id=eq.'+id,{method:'DELETE',headers:h});
+  });
 }
 function updateContact(c){ sv(); if(supaReady) dbSave('contacts', [c]); }
 
@@ -6538,11 +6553,15 @@ async function signOut(){
   if(!confirm('Sign out of Properly CRM?')) return;
   await supa.auth.signOut();
   currentUser = null;
+  authInitDone = false;
   C=[]; N=[]; F=[]; D=[]; TX=[];
   showLoginScreen();
 }
 
+var authInitDone = false;
 function onAuthSuccess(user){
+  if(authInitDone) return; // prevent double-fire from SIGNED_IN + INITIAL_SESSION
+  authInitDone = true;
   showApp(user);
   loadFromDB().then(function(ok){
     if(!ok && !C.length) demo();
