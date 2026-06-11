@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-  <meta name="version" content="4.3">
+  <meta name="version" content="4.4">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>Properly CRM</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -540,7 +540,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
       <div class="topbar-right">
         <input class="sbox" type="text" placeholder="Search..." id="searchBox">
         <button class="btn btn-p" id="btnAdd">+ Add</button>
-        <div style="font-size:11px;color:var(--text3);margin-right:4px;">v4.3</div>
+        <div style="font-size:11px;color:var(--text3);margin-right:4px;">v4.4</div>
         <div class="topbar-user" id="topbarUser" title="Click to sign out" style="cursor:pointer;position:relative;" id="topbarUserBtn">RE</div>
       </div>
     </div>
@@ -6554,73 +6554,59 @@ function onAuthSuccess(user){
 
 async function startup(){
   try{
-    // Wait for Supabase CDN to load (up to 5 seconds)
+    // Show login screen immediately
+    ge('loginScreen').classList.add('visible');
+
+    // Wait for Supabase CDN
     var waited = 0;
     while(!window.supabase && waited < 50){
       await new Promise(function(r){ setTimeout(r, 100); });
       waited++;
     }
 
+    if(!window.supabase){
+      showLoginErr('Could not load authentication library. Please refresh.');
+      return;
+    }
+
     initSupabase();
+
     if(!supaReady){
-      // No Supabase - run in demo mode
-      var banner = ge('setupBanner');
-      if(banner) banner.style.display = 'none';
-      try{ var lc=localStorage.getItem('crm_c'); if(lc){ C=JSON.parse(lc); N=JSON.parse(localStorage.getItem('crm_n')||'[]'); F=JSON.parse(localStorage.getItem('crm_f')||'[]'); D=JSON.parse(localStorage.getItem('crm_d')||'[]'); TX=JSON.parse(localStorage.getItem('crm_tx')||'[]'); } else demo(); }catch(e2){ demo(); }
+      // No Supabase config - load from localStorage
+      try{
+        var lc=localStorage.getItem('crm_c');
+        if(lc){ C=JSON.parse(lc); N=JSON.parse(localStorage.getItem('crm_n')||'[]'); F=JSON.parse(localStorage.getItem('crm_f')||'[]'); D=JSON.parse(localStorage.getItem('crm_d')||'[]'); TX=JSON.parse(localStorage.getItem('crm_tx')||'[]'); }
+        else demo();
+      }catch(e2){ demo(); }
       ge('mainApp').style.display = 'flex';
+      ge('loginScreen').classList.remove('visible');
       rd(); return;
     }
 
-    // Listen for auth state changes FIRST before checking session
-    // This ensures we catch the OAuth redirect token in the URL hash
+    // Register auth listener
     supa.auth.onAuthStateChange(function(event, session){
-      console.log('Auth event:', event, 'user:', session && session.user && session.user.email);
-      if((event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') && session && session.user){
-        if(!currentUser){
+      console.log('Auth event:', event, session && session.user ? session.user.email : 'no user');
+      if(event === 'SIGNED_IN' && session && session.user && !currentUser){
+        onAuthSuccess(session.user);
+      } else if(event === 'INITIAL_SESSION'){
+        if(session && session.user){
           onAuthSuccess(session.user);
+        } else {
+          // No session - show login
+          ge('loginScreen').classList.add('visible');
         }
       } else if(event === 'SIGNED_OUT'){
         currentUser = null;
-        showLoginScreen();
-      } else if(event === 'PASSWORD_RECOVERY'){
-        showLoginScreen();
-        showLoginMsg('Enter your new password below.');
+        C=[]; N=[]; F=[]; D=[]; TX=[];
+        ge('mainApp').style.display = 'none';
+        ge('loginScreen').classList.add('visible');
       }
     });
 
-    // Check for existing session (also handles OAuth redirect tokens in URL hash)
-    var sessionResult = await supa.auth.getSession();
-    var session = sessionResult.data && sessionResult.data.session;
-    console.log('getSession result:', session ? 'has session' : 'no session', session && session.user && session.user.email);
-
-    if(session && session.user){
-      onAuthSuccess(session.user);
-    } else if(window.location.hash && window.location.hash.includes('access_token')){
-      // OAuth redirect - Supabase is processing the token via detectSessionInUrl
-      // Wait up to 5 seconds for onAuthStateChange to fire
-      showLoginMsg('Completing Google sign in...');
-      var hashWait = 0;
-      var hashTimer = setInterval(function(){
-        hashWait++;
-        if(currentUser){
-          clearInterval(hashTimer);
-          window.history.replaceState(null, '', window.location.pathname);
-        } else if(hashWait > 50){
-          clearInterval(hashTimer);
-          showLoginScreen();
-          showLoginErr('Sign in timed out. Please try again.');
-        }
-      }, 100);
-    } else {
-      showLoginScreen();
-    }
-
   }catch(e){
-    console.log('Startup error:', e);
-    // Show login screen on any error - safe fallback
+    console.log('Startup error:', e.message, e.stack);
     ge('loginScreen').classList.add('visible');
-    ge('loginMsg').style.display = 'block';
-    ge('loginMsg').textContent = 'Connection error - please refresh the page.';
+    showLoginErr('Startup error: ' + e.message + '. Please refresh.');
   }
 }
 ge('nav-dashboard').addEventListener('click',function(){sp('dashboard');});
