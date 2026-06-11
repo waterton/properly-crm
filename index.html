@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-  <meta name="version" content="3.5">
+  <meta name="version" content="3.6">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>Properly CRM</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -313,6 +313,28 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 /* Member filter pills */
 .cal-member-pill{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;font-size:13px;cursor:pointer;border:2px solid transparent;transition:all 0.15s;font-family:'DM Sans',sans-serif;}
 .cal-member-pill.active{border-color:white;}
+/* CARD SCANNER */
+.card-scanner-wrap{max-width:640px;margin:0 auto;}
+.card-scan-tabs{display:flex;gap:0;margin-bottom:20px;background:var(--surface);border:1px solid var(--border);border-radius:9px;overflow:hidden;}
+.card-scan-tab{flex:1;padding:11px;text-align:center;cursor:pointer;font-size:15px;font-weight:600;color:var(--text3);border:none;background:none;font-family:'DM Sans',sans-serif;transition:all 0.15s;}
+.card-scan-tab.active{background:var(--accent);color:var(--bg);}
+.qr-video-wrap{position:relative;background:#000;border-radius:12px;overflow:hidden;aspect-ratio:4/3;max-height:360px;}
+.qr-video-wrap video{width:100%;height:100%;object-fit:cover;}
+.qr-overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;}
+.qr-frame{width:200px;height:200px;border:3px solid var(--accent);border-radius:12px;box-shadow:0 0 0 2000px rgba(0,0,0,0.5);}
+.qr-scan-line{position:absolute;top:0;left:0;right:0;height:2px;background:var(--accent);animation:qrscan 2s linear infinite;opacity:0.8;}
+@keyframes qrscan{0%{top:calc(50% - 100px);}50%{top:calc(50% + 100px);}100%{top:calc(50% - 100px);}}
+.card-result{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;margin-top:18px;}
+.card-result-header{display:flex;align-items:center;gap:14px;margin-bottom:18px;padding-bottom:16px;border-bottom:1px solid var(--border);}
+.card-result-avatar{width:52px;height:52px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:20px;color:var(--bg);flex-shrink:0;}
+.card-result-name{font-size:18px;font-weight:700;color:var(--text);}
+.card-result-company{font-size:14px;color:var(--text3);margin-top:2px;}
+.card-field{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);}
+.card-field:last-child{border-bottom:none;}
+.card-field-icon{width:32px;height:32px;border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:14px;}
+.card-field-label{font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:2px;}
+.card-field-input{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:14px;color:var(--text);font-family:'DM Sans',sans-serif;outline:none;width:100%;}
+.card-field-input:focus{border-color:var(--accent);}
 .fab{position:fixed;bottom:24px;right:24px;width:52px;height:52px;border-radius:50%;background:var(--accent);border:none;cursor:pointer;font-size:26px;color:var(--bg);font-weight:700;box-shadow:0 4px 20px rgba(201,168,76,0.5);z-index:200;}
 /* Login CSS removed - auth disabled for testing */
 .mls-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;}
@@ -437,6 +459,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
       <button class="ni" id="nav-tc"><svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Transactions<span class="nbadge" id="nbTC">0</span></button>
       <div class="nav-sec">AI Tools</div>
       <button class="ni" id="nav-scanner"><svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/><path d="M9 13h6M9 17h6M9 9h1"/></svg>Doc Scanner</button>
+      <button class="ni" id="nav-cardscanner"><svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>Card Scanner</button>
       <div class="nav-sec">Calendar</div>
       <button class="ni" id="nav-calendar"><svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Calendar</button>
       <div class="nav-sec">Team</div>
@@ -457,7 +480,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
       <div class="topbar-right">
         <input class="sbox" type="text" placeholder="Search..." id="searchBox">
         <button class="btn btn-p" id="btnAdd">+ Add</button>
-        <div style="font-size:11px;color:var(--text3);margin-right:4px;">v3.5</div>
+        <div style="font-size:11px;color:var(--text3);margin-right:4px;">v3.6</div>
         <div class="topbar-user" id="topbarUser" title="Sign out" style="cursor:pointer;">RE</div>
       </div>
     </div>
@@ -641,6 +664,75 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
             <button class="btn btn-g" data-close="tcModal">Cancel</button>
             <button class="btn btn-p" id="btnSaveTransaction">Save Transaction</button>
           </div>
+        </div>
+      </div>
+
+      <!-- BUSINESS CARD / QR SCANNER PAGE -->
+      <div class="page" id="page-cardscanner">
+        <div class="card-scanner-wrap">
+          <div style="margin-bottom:16px;">
+            <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:4px;">Card &amp; QR Scanner</div>
+            <div style="font-size:14px;color:var(--text2);">Scan a business card photo or QR code to instantly create a contact.</div>
+          </div>
+
+          <!-- Tab switcher -->
+          <div class="card-scan-tabs">
+            <button class="card-scan-tab active" id="tabCardPhoto">&#128247; Photo / Upload</button>
+            <button class="card-scan-tab" id="tabQRCode">&#9638; QR Code</button>
+          </div>
+
+          <!-- Photo/Upload tab -->
+          <div id="cardPhotoTab">
+            <div class="scanner-drop" id="cardDrop" style="margin-bottom:0;">
+              <div class="scanner-drop-icon">
+                <svg width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+              </div>
+              <div class="scanner-drop-title">Drop business card here or tap to upload</div>
+              <div class="scanner-drop-sub" style="margin-bottom:14px;">JPG, PNG — front or back of card</div>
+              <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+                <button class="btn btn-p" id="btnCardUpload">Choose Photo</button>
+                <button class="btn btn-g" id="btnCardCamera">Use Camera</button>
+              </div>
+            </div>
+            <input type="file" id="cardFileInput" accept="image/*" style="display:none;">
+            <input type="file" id="cardCameraInput" accept="image/*" capture="environment" style="display:none;">
+          </div>
+
+          <!-- QR Code tab -->
+          <div id="qrCodeTab" style="display:none;">
+            <div class="qr-video-wrap" id="qrVideoWrap" style="display:none;">
+              <video id="qrVideo" autoplay playsinline muted></video>
+              <div class="qr-overlay">
+                <div style="position:relative;">
+                  <div class="qr-frame"></div>
+                  <div class="qr-scan-line"></div>
+                </div>
+              </div>
+              <canvas id="qrCanvas" style="display:none;"></canvas>
+            </div>
+            <div id="qrStartWrap" style="text-align:center;padding:32px 20px;background:var(--surface);border:1px solid var(--border);border-radius:12px;">
+              <div style="font-size:48px;margin-bottom:12px;">&#9638;</div>
+              <div style="font-size:16px;font-weight:600;color:var(--text);margin-bottom:8px;">QR Code Scanner</div>
+              <div style="font-size:14px;color:var(--text3);margin-bottom:18px;">Point your camera at a QR code on a business card to instantly extract contact info.</div>
+              <button class="btn btn-p" id="btnStartQR" style="font-size:16px;padding:12px 24px;">Start Camera</button>
+            </div>
+            <div id="qrManualInput" style="margin-top:14px;display:none;">
+              <div style="font-size:12px;color:var(--text3);margin-bottom:6px;">Or paste QR code URL / vCard text manually:</div>
+              <textarea class="fi" id="qrManualText" rows="3" placeholder="Paste vCard, URL, or contact text here..."></textarea>
+              <button class="btn btn-p" id="btnParseQRText" style="margin-top:8px;">Parse Text</button>
+            </div>
+            <button class="btn btn-g" id="btnQRManualToggle" style="margin-top:10px;font-size:13px;">Enter text manually instead</button>
+          </div>
+
+          <!-- Processing -->
+          <div id="cardProcessing" style="display:none;" class="scanner-processing">
+            <div class="scanner-spinner"></div>
+            <div style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:6px;" id="cardProcessingMsg">Scanning card...</div>
+            <div style="font-size:13px;color:var(--text3);">Extracting contact information...</div>
+          </div>
+
+          <!-- Result -->
+          <div id="cardResult" style="display:none;"></div>
         </div>
       </div>
 
@@ -1334,7 +1426,7 @@ function pl(p){return p==='hot'?'HOT':p==='warn'?'SOON':'OK';}
 function pb(p){return p==='hot'?'b-hot':p==='warn'?'b-warn':'b-ok';}
 function ge(id){return document.getElementById(id);}
 function ck(){var s=document.createElementNS('http://www.w3.org/2000/svg','svg');s.setAttribute('width','9');s.setAttribute('height','9');s.setAttribute('fill','none');s.setAttribute('stroke','#0d0f14');s.setAttribute('stroke-width','3');s.setAttribute('viewBox','0 0 24 24');var p=document.createElementNS('http://www.w3.org/2000/svg','polyline');p.setAttribute('points','20,6 9,17 4,12');s.appendChild(p);return s;}
-var pn={briefing:'Daily Briefing',dashboard:'Dashboard',pipeline:'Pipeline',contacts:'Contacts',followups:'Follow-ups',notes:'Notes',deadlines:'Deadlines',tc:'Transactions',scanner:'Doc Scanner',calendar:'Calendar',team:'Team',gmail:'Gmail',mls:'MLS Search'};
+var pn={briefing:'Daily Briefing',dashboard:'Dashboard',pipeline:'Pipeline',contacts:'Contacts',followups:'Follow-ups',notes:'Notes',deadlines:'Deadlines',tc:'Transactions',scanner:'Doc Scanner',cardscanner:'Card Scanner',calendar:'Calendar',team:'Team',gmail:'Gmail',mls:'MLS Search'};
 function sp(id){
   curPage=id;
   document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');});
@@ -1365,6 +1457,7 @@ function sp(id){
   }
   else if(id==='tc')initTC();
   else if(id==='scanner')initScanner();
+  else if(id==='cardscanner')initCardScanner();
   else if(id==='calendar')initCalendar();
   else if(id==='team')initTeam();
   else if(id==='gmail')initGmail();
@@ -2884,6 +2977,454 @@ function getTCBriefingItems(){
     if(next.length) items.push({name: name, address: tx.address, nextStep: next[0].label, type:'nextstep'});
   });
   return items;
+}
+
+// -- BUSINESS CARD & QR SCANNER ---
+var cardScannerState = {
+  stream: null,
+  qrScanning: false,
+  qrInterval: null
+};
+
+function initCardScanner(){
+  // Tab switching
+}
+
+//  PHOTO / UPLOAD CARD SCAN 
+function startCardScan(file){
+  if(!file) return;
+  if(file.size > 20 * 1024 * 1024){ alert('File too large. Please use an image under 20MB.'); return; }
+
+  ge('cardDrop').style.display = 'none';
+  ge('cardResult').style.display = 'none';
+  ge('cardProcessing').style.display = 'block';
+  ge('cardProcessingMsg').textContent = 'Reading business card...';
+
+  var reader = new FileReader();
+  reader.onload = function(e){
+    var base64 = e.target.result.split(',')[1];
+    var mediaType = file.type || 'image/jpeg';
+    analyzeBusinessCard(base64, mediaType);
+  };
+  reader.readAsDataURL(file);
+}
+
+async function analyzeBusinessCard(base64, mediaType){
+  var prompt = [
+    'This is a business card image. Extract ALL contact information you can find.',
+    'Return ONLY a valid JSON object with these exact fields (use empty string if not found):',
+    '{',
+    '  "firstName": "first name",',
+    '  "lastName": "last name",',
+    '  "fullName": "full name as shown",',
+    '  "title": "job title or position",',
+    '  "company": "company or business name",',
+    '  "phone": "primary phone number",',
+    '  "phone2": "secondary phone number if present",',
+    '  "mobile": "mobile/cell number if labeled",',
+    '  "email": "primary email address",',
+    '  "email2": "secondary email if present",',
+    '  "website": "website URL",',
+    '  "address": "full address if present",',
+    '  "linkedin": "linkedin URL or username",',
+    '  "instagram": "instagram handle or URL",',
+    '  "facebook": "facebook URL or name",',
+    '  "twitter": "twitter/X handle",',
+    '  "youtube": "youtube channel if present",',
+    '  "tiktok": "tiktok handle if present",',
+    '  "whatsapp": "whatsapp number if labeled",',
+    '  "qrData": "any text visible in a QR code if you can read it",',
+    '  "notes": "any other relevant information on the card",',
+    '  "cardType": "business|personal|realtor|other"',
+    '}',
+    'Be thorough. Extract every piece of contact information visible on the card.',
+    'For phone numbers include the country code if shown.',
+    'For social media just extract the handle/username or full URL as shown on the card.'
+  ].join('\n');
+
+  try{
+    var resp = await fetch('/api/claude', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        model:'claude-sonnet-4-20250514',
+        max_tokens:1500,
+        messages:[{
+          role:'user',
+          content:[
+            {type:'image', source:{type:'base64', media_type:mediaType, data:base64}},
+            {type:'text', text:prompt}
+          ]
+        }]
+      })
+    });
+    var data = await resp.json();
+    if(!data.content || !data.content[0]){ showCardError('No response from AI.'); return; }
+    var text = data.content[0].text;
+    try{
+      var clean = text.replace(/```json/g,'').replace(/```/g,'').trim();
+      var fb = clean.indexOf('{'); var lb = clean.lastIndexOf('}');
+      if(fb !== -1 && lb > fb) clean = clean.substring(fb, lb+1);
+      var result = JSON.parse(clean);
+      showCardResult(result);
+    }catch(e){
+      // Try to show whatever came back
+      showCardError('Could not parse card data. Try a clearer photo.');
+    }
+  }catch(e){ showCardError('Scan error: ' + e.message); }
+}
+
+function showCardResult(r){
+  ge('cardProcessing').style.display = 'none';
+  var el = ge('cardResult');
+  el.style.display = 'block';
+  el.innerHTML = '';
+
+  var card = document.createElement('div');
+  card.className = 'card-result';
+
+  // Header with avatar
+  var hdr = document.createElement('div');
+  hdr.className = 'card-result-header';
+  var av = document.createElement('div');
+  av.className = 'card-result-avatar';
+  av.textContent = ((r.firstName||r.fullName||'?').charAt(0) + (r.lastName||'').charAt(0)).toUpperCase() || '?';
+  var nameDiv = document.createElement('div');
+  var nameEl = document.createElement('div');
+  nameEl.className = 'card-result-name';
+  nameEl.textContent = r.fullName || ((r.firstName||'') + ' ' + (r.lastName||'')).trim() || 'Unknown';
+  var compEl = document.createElement('div');
+  compEl.className = 'card-result-company';
+  compEl.textContent = (r.title ? r.title + (r.company ? ' at ' + r.company : '') : r.company) || '';
+  nameDiv.appendChild(nameEl);
+  if(compEl.textContent) nameDiv.appendChild(compEl);
+  hdr.appendChild(av); hdr.appendChild(nameDiv);
+  card.appendChild(hdr);
+
+  // Editable fields
+  var fields = [
+    {label:'First Name', key:'firstName', icon:'&#128100;', color:'#4C8EC9', id:'cf_first'},
+    {label:'Last Name', key:'lastName', icon:'&#128100;', color:'#4C8EC9', id:'cf_last'},
+    {label:'Job Title', key:'title', icon:'&#128084;', color:'#C9A84C', id:'cf_title'},
+    {label:'Company', key:'company', icon:'&#127970;', color:'#C9A84C', id:'cf_company'},
+    {label:'Phone', key:'phone', icon:'&#128222;', color:'#6BC97A', id:'cf_phone'},
+    {label:'Mobile', key:'mobile', icon:'&#128241;', color:'#6BC97A', id:'cf_mobile'},
+    {label:'Phone 2', key:'phone2', icon:'&#128222;', color:'#6BC97A', id:'cf_phone2'},
+    {label:'Email', key:'email', icon:'&#9993;', color:'#C94C8E', id:'cf_email'},
+    {label:'Email 2', key:'email2', icon:'&#9993;', color:'#C94C8E', id:'cf_email2'},
+    {label:'Website', key:'website', icon:'&#127760;', color:'#4C8EC9', id:'cf_website'},
+    {label:'Address', key:'address', icon:'&#128205;', color:'#C96B4C', id:'cf_address'},
+    {label:'LinkedIn', key:'linkedin', icon:'in', color:'#0077b5', id:'cf_linkedin'},
+    {label:'Instagram', key:'instagram', icon:'&#128247;', color:'#E1306C', id:'cf_instagram'},
+    {label:'Facebook', key:'facebook', icon:'f', color:'#1877F2', id:'cf_facebook'},
+    {label:'Twitter/X', key:'twitter', icon:'X', color:'#000000', id:'cf_twitter'},
+    {label:'TikTok', key:'tiktok', icon:'&#9835;', color:'#ff0050', id:'cf_tiktok'},
+    {label:'WhatsApp', key:'whatsapp', icon:'&#128172;', color:'#25D366', id:'cf_whatsapp'},
+    {label:'Notes', key:'notes', icon:'&#128203;', color:'#8A8A7A', id:'cf_notes'}
+  ];
+
+  fields.forEach(function(f){
+    if(!r[f.key]) return; // Skip empty fields
+    var row = document.createElement('div');
+    row.className = 'card-field';
+    var icon = document.createElement('div');
+    icon.className = 'card-field-icon';
+    icon.style.background = f.color + '22';
+    icon.style.color = f.color;
+    icon.innerHTML = f.icon;
+    var info = document.createElement('div');
+    info.style.flex = '1';
+    var lbl = document.createElement('div');
+    lbl.className = 'card-field-label';
+    lbl.textContent = f.label;
+    var inp = document.createElement('input');
+    inp.className = 'card-field-input';
+    inp.id = f.id;
+    inp.value = r[f.key] || '';
+    inp.placeholder = f.label;
+    info.appendChild(lbl); info.appendChild(inp);
+    row.appendChild(icon); row.appendChild(info);
+    card.appendChild(row);
+  });
+
+  // Contact type selector
+  var typeRow = document.createElement('div');
+  typeRow.style.cssText = 'margin-top:14px;padding-top:14px;border-top:1px solid var(--border);display:flex;align-items:center;gap:12px;';
+  var typeLbl = document.createElement('label');
+  typeLbl.style.cssText = 'font-size:14px;color:var(--text3);flex-shrink:0;';
+  typeLbl.textContent = 'Contact Type:';
+  var typeSel = document.createElement('select');
+  typeSel.className = 'fsel';
+  typeSel.id = 'cf_type';
+  typeSel.style.flex = '1';
+  ['lead','buyer','seller'].forEach(function(t){
+    var o = document.createElement('option');
+    o.value = t; o.textContent = t.charAt(0).toUpperCase()+t.slice(1);
+    typeSel.appendChild(o);
+  });
+  typeRow.appendChild(typeLbl); typeRow.appendChild(typeSel);
+  card.appendChild(typeRow);
+
+  // Action buttons
+  var actions = document.createElement('div');
+  actions.style.cssText = 'display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;padding-top:14px;border-top:1px solid var(--border);';
+
+  var importBtn = document.createElement('button');
+  importBtn.className = 'btn btn-p';
+  importBtn.style.fontSize = '15px';
+  importBtn.textContent = 'Save as Contact';
+  importBtn.addEventListener('click', function(){ importCardContact(r); });
+
+  var rescanBtn = document.createElement('button');
+  rescanBtn.className = 'btn btn-g';
+  rescanBtn.textContent = 'Scan Another';
+  rescanBtn.addEventListener('click', function(){
+    el.style.display = 'none';
+    ge('cardDrop').style.display = 'block';
+    ge('cardFileInput').value = '';
+    ge('cardCameraInput').value = '';
+  });
+
+  actions.appendChild(importBtn); actions.appendChild(rescanBtn);
+  card.appendChild(actions);
+  el.appendChild(card);
+}
+
+function importCardContact(r){
+  var firstName = (ge('cf_first') && ge('cf_first').value) || r.firstName || (r.fullName||'').split(' ')[0] || 'Unknown';
+  var lastName = (ge('cf_last') && ge('cf_last').value) || r.lastName || (r.fullName||'').split(' ').slice(1).join(' ') || '';
+  var type = ge('cf_type') ? ge('cf_type').value : 'lead';
+
+  // Build notes with all extra fields
+  var extraLines = [];
+  if(ge('cf_title') && ge('cf_title').value) extraLines.push('Title: ' + ge('cf_title').value);
+  if(ge('cf_company') && ge('cf_company').value) extraLines.push('Company: ' + ge('cf_company').value);
+  if(ge('cf_mobile') && ge('cf_mobile').value) extraLines.push('Mobile: ' + ge('cf_mobile').value);
+  if(ge('cf_phone2') && ge('cf_phone2').value) extraLines.push('Phone 2: ' + ge('cf_phone2').value);
+  if(ge('cf_email2') && ge('cf_email2').value) extraLines.push('Email 2: ' + ge('cf_email2').value);
+  if(ge('cf_website') && ge('cf_website').value) extraLines.push('Website: ' + ge('cf_website').value);
+  if(ge('cf_linkedin') && ge('cf_linkedin').value) extraLines.push('LinkedIn: ' + ge('cf_linkedin').value);
+  if(ge('cf_instagram') && ge('cf_instagram').value) extraLines.push('Instagram: ' + ge('cf_instagram').value);
+  if(ge('cf_facebook') && ge('cf_facebook').value) extraLines.push('Facebook: ' + ge('cf_facebook').value);
+  if(ge('cf_twitter') && ge('cf_twitter').value) extraLines.push('Twitter: ' + ge('cf_twitter').value);
+  if(ge('cf_tiktok') && ge('cf_tiktok').value) extraLines.push('TikTok: ' + ge('cf_tiktok').value);
+  if(ge('cf_whatsapp') && ge('cf_whatsapp').value) extraLines.push('WhatsApp: ' + ge('cf_whatsapp').value);
+  if(ge('cf_notes') && ge('cf_notes').value) extraLines.push(ge('cf_notes').value);
+  extraLines.push('Imported from business card scan.');
+
+  var nc = {
+    id: Date.now(),
+    first: firstName,
+    last: lastName,
+    type: type,
+    phone: (ge('cf_phone') && ge('cf_phone').value) || r.phone || '',
+    email: (ge('cf_email') && ge('cf_email').value) || r.email || '',
+    property: '',
+    stage: 'New Lead',
+    price: '',
+    notes: extraLines.join('\n'),
+    added: new Date().toISOString()
+  };
+
+  // Check for duplicate by email or phone
+  var dup = C.find(function(c){
+    return (nc.email && c.email && c.email.toLowerCase() === nc.email.toLowerCase()) ||
+           (nc.phone && c.phone && c.phone.replace(/\D/g,'') === nc.phone.replace(/\D/g,''));
+  });
+
+  if(dup){
+    if(!confirm('A contact with this email or phone already exists (' + dup.first + ' ' + dup.last + '). Create anyway?')) return;
+  }
+
+  C.push(nc);
+  saveContact(nc);
+  alert('Contact saved: ' + firstName + ' ' + lastName + '!');
+  sp('contacts');
+  rc();
+}
+
+function showCardError(msg){
+  ge('cardProcessing').style.display = 'none';
+  ge('cardDrop').style.display = 'block';
+  alert(msg);
+}
+
+//  QR CODE SCANNER 
+function startQRScanner(){
+  ge('qrStartWrap').style.display = 'none';
+  ge('qrVideoWrap').style.display = 'block';
+  ge('qrManualInput').style.display = 'block';
+
+  navigator.mediaDevices.getUserMedia({
+    video: { facingMode: 'environment', width:{ideal:1280}, height:{ideal:720} }
+  }).then(function(stream){
+    cardScannerState.stream = stream;
+    var video = ge('qrVideo');
+    video.srcObject = stream;
+    video.play();
+    cardScannerState.qrScanning = true;
+    scanQRFrame();
+  }).catch(function(err){
+    ge('qrVideoWrap').style.display = 'none';
+    ge('qrStartWrap').style.display = 'block';
+    alert('Camera access denied or not available. Use the manual text input below instead.');
+    ge('qrManualInput').style.display = 'block';
+  });
+}
+
+function stopQRScanner(){
+  cardScannerState.qrScanning = false;
+  if(cardScannerState.qrInterval) clearInterval(cardScannerState.qrInterval);
+  if(cardScannerState.stream){
+    cardScannerState.stream.getTracks().forEach(function(t){ t.stop(); });
+    cardScannerState.stream = null;
+  }
+  ge('qrVideoWrap').style.display = 'none';
+  ge('qrStartWrap').style.display = 'block';
+}
+
+function scanQRFrame(){
+  if(!cardScannerState.qrScanning) return;
+  var video = ge('qrVideo');
+  var canvas = ge('qrCanvas');
+  if(!video || !canvas) return;
+
+  if(video.readyState === video.HAVE_ENOUGH_DATA){
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    var ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    // Use BarcodeDetector API if available (modern browsers)
+    if('BarcodeDetector' in window){
+      var detector = new BarcodeDetector({formats:['qr_code']});
+      detector.detect(canvas).then(function(barcodes){
+        if(barcodes.length > 0){
+          cardScannerState.qrScanning = false;
+          stopQRScanner();
+          parseQRData(barcodes[0].rawValue);
+        } else {
+          setTimeout(scanQRFrame, 300);
+        }
+      }).catch(function(){ setTimeout(scanQRFrame, 300); });
+    } else {
+      // BarcodeDetector not available - prompt for manual
+      stopQRScanner();
+      ge('qrManualInput').style.display = 'block';
+      alert('QR scanning not supported in this browser. Please use the manual text input or try Chrome on Android.');
+    }
+  } else {
+    setTimeout(scanQRFrame, 300);
+  }
+}
+
+function parseQRData(text){
+  if(!text) return;
+  ge('cardResult').style.display = 'none';
+  ge('cardProcessing').style.display = 'block';
+  ge('cardProcessingMsg').textContent = 'Parsing QR data...';
+
+  // Check if it's a vCard
+  if(text.toUpperCase().indexOf('BEGIN:VCARD') !== -1){
+    var result = parseVCard(text);
+    showCardResult(result);
+    return;
+  }
+
+  // Check if it's a URL - fetch and parse
+  if(text.startsWith('http://') || text.startsWith('https://')){
+    // Send to AI to parse the URL/page info
+    analyzeQRText('This QR code contains this URL: ' + text + '. Extract any contact information visible or implied by this URL (LinkedIn profile, website contact page, etc). The URL itself might be a social media profile or contact page.');
+    return;
+  }
+
+  // Plain text - send to AI
+  analyzeQRText(text);
+}
+
+function parseVCard(vcardText){
+  // Parse standard vCard format
+  var r = {firstName:'',lastName:'',fullName:'',title:'',company:'',phone:'',mobile:'',phone2:'',email:'',email2:'',website:'',address:'',linkedin:'',instagram:'',twitter:'',notes:'',cardType:'business'};
+  var lines = vcardText.replace(/\r\n/g,'\n').replace(/\r/g,'\n').split('\n');
+  var phoneCount = 0;
+  var emailCount = 0;
+
+  lines.forEach(function(line){
+    var parts = line.split(':');
+    if(parts.length < 2) return;
+    var key = parts[0].toUpperCase();
+    var val = parts.slice(1).join(':').trim();
+
+    if(key === 'FN') r.fullName = val;
+    else if(key === 'N'){
+      var np = val.split(';');
+      r.lastName = (np[0]||'').trim();
+      r.firstName = (np[1]||'').trim();
+    }
+    else if(key === 'ORG') r.company = val.replace(';','').trim();
+    else if(key === 'TITLE') r.title = val;
+    else if(key.indexOf('TEL') !== -1){
+      if(key.indexOf('CELL') !== -1 || key.indexOf('MOBILE') !== -1) r.mobile = val;
+      else if(!r.phone) r.phone = val;
+      else if(!r.phone2) r.phone2 = val;
+    }
+    else if(key.indexOf('EMAIL') !== -1){
+      if(!r.email) r.email = val;
+      else if(!r.email2) r.email2 = val;
+    }
+    else if(key.indexOf('URL') !== -1){
+      if(val.indexOf('linkedin') !== -1) r.linkedin = val;
+      else if(val.indexOf('instagram') !== -1) r.instagram = val;
+      else if(val.indexOf('twitter') !== -1 || val.indexOf('x.com') !== -1) r.twitter = val;
+      else if(val.indexOf('facebook') !== -1) r.facebook = val;
+      else r.website = r.website || val;
+    }
+    else if(key.indexOf('ADR') !== -1){
+      r.address = val.replace(/;/g,' ').trim();
+    }
+    else if(key === 'NOTE') r.notes = val;
+  });
+
+  if(!r.firstName && r.fullName){
+    var np2 = r.fullName.trim().split(' ');
+    r.firstName = np2[0] || '';
+    r.lastName = np2.slice(1).join(' ') || '';
+  }
+
+  showCardResult(r);
+  return r;
+}
+
+async function analyzeQRText(text){
+  var prompt = [
+    'Extract contact information from this text/URL from a QR code.',
+    'Return ONLY a valid JSON object with these fields (empty string if not found):',
+    '{"firstName":"","lastName":"","fullName":"","title":"","company":"","phone":"","mobile":"","phone2":"","email":"","email2":"","website":"","address":"","linkedin":"","instagram":"","facebook":"","twitter":"","tiktok":"","whatsapp":"","notes":"","cardType":"business"}',
+    'Text/URL to parse:',
+    text
+  ].join('\n');
+
+  try{
+    var resp = await fetch('/api/claude', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        model:'claude-sonnet-4-20250514',
+        max_tokens:800,
+        messages:[{role:'user', content:prompt}]
+      })
+    });
+    var data = await resp.json();
+    if(!data.content || !data.content[0]){ showCardError('Could not parse QR data.'); return; }
+    var responseText = data.content[0].text;
+    try{
+      var clean = responseText.replace(/```json/g,'').replace(/```/g,'').trim();
+      var fb = clean.indexOf('{'); var lb = clean.lastIndexOf('}');
+      if(fb !== -1 && lb > fb) clean = clean.substring(fb, lb+1);
+      var result = JSON.parse(clean);
+      showCardResult(result);
+    }catch(e){ showCardError('Could not parse QR response.'); }
+  }catch(e){ showCardError('QR parse error: ' + e.message); }
 }
 
 // -- DOCUMENT SCANNER ---
@@ -5723,6 +6264,7 @@ function openAttachModal(listing){
 ge('nav-briefing').addEventListener('click',function(){sp('briefing');});
 ge('nav-tc').addEventListener('click',function(){sp('tc');});
 ge('nav-scanner').addEventListener('click',function(){sp('scanner');});
+ge('nav-cardscanner').addEventListener('click',function(){sp('cardscanner');});
 ge('nav-calendar').addEventListener('click',function(){sp('calendar');});
 ge('nav-team').addEventListener('click',function(){sp('team');});
 ge('nav-gmail').addEventListener('click',function(){sp('gmail');});
@@ -5861,6 +6403,37 @@ ge('btnSaveDL').addEventListener('click',svdl);
 ge('btnSaveDetNote').addEventListener('click',adn);
 ge('detOv').addEventListener('click',function(e){if(e.target===ge('detOv'))cd();});
 ge('searchBox').addEventListener('input',function(){if(curPage==='contacts')rc();});
+
+// Card Scanner listeners
+ge('btnCardUpload').addEventListener('click', function(){ ge('cardFileInput').click(); });
+ge('btnCardCamera').addEventListener('click', function(){ ge('cardCameraInput').click(); });
+ge('cardFileInput').addEventListener('change', function(){ if(this.files[0]) startCardScan(this.files[0]); this.value=''; });
+ge('cardCameraInput').addEventListener('change', function(){ if(this.files[0]) startCardScan(this.files[0]); this.value=''; });
+ge('cardDrop').addEventListener('dragover', function(e){ e.preventDefault(); this.classList.add('dragover'); });
+ge('cardDrop').addEventListener('dragleave', function(){ this.classList.remove('dragover'); });
+ge('cardDrop').addEventListener('drop', function(e){ e.preventDefault(); this.classList.remove('dragover'); if(e.dataTransfer.files[0]) startCardScan(e.dataTransfer.files[0]); });
+ge('cardDrop').addEventListener('click', function(e){ if(e.target === this || e.target.classList.contains('scanner-drop-title') || e.target.classList.contains('scanner-drop-sub')) ge('cardFileInput').click(); });
+
+// QR Scanner listeners
+ge('tabCardPhoto').addEventListener('click', function(){
+  this.classList.add('active'); ge('tabQRCode').classList.remove('active');
+  ge('cardPhotoTab').style.display='block'; ge('qrCodeTab').style.display='none';
+  stopQRScanner();
+});
+ge('tabQRCode').addEventListener('click', function(){
+  this.classList.add('active'); ge('tabCardPhoto').classList.remove('active');
+  ge('cardPhotoTab').style.display='none'; ge('qrCodeTab').style.display='block';
+});
+ge('btnStartQR').addEventListener('click', startQRScanner);
+ge('btnQRManualToggle').addEventListener('click', function(){
+  var mi = ge('qrManualInput');
+  mi.style.display = mi.style.display==='none' ? 'block' : 'none';
+});
+ge('btnParseQRText').addEventListener('click', function(){
+  var text = ge('qrManualText').value.trim();
+  if(!text){ alert('Please enter some text or a URL to parse.'); return; }
+  parseQRData(text);
+});
 ge('btnAddCalEvent').addEventListener('click', openAddCalEvent);
 ge('btnSaveCalEvent').addEventListener('click', saveCalEvent);
 ge('btnDeleteCalEvent').addEventListener('click', deleteCalEvent);
