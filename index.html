@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-  <meta name="version" content="3.3">
+  <meta name="version" content="3.4">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Properly CRM</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -412,7 +412,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
       <div class="topbar-right">
         <input class="sbox" type="text" placeholder="Search..." id="searchBox">
         <button class="btn btn-p" id="btnAdd">+ Add</button>
-        <div style="font-size:11px;color:var(--text3);margin-right:4px;">v3.3</div>
+        <div style="font-size:11px;color:var(--text3);margin-right:4px;">v3.4</div>
         <div class="topbar-user" id="topbarUser" title="Sign out" style="cursor:pointer;">RE</div>
       </div>
     </div>
@@ -3572,7 +3572,7 @@ function initCalendar(){
   renderCalendar();
 
   // Fetch Google Calendar events in background
-  fetchGCalEvents();
+  fetchGCalEvents().catch(function(e){ console.log('GCal fetch error:', e); });
 }
 
 async function fetchGCalEvents(){
@@ -3598,6 +3598,7 @@ async function fetchGCalEvents(){
 
   CAL.gcalLoading = true;
   var allEvents = [];
+  var gcalErrors = [];
 
   // Fetch from each connected account
   await Promise.all(connected.map(async function(mid){
@@ -3609,18 +3610,35 @@ async function fetchGCalEvents(){
       });
       var text = await resp.text();
       var data;
-      try{ data = JSON.parse(text); }catch(e){ return; }
-      if(data.error){ console.log('GCal fetch error:', data.error); return; }
+      try{ data = JSON.parse(text); }catch(e){
+        gcalErrors.push('Parse error ('+mid+'): '+text.substring(0,100));
+        return;
+      }
+      if(data.error){
+        gcalErrors.push('API error ('+mid+'): '+data.error);
+        return;
+      }
       if(data.events){
         data.events.forEach(function(ev){
           ev.memberId = mid;
           ev.fromGCal = true;
-          ev.gcalMemberEmail = gmailState.connectedAccounts[mid] ? gmailState.connectedAccounts[mid].email : '';
+          ev.gcalMemberEmail = gmailState.connectedAccounts[String(mid)] ? gmailState.connectedAccounts[String(mid)].email : '';
           allEvents.push(ev);
         });
       }
-    }catch(e){ console.log('GCal fetch error:', e.message); }
+    }catch(e){ gcalErrors.push('Fetch error ('+mid+'): '+e.message); }
   }));
+
+  if(gcalErrors.length){
+    console.log('GCal errors:', gcalErrors);
+    // Show error in refresh button
+    var refreshBtn = ge('btnRefreshGCal');
+    if(refreshBtn){
+      refreshBtn.textContent = 'GCal Error - click for details';
+      refreshBtn.style.color = 'var(--danger)';
+      refreshBtn.title = gcalErrors.join(' | ');
+    }
+  }
 
   CAL.gcalEvents = allEvents;
   CAL.gcalLastFetch = Date.now();
