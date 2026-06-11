@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-  <meta name="version" content="3.4">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="version" content="3.5">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>Properly CRM</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -220,6 +220,51 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .gmail-template-btn{background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:3px 9px;font-size:16px;color:var(--text2);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all 0.15s;}
 .gmail-template-btn:hover{border-color:var(--accent);color:var(--accent);}
 .gmail-empty{display:flex;align-items:center;justify-content:center;flex:1;flex-direction:column;gap:12px;color:var(--text3);}
+/* MOBILE RESPONSIVE - Gmail & Calendar */
+@media (max-width: 768px) {
+  /* Gmail - stack vertically on mobile */
+  .gmail-layout{grid-template-columns:1fr;height:auto;}
+  .gmail-sidebar{height:auto;max-height:40vh;border-right:none;border-bottom:1px solid var(--border);}
+  .gmail-thread{min-height:50vh;}
+  .gmail-msg-list{max-height:calc(40vh - 50px);}
+
+  /* Hide sidebar when thread is open on mobile */
+  .gmail-layout.thread-open .gmail-sidebar{display:none;}
+  .gmail-layout.thread-open .gmail-thread{min-height:80vh;}
+
+  /* Calendar - make toolbar wrap */
+  .cal-toolbar{flex-wrap:wrap;gap:6px;padding:8px;}
+  .cal-title{font-size:18px;min-width:150px;}
+  .cal-wrap{height:auto;min-height:80vh;}
+  .cal-cell{min-height:60px;padding:2px;}
+  .cal-day-num{font-size:12px;width:20px;height:20px;}
+  .cal-event{font-size:11px;padding:1px 4px;}
+  .cal-grid{font-size:11px;}
+  .cal-dow{padding:4px 2px;font-size:11px;}
+
+  /* Week view on mobile - horizontal scroll */
+  .cal-week-grid{overflow-x:auto;display:block;}
+
+  /* Agenda view works well on mobile already */
+
+  /* Main layout - reduce sidebar on mobile */
+  .aside{width:180px;}
+  .ni{font-size:12px;padding:7px 8px;}
+
+  /* Modals - full screen on mobile */
+  .modal{max-width:100% !important;margin:10px;max-height:90vh;overflow-y:auto;}
+
+  /* Det panels - full screen on mobile */
+  .det-panel,.tc-det-panel,.mls-detail-panel{max-width:100% !important;width:100% !important;}
+}
+@media (max-width: 480px) {
+  .aside{width:160px;}
+  .main{padding:10px;}
+  .gmail-sidebar-hdr{flex-wrap:wrap;gap:6px;}
+  .cal-toolbar{gap:4px;}
+  .cal-view-btn{padding:4px 8px;font-size:12px;}
+  .gmail-layout{border-radius:0;}
+}
 /* CALENDAR */
 .cal-wrap{display:flex;flex-direction:column;height:calc(100vh - 130px);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
 .cal-toolbar{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--border);flex-shrink:0;flex-wrap:wrap;}
@@ -412,7 +457,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
       <div class="topbar-right">
         <input class="sbox" type="text" placeholder="Search..." id="searchBox">
         <button class="btn btn-p" id="btnAdd">+ Add</button>
-        <div style="font-size:11px;color:var(--text3);margin-right:4px;">v3.4</div>
+        <div style="font-size:11px;color:var(--text3);margin-right:4px;">v3.5</div>
         <div class="topbar-user" id="topbarUser" title="Sign out" style="cursor:pointer;">RE</div>
       </div>
     </div>
@@ -3884,7 +3929,7 @@ function renderMonthView(days){
 
     // Add events
     var evs = getEventsForDate(dateStr);
-    var maxShow = 3;
+    var maxShow = window.innerWidth <= 768 ? 1 : 3;
     evs.slice(0, maxShow).forEach(function(ev){
       var evEl = document.createElement('div');
       evEl.className = 'cal-event ' + ev.type;
@@ -4936,6 +4981,21 @@ async function loadThread(threadId, messageId){
 function renderThread(messages, threadId){
   var thread = ge('gmailThread');
   thread.innerHTML = '';
+
+  // On mobile - hide sidebar and show thread
+  var layout = ge('gmailLayout');
+  if(layout && window.innerWidth <= 768){
+    layout.classList.add('thread-open');
+    // Add back button at top
+    var backBtn = document.createElement('button');
+    backBtn.style.cssText = 'display:flex;align-items:center;gap:6px;background:none;border:none;color:var(--accent);cursor:pointer;font-size:15px;font-family:DM Sans,sans-serif;padding:12px 16px;border-bottom:1px solid var(--border);width:100%;';
+    backBtn.innerHTML = '&#8592; Back to Inbox';
+    backBtn.addEventListener('click', function(){
+      layout.classList.remove('thread-open');
+      thread.innerHTML = '<div class="gmail-empty" id="gmailEmptyState"><svg width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg><div>Select an email to read</div></div>';
+    });
+    thread.appendChild(backBtn);
+  }
 
   if(!messages.length){ thread.innerHTML='<div class="gmail-empty">Empty thread.</div>'; return; }
 
