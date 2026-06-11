@@ -616,7 +616,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
           <button class="filter-btn" data-filter="title">Title</button>
           <button class="filter-btn" data-filter="vendor">Vendors</button>
           <button class="filter-btn" data-filter="other">Other</button>
-          <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;">
+          <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+            <span style="font-size:13px;color:var(--text3);">Sort:</span>
+            <button class="filter-btn active" id="sortByLast" style="padding:4px 10px;font-size:13px;">Last</button>
+            <button class="filter-btn" id="sortByFirst" style="padding:4px 10px;font-size:13px;">First</button>
             <button class="btn btn-g" id="btnImportCSV">&#8593; Import CSV</button>
             <button class="btn btn-g" id="btnExportCSV">&#8595; Export CSV</button>
             <button class="btn btn-p" id="btnContactAdd">+ Add Contact</button>
@@ -1258,11 +1261,12 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
     <div class="mhdr"><div class="mtitle">Add Contact</div><button class="mx" data-close="addModal">&#x2715;</button></div>
     <div class="mbody">
       <div class="frow"><div class="fg"><label class="fl">First Name</label><input class="fi" id="fFirst" placeholder="Sarah"></div><div class="fg"><label class="fl">Last Name</label><input class="fi" id="fLast" placeholder="Johnson"></div></div>
-      <div class="fg"><label class="fl">Type</label><select class="fsel" id="fType"><option value="prospect">Prospect</option><option value="buyer">Buyer</option><option value="seller">Seller</option><option value="agent">Agent/Broker</option><option value="lender">Loan Officer/Lender</option><option value="title">Title Company</option><option value="vendor">Vendor</option><option value="other">Other</option></select></div>
+      <div class="fg"><label class="fl">Type <span style="color:var(--text3);font-weight:400;">(optional)</span></label><select class="fsel" id="fType"><option value="">-- No type --</option><option value="prospect">Prospect</option><option value="buyer">Buyer</option><option value="seller">Seller</option><option value="agent">Agent/Broker</option><option value="lender">Loan Officer/Lender</option><option value="title">Title Company</option><option value="vendor">Vendor</option><option value="other">Other</option></select></div>
       <div class="fg"><label class="fl">Phone</label><input class="fi" id="fPhone" type="tel" placeholder="(555) 000-0000"></div>
       <div class="fg"><label class="fl">Email</label><input class="fi" id="fEmail" type="email" placeholder="sarah@email.com"></div>
       <div class="fg"><label class="fl">Property / Interest</label><input class="fi" id="fProp" placeholder="123 Oak St or Budget $400k-$500k"></div>
-      <div class="frow"><div class="fg"><label class="fl">Stage</label><select class="fsel" id="fStage"><option>New Lead</option><option>Contacted</option><option>Showing</option><option>Under Contract</option><option>Closed</option></select></div><div class="fg"><label class="fl">Price/Budget</label><input class="fi" id="fPrice" placeholder="$450,000"></div></div>
+      <div class="frow"><div class="fg"><label class="fl">Stage <span style="color:var(--text3);font-weight:400;">(optional)</span></label><select class="fsel" id="fStage"><option value="">-- No stage --</option><option>New Lead</option><option>Contacted</option><option>Showing</option><option>Under Contract</option><option>Closed</option></select></div><div class="fg"><label class="fl">Price/Budget</label><input class="fi" id="fPrice" placeholder="$450,000"></div></div>
+      <div class="fg"><label class="fl">Closing Date <span style="color:var(--text3);font-weight:400;">(optional)</span></label><input class="fi" id="fCloseDate" type="date"></div>
       <div class="fg"><label class="fl">Notes</label><textarea class="fi" id="fNotes" rows="3" placeholder="Source, preferences..."></textarea></div>
     </div>
     <div class="mftr"><button class="btn btn-g" data-close="addModal">Cancel</button><button class="btn btn-p" id="btnSaveContact">Save Contact</button></div>
@@ -1390,6 +1394,7 @@ async function getAuthHeaders(extra) {
 
 var C=[],N=[],F=[],D=[],TX=[],TM=[],curDet=null,curFilter='all',curPage='dashboard';
 var CAMP=[],ENR=[],SENDLOG=[];
+var curSort='last'; // 'last' or 'first'
 // TM = Team Members: [{id, first, last, role, email, phone, color, calLink}]
 
 // -- SAVE / LOAD -------------------------------------------------------
@@ -1809,25 +1814,29 @@ function rc(){
     : C.slice();
   var q=ge('searchBox').value.toLowerCase();
   if(q) list=list.filter(function(c){return fn(c).toLowerCase().indexOf(q)>=0||(c.email||'').toLowerCase().indexOf(q)>=0||(c.phone||'').indexOf(q)>=0;});
-  // sort alphabetically by last name then first
+  // sort
   list.sort(function(a,b){
-    var la=(a.last||'').toLowerCase(), lb=(b.last||'').toLowerCase();
-    if(la!==lb) return la<lb?-1:1;
-    return (a.first||'').toLowerCase()<(b.first||'').toLowerCase()?-1:1;
+    var ka = curSort==='first'
+      ? (a.first||'').toLowerCase() + (a.last||'').toLowerCase()
+      : (a.last||'').toLowerCase() + (a.first||'').toLowerCase();
+    var kb = curSort==='first'
+      ? (b.first||'').toLowerCase() + (b.last||'').toLowerCase()
+      : (b.last||'').toLowerCase() + (b.first||'').toLowerCase();
+    return ka<kb?-1:ka>kb?1:0;
   });
   var grid=ge('cGrid');grid.innerHTML='';
   if(!list.length){
-    var empty=mkDiv('padding:24px;text-align:center;color:var(--text3);font-size:16px;','No contacts found.');
-    grid.appendChild(empty); return;
+    grid.appendChild(mkDiv('padding:24px;text-align:center;color:var(--text3);font-size:16px;','No contacts found.'));
+    return;
   }
-  // letter dividers
+  // letter dividers based on sort key
   var lastLetter='';
   list.forEach(function(c){
-    var letter=(c.last||c.first||'#').charAt(0).toUpperCase();
+    var divKey = curSort==='first' ? (c.first||c.last||'#') : (c.last||c.first||'#');
+    var letter = divKey.charAt(0).toUpperCase();
     if(letter!==lastLetter){
       lastLetter=letter;
-      var div=mkDiv('padding:8px 18px 4px;font-size:12px;font-weight:700;letter-spacing:2px;color:var(--text3);border-bottom:1px solid var(--border);background:var(--surface2);',letter);
-      grid.appendChild(div);
+      grid.appendChild(mkDiv('padding:8px 18px 4px;font-size:12px;font-weight:700;letter-spacing:2px;color:var(--text3);border-bottom:1px solid var(--border);background:var(--surface2);',letter));
     }
     var row=document.createElement('div');
     row.style.cssText='display:flex;align-items:center;gap:12px;padding:11px 18px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.12s;';
@@ -1835,27 +1844,21 @@ function rc(){
     row.addEventListener('mouseleave',function(){this.style.background='';});
     (function(id){row.addEventListener('click',function(){vc(id);});})(c.id);
 
-    // avatar
-    var av=document.createElement('div');
-    var displayType=c.type==='lead'?'prospect':c.type;
-    av.className='av av-'+displayType;
-    av.style.cssText='width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0;';
-    av.textContent=ini(c);
-    row.appendChild(av);
-
-    // name + type badge
+    // name + badges
     var info=mkDiv('flex:1;min-width:0;');
-    info.appendChild(mkDiv('font-size:16px;font-weight:600;color:var(--text);',fn(c)));
-    var sub=mkDiv('display:flex;align-items:center;gap:8px;margin-top:2px;');
-    var tg=document.createElement('span');
-    tg.className='tag tag-'+displayType;
-    tg.style.cssText='font-size:12px;padding:1px 7px;';
-    tg.textContent=displayType;
-    sub.appendChild(tg);
-    if(c.stage && (c.type==='buyer'||c.type==='seller'||c.type==='prospect'||c.type==='lead')){
-      var stg=mkDiv('font-size:13px;color:var(--text3);',c.stage);
-      sub.appendChild(stg);
+    var displayName = curSort==='first' ? fn(c) : ((c.last||'') + (c.first ? ', '+c.first : ''));
+    info.appendChild(mkDiv('font-size:16px;font-weight:600;color:var(--text);', displayName));
+    var sub=mkDiv('display:flex;align-items:center;gap:8px;margin-top:2px;flex-wrap:wrap;');
+    var displayType=c.type==='lead'?'prospect':c.type;
+    if(displayType){
+      var tg=document.createElement('span');
+      tg.className='tag tag-'+displayType;
+      tg.style.cssText='font-size:12px;padding:1px 7px;';
+      tg.textContent=displayType;
+      sub.appendChild(tg);
     }
+    if(c.stage) sub.appendChild(mkDiv('font-size:13px;color:var(--text3);', c.stage));
+    if(c.closeDate) sub.appendChild(mkDiv('font-size:13px;color:var(--accent);', 'Closed '+fd(c.closeDate)));
     info.appendChild(sub);
     row.appendChild(info);
 
@@ -1864,7 +1867,6 @@ function rc(){
     if(c.phone) dets.appendChild(mkDiv('font-size:13px;color:var(--text2);',c.phone));
     if(c.email) dets.appendChild(mkDiv('font-size:13px;color:var(--text3);',c.email));
     row.appendChild(dets);
-
     grid.appendChild(row);
   });
 }
@@ -1892,6 +1894,7 @@ function vc(id){
   if(c.property)isec.appendChild(mkfld('Property',c.property,null,''));
   if(c.price)isec.appendChild(mkfld('Price',c.price,null,'color:var(--accent);font-family:monospace;'));
   if(c.notes)isec.appendChild(mkfld('Notes',c.notes,null,''));
+  if(c.closeDate)isec.appendChild(mkfld('Closing Date',fd(c.closeDate),null,'color:var(--accent);'));
   body.appendChild(isec);
   var tsec=mksec('Type');var tr=mkRow('stage-row');tr.style.flexWrap='wrap';
   [['prospect','Prospect'],['buyer','Buyer'],['seller','Seller'],['agent','Agent'],['lender','Lender'],['title','Title'],['vendor','Vendor'],['other','Other']].forEach(function(pair){
@@ -2297,13 +2300,14 @@ function openEditContact(id){
   ge('btnSaveContact') && ge('btnSaveContact').setAttribute('data-edit-id', id);
   ge('fFirst').value = c.first||'';
   ge('fLast').value = c.last||'';
-  ge('fType').value = c.type||'prospect';
+  ge('fType').value = c.type||'';
   ge('fPhone').value = c.phone||'';
   ge('fEmail').value = c.email||'';
   ge('fProp').value = c.property||'';
-  ge('fStage').value = c.stage||'New Lead';
+  ge('fStage').value = c.stage||'';
   ge('fPrice').value = c.price||'';
   ge('fNotes').value = c.notes||'';
+  ge('fCloseDate').value = c.closeDate||'';
   cd(); // close detail panel
   ge('addModal').classList.add('open');
 }
@@ -2321,6 +2325,7 @@ function svc(){
       c.phone=ge('fPhone').value; c.email=ge('fEmail').value;
       c.property=ge('fProp').value; c.stage=ge('fStage').value;
       c.price=ge('fPrice').value; c.notes=ge('fNotes').value;
+      c.closeDate=ge('fCloseDate').value||'';
       updateContact(c);
     }
     ge('btnSaveContact') && ge('btnSaveContact').setAttribute('data-edit-id','');
@@ -2330,11 +2335,13 @@ function svc(){
       phone:ge('fPhone').value,email:ge('fEmail').value,
       property:ge('fProp').value,stage:ge('fStage').value,
       price:ge('fPrice').value,notes:ge('fNotes').value,
+      closeDate:ge('fCloseDate').value||'',
       added:new Date().toISOString()};
     C.push(nc); saveContact(nc);
   }
   cm('addModal');
-  ['fFirst','fLast','fPhone','fEmail','fProp','fPrice','fNotes'].forEach(function(x){ge(x).value='';});
+  ['fFirst','fLast','fPhone','fEmail','fProp','fPrice','fNotes','fCloseDate'].forEach(function(x){ge(x).value='';});
+  ge('fType').value=''; ge('fStage').value='';
   rd(); if(curPage==='contacts')rc(); if(curPage==='pipeline')rp();
 }
 function svn(){
@@ -6591,6 +6598,16 @@ ge('nav-team').addEventListener('click',function(){sp('team');});
 ge('nav-gmail').addEventListener('click',function(){sp('gmail');});
 ge('nav-mls').addEventListener('click',function(){sp('mls');});
 ge('nav-drips').addEventListener('click',function(){sp('drips');});
+ge('sortByLast').addEventListener('click',function(){
+  curSort='last';
+  ge('sortByLast').classList.add('active'); ge('sortByFirst').classList.remove('active');
+  rc();
+});
+ge('sortByFirst').addEventListener('click',function(){
+  curSort='first';
+  ge('sortByFirst').classList.add('active'); ge('sortByLast').classList.remove('active');
+  rc();
+});
 ge('btnSaveToken').addEventListener('click', connectMLSToken);
 ge('btnClearToken').addEventListener('click', disconnectMLS);
 ge('btnMLSSearch').addEventListener('click', searchMLS);
