@@ -109,12 +109,12 @@ export default async function handler(req, res) {
         })
       );
 
-      // Log first message headers for debugging
-      if (msgs[0] && msgs[0].payload && msgs[0].payload.headers) {
-        console.log('First message headers:', JSON.stringify(msgs[0].payload.headers));
-      } else {
-        console.log('First message structure:', JSON.stringify(Object.keys(msgs[0] || {})));
-        console.log('First message payload keys:', JSON.stringify(Object.keys((msgs[0] && msgs[0].payload) || {})));
+      // Log first message for debugging
+      console.log('MSG COUNT:', msgs.length);
+      if (msgs.length > 0) {
+        const m0 = msgs[0];
+        console.log('MSG0 keys:', JSON.stringify(Object.keys(m0 || {})));
+        console.log('MSG0 raw (first 300):', JSON.stringify(m0).substring(0, 300));
       }
 
       const parsed = msgs.filter(m => m && m.id).map(m => {
