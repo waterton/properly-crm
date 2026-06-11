@@ -89,14 +89,21 @@ export default async function handler(req, res) {
 
     if (action === 'inbox') {
       const q = query || 'in:inbox';
+      console.log('Fetching inbox, query:', q);
       const listResp = await fetch(`${gmailBase}/messages?maxResults=20&q=${encodeURIComponent(q)}`, { headers });
-      const listData = await listResp.json();
+      const listRawText = await listResp.text();
+      console.log('List response status:', listResp.status, 'preview:', listRawText.substring(0, 200));
+      let listData;
+      try { listData = JSON.parse(listRawText); } catch(e) {
+        return res.status(500).json({ error: 'Gmail list parse error: ' + listRawText.substring(0, 200) });
+      }
       if (listData.error) return res.status(400).json({ error: listData.error.message });
       if (!listData.messages) return res.status(200).json({ messages: [] });
 
       const msgs = await Promise.all(
         listData.messages.slice(0, 15).map(async (m) => {
-          const msgResp = await fetch(`${gmailBase}/messages/${m.id}?format=metadata&metadataHeaders=From,To,Subject,Date`, { headers });
+          // Use format=metadata without header filter - gets all headers
+          const msgResp = await fetch(`${gmailBase}/messages/${m.id}?format=metadata`, { headers });
           const msgData = await msgResp.json();
           return msgData;
         })
