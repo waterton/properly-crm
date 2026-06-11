@@ -8,7 +8,7 @@
 <style>
 :root{--bg:#0d0f14;--surface:#151820;--surface2:#1c2030;--surface3:#232840;--border:#2a2f45;--accent:#c9a84c;--accent2:#e8c97a;--text:#e8eaf0;--text2:#8b90a8;--text3:#5a5f78;--buyer:#4c8ec9;--seller:#c96b4c;--lead:#6bc97a;--danger:#c94c4c;--warn:#c9a84c;--radius:10px;}
 *{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden;}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden;font-size:16px;}
 ::-webkit-scrollbar{width:5px;}::-webkit-scrollbar-track{background:var(--bg);}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
 .app{display:flex;height:100vh;overflow:hidden;}
 .sidebar{width:220px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;transition:transform 0.3s;z-index:100;}
@@ -17,19 +17,19 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .content{flex:1;overflow-y:auto;padding:20px;}
 .logo{padding:20px 18px 16px;border-bottom:1px solid var(--border);}
 .logo-text{font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:2px;color:var(--accent);}
-.logo-sub{font-size:10px;color:var(--text3);letter-spacing:3px;text-transform:uppercase;}
+.logo-sub{font-size:16px;color:var(--text3);letter-spacing:3px;text-transform:uppercase;}
 .nav{padding:14px 8px;flex:1;}
-.nav-sec{font-size:10px;color:var(--text3);letter-spacing:2px;text-transform:uppercase;padding:8px 10px 5px;margin-top:6px;}
-.ni{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:7px;cursor:pointer;font-size:14px;color:var(--text2);border:none;background:none;width:100%;text-align:left;margin-bottom:2px;transition:all 0.15s;}
+.nav-sec{font-size:16px;color:var(--text3);letter-spacing:2px;text-transform:uppercase;padding:8px 10px 5px;margin-top:6px;}
+.ni{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:7px;cursor:pointer;font-size:16px;color:var(--text2);border:none;background:none;width:100%;text-align:left;margin-bottom:2px;transition:all 0.15s;}
 .ni:hover{background:var(--surface2);color:var(--text);}
 .ni.active{background:var(--surface3);color:var(--accent);}
-.nbadge{margin-left:auto;background:var(--accent);color:var(--bg);font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px;}
+.nbadge{margin-left:auto;background:var(--accent);color:var(--bg);font-size:16px;font-weight:700;padding:1px 6px;border-radius:10px;}
 .topbar-title{font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:1px;}
 .topbar-right{display:flex;align-items:center;gap:10px;}
-.sbox{background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:7px 11px;font-size:13px;color:var(--text);font-family:'DM Sans',sans-serif;width:160px;outline:none;}
+.sbox{background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:7px 11px;font-size:16px;color:var(--text);font-family:'DM Sans',sans-serif;width:160px;outline:none;}
 .sbox:focus{border-color:var(--accent);}
 .sbox::placeholder{color:var(--text3);}
-.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;font-weight:500;cursor:pointer;border:none;transition:all 0.15s;}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:7px;font-size:16px;font-family:'DM Sans',sans-serif;font-weight:500;cursor:pointer;border:none;transition:all 0.15s;}
 .btn-p{background:var(--accent);color:var(--bg);}
 .btn-p:hover{background:var(--accent2);}
 .btn-g{background:var(--surface2);color:var(--text2);border:1px solid var(--border);text-decoration:none;}
@@ -44,19 +44,19 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .sc-s::before{background:var(--seller);}
 .sc-l::before{background:var(--lead);}
 .sc-d::before{background:var(--accent);}
-.slbl{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px;}
+.slbl{font-size:16px;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px;}
 .sval{font-family:'Bebas Neue',sans-serif;font-size:36px;line-height:1;}
-.ssub{font-size:11px;color:var(--text3);margin-top:3px;}
+.ssub{font-size:16px;color:var(--text3);margin-top:3px;}
 .col2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;}
 .col3{display:grid;grid-template-columns:2fr 1fr;gap:14px;margin-bottom:14px;}
 .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
 .card-hdr{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
-.card-title{font-size:13px;font-weight:600;}
-.tag{display:inline-flex;align-items:center;font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;text-transform:uppercase;}
+.card-title{font-size:16px;font-weight:600;}
+.tag{display:inline-flex;align-items:center;font-size:16px;font-weight:700;padding:2px 7px;border-radius:4px;text-transform:uppercase;}
 .tag-buyer{background:rgba(76,142,201,0.15);color:var(--buyer);}
 .tag-seller{background:rgba(201,107,76,0.15);color:var(--seller);}
 .tag-lead{background:rgba(107,201,122,0.15);color:var(--lead);}
-.badge{font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;display:inline-block;}
+.badge{font-size:16px;font-weight:700;padding:2px 7px;border-radius:4px;display:inline-block;}
 .b-hot{background:rgba(201,76,76,0.2);color:var(--danger);}
 .b-warn{background:rgba(201,168,76,0.2);color:var(--warn);}
 .b-ok{background:rgba(107,201,122,0.15);color:var(--lead);}
@@ -67,7 +67,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .note-item{padding:13px 18px;border-bottom:1px solid var(--border);}
 .note-item:last-child{border-bottom:none;}
 .note-hdr{display:flex;align-items:center;gap:8px;margin-bottom:5px;flex-wrap:wrap;}
-.note-text{font-size:13px;color:var(--text2);line-height:1.5;}
+.note-text{font-size:16px;color:var(--text2);line-height:1.5;}
 .li{display:flex;align-items:center;gap:12px;padding:12px 18px;border-bottom:1px solid var(--border);}
 .li:last-child{border-bottom:none;}
 .fu-row{display:flex;align-items:flex-start;gap:12px;padding:12px 18px;border-bottom:1px solid var(--border);}
@@ -83,7 +83,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .cgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:12px;}
 .cc{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;cursor:pointer;transition:all 0.15s;}
 .cc:hover{border-color:var(--accent);transform:translateY(-2px);}
-.av{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;}
+.av{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;flex-shrink:0;}
 .av-buyer{background:rgba(76,142,201,0.2);color:var(--buyer);}
 .av-seller{background:rgba(201,107,76,0.2);color:var(--seller);}
 .av-lead{background:rgba(107,201,122,0.2);color:var(--lead);}
@@ -95,24 +95,24 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .mx{background:none;border:none;color:var(--text3);cursor:pointer;font-size:22px;line-height:1;}
 .mbody{padding:20px 22px;}
 .fg{margin-bottom:14px;}
-.fl{font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);margin-bottom:5px;display:block;}
-.fi{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:9px 11px;font-size:14px;color:var(--text);font-family:'DM Sans',sans-serif;outline:none;}
+.fl{font-size:16px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);margin-bottom:5px;display:block;}
+.fi{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:9px 11px;font-size:16px;color:var(--text);font-family:'DM Sans',sans-serif;outline:none;}
 .fi:focus{border-color:var(--accent);}
-.fsel{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:9px 11px;font-size:14px;color:var(--text);font-family:'DM Sans',sans-serif;outline:none;cursor:pointer;}
+.fsel{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:9px 11px;font-size:16px;color:var(--text);font-family:'DM Sans',sans-serif;outline:none;cursor:pointer;}
 .frow{display:grid;grid-template-columns:1fr 1fr;gap:11px;}
 .mftr{padding:14px 22px;border-top:1px solid var(--border);display:flex;gap:9px;justify-content:flex-end;}
 .sb-ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:99;}
 .sb-ov.open{display:block;}
-.empty{text-align:center;padding:36px 20px;color:var(--text3);font-size:14px;}
-.filter-btn{padding:5px 13px;border-radius:20px;font-size:12px;font-weight:500;cursor:pointer;border:1px solid var(--border);background:var(--surface2);color:var(--text2);transition:all 0.15s;font-family:'DM Sans',sans-serif;}
+.empty{text-align:center;padding:36px 20px;color:var(--text3);font-size:16px;}
+.filter-btn{padding:5px 13px;border-radius:20px;font-size:16px;font-weight:500;cursor:pointer;border:1px solid var(--border);background:var(--surface2);color:var(--text2);transition:all 0.15s;font-family:'DM Sans',sans-serif;}
 .filter-btn.active,.filter-btn:hover{border-color:var(--accent);color:var(--accent);background:rgba(201,168,76,0.08);}
-.topbar-user{width:30px;height:30px;border-radius:50%;background:var(--accent);color:var(--bg);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;}
+.topbar-user{width:30px;height:30px;border-radius:50%;background:var(--accent);color:var(--bg);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;}
 /* TRANSACTION COORDINATOR */
 .tc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px;}
 .tc-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;cursor:pointer;transition:all 0.15s;}
 .tc-card:hover{border-color:var(--accent);transform:translateY(-2px);}
 .tc-card-header{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
-.tc-card-title{font-size:14px;font-weight:600;color:var(--text);}
+.tc-card-title{font-size:16px;font-weight:600;color:var(--text);}
 .tc-card-body{padding:12px 16px;}
 .tc-progress-bar{height:4px;background:var(--surface2);border-radius:2px;margin:8px 0;}
 .tc-progress-fill{height:4px;border-radius:2px;background:var(--accent);transition:width 0.3s;}
@@ -123,46 +123,46 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .tc-step-chk.done{background:var(--accent);border-color:var(--accent);}
 .tc-step-chk.urgent{border-color:var(--danger);}
 .tc-step-info{flex:1;}
-.tc-step-label{font-size:13px;color:var(--text);}
+.tc-step-label{font-size:16px;color:var(--text);}
 .tc-step-label.done{text-decoration:line-through;color:var(--text3);}
-.tc-step-due{font-size:11px;color:var(--text3);margin-top:2px;}
+.tc-step-due{font-size:16px;color:var(--text3);margin-top:2px;}
 .tc-step-due.overdue{color:var(--danger);}
 .tc-step-due.soon{color:var(--warn);}
-.tc-type-badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;text-transform:uppercase;}
+.tc-type-badge{font-size:16px;font-weight:700;padding:2px 8px;border-radius:4px;text-transform:uppercase;}
 .tc-buyer{background:rgba(76,142,201,0.15);color:var(--buyer);}
 .tc-seller{background:rgba(201,107,76,0.15);color:var(--seller);}
 .tc-det-ov{position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:550;display:none;backdrop-filter:blur(3px);}
 .tc-det-ov.open{display:flex;align-items:flex-start;justify-content:flex-end;}
 .tc-det-panel{background:var(--surface);width:100%;max-width:540px;height:100vh;overflow-y:auto;box-shadow:-6px 0 30px rgba(0,0,0,0.5);display:flex;flex-direction:column;}
 .tc-det-hdr{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;position:sticky;top:0;background:var(--surface);z-index:10;}
-.tc-phase-header{padding:10px 16px;background:var(--surface2);border-bottom:1px solid var(--border);font-size:10px;text-transform:uppercase;letter-spacing:2px;color:var(--text3);font-weight:700;}
+.tc-phase-header{padding:10px 16px;background:var(--surface2);border-bottom:1px solid var(--border);font-size:16px;text-transform:uppercase;letter-spacing:2px;color:var(--text3);font-weight:700;}
 .tc-ai-box{background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:14px 16px;margin:14px 20px;}
 .tc-ai-input{display:flex;gap:8px;margin-bottom:10px;}
-.tc-ai-input input{flex:1;background:var(--surface);border:1px solid var(--border);border-radius:7px;padding:8px 11px;font-size:13px;color:var(--text);font-family:'DM Sans',sans-serif;outline:none;}
+.tc-ai-input input{flex:1;background:var(--surface);border:1px solid var(--border);border-radius:7px;padding:8px 11px;font-size:16px;color:var(--text);font-family:'DM Sans',sans-serif;outline:none;}
 .tc-ai-input input:focus{border-color:var(--accent);}
-.tc-ai-response{font-size:13px;color:var(--text2);line-height:1.6;white-space:pre-wrap;}
+.tc-ai-response{font-size:16px;color:var(--text2);line-height:1.6;white-space:pre-wrap;}
 /* DOCUMENT SCANNER */
 .scanner-drop{border:2px dashed var(--border);border-radius:12px;padding:36px 20px;text-align:center;cursor:pointer;transition:all 0.2s;background:var(--surface2);}
 .scanner-drop:hover,.scanner-drop.dragover{border-color:var(--accent);background:rgba(201,168,76,0.05);}
 .scanner-drop-icon{font-size:48px;margin-bottom:12px;color:var(--text3);}
-.scanner-drop-title{font-size:15px;font-weight:600;color:var(--text);margin-bottom:6px;}
-.scanner-drop-sub{font-size:12px;color:var(--text3);}
+.scanner-drop-title{font-size:16px;font-weight:600;color:var(--text);margin-bottom:6px;}
+.scanner-drop-sub{font-size:16px;color:var(--text3);}
 .scanner-result{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;margin-top:18px;}
 .scanner-result-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid var(--border);}
 .scanner-result-title{font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:1px;color:var(--accent);}
-.scanner-doc-type{font-size:11px;font-weight:700;padding:3px 10px;border-radius:4px;text-transform:uppercase;background:rgba(76,142,201,0.15);color:var(--buyer);}
-.scanner-summary{background:var(--surface2);border-left:3px solid var(--accent);border-radius:0 8px 8px 0;padding:14px 16px;margin-bottom:16px;font-size:13px;color:var(--text2);line-height:1.7;}
+.scanner-doc-type{font-size:16px;font-weight:700;padding:3px 10px;border-radius:4px;text-transform:uppercase;background:rgba(76,142,201,0.15);color:var(--buyer);}
+.scanner-summary{background:var(--surface2);border-left:3px solid var(--accent);border-radius:0 8px 8px 0;padding:14px 16px;margin-bottom:16px;font-size:16px;color:var(--text2);line-height:1.7;}
 .scanner-fields{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;}
 .scanner-field{background:var(--surface2);border-radius:8px;padding:10px 12px;}
-.scanner-field-label{font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);margin-bottom:4px;}
-.scanner-field-val{font-size:13px;color:var(--text);font-weight:500;}
+.scanner-field-label{font-size:16px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);margin-bottom:4px;}
+.scanner-field-val{font-size:16px;color:var(--text);font-weight:500;}
 .scanner-field-val.editable{background:var(--surface);border:1px solid var(--border);border-radius:5px;padding:4px 8px;width:100%;font-family:'DM Sans',sans-serif;color:var(--text);outline:none;}
 .scanner-field-val.editable:focus{border-color:var(--accent);}
 .scanner-deadlines{margin-bottom:16px;}
 .scanner-deadline-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);}
 .scanner-deadline-row:last-child{border-bottom:none;}
 .scanner-flags{background:rgba(201,76,76,0.08);border:1px solid rgba(201,76,76,0.2);border-radius:8px;padding:12px 14px;margin-bottom:16px;}
-.scanner-flag{display:flex;align-items:flex-start;gap:8px;padding:4px 0;font-size:13px;color:var(--text2);}
+.scanner-flag{display:flex;align-items:flex-start;gap:8px;padding:4px 0;font-size:16px;color:var(--text2);}
 .scanner-actions{display:flex;gap:10px;flex-wrap:wrap;padding-top:14px;border-top:1px solid var(--border);}
 .scanner-processing{text-align:center;padding:40px 20px;}
 .scanner-spinner{width:40px;height:40px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 16px;}
@@ -170,22 +170,22 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .scanner-history-item{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--border);cursor:pointer;}
 .scanner-history-item:last-child{border-bottom:none;}
 .scanner-history-item:hover .scanner-history-title{color:var(--accent);}
-.scanner-history-title{font-size:13px;font-weight:600;color:var(--text);}
-.scanner-history-sub{font-size:11px;color:var(--text3);margin-top:2px;}
+.scanner-history-title{font-size:16px;font-weight:600;color:var(--text);}
+.scanner-history-sub{font-size:16px;color:var(--text3);margin-top:2px;}
 /* TEAM */
 .team-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;margin-bottom:24px;}
 .team-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px;transition:all 0.15s;}
 .team-card:hover{border-color:var(--accent);}
 .team-avatar{width:52px;height:52px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:1px;margin-bottom:10px;}
-.team-name{font-size:15px;font-weight:700;color:var(--text);margin-bottom:2px;}
-.team-role{font-size:12px;color:var(--text3);margin-bottom:12px;}
+.team-name{font-size:16px;font-weight:700;color:var(--text);margin-bottom:2px;}
+.team-role{font-size:16px;color:var(--text3);margin-bottom:12px;}
 .team-stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:12px;}
 .team-stat{background:var(--surface2);border-radius:6px;padding:7px;text-align:center;}
 .team-stat-val{font-family:'Bebas Neue',sans-serif;font-size:18px;color:var(--accent);}
 .team-stat-lbl{font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--text3);}
-.team-cal-btn{display:flex;align-items:center;gap:6px;background:rgba(76,142,201,0.1);border:1px solid rgba(76,142,201,0.2);border-radius:6px;padding:6px 10px;font-size:12px;color:var(--buyer);cursor:pointer;text-decoration:none;transition:all 0.15s;width:100%;}
+.team-cal-btn{display:flex;align-items:center;gap:6px;background:rgba(76,142,201,0.1);border:1px solid rgba(76,142,201,0.2);border-radius:6px;padding:6px 10px;font-size:16px;color:var(--buyer);cursor:pointer;text-decoration:none;transition:all 0.15s;width:100%;}
 .team-cal-btn:hover{background:rgba(76,142,201,0.2);}
-.assign-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:700;background:var(--surface2);color:var(--text2);}
+.assign-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:4px;font-size:16px;font-weight:700;background:var(--surface2);color:var(--text2);}
 /* GMAIL */
 .gmail-layout{display:grid;grid-template-columns:300px 1fr;gap:0;height:calc(100vh - 120px);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
 .gmail-sidebar{border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;}
@@ -195,27 +195,27 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .gmail-msg-item:hover{background:var(--surface2);}
 .gmail-msg-item.active{background:rgba(201,168,76,0.08);border-left:3px solid var(--accent);}
 .gmail-msg-item.unread .gmail-msg-subject{font-weight:700;color:var(--text);}
-.gmail-msg-from{font-size:12px;font-weight:600;color:var(--text);margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.gmail-msg-subject{font-size:12px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.gmail-msg-snippet{font-size:11px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;}
-.gmail-msg-date{font-size:10px;color:var(--text3);white-space:nowrap;flex-shrink:0;}
+.gmail-msg-from{font-size:16px;font-weight:600;color:var(--text);margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.gmail-msg-subject{font-size:16px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.gmail-msg-snippet{font-size:16px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;}
+.gmail-msg-date{font-size:16px;color:var(--text3);white-space:nowrap;flex-shrink:0;}
 .gmail-thread{flex:1;overflow-y:auto;display:flex;flex-direction:column;}
 .gmail-thread-hdr{padding:16px 20px;border-bottom:1px solid var(--border);flex-shrink:0;}
 .gmail-thread-subject{font-size:16px;font-weight:700;color:var(--text);margin-bottom:6px;}
-.gmail-thread-meta{font-size:12px;color:var(--text3);}
+.gmail-thread-meta{font-size:16px;color:var(--text3);}
 .gmail-message{padding:16px 20px;border-bottom:1px solid var(--border);}
 .gmail-message-hdr{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;}
-.gmail-message-from{font-size:13px;font-weight:600;color:var(--text);}
-.gmail-message-to{font-size:11px;color:var(--text3);}
-.gmail-message-date{font-size:11px;color:var(--text3);white-space:nowrap;}
-.gmail-message-body{font-size:13px;color:var(--text2);line-height:1.7;white-space:pre-wrap;word-break:break-word;}
-.gmail-attachment{display:inline-flex;align-items:center;gap:6px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:5px 10px;margin:4px 4px 0 0;font-size:12px;color:var(--text2);cursor:pointer;transition:all 0.15s;}
+.gmail-message-from{font-size:16px;font-weight:600;color:var(--text);}
+.gmail-message-to{font-size:16px;color:var(--text3);}
+.gmail-message-date{font-size:16px;color:var(--text3);white-space:nowrap;}
+.gmail-message-body{font-size:16px;color:var(--text2);line-height:1.7;white-space:pre-wrap;word-break:break-word;}
+.gmail-attachment{display:inline-flex;align-items:center;gap:6px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:5px 10px;margin:4px 4px 0 0;font-size:16px;color:var(--text2);cursor:pointer;transition:all 0.15s;}
 .gmail-attachment:hover{border-color:var(--accent);color:var(--accent);}
 .gmail-compose{flex-shrink:0;border-top:1px solid var(--border);background:var(--surface);}
-.gmail-compose-hdr{padding:10px 16px;border-bottom:1px solid var(--border);font-size:13px;font-weight:600;color:var(--text);display:flex;align-items:center;justify-content:space-between;}
+.gmail-compose-hdr{padding:10px 16px;border-bottom:1px solid var(--border);font-size:16px;font-weight:600;color:var(--text);display:flex;align-items:center;justify-content:space-between;}
 .gmail-compose-body{padding:12px 16px;}
 .gmail-template-bar{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;}
-.gmail-template-btn{background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:3px 9px;font-size:11px;color:var(--text2);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all 0.15s;}
+.gmail-template-btn{background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:3px 9px;font-size:16px;color:var(--text2);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all 0.15s;}
 .gmail-template-btn:hover{border-color:var(--accent);color:var(--accent);}
 .gmail-empty{display:flex;align-items:center;justify-content:center;flex:1;flex-direction:column;gap:12px;color:var(--text3);}
 .fab{position:fixed;bottom:24px;right:24px;width:52px;height:52px;border-radius:50%;background:var(--accent);border:none;cursor:pointer;font-size:26px;color:var(--bg);font-weight:700;box-shadow:0 4px 20px rgba(201,168,76,0.5);z-index:200;}
@@ -223,22 +223,22 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .mls-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;}
 .mls-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;cursor:pointer;transition:all 0.15s;}
 .mls-card:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 4px 20px rgba(0,0,0,0.3);}
-.mls-photo{width:100%;height:170px;object-fit:cover;background:var(--surface2);display:flex;align-items:center;justify-content:center;color:var(--text3);font-size:13px;}
+.mls-photo{width:100%;height:170px;object-fit:cover;background:var(--surface2);display:flex;align-items:center;justify-content:center;color:var(--text3);font-size:16px;}
 .mls-photo img{width:100%;height:170px;object-fit:cover;}
 .mls-card-body{padding:13px 14px;}
 .mls-price{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:0.5px;color:var(--accent);}
-.mls-addr{font-size:13px;font-weight:600;color:var(--text);margin:2px 0;}
-.mls-sub{font-size:11px;color:var(--text3);margin-bottom:8px;}
-.mls-stats{display:flex;gap:12px;font-size:12px;color:var(--text2);}
+.mls-addr{font-size:16px;font-weight:600;color:var(--text);margin:2px 0;}
+.mls-sub{font-size:16px;color:var(--text3);margin-bottom:8px;}
+.mls-stats{display:flex;gap:12px;font-size:16px;color:var(--text2);}
 .mls-stat{display:flex;align-items:center;gap:4px;}
-.mls-dom{font-size:10px;font-family:'DM Mono',monospace;padding:2px 6px;border-radius:4px;margin-left:auto;}
+.mls-dom{font-size:16px;font-family:'DM Mono',monospace;padding:2px 6px;border-radius:4px;margin-left:auto;}
 .dom-new{background:rgba(107,201,122,0.15);color:var(--lead);}
 .dom-mid{background:rgba(201,168,76,0.15);color:var(--warn);}
 .dom-old{background:rgba(201,76,76,0.15);color:var(--danger);}
 .mls-card-footer{padding:10px 14px;border-top:1px solid var(--border);display:flex;gap:7px;}
 .mls-list-item{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:13px 16px;margin-bottom:9px;cursor:pointer;display:flex;gap:14px;align-items:center;transition:all 0.15s;}
 .mls-list-item:hover{border-color:var(--accent);}
-.mls-list-thumb{width:80px;height:60px;border-radius:6px;object-fit:cover;background:var(--surface2);flex-shrink:0;display:flex;align-items:center;justify-content:center;color:var(--text3);font-size:11px;}
+.mls-list-thumb{width:80px;height:60px;border-radius:6px;object-fit:cover;background:var(--surface2);flex-shrink:0;display:flex;align-items:center;justify-content:center;color:var(--text3);font-size:16px;}
 .mls-list-thumb img{width:80px;height:60px;border-radius:6px;object-fit:cover;}
 .mls-detail-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:600;display:none;backdrop-filter:blur(4px);}
 .mls-detail-overlay.open{display:flex;align-items:flex-start;justify-content:flex-end;}
@@ -248,65 +248,65 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .mls-det-body{padding:20px;}
 .mls-det-price{font-family:'Bebas Neue',sans-serif;font-size:32px;color:var(--accent);letter-spacing:1px;}
 .mls-det-addr{font-size:16px;font-weight:600;color:var(--text);margin:4px 0 2px;}
-.mls-det-sub{font-size:13px;color:var(--text3);margin-bottom:16px;}
+.mls-det-sub{font-size:16px;color:var(--text3);margin-bottom:16px;}
 .mls-det-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px;}
 .mls-det-stat{background:var(--surface2);border-radius:8px;padding:10px;text-align:center;}
 .mls-det-stat-val{font-family:'Bebas Neue',sans-serif;font-size:22px;color:var(--text);}
-.mls-det-stat-lbl{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;}
+.mls-det-stat-lbl{font-size:16px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;}
 .mls-det-section{margin-bottom:16px;}
-.mls-det-sec-title{font-size:10px;text-transform:uppercase;letter-spacing:2px;color:var(--text3);margin-bottom:8px;}
+.mls-det-sec-title{font-size:16px;text-transform:uppercase;letter-spacing:2px;color:var(--text3);margin-bottom:8px;}
 .mls-det-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
-.mls-det-field{font-size:12px;color:var(--text2);}
+.mls-det-field{font-size:16px;color:var(--text2);}
 .mls-det-field b{color:var(--text);}
 .bhero{background:linear-gradient(135deg,#1a1f35,#0d0f14);border:1px solid var(--border);border-radius:12px;padding:26px;margin-bottom:18px;}
-.bdate{font-size:10px;color:var(--text3);letter-spacing:2px;text-transform:uppercase;margin-bottom:5px;}
+.bdate{font-size:16px;color:var(--text3);letter-spacing:2px;text-transform:uppercase;margin-bottom:5px;}
 .bgreet{font-family:'Bebas Neue',sans-serif;font-size:30px;letter-spacing:1px;margin-bottom:4px;}
-.bsub{font-size:13px;color:var(--text2);line-height:1.5;}
+.bsub{font-size:16px;color:var(--text2);line-height:1.5;}
 .bstats{display:grid;grid-template-columns:repeat(3,1fr);gap:11px;margin-bottom:18px;}
 .bstat{background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:14px;text-align:center;}
 .bnum{font-family:'Bebas Neue',sans-serif;font-size:34px;line-height:1;}
 .bn-r{color:var(--danger);}.bn-y{color:var(--warn);}.bn-g{color:var(--lead);}
-.bslbl{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-top:2px;}
+.bslbl{font-size:16px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-top:2px;}
 .bsec{background:var(--surface);border:1px solid var(--border);border-radius:9px;margin-bottom:12px;overflow:hidden;}
-.bsechdr{padding:11px 16px;background:var(--surface2);border-bottom:1px solid var(--border);font-size:11px;font-weight:700;letter-spacing:0.5px;}
+.bsechdr{padding:11px 16px;background:var(--surface2);border-bottom:1px solid var(--border);font-size:16px;font-weight:700;letter-spacing:0.5px;}
 .brow{display:flex;align-items:center;gap:11px;padding:10px 16px;border-bottom:1px solid var(--border);}
 .brow:last-child{border-bottom:none;}
 .brow-info{flex:1;}
-.brow-name{font-size:13px;font-weight:600;}
-.brow-sub{font-size:11px;color:var(--text3);margin-top:1px;}
-.brow-right{font-size:12px;color:var(--text2);flex-shrink:0;text-align:right;}
+.brow-name{font-size:16px;font-weight:600;}
+.brow-sub{font-size:16px;color:var(--text3);margin-top:1px;}
+.brow-right{font-size:16px;color:var(--text2);flex-shrink:0;text-align:right;}
 .det-ov{position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:500;display:none;backdrop-filter:blur(3px);}
 .det-ov.open{display:flex;align-items:flex-start;justify-content:flex-end;}
 .det-panel{background:var(--surface);width:100%;max-width:440px;height:100vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:-6px 0 30px rgba(0,0,0,0.5);}
 .det-hdr{padding:16px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;flex-shrink:0;}
 .det-av{width:46px;height:46px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:700;flex-shrink:0;}
 .det-name{font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:1px;}
-.det-meta{font-size:11px;color:var(--text3);margin-top:2px;}
+.det-meta{font-size:16px;color:var(--text3);margin-top:2px;}
 .det-x{margin-left:auto;background:none;border:none;color:var(--text3);cursor:pointer;font-size:22px;line-height:1;flex-shrink:0;}
 .det-x:hover{color:var(--text);}
 .det-acts{padding:11px 18px;border-bottom:1px solid var(--border);display:flex;gap:7px;flex-wrap:wrap;flex-shrink:0;}
 .det-body{flex:1;overflow-y:auto;}
 .det-sec{border-bottom:1px solid var(--border);padding:14px 18px;}
-.det-sec-title{font-size:10px;text-transform:uppercase;letter-spacing:2px;color:var(--text3);margin-bottom:10px;}
+.det-sec-title{font-size:16px;text-transform:uppercase;letter-spacing:2px;color:var(--text3);margin-bottom:10px;}
 .det-field{display:flex;gap:9px;margin-bottom:8px;}
 .det-field:last-child{margin-bottom:0;}
-.det-flbl{font-size:11px;color:var(--text3);width:65px;flex-shrink:0;padding-top:1px;}
-.det-fval{font-size:13px;color:var(--text2);flex:1;word-break:break-word;}
+.det-flbl{font-size:16px;color:var(--text3);width:65px;flex-shrink:0;padding-top:1px;}
+.det-fval{font-size:16px;color:var(--text2);flex:1;word-break:break-word;}
 .det-fval a{color:var(--accent);text-decoration:none;}
 .stage-row{display:flex;gap:5px;flex-wrap:wrap;}
-.sp{padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);color:var(--text3);cursor:pointer;background:none;font-family:'DM Sans',sans-serif;transition:all 0.15s;}
+.sp{padding:4px 10px;border-radius:20px;font-size:16px;font-weight:600;border:1px solid var(--border);color:var(--text3);cursor:pointer;background:none;font-family:'DM Sans',sans-serif;transition:all 0.15s;}
 .sp.active{background:var(--accent);color:var(--bg);border-color:var(--accent);}
 .sp:hover:not(.active){border-color:var(--accent);color:var(--accent);}
 .det-note{padding:9px 0;border-bottom:1px solid var(--border);}
 .det-note:last-child{border-bottom:none;}
-.det-note-time{font-size:10px;color:var(--text3);margin-bottom:2px;}
-.det-note-text{font-size:13px;color:var(--text2);line-height:1.5;}
+.det-note-time{font-size:16px;color:var(--text3);margin-bottom:2px;}
+.det-note-text{font-size:16px;color:var(--text2);line-height:1.5;}
 .det-fu{display:flex;align-items:center;gap:9px;padding:8px 0;border-bottom:1px solid var(--border);}
 .det-fu:last-child{border-bottom:none;}
 .det-fu-chk{width:15px;height:15px;border-radius:3px;border:1.5px solid var(--border);flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.15s;}
 .det-fu-chk.done{background:var(--accent);border-color:var(--accent);}
 .det-note-inp{display:flex;gap:8px;padding:11px 18px;border-top:1px solid var(--border);background:var(--surface);flex-shrink:0;}
-.det-note-inp textarea{flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:7px 10px;font-size:13px;color:var(--text);font-family:'DM Sans',sans-serif;outline:none;resize:none;height:36px;transition:all 0.2s;}
+.det-note-inp textarea{flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:7px 10px;font-size:16px;color:var(--text);font-family:'DM Sans',sans-serif;outline:none;resize:none;height:36px;transition:all 0.2s;}
 .det-note-inp textarea:focus{border-color:var(--accent);height:64px;}
 @media(max-width:768px){
   .sidebar{position:fixed;left:0;top:0;bottom:0;transform:translateX(-100%);}
@@ -382,14 +382,14 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
         <div id="setupBanner" style="background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:16px 18px;margin-bottom:20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
           <svg width="20" height="20" fill="none" stroke="var(--accent)" stroke-width="2" viewBox="0 0 24 24"><polyline points="16,17 21,12 16,7"/><path d="M21 12H9"/><path d="M9 18H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4"/></svg>
           <div style="flex:1;">
-            <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:2px;">Connect Cloud Sync</div>
-            <div style="font-size:12px;color:var(--text3);">Paste your Supabase URL and key to sync across all devices in real time</div>
+            <div style="font-size:16px;font-weight:600;color:var(--text);margin-bottom:2px;">Connect Cloud Sync</div>
+            <div style="font-size:16px;color:var(--text3);">Paste your Supabase URL and key to sync across all devices in real time</div>
           </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-            <input id="supaUrlInput" type="text" placeholder="https://xxx.supabase.co" value="https://fgkilooomlozhwfnvjze.supabase.co" style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:12px;color:var(--text);font-family:'DM Sans',sans-serif;outline:none;width:200px;">
-            <input id="supaKeyInput" type="password" placeholder="eyJ... anon key" value="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZna2lsb29vbWxvemh3Zm52anplIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA3NTc0NTIsImV4cCI6MjA5NjMzMzQ1Mn0.owQk8Vy3Vcs8n8c0sI0fXQYmjpAy14hev8lDt4g5iZE" style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:12px;color:var(--text);font-family:'DM Sans',sans-serif;outline:none;width:180px;">
-            <button class="btn btn-p" id="btnConnectSupa" style="padding:6px 14px;font-size:12px;">Connect</button>
-            <button class="btn btn-g" id="btnDisconnectSupa" style="padding:6px 14px;font-size:12px;display:none;">Disconnect</button>
+            <input id="supaUrlInput" type="text" placeholder="https://xxx.supabase.co" value="https://fgkilooomlozhwfnvjze.supabase.co" style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:16px;color:var(--text);font-family:'DM Sans',sans-serif;outline:none;width:200px;">
+            <input id="supaKeyInput" type="password" placeholder="eyJ... anon key" value="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZna2lsb29vbWxvemh3Zm52anplIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA3NTc0NTIsImV4cCI6MjA5NjMzMzQ1Mn0.owQk8Vy3Vcs8n8c0sI0fXQYmjpAy14hev8lDt4g5iZE" style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:16px;color:var(--text);font-family:'DM Sans',sans-serif;outline:none;width:180px;">
+            <button class="btn btn-p" id="btnConnectSupa" style="padding:6px 14px;font-size:16px;">Connect</button>
+            <button class="btn btn-g" id="btnDisconnectSupa" style="padding:6px 14px;font-size:16px;display:none;">Disconnect</button>
           </div>
         </div>
         <div class="grid4">
@@ -399,11 +399,11 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
           <div class="scard sc-d"><div class="slbl">Closing Soon</div><div class="sval" id="sClosing">0</div><div class="ssub">30 days</div></div>
         </div>
         <div class="col3">
-          <div class="card"><div class="card-hdr"><div class="card-title">Recent Activity</div><button class="btn btn-g" id="btnViewNotes" style="padding:4px 9px;font-size:12px;">View all</button></div><div id="dRecent"></div></div>
+          <div class="card"><div class="card-hdr"><div class="card-title">Recent Activity</div><button class="btn btn-g" id="btnViewNotes" style="padding:4px 9px;font-size:16px;">View all</button></div><div id="dRecent"></div></div>
           <div class="card"><div class="card-hdr"><div class="card-title">Deadlines</div></div><div id="dDeadlines"></div></div>
         </div>
         <div class="col2">
-          <div class="card"><div class="card-hdr"><div class="card-title">Follow-ups Due</div><button class="btn btn-g" id="btnViewFU" style="padding:4px 9px;font-size:12px;">View all</button></div><div id="dFollowups"></div></div>
+          <div class="card"><div class="card-hdr"><div class="card-title">Follow-ups Due</div><button class="btn btn-g" id="btnViewFU" style="padding:4px 9px;font-size:16px;">View all</button></div><div id="dFollowups"></div></div>
           <div class="card"><div class="card-hdr"><div class="card-title">Pipeline</div></div><div id="dPipeline"></div></div>
         </div>
       </div>
@@ -440,20 +440,20 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
           <!-- Filter bar -->
           <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;">
             <div>
-              <label style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);display:block;margin-bottom:4px;">From Date</label>
-              <input type="date" id="dlFilterFrom" class="fi" style="padding:5px 8px;font-size:12px;width:140px;" oninput="rdl()">
+              <label style="font-size:16px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);display:block;margin-bottom:4px;">From Date</label>
+              <input type="date" id="dlFilterFrom" class="fi" style="padding:5px 8px;font-size:16px;width:140px;" oninput="rdl()">
             </div>
             <div>
-              <label style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);display:block;margin-bottom:4px;">To Date</label>
-              <input type="date" id="dlFilterTo" class="fi" style="padding:5px 8px;font-size:12px;width:140px;" oninput="rdl()">
+              <label style="font-size:16px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);display:block;margin-bottom:4px;">To Date</label>
+              <input type="date" id="dlFilterTo" class="fi" style="padding:5px 8px;font-size:16px;width:140px;" oninput="rdl()">
             </div>
             <div>
-              <label style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);display:block;margin-bottom:4px;">Client</label>
-              <select id="dlFilterContact" class="fsel" style="padding:5px 8px;font-size:12px;width:160px;" onchange="rdl()">
+              <label style="font-size:16px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);display:block;margin-bottom:4px;">Client</label>
+              <select id="dlFilterContact" class="fsel" style="padding:5px 8px;font-size:16px;width:160px;" onchange="rdl()">
                 <option value="">All Clients</option>
               </select>
             </div>
-            <button class="btn btn-g" style="padding:5px 12px;font-size:12px;" onclick="ge('dlFilterFrom').value='';ge('dlFilterTo').value='';ge('dlFilterContact').value='';rdl();">Clear Filters</button>
+            <button class="btn btn-g" style="padding:5px 12px;font-size:16px;" onclick="ge('dlFilterFrom').value='';ge('dlFilterTo').value='';ge('dlFilterContact').value='';rdl();">Clear Filters</button>
           </div>
           <div id="dlList" style="padding:12px 16px;"></div>
         </div>
@@ -463,8 +463,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
       <div class="page" id="page-tc">
         <div style="display:flex;gap:10px;margin-bottom:18px;flex-wrap:wrap;align-items:center;">
           <div style="flex:1;">
-            <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:4px;">Active Transactions</div>
-            <div style="font-size:13px;color:var(--text2);">Track every deal from contract to close  -  and beyond.</div>
+            <div style="font-size:16px;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:4px;">Active Transactions</div>
+            <div style="font-size:16px;color:var(--text2);">Track every deal from contract to close  -  and beyond.</div>
           </div>
           <button class="btn btn-p" id="btnNewTransaction">+ New Transaction</button>
         </div>
@@ -484,20 +484,20 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
           <div class="tc-det-hdr">
             <div>
               <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:1px;color:var(--accent);" id="tcDetTitle">Transaction</div>
-              <div style="font-size:12px;color:var(--text3);margin-top:2px;" id="tcDetSub"></div>
+              <div style="font-size:16px;color:var(--text3);margin-top:2px;" id="tcDetSub"></div>
             </div>
             <div style="display:flex;gap:8px;align-items:center;">
-              <button class="btn btn-g" style="font-size:12px;padding:5px 11px;" id="tcDetEdit">Edit</button>
-              <button class="btn" style="font-size:12px;padding:5px 11px;background:rgba(201,76,76,0.15);color:var(--danger);border:1px solid rgba(201,76,76,0.3);border-radius:7px;cursor:pointer;font-family:DM Sans,sans-serif;" id="tcDetDelete">Delete</button>
+              <button class="btn btn-g" style="font-size:16px;padding:5px 11px;" id="tcDetEdit">Edit</button>
+              <button class="btn" style="font-size:16px;padding:5px 11px;background:rgba(201,76,76,0.15);color:var(--danger);border:1px solid rgba(201,76,76,0.3);border-radius:7px;cursor:pointer;font-family:DM Sans,sans-serif;" id="tcDetDelete">Delete</button>
               <button style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:22px;line-height:1;" id="tcDetClose">&#x2715;</button>
             </div>
           </div>
           <!-- AI Ask Section -->
           <div class="tc-ai-box">
-            <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px;">Ask About This Transaction</div>
+            <div style="font-size:16px;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px;">Ask About This Transaction</div>
             <div class="tc-ai-input">
               <input id="tcAiInput" placeholder="What's left to close? What's due this week? What are next steps?">
-              <button class="btn btn-p" id="btnTCAsk" style="padding:7px 14px;font-size:12px;">Ask</button>
+              <button class="btn btn-p" id="btnTCAsk" style="padding:7px 14px;font-size:16px;">Ask</button>
             </div>
             <div class="tc-ai-response" id="tcAiResponse" style="display:none;"></div>
           </div>
@@ -550,8 +550,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
       <div class="page" id="page-scanner">
         <div style="display:flex;gap:14px;margin-bottom:20px;flex-wrap:wrap;align-items:flex-start;">
           <div style="flex:1;">
-            <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:4px;">AI Document Scanner</div>
-            <div style="font-size:13px;color:var(--text2);">Upload a REPC, addendum, inspection report, or any real estate document. AI extracts key data and imports directly into your CRM.</div>
+            <div style="font-size:16px;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:4px;">AI Document Scanner</div>
+            <div style="font-size:16px;color:var(--text2);">Upload a REPC, addendum, inspection report, or any real estate document. AI extracts key data and imports directly into your CRM.</div>
           </div>
         </div>
 
@@ -569,7 +569,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 
           <!-- Doc type selector -->
           <div style="margin-top:14px;background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:14px 18px;">
-            <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px;">Document Type (helps AI extract better)</div>
+            <div style="font-size:16px;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px;">Document Type (helps AI extract better)</div>
             <div style="display:flex;gap:8px;flex-wrap:wrap;">
               <button class="filter-btn active" data-doctype="auto">Auto-Detect</button>
               <button class="filter-btn" data-doctype="repc">REPC</button>
@@ -585,8 +585,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
         <!-- Processing indicator -->
         <div id="scannerProcessing" style="display:none;" class="scanner-processing">
           <div class="scanner-spinner"></div>
-          <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:6px;" id="scannerProcessingMsg">Analyzing document...</div>
-          <div style="font-size:12px;color:var(--text3);">This usually takes 10-20 seconds</div>
+          <div style="font-size:16px;font-weight:600;color:var(--text);margin-bottom:6px;" id="scannerProcessingMsg">Analyzing document...</div>
+          <div style="font-size:16px;color:var(--text3);">This usually takes 10-20 seconds</div>
         </div>
 
         <!-- Results area -->
@@ -605,8 +605,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
       <div class="page" id="page-team">
         <div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;align-items:center;">
           <div style="flex:1;">
-            <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:4px;">Team Management</div>
-            <div style="font-size:13px;color:var(--text2);">Assign contacts, transactions, deadlines and tasks to team members.</div>
+            <div style="font-size:16px;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:4px;">Team Management</div>
+            <div style="font-size:16px;color:var(--text2);">Assign contacts, transactions, deadlines and tasks to team members.</div>
           </div>
           <button class="btn btn-p" id="btnAddMember">+ Add Member</button>
           <button class="btn btn-g" id="btnTeamSettings">Team Settings</button>
@@ -620,10 +620,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
           <div class="card-hdr">
             <div class="card-title">All Assignments</div>
             <div style="display:flex;gap:8px;align-items:center;">
-              <select id="teamFilterMember" class="fsel" style="font-size:12px;padding:5px 9px;width:160px;" onchange="renderTeamAssignments()">
+              <select id="teamFilterMember" class="fsel" style="font-size:16px;padding:5px 9px;width:160px;" onchange="renderTeamAssignments()">
                 <option value="">All Members</option>
               </select>
-              <select id="teamFilterType" class="fsel" style="font-size:12px;padding:5px 9px;width:130px;" onchange="renderTeamAssignments()">
+              <select id="teamFilterType" class="fsel" style="font-size:16px;padding:5px 9px;width:130px;" onchange="renderTeamAssignments()">
                 <option value="">All Types</option>
                 <option value="contact">Contacts</option>
                 <option value="transaction">Transactions</option>
@@ -669,7 +669,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
             <div class="fg">
               <label class="fl">Google Calendar Link</label>
               <input class="fi" id="mCalLink" placeholder="https://calendar.google.com/calendar/r?cid=...">
-              <div style="font-size:11px;color:var(--text3);margin-top:4px;">Share your Google Calendar and paste the link here to enable scheduling.</div>
+              <div style="font-size:16px;color:var(--text3);margin-top:4px;">Share your Google Calendar and paste the link here to enable scheduling.</div>
             </div>
           </div>
           <div class="mftr">
@@ -694,9 +694,9 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
         <div id="gmailNotConnected" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;text-align:center;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);">
           <svg width="48" height="48" fill="none" stroke="var(--text3)" stroke-width="1.5" viewBox="0 0 24 24" style="margin-bottom:16px;"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
           <div style="font-size:16px;font-weight:600;color:var(--text);margin-bottom:8px;">Connect Gmail</div>
-          <div style="font-size:13px;color:var(--text3);max-width:400px;margin-bottom:20px;">Connect your Gmail account to view emails, reply to clients, and import documents directly into the CRM.</div>
+          <div style="font-size:16px;color:var(--text3);max-width:400px;margin-bottom:20px;">Connect your Gmail account to view emails, reply to clients, and import documents directly into the CRM.</div>
           <div id="gmailConnectButtons" style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;"></div>
-          <div style="margin-top:20px;font-size:12px;color:var(--text3);">Make sure popups are allowed for this site in your browser settings.</div>
+          <div style="margin-top:20px;font-size:16px;color:var(--text3);">Make sure popups are allowed for this site in your browser settings.</div>
         </div>
 
         <!-- Connected Gmail layout -->
@@ -706,10 +706,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
             <div class="gmail-sidebar">
               <div class="gmail-sidebar-hdr">
                 <div style="flex:1;">
-                  <div style="font-size:13px;font-weight:600;color:var(--text);" id="gmailAccountEmail">Inbox</div>
-                  <div style="font-size:10px;color:var(--text3);margin-top:1px;" id="gmailMsgCount"></div>
+                  <div style="font-size:16px;font-weight:600;color:var(--text);" id="gmailAccountEmail">Inbox</div>
+                  <div style="font-size:16px;color:var(--text3);margin-top:1px;" id="gmailMsgCount"></div>
                 </div>
-                <select id="gmailInboxFilter" class="fsel" style="font-size:11px;padding:3px 6px;width:100px;" onchange="loadGmailInbox()">
+                <select id="gmailInboxFilter" class="fsel" style="font-size:16px;padding:3px 6px;width:100px;" onchange="loadGmailInbox()">
                   <option value="in:inbox">Inbox</option>
                   <option value="in:sent">Sent</option>
                   <option value="is:unread">Unread</option>
@@ -717,7 +717,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
                 </select>
               </div>
               <div class="gmail-msg-list" id="gmailMsgList">
-                <div style="padding:20px;text-align:center;color:var(--text3);font-size:13px;">Loading emails...</div>
+                <div style="padding:20px;text-align:center;color:var(--text3);font-size:16px;">Loading emails...</div>
               </div>
             </div>
             <!-- Thread / Compose panel -->
@@ -744,7 +744,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
               <div class="fg"><label class="fl">Subject</label><input class="fi" id="composeSubject" placeholder="Subject..."></div>
               <!-- Template bar -->
               <div style="margin-bottom:8px;">
-                <div style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);margin-bottom:6px;">Templates</div>
+                <div style="font-size:16px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);margin-bottom:6px;">Templates</div>
                 <div class="gmail-template-bar">
                   <button class="gmail-template-btn" data-tpl="new_buyer">New Buyer</button>
                   <button class="gmail-template-btn" data-tpl="new_seller">New Seller</button>
@@ -758,7 +758,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
               <div class="fg"><label class="fl">Message</label>
                 <textarea class="fi" id="composeBody" rows="10" style="resize:vertical;" placeholder="Write your message here..."></textarea>
               </div>
-              <div style="font-size:11px;color:var(--text3);">Use {{firstName}}, {{lastName}}, {{propertyAddress}}, {{closingDate}}, {{agentName}} as merge fields.</div>
+              <div style="font-size:16px;color:var(--text3);">Use {{firstName}}, {{lastName}}, {{propertyAddress}}, {{closingDate}}, {{agentName}} as merge fields.</div>
               <!-- Link to contact for merge fields -->
               <div class="fg" style="margin-top:8px;"><label class="fl">Link to Contact (for merge fields)</label>
                 <select class="fsel" id="composeLinkContact">
@@ -780,22 +780,22 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
         <!-- Token Banner -->
         <div id="mlsTokenBanner" style="background:rgba(201,168,76,0.1);border:1px solid var(--accent);border-radius:9px;padding:13px 18px;margin-bottom:18px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
           <svg width="16" height="16" fill="none" stroke="var(--accent)" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-          <div style="flex:1;font-size:13px;color:var(--text2);">Using <b style="color:var(--accent);">demo data</b>  -  paste your URE Bearer Token to go live</div>
+          <div style="flex:1;font-size:16px;color:var(--text2);">Using <b style="color:var(--accent);">demo data</b>  -  paste your URE Bearer Token to go live</div>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-            <input id="mlsTokenInput" type="password" placeholder="Paste Bearer Token here..." style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:12px;color:var(--text);font-family:'DM Sans',sans-serif;outline:none;width:220px;">
-            <button class="btn btn-p" id="btnSaveToken" style="padding:6px 14px;font-size:12px;">Connect</button>
-            <button class="btn btn-g" id="btnClearToken" style="padding:6px 14px;font-size:12px;display:none;">Disconnect</button>
+            <input id="mlsTokenInput" type="password" placeholder="Paste Bearer Token here..." style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:16px;color:var(--text);font-family:'DM Sans',sans-serif;outline:none;width:220px;">
+            <button class="btn btn-p" id="btnSaveToken" style="padding:6px 14px;font-size:16px;">Connect</button>
+            <button class="btn btn-g" id="btnClearToken" style="padding:6px 14px;font-size:16px;display:none;">Disconnect</button>
           </div>
         </div>
 
         <!-- Search Bar -->
         <div style="background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:16px 18px;margin-bottom:16px;">
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr auto;gap:10px;align-items:end;flex-wrap:wrap;">
-            <div><label style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);display:block;margin-bottom:5px;">City / Zip</label><input class="fi" id="mlsCity" placeholder="Salt Lake City..."></div>
-            <div><label style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);display:block;margin-bottom:5px;">Min Price</label><input class="fi" id="mlsMinPrice" placeholder="$200,000"></div>
-            <div><label style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);display:block;margin-bottom:5px;">Max Price</label><input class="fi" id="mlsMaxPrice" placeholder="$600,000"></div>
-            <div><label style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);display:block;margin-bottom:5px;">Min Beds</label><select class="fsel" id="mlsBeds" style="padding:9px 11px;"><option value="">Any</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5+</option></select></div>
-            <div><label style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);display:block;margin-bottom:5px;">Type</label><select class="fsel" id="mlsType" style="padding:9px 11px;"><option value="">Any</option><option value="Residential">Residential</option><option value="Condo">Condo/Townhouse</option><option value="Land">Land</option><option value="Commercial">Commercial</option></select></div>
+            <div><label style="font-size:16px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);display:block;margin-bottom:5px;">City / Zip</label><input class="fi" id="mlsCity" placeholder="Salt Lake City..."></div>
+            <div><label style="font-size:16px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);display:block;margin-bottom:5px;">Min Price</label><input class="fi" id="mlsMinPrice" placeholder="$200,000"></div>
+            <div><label style="font-size:16px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);display:block;margin-bottom:5px;">Max Price</label><input class="fi" id="mlsMaxPrice" placeholder="$600,000"></div>
+            <div><label style="font-size:16px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);display:block;margin-bottom:5px;">Min Beds</label><select class="fsel" id="mlsBeds" style="padding:9px 11px;"><option value="">Any</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5+</option></select></div>
+            <div><label style="font-size:16px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);display:block;margin-bottom:5px;">Type</label><select class="fsel" id="mlsType" style="padding:9px 11px;"><option value="">Any</option><option value="Residential">Residential</option><option value="Condo">Condo/Townhouse</option><option value="Land">Land</option><option value="Commercial">Commercial</option></select></div>
             <button class="btn btn-p" id="btnMLSSearch" style="height:38px;padding:0 20px;">Search</button>
           </div>
           <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
@@ -803,8 +803,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
             <button class="filter-btn" data-mls-filter="pending">Pending</button>
             <button class="filter-btn" data-mls-filter="sold">Recently Sold</button>
             <button class="filter-btn" data-mls-filter="openhouse">Open Houses</button>
-            <div style="margin-left:auto;font-size:12px;color:var(--text3);display:flex;align-items:center;gap:6px;">
-              Sort: <select class="fsel" id="mlsSort" style="padding:4px 8px;font-size:12px;width:auto;">
+            <div style="margin-left:auto;font-size:16px;color:var(--text3);display:flex;align-items:center;gap:6px;">
+              Sort: <select class="fsel" id="mlsSort" style="padding:4px 8px;font-size:16px;width:auto;">
                 <option value="price_asc">Price Low-High</option>
                 <option value="price_desc">Price High-Low</option>
                 <option value="dom_asc">Newest Listed</option>
@@ -816,7 +816,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 
         <!-- Results -->
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-          <div style="font-size:13px;color:var(--text2);" id="mlsResultCount"></div>
+          <div style="font-size:16px;color:var(--text2);" id="mlsResultCount"></div>
           <div style="display:flex;gap:6px;">
             <button id="mlsViewGrid" style="background:var(--accent);border:none;border-radius:5px;padding:5px 10px;cursor:pointer;color:var(--bg);">&#9634; Grid</button>
             <button id="mlsViewList" style="background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:5px 10px;cursor:pointer;color:var(--text2);">&#9776; List</button>
@@ -835,12 +835,12 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
     <div class="mhdr"><div class="mtitle">Import CSV</div><button class="mx" data-close="csvModal">&#x2715;</button></div>
     <div class="mbody">
       <div id="csvStep1">
-        <p style="font-size:13px;color:var(--text2);margin-bottom:16px;">Upload a CSV file with your contacts. The first row should be headers.</p>
-        <p style="font-size:12px;color:var(--text3);margin-bottom:16px;">Expected columns (any order): <b style="color:var(--accent);">First Name, Last Name, Type, Phone, Email, Property, Stage, Price, Notes</b></p>
+        <p style="font-size:16px;color:var(--text2);margin-bottom:16px;">Upload a CSV file with your contacts. The first row should be headers.</p>
+        <p style="font-size:16px;color:var(--text3);margin-bottom:16px;">Expected columns (any order): <b style="color:var(--accent);">First Name, Last Name, Type, Phone, Email, Property, Stage, Price, Notes</b></p>
         <div id="csvDropZone" style="border:2px dashed var(--border);border-radius:9px;padding:32px;text-align:center;cursor:pointer;transition:border 0.2s;">
           <div style="font-size:32px;margin-bottom:8px;">&#128462;</div>
-          <div style="font-size:14px;color:var(--text2);margin-bottom:6px;">Drop your CSV file here</div>
-          <div style="font-size:12px;color:var(--text3);">or click to browse</div>
+          <div style="font-size:16px;color:var(--text2);margin-bottom:6px;">Drop your CSV file here</div>
+          <div style="font-size:16px;color:var(--text3);">or click to browse</div>
         </div>
       </div>
       <div id="csvStep2" style="display:none;">
@@ -1037,17 +1037,17 @@ function showSyncStatus(status){
     bar.style.display = 'flex';
     bar.style.background = 'rgba(107,201,122,0.12)';
     bar.style.borderColor = 'var(--lead)';
-    bar.innerHTML = '<span style="color:var(--lead);">&#9679;</span>&nbsp;<span style="font-size:12px;color:var(--text2);">Synced to cloud  -  changes shared with all devices in real time</span>';
+    bar.innerHTML = '<span style="color:var(--lead);">&#9679;</span>&nbsp;<span style="font-size:16px;color:var(--text2);">Synced to cloud  -  changes shared with all devices in real time</span>';
   } else if(status === 'loading'){
     bar.style.display = 'flex';
     bar.style.background = 'rgba(201,168,76,0.1)';
     bar.style.borderColor = 'var(--accent)';
-    bar.innerHTML = '<span style="color:var(--accent);">&#8635;</span>&nbsp;<span style="font-size:12px;color:var(--text2);">Connecting to cloud...</span>';
+    bar.innerHTML = '<span style="color:var(--accent);">&#8635;</span>&nbsp;<span style="font-size:16px;color:var(--text2);">Connecting to cloud...</span>';
   } else if(status === 'error'){
     bar.style.display = 'flex';
     bar.style.background = 'rgba(201,76,76,0.1)';
     bar.style.borderColor = 'var(--danger)';
-    bar.innerHTML = '<span style="color:var(--danger);">&#9888;</span>&nbsp;<span style="font-size:12px;color:var(--text2);">Cloud sync error  -  using local data. Check your Supabase keys.</span>';
+    bar.innerHTML = '<span style="color:var(--danger);">&#9888;</span>&nbsp;<span style="font-size:16px;color:var(--text2);">Cloud sync error  -  using local data. Check your Supabase keys.</span>';
   } else {
     bar.style.display = 'none';
   }
@@ -1211,17 +1211,17 @@ function rb(){
   var uEl=ge('bUrgent');uEl.innerHTML='';
   if(!urg){uEl.innerHTML='<div class="empty" style="padding:14px;">No urgent items!</div>';}
   else{
-    uDL.forEach(function(d){var c=gc(d.contactId);var n=du(d.date);var row=mkRow('brow');row.appendChild(mkDot('dot-r'));var info=mkRow('brow-info');info.appendChild(mkDiv('font-size:13px;font-weight:600;',d.type));info.appendChild(mkDiv('font-size:11px;color:var(--text3);',c?fn(c):'Unknown'));row.appendChild(info);row.appendChild(mkDiv('font-size:12px;color:var(--danger);',n<0?Math.abs(n)+'d overdue':'TODAY'));uEl.appendChild(row);});
-    oFU.forEach(function(f){var c=gc(f.contactId);var row=mkRow('brow');row.appendChild(mkDot('dot-r'));var info=mkRow('brow-info');info.appendChild(mkDiv('font-size:13px;font-weight:600;',f.label));info.appendChild(mkDiv('font-size:11px;color:var(--text3);',c?fn(c):'Unknown'));row.appendChild(info);row.appendChild(mkDiv('font-size:12px;color:var(--danger);',fd(f.date)));uEl.appendChild(row);});
+    uDL.forEach(function(d){var c=gc(d.contactId);var n=du(d.date);var row=mkRow('brow');row.appendChild(mkDot('dot-r'));var info=mkRow('brow-info');info.appendChild(mkDiv('font-size:16px;font-weight:600;',d.type));info.appendChild(mkDiv('font-size:16px;color:var(--text3);',c?fn(c):'Unknown'));row.appendChild(info);row.appendChild(mkDiv('font-size:16px;color:var(--danger);',n<0?Math.abs(n)+'d overdue':'TODAY'));uEl.appendChild(row);});
+    oFU.forEach(function(f){var c=gc(f.contactId);var row=mkRow('brow');row.appendChild(mkDot('dot-r'));var info=mkRow('brow-info');info.appendChild(mkDiv('font-size:16px;font-weight:600;',f.label));info.appendChild(mkDiv('font-size:16px;color:var(--text3);',c?fn(c):'Unknown'));row.appendChild(info);row.appendChild(mkDiv('font-size:16px;color:var(--danger);',fd(f.date)));uEl.appendChild(row);});
   }
   var fEl=ge('bFU');fEl.innerHTML='';
   if(!tFU.length){fEl.innerHTML='<div class="empty" style="padding:14px;">No follow-ups due today.</div>';}
-  else tFU.forEach(function(f){var c=gc(f.contactId);var row=mkRow('brow');var chk=mkRow('chk'+(f.done?' done':''));if(f.done)chk.appendChild(ck());(function(id){chk.addEventListener('click',function(){tfu(id);rb();});})(f.id);row.appendChild(chk);var info=mkRow('brow-info');info.appendChild(mkDiv('font-size:13px;font-weight:600;',f.label));info.appendChild(mkDiv('font-size:11px;color:var(--text3);',c?fn(c):''));row.appendChild(info);row.appendChild(mkBadge(f.pri));fEl.appendChild(row);});
+  else tFU.forEach(function(f){var c=gc(f.contactId);var row=mkRow('brow');var chk=mkRow('chk'+(f.done?' done':''));if(f.done)chk.appendChild(ck());(function(id){chk.addEventListener('click',function(){tfu(id);rb();});})(f.id);row.appendChild(chk);var info=mkRow('brow-info');info.appendChild(mkDiv('font-size:16px;font-weight:600;',f.label));info.appendChild(mkDiv('font-size:16px;color:var(--text3);',c?fn(c):''));row.appendChild(info);row.appendChild(mkBadge(f.pri));fEl.appendChild(row);});
   var wEl=ge('bWeek');wEl.innerHTML='';
   if(!wDL.length){wEl.innerHTML='<div class="empty" style="padding:14px;">No deadlines this week.</div>';}
-  else wDL.slice().sort(function(a,b){return new Date(a.date)-new Date(b.date);}).forEach(function(d){var c=gc(d.contactId);var n=du(d.date);var row=mkRow('brow');row.appendChild(mkDot(n<=3?'dot-y':'dot-g'));var info=mkRow('brow-info');info.appendChild(mkDiv('font-size:13px;font-weight:600;',d.type));info.appendChild(mkDiv('font-size:11px;color:var(--text3);',c?fn(c):''));row.appendChild(info);row.appendChild(mkDiv('font-size:12px;color:var(--text2);',fd(d.date)+' ('+n+'d)'));wEl.appendChild(row);});
+  else wDL.slice().sort(function(a,b){return new Date(a.date)-new Date(b.date);}).forEach(function(d){var c=gc(d.contactId);var n=du(d.date);var row=mkRow('brow');row.appendChild(mkDot(n<=3?'dot-y':'dot-g'));var info=mkRow('brow-info');info.appendChild(mkDiv('font-size:16px;font-weight:600;',d.type));info.appendChild(mkDiv('font-size:16px;color:var(--text3);',c?fn(c):''));row.appendChild(info);row.appendChild(mkDiv('font-size:16px;color:var(--text2);',fd(d.date)+' ('+n+'d)'));wEl.appendChild(row);});
   var sEl=ge('bSnap');sEl.innerHTML='';
-  ['New Lead','Contacted','Showing','Under Contract'].forEach(function(s){var cnt=C.filter(function(c){return c.stage===s;}).length;var row=mkRow('brow');var info=mkRow('brow-info');info.appendChild(mkDiv('font-size:13px;font-weight:600;',s));row.appendChild(info);row.appendChild(mkDiv('font-family:monospace;font-size:22px;font-weight:700;color:var(--accent);',cnt));sEl.appendChild(row);});
+  ['New Lead','Contacted','Showing','Under Contract'].forEach(function(s){var cnt=C.filter(function(c){return c.stage===s;}).length;var row=mkRow('brow');var info=mkRow('brow-info');info.appendChild(mkDiv('font-size:16px;font-weight:600;',s));row.appendChild(info);row.appendChild(mkDiv('font-family:monospace;font-size:22px;font-weight:700;color:var(--accent);',cnt));sEl.appendChild(row);});
 }
 
 function rd(){
@@ -1232,17 +1232,17 @@ function rd(){
   var rEl=ge('dRecent');rEl.innerHTML='';
   var rec=N.slice().sort(function(a,b){return new Date(b.date)-new Date(a.date);}).slice(0,4);
   if(!rec.length){rEl.innerHTML='<div class="empty">No notes yet</div>';}
-  else rec.forEach(function(note){var c=gc(note.contactId);var d=mkRow('note-item');var h=mkRow('note-hdr');var b=document.createElement('b');b.style.fontSize='12px';b.textContent=c?fn(c):'Unknown';var ts=mkDiv('font-size:11px;color:var(--text3);margin-left:6px;',rt(note.date));h.appendChild(b);h.appendChild(ts);d.appendChild(h);d.appendChild(mkDiv('note-text',note.text));rEl.appendChild(d);});
+  else rec.forEach(function(note){var c=gc(note.contactId);var d=mkRow('note-item');var h=mkRow('note-hdr');var b=document.createElement('b');b.style.fontSize='12px';b.textContent=c?fn(c):'Unknown';var ts=mkDiv('font-size:16px;color:var(--text3);margin-left:6px;',rt(note.date));h.appendChild(b);h.appendChild(ts);d.appendChild(h);d.appendChild(mkDiv('note-text',note.text));rEl.appendChild(d);});
   var dlEl=ge('dDeadlines');dlEl.innerHTML='';
   var dl=D.slice().sort(function(a,b){return new Date(a.date)-new Date(b.date);}).slice(0,5);
   if(!dl.length){dlEl.innerHTML='<div class="empty">No deadlines</div>';}
-  else dl.forEach(function(d){var c=gc(d.contactId);var n=du(d.date);var lbl=n<0?'Overdue':n===0?'Today':n+'d';var row=mkRow('dl-row');row.appendChild(mkDot(dc(n)));var info=mkDiv('flex:1;');info.appendChild(mkDiv('font-size:13px;',d.type));info.appendChild(mkDiv('font-size:11px;color:var(--text3);',c?fn(c):''));row.appendChild(info);row.appendChild(mkDiv('font-family:monospace;font-size:12px;color:var(--text2);',lbl));dlEl.appendChild(row);});
+  else dl.forEach(function(d){var c=gc(d.contactId);var n=du(d.date);var lbl=n<0?'Overdue':n===0?'Today':n+'d';var row=mkRow('dl-row');row.appendChild(mkDot(dc(n)));var info=mkDiv('flex:1;');info.appendChild(mkDiv('font-size:16px;',d.type));info.appendChild(mkDiv('font-size:16px;color:var(--text3);',c?fn(c):''));row.appendChild(info);row.appendChild(mkDiv('font-family:monospace;font-size:16px;color:var(--text2);',lbl));dlEl.appendChild(row);});
   var fuEl=ge('dFollowups');fuEl.innerHTML='';
   var pend=F.filter(function(f){return !f.done;}).slice(0,4);
   if(!pend.length){fuEl.innerHTML='<div class="empty">All caught up!</div>';}
-  else pend.forEach(function(f){var c=gc(f.contactId);var row=mkRow('fu-row');var chk=mkRow('chk'+(f.done?' done':''));if(f.done)chk.appendChild(ck());(function(id){chk.addEventListener('click',function(){tfu(id);rd();});})(f.id);var info=mkDiv('flex:1;');info.appendChild(mkDiv('font-size:13px;',f.label));info.appendChild(mkDiv('font-size:11px;color:var(--text3);',(c?fn(c):'')+' - '+fd(f.date)));row.appendChild(chk);row.appendChild(info);row.appendChild(mkBadge(f.pri));fuEl.appendChild(row);});
+  else pend.forEach(function(f){var c=gc(f.contactId);var row=mkRow('fu-row');var chk=mkRow('chk'+(f.done?' done':''));if(f.done)chk.appendChild(ck());(function(id){chk.addEventListener('click',function(){tfu(id);rd();});})(f.id);var info=mkDiv('flex:1;');info.appendChild(mkDiv('font-size:16px;',f.label));info.appendChild(mkDiv('font-size:16px;color:var(--text3);',(c?fn(c):'')+' - '+fd(f.date)));row.appendChild(chk);row.appendChild(info);row.appendChild(mkBadge(f.pri));fuEl.appendChild(row);});
   var pipEl=ge('dPipeline');pipEl.innerHTML='';
-  ['New Lead','Contacted','Showing','Under Contract'].forEach(function(s){var cnt=C.filter(function(c){return c.stage===s;}).length;var row=mkRow('li');row.appendChild(mkDiv('flex:1;font-size:13px;font-weight:600;',s));row.appendChild(mkDiv('font-family:monospace;font-size:22px;font-weight:700;color:var(--accent);',cnt));pipEl.appendChild(row);});
+  ['New Lead','Contacted','Showing','Under Contract'].forEach(function(s){var cnt=C.filter(function(c){return c.stage===s;}).length;var row=mkRow('li');row.appendChild(mkDiv('flex:1;font-size:16px;font-weight:600;',s));row.appendChild(mkDiv('font-family:monospace;font-size:22px;font-weight:700;color:var(--accent);',cnt));pipEl.appendChild(row);});
   ge('nbFollowups').textContent=F.filter(function(f){return !f.done;}).length;
   ge('nbPipeline').textContent=C.filter(function(c){return c.stage!=='Closed';}).length;
 }
@@ -1252,8 +1252,8 @@ function rp(){
   ['New Lead','Contacted','Showing','Under Contract','Closed'].forEach(function(s){
     var sc=C.filter(function(c){return c.stage===s;});
     var col=mkDiv('min-width:210px;flex-shrink:0;');
-    var hdr=mkDiv('font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);margin-bottom:10px;display:flex;justify-content:space-between;',s);
-    var badge=mkDiv('background:var(--surface3);color:var(--text2);font-size:10px;padding:1px 6px;border-radius:8px;',sc.length);
+    var hdr=mkDiv('font-size:16px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);margin-bottom:10px;display:flex;justify-content:space-between;',s);
+    var badge=mkDiv('background:var(--surface3);color:var(--text2);font-size:16px;padding:1px 6px;border-radius:8px;',sc.length);
     hdr.appendChild(badge);col.appendChild(hdr);
     sc.forEach(function(c){
       var card=mkDiv('background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px 13px;margin-bottom:9px;cursor:pointer;transition:all 0.15s;');
@@ -1262,11 +1262,11 @@ function rp(){
       card.addEventListener('mouseleave',function(){this.style.borderColor='var(--border)';this.style.transform='none';});
       var tg=document.createElement('span');tg.className='tag tag-'+c.type;tg.style.marginBottom='5px';tg.style.display='inline-block';tg.textContent=c.type;
       card.appendChild(tg);
-      card.appendChild(mkDiv('font-size:13px;font-weight:600;margin-bottom:2px;',fn(c)));
-      card.appendChild(mkDiv('font-size:11px;color:var(--text2);margin-bottom:7px;',c.property||'-'));
+      card.appendChild(mkDiv('font-size:16px;font-weight:600;margin-bottom:2px;',fn(c)));
+      card.appendChild(mkDiv('font-size:16px;color:var(--text2);margin-bottom:7px;',c.property||'-'));
       var foot=mkDiv('display:flex;justify-content:space-between;');
-      foot.appendChild(mkDiv('font-family:monospace;font-size:12px;color:var(--accent);',c.price||'-'));
-      foot.appendChild(mkDiv('font-size:10px;color:var(--text3);',rt(c.added)));
+      foot.appendChild(mkDiv('font-family:monospace;font-size:16px;color:var(--accent);',c.price||'-'));
+      foot.appendChild(mkDiv('font-size:16px;color:var(--text3);',rt(c.added)));
       card.appendChild(foot);col.appendChild(card);
     });
     board.appendChild(col);
@@ -1288,20 +1288,20 @@ function rc(){
     var av=mkDiv('av av-'+c.type,ini(c));
     av.className='av av-'+c.type;
     var nb=mkDiv('');
-    nb.appendChild(mkDiv('font-size:15px;font-weight:600;',fn(c)));
+    nb.appendChild(mkDiv('font-size:16px;font-weight:600;',fn(c)));
     var td=mkDiv('margin-top:2px;');
     var tg=document.createElement('span');tg.className='tag tag-'+c.type;tg.textContent=c.type;td.appendChild(tg);
     nb.appendChild(td);top.appendChild(av);top.appendChild(nb);card.appendChild(top);
     var dets=mkDiv('display:flex;flex-direction:column;gap:3px;');
-    if(c.phone)dets.appendChild(mkDiv('font-size:12px;color:var(--text2);',c.phone));
-    if(c.email)dets.appendChild(mkDiv('font-size:12px;color:var(--text2);',c.email));
-    if(c.property)dets.appendChild(mkDiv('font-size:12px;color:var(--text2);',c.property));
+    if(c.phone)dets.appendChild(mkDiv('font-size:16px;color:var(--text2);',c.phone));
+    if(c.email)dets.appendChild(mkDiv('font-size:16px;color:var(--text2);',c.email));
+    if(c.property)dets.appendChild(mkDiv('font-size:16px;color:var(--text2);',c.property));
     card.appendChild(dets);
     var foot=mkDiv('margin-top:11px;padding-top:9px;border-top:1px solid var(--border);display:flex;justify-content:space-between;');
-    var ss=mkDiv('font-size:11px;color:var(--text3);','Stage: ');
+    var ss=mkDiv('font-size:16px;color:var(--text3);','Stage: ');
     var sb=document.createElement('b');sb.style.color='var(--accent)';sb.textContent=c.stage;ss.appendChild(sb);
     foot.appendChild(ss);
-    if(c.price)foot.appendChild(mkDiv('font-family:monospace;font-size:12px;color:var(--text2);',c.price));
+    if(c.price)foot.appendChild(mkDiv('font-family:monospace;font-size:16px;color:var(--text2);',c.price));
     card.appendChild(foot);grid.appendChild(card);
   });
 }
@@ -1316,12 +1316,12 @@ function vc(id){
   var xb=mkBtn('det-x','\u2715','');xb.addEventListener('click',cd);
   hdr.appendChild(av);hdr.appendChild(nd);hdr.appendChild(xb);
   var acts=ge('detActs');acts.innerHTML='';
-  if(c.phone){var a1=document.createElement('a');a1.href='tel:'+c.phone;a1.className='btn btn-g';a1.style.cssText='font-size:12px;padding:5px 11px;';a1.textContent='Call';acts.appendChild(a1);}
-  if(c.phone){var a2=document.createElement('a');a2.href='sms:'+c.phone;a2.className='btn btn-g';a2.style.cssText='font-size:12px;padding:5px 11px;';a2.textContent='Text';acts.appendChild(a2);}
-  if(c.email){var a3=document.createElement('a');a3.href='mailto:'+c.email;a3.className='btn btn-g';a3.style.cssText='font-size:12px;padding:5px 11px;';a3.textContent='Email';acts.appendChild(a3);}
-  var fb=mkBtn('btn btn-g','+ FU','font-size:12px;padding:5px 11px;');(function(cid){fb.addEventListener('click',function(){ofc(cid);});})(id);acts.appendChild(fb);
-  var db=mkBtn('btn btn-g','+ DL','font-size:12px;padding:5px 11px;');(function(cid){db.addEventListener('click',function(){odc(cid);});})(id);acts.appendChild(db);
-  var delb=mkBtn('btn btn-d','Delete','font-size:12px;padding:5px 11px;margin-left:auto;');(function(cid){delb.addEventListener('click',function(){delc(cid);});})(id);acts.appendChild(delb);
+  if(c.phone){var a1=document.createElement('a');a1.href='tel:'+c.phone;a1.className='btn btn-g';a1.style.cssText='font-size:16px;padding:5px 11px;';a1.textContent='Call';acts.appendChild(a1);}
+  if(c.phone){var a2=document.createElement('a');a2.href='sms:'+c.phone;a2.className='btn btn-g';a2.style.cssText='font-size:16px;padding:5px 11px;';a2.textContent='Text';acts.appendChild(a2);}
+  if(c.email){var a3=document.createElement('a');a3.href='mailto:'+c.email;a3.className='btn btn-g';a3.style.cssText='font-size:16px;padding:5px 11px;';a3.textContent='Email';acts.appendChild(a3);}
+  var fb=mkBtn('btn btn-g','+ FU','font-size:16px;padding:5px 11px;');(function(cid){fb.addEventListener('click',function(){ofc(cid);});})(id);acts.appendChild(fb);
+  var db=mkBtn('btn btn-g','+ DL','font-size:16px;padding:5px 11px;');(function(cid){db.addEventListener('click',function(){odc(cid);});})(id);acts.appendChild(db);
+  var delb=mkBtn('btn btn-d','Delete','font-size:16px;padding:5px 11px;margin-left:auto;');(function(cid){delb.addEventListener('click',function(){delc(cid);});})(id);acts.appendChild(delb);
   var body=ge('detBody');body.innerHTML='';
   var isec=mksec('Contact Info');
   if(c.phone)isec.appendChild(mkfld('Phone',c.phone,'tel:'+c.phone,''));
@@ -1334,22 +1334,22 @@ function vc(id){
   stgs.forEach(function(s){var b=mkBtn('sp'+(c.stage===s?' active':''),s,'');(function(cid,stage){b.addEventListener('click',function(){ss(cid,stage);});})(id,s);sr.appendChild(b);});
   ssec.appendChild(sr);body.appendChild(ssec);
   var dlsec=mksec('Deadlines');
-  var dlab=mkBtn('','+ Add','background:none;border:none;color:var(--accent);cursor:pointer;font-size:11px;margin-left:8px;');
+  var dlab=mkBtn('','+ Add','background:none;border:none;color:var(--accent);cursor:pointer;font-size:16px;margin-left:8px;');
   (function(cid){dlab.addEventListener('click',function(){odc(cid);});})(id);dlsec.querySelector('.det-sec-title').appendChild(dlab);
   var cDL=D.filter(function(d){return d.contactId===id;}).sort(function(a,b){return new Date(a.date)-new Date(b.date);});
-  if(!cDL.length)dlsec.appendChild(mkDiv('font-size:12px;color:var(--text3);padding:4px 0;','None yet.'));
-  else cDL.forEach(function(d){var n=du(d.date);var row=mkRow('dl-row');row.style.padding='7px 0';row.appendChild(mkDot(dc(n)));row.appendChild(mkDiv('flex:1;font-size:12px;',d.type));row.appendChild(mkDiv('font-family:monospace;font-size:12px;color:var(--text2);',fd(d.date)));dlsec.appendChild(row);});
+  if(!cDL.length)dlsec.appendChild(mkDiv('font-size:16px;color:var(--text3);padding:4px 0;','None yet.'));
+  else cDL.forEach(function(d){var n=du(d.date);var row=mkRow('dl-row');row.style.padding='7px 0';row.appendChild(mkDot(dc(n)));row.appendChild(mkDiv('flex:1;font-size:16px;',d.type));row.appendChild(mkDiv('font-family:monospace;font-size:16px;color:var(--text2);',fd(d.date)));dlsec.appendChild(row);});
   body.appendChild(dlsec);
   var fusec=mksec('Follow-ups');
-  var fuab=mkBtn('','+ Add','background:none;border:none;color:var(--accent);cursor:pointer;font-size:11px;margin-left:8px;');
+  var fuab=mkBtn('','+ Add','background:none;border:none;color:var(--accent);cursor:pointer;font-size:16px;margin-left:8px;');
   (function(cid){fuab.addEventListener('click',function(){ofc(cid);});})(id);fusec.querySelector('.det-sec-title').appendChild(fuab);
   var cFU=F.filter(function(f){return f.contactId===id;}).sort(function(a,b){return new Date(a.date)-new Date(b.date);});
-  if(!cFU.length)fusec.appendChild(mkDiv('font-size:12px;color:var(--text3);padding:4px 0;','None yet.'));
-  else cFU.forEach(function(f){var row=mkRow('det-fu');var chk=mkRow('det-fu-chk'+(f.done?' done':''));if(f.done)chk.appendChild(ck());(function(fid,cid){chk.addEventListener('click',function(){tfu(fid);vc(cid);});})(f.id,id);var lbl=mkDiv('flex:1;font-size:13px;'+(f.done?'text-decoration:line-through;color:var(--text3);':''),f.label);var dt=mkDiv('font-size:11px;color:var(--text3);',fd(f.date));row.appendChild(chk);row.appendChild(lbl);row.appendChild(dt);fusec.appendChild(row);});
+  if(!cFU.length)fusec.appendChild(mkDiv('font-size:16px;color:var(--text3);padding:4px 0;','None yet.'));
+  else cFU.forEach(function(f){var row=mkRow('det-fu');var chk=mkRow('det-fu-chk'+(f.done?' done':''));if(f.done)chk.appendChild(ck());(function(fid,cid){chk.addEventListener('click',function(){tfu(fid);vc(cid);});})(f.id,id);var lbl=mkDiv('flex:1;font-size:16px;'+(f.done?'text-decoration:line-through;color:var(--text3);':''),f.label);var dt=mkDiv('font-size:16px;color:var(--text3);',fd(f.date));row.appendChild(chk);row.appendChild(lbl);row.appendChild(dt);fusec.appendChild(row);});
   body.appendChild(fusec);
   var nsec=mksec('Notes');
   var cN=N.filter(function(n){return n.contactId===id;}).sort(function(a,b){return new Date(b.date)-new Date(a.date);});
-  if(!cN.length)nsec.appendChild(mkDiv('font-size:12px;color:var(--text3);','No notes yet. Add one below.'));
+  if(!cN.length)nsec.appendChild(mkDiv('font-size:16px;color:var(--text3);','No notes yet. Add one below.'));
   else cN.forEach(function(n){
     var d=mkRow('det-note');
     d.appendChild(mkDiv('det-note-time',new Date(n.date).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})));
@@ -1375,11 +1375,11 @@ function vc(id){
   var assignSec = document.createElement('div');
   assignSec.style.cssText = 'padding:12px 20px;border-top:1px solid var(--border);display:flex;align-items:center;gap:10px;';
   var assignLbl = document.createElement('div');
-  assignLbl.style.cssText = 'font-size:12px;color:var(--text3);flex-shrink:0;';
+  assignLbl.style.cssText = 'font-size:16px;color:var(--text3);flex-shrink:0;';
   assignLbl.textContent = 'Assigned To:';
   var assignSel = document.createElement('select');
   assignSel.className = 'fsel assign-to-select';
-  assignSel.style.cssText = 'font-size:12px;padding:5px 8px;flex:1;';
+  assignSel.style.cssText = 'font-size:16px;padding:5px 8px;flex:1;';
   assignSel.innerHTML = '<option value="">Unassigned</option>';
   TM.forEach(function(m){
     var o=document.createElement('option');
@@ -1407,7 +1407,7 @@ function vc(id){
     calA.href = assignedM.calLink;
     calA.target = '_blank';
     calA.className = 'team-cal-btn cal-quick-link';
-    calA.style.cssText = 'width:auto;padding:5px 10px;font-size:11px;flex-shrink:0;';
+    calA.style.cssText = 'width:auto;padding:5px 10px;font-size:16px;flex-shrink:0;';
     calA.innerHTML = '<svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> Calendar';
     calQuick.appendChild(calA);
   }
@@ -1423,7 +1423,7 @@ function vc(id){
   (function(cid){ editCBtn.addEventListener('click', function(){ openEditContact(cid); }); })(id);
   var delCBtn = document.createElement('button');
   delCBtn.className = 'btn';
-  delCBtn.style.cssText = 'background:rgba(201,76,76,0.15);color:var(--danger);border:1px solid rgba(201,76,76,0.3);border-radius:7px;padding:8px 14px;cursor:pointer;font-size:13px;font-family:DM Sans,sans-serif;';
+  delCBtn.style.cssText = 'background:rgba(201,76,76,0.15);color:var(--danger);border:1px solid rgba(201,76,76,0.3);border-radius:7px;padding:8px 14px;cursor:pointer;font-size:16px;font-family:DM Sans,sans-serif;';
   delCBtn.textContent = 'Delete Contact';
   (function(cid){ delCBtn.addEventListener('click', function(){ if(confirm('Delete this contact and all their data?')) delc(cid); }); })(id);
   actSec.appendChild(editCBtn); actSec.appendChild(delCBtn);
@@ -1441,7 +1441,7 @@ function rfu(){
   var el=ge('fuList');el.innerHTML='';
   var sorted=F.slice().sort(function(a,b){return new Date(a.date)-new Date(b.date);});
   if(!sorted.length){el.innerHTML='<div class="empty">No follow-ups yet.</div>';return;}
-  sorted.forEach(function(f){var c=gc(f.contactId);var row=mkRow('fu-row');var chk=mkRow('chk'+(f.done?' done':''));if(f.done)chk.appendChild(ck());(function(id){chk.addEventListener('click',function(){tfu(id);rfu();});})(f.id);var info=mkDiv('flex:1;');info.appendChild(mkDiv('font-size:13px;'+(f.done?'text-decoration:line-through;color:var(--text3);':''),f.label));info.appendChild(mkDiv('font-size:11px;color:var(--text3);',(c?fn(c):'Unknown')+' - '+fd(f.date)));var right=mkDiv('display:flex;align-items:center;gap:7px;');right.appendChild(mkBadge(f.pri));var del=mkBtn('','\u00d7','background:none;border:none;color:var(--text3);cursor:pointer;font-size:18px;line-height:1;');(function(id){del.addEventListener('click',function(){F=F.filter(function(f){return f.id!==id;});sv();if(supaReady) fetch(SUPA_URL+'/rest/v1/followups?id=eq.'+id,{method:'DELETE',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}});rfu();rd();});})(f.id);right.appendChild(del);row.appendChild(chk);row.appendChild(info);row.appendChild(right);el.appendChild(row);});
+  sorted.forEach(function(f){var c=gc(f.contactId);var row=mkRow('fu-row');var chk=mkRow('chk'+(f.done?' done':''));if(f.done)chk.appendChild(ck());(function(id){chk.addEventListener('click',function(){tfu(id);rfu();});})(f.id);var info=mkDiv('flex:1;');info.appendChild(mkDiv('font-size:16px;'+(f.done?'text-decoration:line-through;color:var(--text3);':''),f.label));info.appendChild(mkDiv('font-size:16px;color:var(--text3);',(c?fn(c):'Unknown')+' - '+fd(f.date)));var right=mkDiv('display:flex;align-items:center;gap:7px;');right.appendChild(mkBadge(f.pri));var del=mkBtn('','\u00d7','background:none;border:none;color:var(--text3);cursor:pointer;font-size:18px;line-height:1;');(function(id){del.addEventListener('click',function(){F=F.filter(function(f){return f.id!==id;});sv();if(supaReady) fetch(SUPA_URL+'/rest/v1/followups?id=eq.'+id,{method:'DELETE',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}});rfu();rd();});})(f.id);right.appendChild(del);row.appendChild(chk);row.appendChild(info);row.appendChild(right);el.appendChild(row);});
   ge('nbFollowups').textContent=F.filter(function(f){return !f.done;}).length;
 }
 function tfu(id){var f=F.find(function(x){return x.id===id;});if(f){f.done=!f.done;sv();if(supaReady) dbSave('followups',[f]);}}
@@ -1457,22 +1457,22 @@ function rn(){
     var h=mkRow('note-hdr');
     var av=mkDiv('av av-'+(c?c.type:'lead'),c?ini(c):'?');
     av.className='av av-'+(c?c.type:'lead');
-    av.style.cssText='width:26px;height:26px;font-size:10px;';
+    av.style.cssText='width:26px;height:26px;font-size:16px;';
     var b=document.createElement('b');
     b.style.fontSize='12px';
     b.textContent=c?fn(c):'Unknown';
     h.appendChild(av);h.appendChild(b);
     if(c){var tg=document.createElement('span');tg.className='tag tag-'+c.type;tg.textContent=c.type;h.appendChild(tg);}
-    h.appendChild(mkDiv('font-size:11px;color:var(--text3);',rt(note.date)));
+    h.appendChild(mkDiv('font-size:16px;color:var(--text3);',rt(note.date)));
     // Edit/Delete buttons
     var acts=document.createElement('div');
     acts.style.cssText='margin-left:auto;display:flex;gap:6px;flex-shrink:0;';
     var editBtn=document.createElement('button');
-    editBtn.style.cssText='background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:3px 8px;cursor:pointer;font-size:11px;color:var(--text2);font-family:DM Sans,sans-serif;';
+    editBtn.style.cssText='background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:3px 8px;cursor:pointer;font-size:16px;color:var(--text2);font-family:DM Sans,sans-serif;';
     editBtn.textContent='Edit';
     (function(n2){ editBtn.addEventListener('click',function(){ openEditNote(n2); }); })(note);
     var delBtn=document.createElement('button');
-    delBtn.style.cssText='background:rgba(201,76,76,0.1);border:1px solid rgba(201,76,76,0.2);border-radius:5px;padding:3px 8px;cursor:pointer;font-size:11px;color:var(--danger);font-family:DM Sans,sans-serif;';
+    delBtn.style.cssText='background:rgba(201,76,76,0.1);border:1px solid rgba(201,76,76,0.2);border-radius:5px;padding:3px 8px;cursor:pointer;font-size:16px;color:var(--danger);font-family:DM Sans,sans-serif;';
     delBtn.textContent='Del';
     (function(nid){ delBtn.addEventListener('click',function(){
       if(!confirm('Delete this note?')) return;
@@ -1576,7 +1576,7 @@ function rdl(){
   var real = filtered.filter(function(i){return i.type==='real';}).length;
   var missing = filtered.filter(function(i){return i.type==='missing';}).length;
   var summary = document.createElement('div');
-  summary.style.cssText='font-size:12px;color:var(--text3);margin-bottom:10px;display:flex;gap:12px;flex-wrap:wrap;';
+  summary.style.cssText='font-size:16px;color:var(--text3);margin-bottom:10px;display:flex;gap:12px;flex-wrap:wrap;';
   summary.innerHTML = '<span>' + real + ' deadline' + (real!==1?'s':'') + '</span>'
     + (missing ? '<span style="color:var(--danger);font-weight:600;">&#9888; ' + missing + ' missing date' + (missing!==1?'s':'') + ' need attention</span>' : '');
   el.appendChild(summary);
@@ -1592,21 +1592,21 @@ function rdl(){
       var info = document.createElement('div');
       info.style.flex='1';
       var lbl = document.createElement('div');
-      lbl.style.cssText='font-size:13px;font-weight:600;color:var(--danger);';
+      lbl.style.cssText='font-size:16px;font-weight:600;color:var(--danger);';
       lbl.textContent='MISSING: ' + item.label;
       var sub = document.createElement('div');
-      sub.style.cssText='font-size:11px;color:var(--text3);margin-top:2px;';
+      sub.style.cssText='font-size:16px;color:var(--text3);margin-top:2px;';
       var c2=gc(item.contactId);
       sub.textContent=(item.txAddress||'Unknown property') + (c2?' - '+fn(c2):'') + ' | Date not found in scanned document';
       info.appendChild(lbl); info.appendChild(sub);
       // Add date input to resolve
       var inp = document.createElement('input');
       inp.type='date';
-      inp.style.cssText='background:var(--surface);border:1px solid rgba(201,76,76,0.4);border-radius:5px;padding:5px 8px;font-size:12px;color:var(--text);font-family:DM Sans,sans-serif;outline:none;';
+      inp.style.cssText='background:var(--surface);border:1px solid rgba(201,76,76,0.4);border-radius:5px;padding:5px 8px;font-size:16px;color:var(--text);font-family:DM Sans,sans-serif;outline:none;';
       inp.placeholder='Set date to resolve';
       var saveBtn2 = document.createElement('button');
       saveBtn2.className='btn btn-p';
-      saveBtn2.style.cssText='font-size:12px;padding:5px 12px;';
+      saveBtn2.style.cssText='font-size:16px;padding:5px 12px;';
       saveBtn2.textContent='Add Date';
       (function(it, inpEl){
         saveBtn2.addEventListener('click', function(){
@@ -1641,30 +1641,30 @@ function rdl(){
 
       var info2=mkDiv('flex:1;');
       var typeLbl=document.createElement('div');
-      typeLbl.style.cssText='font-size:13px;font-weight:600;color:'+(isOverdue?'var(--danger)':isToday?'var(--accent)':'var(--text)')+';';
+      typeLbl.style.cssText='font-size:16px;font-weight:600;color:'+(isOverdue?'var(--danger)':isToday?'var(--accent)':'var(--text)')+';';
       typeLbl.textContent=(isOverdue?'OVERDUE: ':isToday?'TODAY: ':'')+d.type;
       info2.appendChild(typeLbl);
-      var subLbl=mkDiv('font-size:11px;color:var(--text3);',(c?fn(c):'Unknown')+(c&&c.property?' - '+c.property:''));
+      var subLbl=mkDiv('font-size:16px;color:var(--text3);',(c?fn(c):'Unknown')+(c&&c.property?' - '+c.property:''));
       info2.appendChild(subLbl);
       row2.appendChild(info2);
 
       var right2=mkDiv('display:flex;align-items:center;gap:8px;');
       var dates2=mkDiv('text-align:right;');
       var dateTxt=document.createElement('div');
-      dateTxt.style.cssText='font-family:monospace;font-size:13px;color:'+(isOverdue?'var(--danger)':isToday?'var(--accent)':'var(--text2)')+';font-weight:'+(isOverdue||isToday?'700':'400')+';';
+      dateTxt.style.cssText='font-family:monospace;font-size:16px;color:'+(isOverdue?'var(--danger)':isToday?'var(--accent)':'var(--text2)')+';font-weight:'+(isOverdue||isToday?'700':'400')+';';
       dateTxt.textContent=fd(d.date);
       var lbl2Text=isOverdue?Math.abs(n)+'d overdue':isToday?'TODAY':n+' days';
-      var lbl2=mkDiv('font-size:11px;color:'+(isOverdue?'var(--danger)':isUrgent?'var(--warn)':'var(--text3)')+';',lbl2Text);
+      var lbl2=mkDiv('font-size:16px;color:'+(isOverdue?'var(--danger)':isUrgent?'var(--warn)':'var(--text3)')+';',lbl2Text);
       dates2.appendChild(dateTxt); dates2.appendChild(lbl2);
       right2.appendChild(dates2);
 
       var editBtn2=document.createElement('button');
-      editBtn2.style.cssText='background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:4px 8px;cursor:pointer;font-size:11px;color:var(--text2);font-family:DM Sans,sans-serif;';
+      editBtn2.style.cssText='background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:4px 8px;cursor:pointer;font-size:16px;color:var(--text2);font-family:DM Sans,sans-serif;';
       editBtn2.textContent='Edit';
       (function(dl){ editBtn2.addEventListener('click',function(e){ e.stopPropagation(); openEditDL(dl); }); })(d);
 
       var delBtn2=document.createElement('button');
-      delBtn2.style.cssText='background:rgba(201,76,76,0.1);border:1px solid rgba(201,76,76,0.2);border-radius:5px;padding:4px 8px;cursor:pointer;font-size:11px;color:var(--danger);font-family:DM Sans,sans-serif;';
+      delBtn2.style.cssText='background:rgba(201,76,76,0.1);border:1px solid rgba(201,76,76,0.2);border-radius:5px;padding:4px 8px;cursor:pointer;font-size:16px;color:var(--danger);font-family:DM Sans,sans-serif;';
       delBtn2.textContent='Del';
       (function(did){ delBtn2.addEventListener('click',function(e){ e.stopPropagation(); if(confirm('Delete this deadline?')){ D=D.filter(function(x){return x.id!==did;}); sv(); if(supaReady) fetch(SUPA_URL+'/rest/v1/deadlines?id=eq.'+did,{method:'DELETE',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}}); rdl(); rd(); }}); })(d.id);
 
@@ -1874,7 +1874,7 @@ function showCSVPreview(contacts){
   var preview = ge('csvPreview');
   preview.innerHTML = '';
   var msg = document.createElement('p');
-  msg.style.cssText = 'font-size:13px;color:var(--text2);margin-bottom:12px;';
+  msg.style.cssText = 'font-size:16px;color:var(--text2);margin-bottom:12px;';
   msg.textContent = 'Found ';
   var b = document.createElement('b');
   b.style.color = 'var(--accent)';
@@ -1885,7 +1885,7 @@ function showCSVPreview(contacts){
   var wrap = document.createElement('div');
   wrap.style.cssText = 'max-height:280px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;';
   var table = document.createElement('table');
-  table.style.cssText = 'width:100%;border-collapse:collapse;font-size:12px;';
+  table.style.cssText = 'width:100%;border-collapse:collapse;font-size:16px;';
   var thead = document.createElement('thead');
   var hrow = document.createElement('tr');
   hrow.style.background = 'var(--surface2)';
@@ -2211,7 +2211,7 @@ function renderTC(){
     title.className = 'tc-card-title';
     title.textContent = tx.address || 'No address';
     var sub = document.createElement('div');
-    sub.style.cssText = 'font-size:11px;color:var(--text3);margin-top:2px;';
+    sub.style.cssText = 'font-size:16px;color:var(--text3);margin-top:2px;';
     sub.textContent = c ? fn(c) : 'Unknown client';
     tl.appendChild(title); tl.appendChild(sub);
     var badge = document.createElement('span');
@@ -2227,10 +2227,10 @@ function renderTC(){
     var progRow = document.createElement('div');
     progRow.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;';
     var progLbl = document.createElement('div');
-    progLbl.style.cssText = 'font-size:11px;color:var(--text3);';
+    progLbl.style.cssText = 'font-size:16px;color:var(--text3);';
     progLbl.textContent = prog + '% complete';
     var progPct = document.createElement('div');
-    progPct.style.cssText = 'font-family:monospace;font-size:11px;color:var(--accent);';
+    progPct.style.cssText = 'font-family:monospace;font-size:16px;color:var(--accent);';
     progPct.textContent = prog + '%';
     progRow.appendChild(progLbl); progRow.appendChild(progPct);
     var bar = document.createElement('div');
@@ -2246,9 +2246,9 @@ function renderTC(){
     if(tx.closingDate || tx.price){
       var dates = document.createElement('div');
       dates.style.cssText = 'display:flex;gap:12px;margin:10px 0 8px;flex-wrap:wrap;';
-      if(tx.price){ var p=document.createElement('div'); p.style.cssText='font-size:12px;'; p.innerHTML='<span style="color:var(--text3);">Price:</span> <b style="color:var(--accent);">'+tx.price+'</b>'; dates.appendChild(p); }
+      if(tx.price){ var p=document.createElement('div'); p.style.cssText='font-size:16px;'; p.innerHTML='<span style="color:var(--text3);">Price:</span> <b style="color:var(--accent);">'+tx.price+'</b>'; dates.appendChild(p); }
       if(tx.closingDate){
-        var d=document.createElement('div'); d.style.cssText='font-size:12px;';
+        var d=document.createElement('div'); d.style.cssText='font-size:16px;';
         var n=daysToClose;
         var color = n < 0 ? 'var(--danger)' : n <= 7 ? 'var(--warn)' : 'var(--lead)';
         var lbl = n < 0 ? Math.abs(n)+'d overdue' : n === 0 ? 'TODAY' : n+'d to close';
@@ -2263,12 +2263,12 @@ function renderTC(){
       var nextDiv = document.createElement('div');
       nextDiv.style.cssText = 'margin-top:8px;padding-top:8px;border-top:1px solid var(--border);';
       var nextLbl = document.createElement('div');
-      nextLbl.style.cssText = 'font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px;';
+      nextLbl.style.cssText = 'font-size:16px;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px;';
       nextLbl.textContent = 'Next Steps';
       nextDiv.appendChild(nextLbl);
       next.slice(0,2).forEach(function(ns){
         var row = document.createElement('div');
-        row.style.cssText = 'font-size:12px;color:var(--text2);padding:3px 0;display:flex;align-items:flex-start;gap:6px;';
+        row.style.cssText = 'font-size:16px;color:var(--text2);padding:3px 0;display:flex;align-items:flex-start;gap:6px;';
         row.innerHTML = '<span style="color:var(--accent);flex-shrink:0;">&#8250;</span>' + ns.label;
         nextDiv.appendChild(row);
       });
@@ -2310,7 +2310,7 @@ function openTCDetail(id){
   ];
   fields.forEach(function(f){
     var d = document.createElement('div');
-    d.style.cssText = 'font-size:12px;min-width:120px;';
+    d.style.cssText = 'font-size:16px;min-width:120px;';
     d.innerHTML = '<span style="color:var(--text3);">' + f[0] + ':</span> <b style="color:var(--text);">' + f[1] + '</b>';
     infoSec.appendChild(d);
   });
@@ -2320,11 +2320,11 @@ function openTCDetail(id){
   var txAssignSec = document.createElement('div');
   txAssignSec.style.cssText = 'padding:10px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;';
   var txAssignLbl = document.createElement('div');
-  txAssignLbl.style.cssText = 'font-size:12px;color:var(--text3);flex-shrink:0;';
+  txAssignLbl.style.cssText = 'font-size:16px;color:var(--text3);flex-shrink:0;';
   txAssignLbl.textContent = 'Assigned To:';
   var txAssignSel = document.createElement('select');
   txAssignSel.className = 'fsel assign-to-select';
-  txAssignSel.style.cssText = 'font-size:12px;padding:5px 8px;flex:1;';
+  txAssignSel.style.cssText = 'font-size:16px;padding:5px 8px;flex:1;';
   txAssignSel.innerHTML = '<option value="">Unassigned</option>';
   TM.forEach(function(m){
     var o=document.createElement('option');
@@ -2344,7 +2344,7 @@ function openTCDetail(id){
   if(txAssignedM && txAssignedM.calLink){
     var txCalA = document.createElement('a');
     txCalA.href = txAssignedM.calLink; txCalA.target='_blank';
-    txCalA.className='team-cal-btn'; txCalA.style.cssText='width:auto;padding:5px 10px;font-size:11px;flex-shrink:0;';
+    txCalA.className='team-cal-btn'; txCalA.style.cssText='width:auto;padding:5px 10px;font-size:16px;flex-shrink:0;';
     txCalA.innerHTML='<svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> Calendar';
     txAssignSec.appendChild(txCalA);
   }
@@ -2362,7 +2362,7 @@ function openTCDetail(id){
   progFill.style.background = prog >= 100 ? 'var(--lead)' : prog >= 50 ? 'var(--accent)' : 'var(--buyer)';
   progBar.appendChild(progFill);
   var progLbl = document.createElement('div');
-  progLbl.style.cssText = 'font-size:12px;color:var(--text3);margin-top:4px;';
+  progLbl.style.cssText = 'font-size:16px;color:var(--text3);margin-top:4px;';
   progLbl.textContent = prog + '% complete across all checklist items';
   progSec.appendChild(progBar); progSec.appendChild(progLbl);
   body.appendChild(progSec);
@@ -2373,7 +2373,7 @@ function openTCDetail(id){
     var doneInPhase = phase.steps.filter(function(s){ return tx.steps && tx.steps[s.key]; }).length;
     var phaseHdr = document.createElement('div');
     phaseHdr.className = 'tc-phase-header';
-    phaseHdr.innerHTML = phase.phase + ' <span style="float:right;font-size:10px;color:var(--accent);">' + doneInPhase + '/' + phase.steps.length + '</span>';
+    phaseHdr.innerHTML = phase.phase + ' <span style="float:right;font-size:16px;color:var(--accent);">' + doneInPhase + '/' + phase.steps.length + '</span>';
     body.appendChild(phaseHdr);
 
     phase.steps.forEach(function(step){
@@ -2435,10 +2435,10 @@ function openTCDetail(id){
     var notesSec = document.createElement('div');
     notesSec.style.cssText = 'padding:14px 20px;border-top:1px solid var(--border);';
     var notesLabel = document.createElement('div');
-    notesLabel.style.cssText = 'font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:2px;margin-bottom:8px;';
+    notesLabel.style.cssText = 'font-size:16px;color:var(--text3);text-transform:uppercase;letter-spacing:2px;margin-bottom:8px;';
     notesLabel.textContent = 'Notes';
     var notesText = document.createElement('div');
-    notesText.style.cssText = 'font-size:13px;color:var(--text2);line-height:1.7;white-space:pre-wrap;word-break:break-word;';
+    notesText.style.cssText = 'font-size:16px;color:var(--text2);line-height:1.7;white-space:pre-wrap;word-break:break-word;';
     notesText.textContent = tx.notes;
     notesSec.appendChild(notesLabel);
     notesSec.appendChild(notesText);
@@ -2819,7 +2819,7 @@ function showScannerResults(r){
   title.className = 'scanner-result-title';
   title.textContent = r.docType || 'Document';
   var addr = document.createElement('div');
-  addr.style.cssText = 'font-size:13px;color:var(--text2);margin-top:3px;';
+  addr.style.cssText = 'font-size:16px;color:var(--text2);margin-top:3px;';
   addr.textContent = r.address || 'Address not found';
   titleDiv.appendChild(title); titleDiv.appendChild(addr);
   var typeB = document.createElement('span');
@@ -2833,7 +2833,7 @@ function showScannerResults(r){
     var sumDiv = document.createElement('div');
     sumDiv.className = 'scanner-summary';
     var sumLabel = document.createElement('div');
-    sumLabel.style.cssText = 'font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);margin-bottom:6px;';
+    sumLabel.style.cssText = 'font-size:16px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);margin-bottom:6px;';
     sumLabel.textContent = 'Summary';
     var sumText = document.createElement('div');
     sumText.textContent = r.summary;
@@ -2847,7 +2847,7 @@ function showScannerResults(r){
     spDiv.className = 'scanner-summary';
     spDiv.style.borderLeftColor = 'var(--seller)';
     var spLabel = document.createElement('div');
-    spLabel.style.cssText = 'font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);margin-bottom:6px;';
+    spLabel.style.cssText = 'font-size:16px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);margin-bottom:6px;';
     spLabel.textContent = 'Resumen en Espanol';
     var spText = document.createElement('div');
     spText.textContent = r.spanishSummary;
@@ -2857,7 +2857,7 @@ function showScannerResults(r){
 
   // Key fields grid - editable
   var fieldsLabel = document.createElement('div');
-  fieldsLabel.style.cssText = 'font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);margin-bottom:8px;';
+  fieldsLabel.style.cssText = 'font-size:16px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);margin-bottom:8px;';
   fieldsLabel.textContent = 'Extracted Data (edit before importing)';
   card.appendChild(fieldsLabel);
 
@@ -2891,7 +2891,7 @@ function showScannerResults(r){
 
   // Deadlines section
   var dlLabel = document.createElement('div');
-  dlLabel.style.cssText = 'font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);margin-bottom:8px;margin-top:4px;';
+  dlLabel.style.cssText = 'font-size:16px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);margin-bottom:8px;margin-top:4px;';
   dlLabel.textContent = 'Key Dates & Deadlines (edit before importing)';
   card.appendChild(dlLabel);
 
@@ -2912,13 +2912,13 @@ function showScannerResults(r){
     var dot = document.createElement('div');
     dot.className = 'dot ' + (r[d.key] ? 'dot-g' : 'dot-r');
     var lbl = document.createElement('div');
-    lbl.style.cssText = 'flex:1;font-size:13px;color:var(--text);';
+    lbl.style.cssText = 'flex:1;font-size:16px;color:var(--text);';
     lbl.textContent = d.label;
     var inp = document.createElement('input');
     inp.id = d.id;
     inp.type = 'date';
     inp.value = r[d.key] || '';
-    inp.style.cssText = 'background:var(--surface);border:1px solid var(--border);border-radius:5px;padding:4px 8px;font-size:12px;color:var(--text);font-family:DM Sans,sans-serif;outline:none;';
+    inp.style.cssText = 'background:var(--surface);border:1px solid var(--border);border-radius:5px;padding:4px 8px;font-size:16px;color:var(--text);font-family:DM Sans,sans-serif;outline:none;';
     inp.addEventListener('focus', function(){ this.style.borderColor='var(--accent)'; });
     inp.addEventListener('blur', function(){ this.style.borderColor='var(--border)'; });
     row.appendChild(dot); row.appendChild(lbl); row.appendChild(inp);
@@ -2932,7 +2932,7 @@ function showScannerResults(r){
     flagDiv.className = 'scanner-flags';
     flagDiv.style.marginTop = '12px';
     var flagTitle = document.createElement('div');
-    flagTitle.style.cssText = 'font-size:11px;font-weight:700;color:var(--danger);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;';
+    flagTitle.style.cssText = 'font-size:16px;font-weight:700;color:var(--danger);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;';
     flagTitle.textContent = 'Items Needing Attention';
     flagDiv.appendChild(flagTitle);
     r.redFlags.forEach(function(flag){
@@ -2948,8 +2948,8 @@ function showScannerResults(r){
   if(r.keyChanges){
     var chgDiv = document.createElement('div');
     chgDiv.style.cssText = 'background:rgba(76,142,201,0.08);border:1px solid rgba(76,142,201,0.2);border-radius:8px;padding:12px 14px;margin-top:12px;';
-    chgDiv.innerHTML = '<div style="font-size:11px;font-weight:700;color:var(--buyer);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Changes from Original Contract</div>'
-      + '<div style="font-size:13px;color:var(--text2);">' + r.keyChanges + '</div>';
+    chgDiv.innerHTML = '<div style="font-size:16px;font-weight:700;color:var(--buyer);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Changes from Original Contract</div>'
+      + '<div style="font-size:16px;color:var(--text2);">' + r.keyChanges + '</div>';
     card.appendChild(chgDiv);
   }
 
@@ -2958,12 +2958,12 @@ function showScannerResults(r){
     var inspDiv = document.createElement('div');
     inspDiv.style.cssText = 'margin-top:12px;';
     var inspTitle = document.createElement('div');
-    inspTitle.style.cssText = 'font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);margin-bottom:8px;';
+    inspTitle.style.cssText = 'font-size:16px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);margin-bottom:8px;';
     inspTitle.textContent = 'Major Inspection Items';
     inspDiv.appendChild(inspTitle);
     r.inspectionItems.forEach(function(item){
       var i = document.createElement('div');
-      i.style.cssText = 'font-size:13px;color:var(--text2);padding:4px 0;border-bottom:1px solid var(--border);display:flex;gap:8px;';
+      i.style.cssText = 'font-size:16px;color:var(--text2);padding:4px 0;border-bottom:1px solid var(--border);display:flex;gap:8px;';
       i.innerHTML = '<span style="color:var(--warn);">-</span>' + item;
       inspDiv.appendChild(i);
     });
@@ -2974,7 +2974,7 @@ function showScannerResults(r){
   var linkDiv = document.createElement('div');
   linkDiv.style.cssText = 'margin-top:14px;padding-top:12px;border-top:1px solid var(--border);';
   var linkLabel = document.createElement('div');
-  linkLabel.style.cssText = 'font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px;';
+  linkLabel.style.cssText = 'font-size:16px;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px;';
   linkLabel.textContent = 'Link to Existing Transaction (optional)';
   var txSel = document.createElement('select');
   txSel.id = 'sc_link_tx';
@@ -3018,10 +3018,10 @@ function showScannerResults(r){
   var notesSec = document.createElement('div');
   notesSec.style.cssText = 'background:var(--surface2);border-radius:9px;padding:14px 16px;margin-top:12px;';
   var notesTitle = document.createElement('div');
-  notesTitle.style.cssText = 'font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);margin-bottom:8px;';
+  notesTitle.style.cssText = 'font-size:16px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);margin-bottom:8px;';
   notesTitle.textContent = 'Full Transaction Notes (saved to CRM)';
   var notesBody = document.createElement('div');
-  notesBody.style.cssText = 'font-size:13px;color:var(--text2);line-height:1.7;white-space:pre-wrap;word-break:break-word;';
+  notesBody.style.cssText = 'font-size:16px;color:var(--text2);line-height:1.7;white-space:pre-wrap;word-break:break-word;';
   var NL3 = '\n';
   var fullNotes = 'Imported from document scan: ' + (r.docType||'Document') + '. ' + (r.summary||'');
   if(r.keyChanges) fullNotes += NL3 + NL3 + 'Key Changes: ' + r.keyChanges;
@@ -3317,11 +3317,11 @@ function renderTeamCards(){
     btnRow.style.cssText = 'display:flex;gap:7px;';
     var editBtn = document.createElement('button');
     editBtn.className = 'btn btn-g';
-    editBtn.style.cssText += 'flex:1;font-size:12px;padding:5px;';
+    editBtn.style.cssText += 'flex:1;font-size:16px;padding:5px;';
     editBtn.textContent = 'Edit';
     (function(mid){ editBtn.addEventListener('click', function(){ openEditMember(mid); }); })(m.id);
     var delBtn = document.createElement('button');
-    delBtn.style.cssText = 'background:rgba(201,76,76,0.1);border:1px solid rgba(201,76,76,0.2);border-radius:7px;padding:5px 10px;cursor:pointer;font-size:12px;color:var(--danger);font-family:DM Sans,sans-serif;';
+    delBtn.style.cssText = 'background:rgba(201,76,76,0.1);border:1px solid rgba(201,76,76,0.2);border-radius:7px;padding:5px 10px;cursor:pointer;font-size:16px;color:var(--danger);font-family:DM Sans,sans-serif;';
     delBtn.textContent = 'Remove';
     (function(mid){ delBtn.addEventListener('click', function(){
       if(!confirm('Remove this team member?')) return;
@@ -3410,10 +3410,10 @@ function renderTeamAssignments(){
     var secHdr = document.createElement('div');
     secHdr.style.cssText = 'padding:10px 16px;background:var(--surface2);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;';
     var av2 = document.createElement('div');
-    av2.style.cssText = 'width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;background:'+(m.color||'#C9A84C')+'22;color:'+(m.color||'#C9A84C')+';';
+    av2.style.cssText = 'width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;flex-shrink:0;background:'+(m.color||'#C9A84C')+'22;color:'+(m.color||'#C9A84C')+';';
     av2.textContent = tmIni(m);
     var mName = document.createElement('div');
-    mName.style.cssText = 'font-size:13px;font-weight:600;color:var(--text);';
+    mName.style.cssText = 'font-size:16px;font-weight:600;color:var(--text);';
     mName.textContent = m.first + ' ' + m.last + ' - ' + byMember[mid].length + ' assignment' + (byMember[mid].length!==1?'s':'');
     secHdr.appendChild(av2); secHdr.appendChild(mName);
 
@@ -3422,7 +3422,7 @@ function renderTeamAssignments(){
       var calLink2 = document.createElement('a');
       calLink2.href = m.calLink;
       calLink2.target = '_blank';
-      calLink2.style.cssText = 'margin-left:auto;font-size:11px;color:var(--buyer);text-decoration:none;display:flex;align-items:center;gap:4px;';
+      calLink2.style.cssText = 'margin-left:auto;font-size:16px;color:var(--buyer);text-decoration:none;display:flex;align-items:center;gap:4px;';
       calLink2.innerHTML = '<svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> Calendar';
       secHdr.appendChild(calLink2);
     }
@@ -3441,16 +3441,16 @@ function renderTeamAssignments(){
       var info = document.createElement('div');
       info.style.flex = '1';
       var lbl = document.createElement('div');
-      lbl.style.cssText = 'font-size:13px;color:var(--text);';
+      lbl.style.cssText = 'font-size:16px;color:var(--text);';
       lbl.textContent = item.label;
       var sub = document.createElement('div');
-      sub.style.cssText = 'font-size:11px;color:var(--text3);margin-top:1px;';
+      sub.style.cssText = 'font-size:16px;color:var(--text3);margin-top:1px;';
       sub.textContent = item.sub;
       info.appendChild(lbl); info.appendChild(sub);
 
       // Unassign button
       var unBtn = document.createElement('button');
-      unBtn.style.cssText = 'background:none;border:none;color:var(--text3);cursor:pointer;font-size:11px;';
+      unBtn.style.cssText = 'background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;';
       unBtn.textContent = 'Unassign';
       (function(it){ unBtn.addEventListener('click', function(){
         it.obj.assignedTo = null;
@@ -3619,16 +3619,16 @@ function renderGmailAccountBar(){
     var acc = gmailState.connectedAccounts[String(m.id)];
     if(acc){
       var btn = document.createElement('button');
-      btn.style.cssText = 'display:flex;align-items:center;gap:7px;padding:6px 12px;border-radius:7px;border:1px solid '+(gmailState.activeMemberId==m.id?'var(--accent)':'var(--border)')+';background:'+(gmailState.activeMemberId==m.id?'rgba(201,168,76,0.1)':'var(--surface)')+';cursor:pointer;font-size:12px;font-family:DM Sans,sans-serif;color:var(--text);transition:all 0.15s;';
+      btn.style.cssText = 'display:flex;align-items:center;gap:7px;padding:6px 12px;border-radius:7px;border:1px solid '+(gmailState.activeMemberId==m.id?'var(--accent)':'var(--border)')+';background:'+(gmailState.activeMemberId==m.id?'rgba(201,168,76,0.1)':'var(--surface)')+';cursor:pointer;font-size:16px;font-family:DM Sans,sans-serif;color:var(--text);transition:all 0.15s;';
       var av = document.createElement('div');
       av.style.cssText = 'width:20px;height:20px;border-radius:50%;background:'+(m.color||'#C9A84C')+'33;color:'+(m.color||'#C9A84C')+';display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;flex-shrink:0;';
       av.textContent = tmIni(m);
       btn.appendChild(av);
       var txt = document.createElement('div');
-      txt.innerHTML = '<div style="font-size:12px;font-weight:600;">' + m.first + '</div><div style="font-size:10px;color:var(--text3);">' + acc.email + '</div>';
+      txt.innerHTML = '<div style="font-size:16px;font-weight:600;">' + m.first + '</div><div style="font-size:16px;color:var(--text3);">' + acc.email + '</div>';
       btn.appendChild(txt);
       var disBtn = document.createElement('button');
-      disBtn.style.cssText='background:rgba(201,76,76,0.1);border:1px solid rgba(201,76,76,0.2);border-radius:4px;color:var(--danger);cursor:pointer;font-size:10px;padding:2px 5px;margin-left:4px;font-family:DM Sans,sans-serif;';
+      disBtn.style.cssText='background:rgba(201,76,76,0.1);border:1px solid rgba(201,76,76,0.2);border-radius:4px;color:var(--danger);cursor:pointer;font-size:16px;padding:2px 5px;margin-left:4px;font-family:DM Sans,sans-serif;';
       disBtn.title='Disconnect Gmail';
       disBtn.textContent='Disconnect';
       (function(mid){ disBtn.addEventListener('click', function(e){ e.stopPropagation(); disconnectGmail(mid); }); })(m.id);
@@ -3658,7 +3658,7 @@ async function connectGmail(memberId){
   try{
     // Show loading state
     var connectBtns = ge('gmailConnectButtons');
-    if(connectBtns) connectBtns.innerHTML = '<div style="color:var(--text3);font-size:13px;">Connecting...</div>';
+    if(connectBtns) connectBtns.innerHTML = '<div style="color:var(--text3);font-size:16px;">Connecting...</div>';
 
     var resp = await fetch('/api/gmail-auth?action=url&memberId=' + memberId);
     if(!resp.ok){
@@ -3750,7 +3750,7 @@ function switchGmailAccount(memberId){
 async function loadGmailInbox(){
   if(!gmailState.activeMemberId) return;
   var filter = ge('gmailInboxFilter') ? ge('gmailInboxFilter').value : 'in:inbox';
-  ge('gmailMsgList').innerHTML = '<div style="padding:20px;text-align:center;color:var(--text3);font-size:13px;">Loading...</div>';
+  ge('gmailMsgList').innerHTML = '<div style="padding:20px;text-align:center;color:var(--text3);font-size:16px;">Loading...</div>';
   try{
     var resp = await fetch('/api/gmail-api', {
       method:'POST', headers:{'Content-Type':'application/json'},
@@ -3760,16 +3760,16 @@ async function loadGmailInbox(){
     var data;
     try{ data = JSON.parse(respText); }
     catch(e){
-      ge('gmailMsgList').innerHTML='<div style="padding:20px;color:var(--danger);font-size:13px;">API error ('+resp.status+'): '+respText.substring(0,200)+'</div>';
+      ge('gmailMsgList').innerHTML='<div style="padding:20px;color:var(--danger);font-size:16px;">API error ('+resp.status+'): '+respText.substring(0,200)+'</div>';
       return;
     }
-    if(data.error){ ge('gmailMsgList').innerHTML='<div style="padding:20px;color:var(--danger);font-size:13px;">'+data.error+'</div>'; return; }
+    if(data.error){ ge('gmailMsgList').innerHTML='<div style="padding:20px;color:var(--danger);font-size:16px;">'+data.error+'</div>'; return; }
     gmailState.messages = data.messages || [];
     ge('gmailMsgCount').textContent = gmailState.messages.length + ' messages';
     var unread = gmailState.messages.filter(function(m){return m.unread;}).length;
     ge('nbGmail').textContent = unread || '';
     renderGmailList();
-  }catch(e){ ge('gmailMsgList').innerHTML='<div style="padding:20px;color:var(--danger);font-size:13px;">Error loading emails: '+e.message+'</div>'; }
+  }catch(e){ ge('gmailMsgList').innerHTML='<div style="padding:20px;color:var(--danger);font-size:16px;">Error loading emails: '+e.message+'</div>'; }
 }
 
 function renderGmailList(){
@@ -3809,7 +3809,7 @@ function renderGmailList(){
     snip.textContent = msg.snippet;
     if(msg.hasAttachment){
       var att = document.createElement('span');
-      att.style.cssText='color:var(--accent);font-size:10px;margin-left:4px;';
+      att.style.cssText='color:var(--accent);font-size:16px;margin-left:4px;';
       att.textContent='[attachment]';
       subj.appendChild(att);
     }
@@ -3835,7 +3835,7 @@ async function loadThread(threadId, messageId){
   renderGmailList(); // Update active state
 
   var thread = ge('gmailThread');
-  thread.innerHTML = '<div class="gmail-empty"><div style="font-size:13px;color:var(--text3);">Loading thread...</div></div>';
+  thread.innerHTML = '<div class="gmail-empty"><div style="font-size:16px;color:var(--text3);">Loading thread...</div></div>';
 
   try{
     var resp = await fetch('/api/gmail-api', {
@@ -3876,7 +3876,7 @@ function renderThread(messages, threadId){
     cBadge.textContent = fn(contact);
     var cBtn = document.createElement('button');
     cBtn.className = 'btn btn-g';
-    cBtn.style.cssText = 'font-size:11px;padding:3px 8px;';
+    cBtn.style.cssText = 'font-size:16px;padding:3px 8px;';
     cBtn.textContent = 'View Contact';
     (function(cid){ cBtn.addEventListener('click', function(){ vc(cid); }); })(contact.id);
     cLink.appendChild(cBadge); cLink.appendChild(cBtn);
@@ -3885,7 +3885,7 @@ function renderThread(messages, threadId){
     // Option to create contact from email
     var newCBtn = document.createElement('button');
     newCBtn.className = 'btn btn-g';
-    newCBtn.style.cssText = 'font-size:11px;padding:3px 8px;margin-top:6px;';
+    newCBtn.style.cssText = 'font-size:16px;padding:3px 8px;margin-top:6px;';
     newCBtn.textContent = '+ Add as Contact';
     (function(email, name){ newCBtn.addEventListener('click', function(){
       var parts = name.replace(/<.*>/,'').trim().split(' ');
@@ -3941,7 +3941,7 @@ function renderThread(messages, threadId){
       var attDiv = document.createElement('div');
       attDiv.style.cssText = 'margin-top:12px;border-top:1px solid var(--border);padding-top:10px;';
       var attLabel = document.createElement('div');
-      attLabel.style.cssText = 'font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);margin-bottom:6px;';
+      attLabel.style.cssText = 'font-size:16px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);margin-bottom:6px;';
       attLabel.textContent = 'Attachments';
       attDiv.appendChild(attLabel);
       msg.attachments.forEach(function(att){
@@ -3954,7 +3954,7 @@ function renderThread(messages, threadId){
         // Scan button for PDFs and images
         if(att.mimeType && (att.mimeType.includes('pdf') || att.mimeType.includes('image'))){
           var scanBtn = document.createElement('button');
-          scanBtn.style.cssText = 'margin-left:6px;background:var(--accent);border:none;border-radius:4px;padding:2px 7px;font-size:10px;color:var(--bg);cursor:pointer;font-family:DM Sans,sans-serif;font-weight:700;';
+          scanBtn.style.cssText = 'margin-left:6px;background:var(--accent);border:none;border-radius:4px;padding:2px 7px;font-size:16px;color:var(--bg);cursor:pointer;font-family:DM Sans,sans-serif;font-weight:700;';
           scanBtn.textContent = 'Scan';
           (function(a, mid){ scanBtn.addEventListener('click', function(e){
             e.stopPropagation();
@@ -3980,7 +3980,7 @@ function renderThread(messages, threadId){
   var replyTitle = document.createElement('span');
   replyTitle.textContent = 'Reply';
   var replyExpand = document.createElement('button');
-  replyExpand.style.cssText = 'background:none;border:none;color:var(--text3);cursor:pointer;font-size:12px;font-family:DM Sans,sans-serif;';
+  replyExpand.style.cssText = 'background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;font-family:DM Sans,sans-serif;';
   replyExpand.textContent = 'Open in Composer';
   var lastMsg = messages[messages.length-1];
   (function(lm, tid){ replyExpand.addEventListener('click', function(){
@@ -4002,7 +4002,7 @@ function renderThread(messages, threadId){
   replyTA.placeholder = 'Quick reply...';
   var replySend = document.createElement('button');
   replySend.className = 'btn btn-p';
-  replySend.style.cssText = 'margin-top:8px;font-size:13px;';
+  replySend.style.cssText = 'margin-top:8px;font-size:16px;';
   replySend.textContent = 'Send Reply';
   (function(lm, tid, ta){ replySend.addEventListener('click', function(){
     if(!ta.value.trim()){ alert('Please enter a reply.'); return; }
@@ -4328,17 +4328,17 @@ function mkMLSCard(l){
   photoDiv.style.cssText = 'width:100%;height:170px;background:var(--surface2);display:flex;align-items:center;justify-content:center;position:relative;';
   var photoPlaceholder = document.createElement('div');
   photoPlaceholder.style.cssText = 'text-align:center;color:var(--text3);';
-  photoPlaceholder.innerHTML = '<svg width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg><div style="font-size:11px;margin-top:4px;">No Photo</div>';
+  photoPlaceholder.innerHTML = '<svg width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg><div style="font-size:16px;margin-top:4px;">No Photo</div>';
   photoDiv.appendChild(photoPlaceholder);
 
   var domBadge = document.createElement('div');
   domBadge.className = 'mls-dom ' + domClass(l.dom);
-  domBadge.style.cssText = 'position:absolute;top:8px;right:8px;font-size:10px;font-family:monospace;padding:2px 7px;border-radius:4px;font-weight:700;';
+  domBadge.style.cssText = 'position:absolute;top:8px;right:8px;font-size:16px;font-family:monospace;padding:2px 7px;border-radius:4px;font-weight:700;';
   domBadge.textContent = domLabel(l.dom);
   photoDiv.appendChild(domBadge);
 
   var statusBadge = document.createElement('div');
-  statusBadge.style.cssText = 'position:absolute;top:8px;left:8px;font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;text-transform:uppercase;';
+  statusBadge.style.cssText = 'position:absolute;top:8px;left:8px;font-size:16px;font-weight:700;padding:2px 7px;border-radius:4px;text-transform:uppercase;';
   statusBadge.style.background = l.status === 'Active' ? 'rgba(107,201,122,0.9)' : 'rgba(201,168,76,0.9)';
   statusBadge.style.color = '#0d0f14';
   statusBadge.textContent = l.status;
@@ -4368,12 +4368,12 @@ function mkMLSCard(l){
   footer.className = 'mls-card-footer';
   var attachBtn = document.createElement('button');
   attachBtn.className = 'btn btn-g';
-  attachBtn.style.cssText = 'font-size:11px;padding:4px 9px;';
+  attachBtn.style.cssText = 'font-size:16px;padding:4px 9px;';
   attachBtn.textContent = 'Attach to Client';
   (function(listing){ attachBtn.addEventListener('click', function(e){ e.stopPropagation(); openAttachModal(listing); }); })(l);
   var detailBtn = document.createElement('button');
   detailBtn.className = 'btn btn-p';
-  detailBtn.style.cssText = 'font-size:11px;padding:4px 9px;margin-left:auto;';
+  detailBtn.style.cssText = 'font-size:16px;padding:4px 9px;margin-left:auto;';
   detailBtn.textContent = 'View Details';
   (function(listing){ detailBtn.addEventListener('click', function(e){ e.stopPropagation(); openMLSDetail(listing); }); })(l);
   footer.appendChild(attachBtn); footer.appendChild(detailBtn);
@@ -4396,10 +4396,10 @@ function mkMLSListItem(l){
   price.style.cssText = 'font-family:Bebas Neue,sans-serif;font-size:18px;color:var(--accent);';
   price.textContent = fmtPrice(l.price);
   var addr = document.createElement('div');
-  addr.style.cssText = 'font-size:13px;font-weight:600;color:var(--text);';
+  addr.style.cssText = 'font-size:16px;font-weight:600;color:var(--text);';
   addr.textContent = l.address + ', ' + l.city + ' ' + l.zip;
   var stats = document.createElement('div');
-  stats.style.cssText = 'font-size:12px;color:var(--text2);margin-top:3px;';
+  stats.style.cssText = 'font-size:16px;color:var(--text2);margin-top:3px;';
   stats.textContent = l.beds + ' bd | ' + l.baths + ' ba | ' + fmtSqft(l.sqft) + ' | ' + domLabel(l.dom) + ' on market';
   info.appendChild(price); info.appendChild(addr); info.appendChild(stats);
 
@@ -4410,7 +4410,7 @@ function mkMLSListItem(l){
   domDiv.textContent = domLabel(l.dom);
   var attachBtn = document.createElement('button');
   attachBtn.className = 'btn btn-g';
-  attachBtn.style.cssText = 'font-size:11px;padding:4px 9px;';
+  attachBtn.style.cssText = 'font-size:16px;padding:4px 9px;';
   attachBtn.textContent = 'Attach';
   (function(listing){ attachBtn.addEventListener('click', function(e){ e.stopPropagation(); openAttachModal(listing); }); })(l);
   right.appendChild(domDiv); right.appendChild(attachBtn);
@@ -4426,7 +4426,7 @@ function renderMLSPagination(total){
   if(pages <= 1) return;
   for(var i = 0; i < pages; i++){
     var btn = document.createElement('button');
-    btn.style.cssText = 'padding:5px 11px;border-radius:5px;border:1px solid var(--border);cursor:pointer;font-size:13px;font-family:DM Sans,sans-serif;transition:all 0.15s;';
+    btn.style.cssText = 'padding:5px 11px;border-radius:5px;border:1px solid var(--border);cursor:pointer;font-size:16px;font-family:DM Sans,sans-serif;transition:all 0.15s;';
     btn.style.background = i === mlsCurrentPage ? 'var(--accent)' : 'var(--surface2)';
     btn.style.color = i === mlsCurrentPage ? 'var(--bg)' : 'var(--text2)';
     btn.textContent = i + 1;
@@ -4441,7 +4441,7 @@ function openMLSDetail(l){
 
   var photoSection = document.createElement('div');
   photoSection.className = 'mls-det-photos';
-  photoSection.innerHTML = '<div style="width:100%;height:240px;background:var(--surface2);display:flex;align-items:center;justify-content:center;flex-direction:column;color:var(--text3);"><svg width="48" height="48" fill="none" stroke="currentColor" stroke-width="1" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg><div style="margin-top:8px;font-size:13px;">Photos load with live MLS token</div></div>';
+  photoSection.innerHTML = '<div style="width:100%;height:240px;background:var(--surface2);display:flex;align-items:center;justify-content:center;flex-direction:column;color:var(--text3);"><svg width="48" height="48" fill="none" stroke="currentColor" stroke-width="1" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg><div style="margin-top:8px;font-size:16px;">Photos load with live MLS token</div></div>';
   content.appendChild(photoSection);
 
   var body = document.createElement('div');
@@ -4489,7 +4489,7 @@ function openMLSDetail(l){
   descTitle.className = 'mls-det-sec-title';
   descTitle.textContent = 'Description';
   var descText = document.createElement('div');
-  descText.style.cssText = 'font-size:13px;color:var(--text2);line-height:1.6;';
+  descText.style.cssText = 'font-size:16px;color:var(--text2);line-height:1.6;';
   descText.textContent = l.desc || 'No description available.';
   descSec.appendChild(descTitle); descSec.appendChild(descText);
 
@@ -4499,7 +4499,7 @@ function openMLSDetail(l){
   agentTitle.className = 'mls-det-sec-title';
   agentTitle.textContent = 'Listing Agent';
   var agentText = document.createElement('div');
-  agentText.style.cssText = 'font-size:13px;color:var(--text2);';
+  agentText.style.cssText = 'font-size:16px;color:var(--text2);';
   agentText.textContent = (l.agent || 'N/A') + (l.office ? ' | ' + l.office : '');
   agentSec.appendChild(agentTitle); agentSec.appendChild(agentText);
 
@@ -4540,7 +4540,7 @@ function openAttachModal(listing){
   var bod = document.createElement('div');
   bod.className = 'mbody';
   var info = document.createElement('p');
-  info.style.cssText = 'font-size:13px;color:var(--text2);margin-bottom:14px;';
+  info.style.cssText = 'font-size:16px;color:var(--text2);margin-bottom:14px;';
   info.textContent = 'Attach ' + listing.address + ' (' + fmtPrice(listing.price) + ') to:';
   var selLabel = document.createElement('label');
   selLabel.className = 'fl';
