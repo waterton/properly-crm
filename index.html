@@ -220,6 +220,53 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .gmail-template-btn{background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:3px 9px;font-size:16px;color:var(--text2);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all 0.15s;}
 .gmail-template-btn:hover{border-color:var(--accent);color:var(--accent);}
 .gmail-empty{display:flex;align-items:center;justify-content:center;flex:1;flex-direction:column;gap:12px;color:var(--text3);}
+/* CALENDAR */
+.cal-wrap{display:flex;flex-direction:column;height:calc(100vh - 130px);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
+.cal-toolbar{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--border);flex-shrink:0;flex-wrap:wrap;}
+.cal-title{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:1px;color:var(--accent);min-width:200px;}
+.cal-nav-btn{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:5px 12px;cursor:pointer;color:var(--text2);font-family:'DM Sans',sans-serif;font-size:16px;transition:all 0.15s;}
+.cal-nav-btn:hover{border-color:var(--accent);color:var(--accent);}
+.cal-view-btn{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:5px 12px;cursor:pointer;color:var(--text2);font-family:'DM Sans',sans-serif;font-size:14px;transition:all 0.15s;}
+.cal-view-btn.active{background:var(--accent);color:var(--bg);border-color:var(--accent);}
+.cal-body{flex:1;overflow:auto;}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);border-left:1px solid var(--border);border-top:1px solid var(--border);}
+.cal-dow{padding:8px;text-align:center;font-size:13px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1px;background:var(--surface2);border-right:1px solid var(--border);border-bottom:1px solid var(--border);}
+.cal-cell{border-right:1px solid var(--border);border-bottom:1px solid var(--border);min-height:100px;padding:4px;cursor:pointer;transition:background 0.1s;vertical-align:top;}
+.cal-cell:hover{background:rgba(201,168,76,0.05);}
+.cal-cell.today{background:rgba(201,168,76,0.08);}
+.cal-cell.other-month{opacity:0.4;}
+.cal-cell.selected{background:rgba(201,168,76,0.12);outline:2px solid var(--accent);}
+.cal-day-num{font-size:14px;font-weight:600;color:var(--text2);margin-bottom:3px;width:24px;height:24px;display:flex;align-items:center;justify-content:center;border-radius:50%;}
+.cal-cell.today .cal-day-num{background:var(--accent);color:var(--bg);}
+.cal-event{font-size:12px;padding:2px 5px;border-radius:3px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;font-weight:500;}
+.cal-event:hover{opacity:0.85;}
+.cal-event.ev-deadline{background:rgba(201,76,76,0.25);color:#ff9999;}
+.cal-event.ev-followup{background:rgba(107,201,122,0.25);color:#6bc97a;}
+.cal-event.ev-transaction{background:rgba(201,168,76,0.25);color:var(--accent);}
+.cal-event.ev-custom{background:rgba(76,142,201,0.25);color:#7ab8f5;}
+.cal-event.ev-overdue{background:rgba(201,76,76,0.5);color:#ff6666;font-weight:700;}
+/* Week view */
+.cal-week-grid{display:grid;grid-template-columns:60px repeat(7,1fr);border-left:1px solid var(--border);border-top:1px solid var(--border);}
+.cal-week-hour{font-size:12px;color:var(--text3);padding:4px 6px;border-right:1px solid var(--border);border-bottom:1px solid var(--border);text-align:right;background:var(--surface2);}
+.cal-week-cell{border-right:1px solid var(--border);border-bottom:1px solid var(--border);min-height:40px;padding:2px;position:relative;cursor:pointer;}
+.cal-week-cell:hover{background:rgba(201,168,76,0.04);}
+/* Agenda view */
+.cal-agenda-day{margin-bottom:2px;}
+.cal-agenda-date{font-size:14px;font-weight:700;color:var(--text);padding:10px 16px 6px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface);z-index:2;}
+.cal-agenda-date.today-header{color:var(--accent);}
+.cal-agenda-item{display:flex;align-items:center;gap:12px;padding:8px 16px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.1s;}
+.cal-agenda-item:hover{background:var(--surface2);}
+.cal-agenda-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+.cal-agenda-time{font-size:13px;color:var(--text3);width:50px;flex-shrink:0;}
+.cal-agenda-title{font-size:15px;color:var(--text);flex:1;}
+.cal-agenda-sub{font-size:13px;color:var(--text3);}
+/* Event detail panel */
+.cal-det-ov{position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:600;display:none;align-items:center;justify-content:center;}
+.cal-det-ov.open{display:flex;}
+.cal-det-box{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px;width:100%;max-width:420px;box-shadow:0 20px 60px rgba(0,0,0,0.5);}
+/* Member filter pills */
+.cal-member-pill{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;font-size:13px;cursor:pointer;border:2px solid transparent;transition:all 0.15s;font-family:'DM Sans',sans-serif;}
+.cal-member-pill.active{border-color:white;}
 .fab{position:fixed;bottom:24px;right:24px;width:52px;height:52px;border-radius:50%;background:var(--accent);border:none;cursor:pointer;font-size:26px;color:var(--bg);font-weight:700;box-shadow:0 4px 20px rgba(201,168,76,0.5);z-index:200;}
 /* Login CSS removed - auth disabled for testing */
 .mls-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;}
@@ -344,6 +391,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
       <button class="ni" id="nav-tc"><svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Transactions<span class="nbadge" id="nbTC">0</span></button>
       <div class="nav-sec">AI Tools</div>
       <button class="ni" id="nav-scanner"><svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/><path d="M9 13h6M9 17h6M9 9h1"/></svg>Doc Scanner</button>
+      <div class="nav-sec">Calendar</div>
+      <button class="ni" id="nav-calendar"><svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Calendar</button>
       <div class="nav-sec">Team</div>
       <button class="ni" id="nav-team"><svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Team</button>
       <button class="ni" id="nav-gmail"><svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>Gmail<span class="nbadge" id="nbGmail">0</span></button>
@@ -603,6 +652,94 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
         </div>
       </div>
 
+      <!-- CALENDAR PAGE -->
+      <div class="page" id="page-calendar">
+        <div class="cal-wrap">
+          <!-- Toolbar -->
+          <div class="cal-toolbar">
+            <button class="cal-nav-btn" id="calPrev">&#8249;</button>
+            <button class="cal-nav-btn" id="calToday">Today</button>
+            <button class="cal-nav-btn" id="calNext">&#8250;</button>
+            <div class="cal-title" id="calTitle">June 2026</div>
+            <div style="display:flex;gap:6px;margin-left:auto;flex-wrap:wrap;align-items:center;">
+              <!-- Member filter pills -->
+              <div id="calMemberFilters" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+              <!-- View buttons -->
+              <div style="display:flex;gap:4px;margin-left:8px;">
+                <button class="cal-view-btn active" data-cal-view="month">Month</button>
+                <button class="cal-view-btn" data-cal-view="week">Week</button>
+                <button class="cal-view-btn" data-cal-view="agenda">Agenda</button>
+              </div>
+              <button class="btn btn-p" id="btnAddCalEvent" style="padding:5px 12px;font-size:14px;">+ Event</button>
+            </div>
+          </div>
+          <!-- Event type legend -->
+          <div style="display:flex;gap:12px;padding:8px 16px;border-bottom:1px solid var(--border);flex-wrap:wrap;flex-shrink:0;">
+            <span style="display:flex;align-items:center;gap:5px;font-size:13px;color:var(--text3);"><span style="width:10px;height:10px;border-radius:2px;background:rgba(201,76,76,0.5);display:inline-block;"></span>Deadlines</span>
+            <span style="display:flex;align-items:center;gap:5px;font-size:13px;color:var(--text3);"><span style="width:10px;height:10px;border-radius:2px;background:rgba(107,201,122,0.5);display:inline-block;"></span>Follow-ups</span>
+            <span style="display:flex;align-items:center;gap:5px;font-size:13px;color:var(--text3);"><span style="width:10px;height:10px;border-radius:2px;background:rgba(201,168,76,0.5);display:inline-block;"></span>Transactions</span>
+            <span style="display:flex;align-items:center;gap:5px;font-size:13px;color:var(--text3);"><span style="width:10px;height:10px;border-radius:2px;background:rgba(76,142,201,0.5);display:inline-block;"></span>Custom Events</span>
+          </div>
+          <!-- Calendar body -->
+          <div class="cal-body" id="calBody"></div>
+        </div>
+
+        <!-- Event detail overlay -->
+        <div class="cal-det-ov" id="calDetOv">
+          <div class="cal-det-box">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;">
+              <div>
+                <div style="font-size:18px;font-weight:700;color:var(--text);" id="calDetTitle"></div>
+                <div style="font-size:14px;color:var(--text3);margin-top:3px;" id="calDetSub"></div>
+              </div>
+              <button style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:22px;" id="calDetClose">&#x2715;</button>
+            </div>
+            <div id="calDetBody"></div>
+            <div style="display:flex;gap:8px;margin-top:18px;padding-top:14px;border-top:1px solid var(--border);" id="calDetActions"></div>
+          </div>
+        </div>
+
+        <!-- Add/Edit Event Modal -->
+        <div class="modal-ov" id="calEventModal">
+          <div class="modal" style="max-width:460px;">
+            <div class="mhdr"><div class="mtitle" id="calEventModalTitle">Add Event</div><button class="mx" data-close="calEventModal">&#x2715;</button></div>
+            <div class="mbody">
+              <div class="fg"><label class="fl">Title</label><input class="fi" id="calEvTitle" placeholder="Meeting, showing, call..."></div>
+              <div class="frow">
+                <div class="fg"><label class="fl">Date</label><input class="fi" id="calEvDate" type="date"></div>
+                <div class="fg"><label class="fl">Time (optional)</label><input class="fi" id="calEvTime" type="time"></div>
+              </div>
+              <div class="fg"><label class="fl">End Time (optional)</label><input class="fi" id="calEvEndTime" type="time"></div>
+              <div class="fg"><label class="fl">Type</label>
+                <select class="fsel" id="calEvType">
+                  <option value="custom">General Event</option>
+                  <option value="showing">Showing</option>
+                  <option value="consultation">Consultation</option>
+                  <option value="closing">Closing</option>
+                  <option value="openhouse">Open House</option>
+                  <option value="call">Phone Call</option>
+                  <option value="meeting">Meeting</option>
+                </select>
+              </div>
+              <div class="fg"><label class="fl">Assign To</label>
+                <select class="fsel assign-to-select" id="calEvMember"><option value="">Everyone</option></select>
+              </div>
+              <div class="fg"><label class="fl">Link to Contact (optional)</label>
+                <select class="fsel" id="calEvContact"><option value="">None</option></select>
+              </div>
+              <div class="fg"><label class="fl">Notes</label>
+                <textarea class="fi" id="calEvNotes" rows="2" placeholder="Additional details..."></textarea>
+              </div>
+            </div>
+            <div class="mftr">
+              <button class="btn btn-g" data-close="calEventModal">Cancel</button>
+              <button class="btn" style="background:rgba(201,76,76,0.15);color:var(--danger);border:1px solid rgba(201,76,76,0.3);border-radius:7px;padding:8px 14px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:14px;" id="btnDeleteCalEvent" style="display:none;">Delete</button>
+              <button class="btn btn-p" id="btnSaveCalEvent">Save Event</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- TEAM PAGE -->
       <div class="page" id="page-team">
         <div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;align-items:center;">
@@ -690,7 +827,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
           </div>
           <button class="btn btn-p" id="btnGmailCompose" style="display:none;">+ Compose</button>
           <button class="btn btn-g" id="btnGmailRefresh" style="display:none;">Refresh</button>
-          <button class="btn btn-g" id="btnGmailDebug" style="display:none;font-size:14px;">Debug Headers</button>
+
         </div>
 
         <!-- Not connected state -->
@@ -1148,7 +1285,7 @@ function pl(p){return p==='hot'?'HOT':p==='warn'?'SOON':'OK';}
 function pb(p){return p==='hot'?'b-hot':p==='warn'?'b-warn':'b-ok';}
 function ge(id){return document.getElementById(id);}
 function ck(){var s=document.createElementNS('http://www.w3.org/2000/svg','svg');s.setAttribute('width','9');s.setAttribute('height','9');s.setAttribute('fill','none');s.setAttribute('stroke','#0d0f14');s.setAttribute('stroke-width','3');s.setAttribute('viewBox','0 0 24 24');var p=document.createElementNS('http://www.w3.org/2000/svg','polyline');p.setAttribute('points','20,6 9,17 4,12');s.appendChild(p);return s;}
-var pn={briefing:'Daily Briefing',dashboard:'Dashboard',pipeline:'Pipeline',contacts:'Contacts',followups:'Follow-ups',notes:'Notes',deadlines:'Deadlines',tc:'Transactions',scanner:'Doc Scanner',team:'Team',gmail:'Gmail',mls:'MLS Search'};
+var pn={briefing:'Daily Briefing',dashboard:'Dashboard',pipeline:'Pipeline',contacts:'Contacts',followups:'Follow-ups',notes:'Notes',deadlines:'Deadlines',tc:'Transactions',scanner:'Doc Scanner',calendar:'Calendar',team:'Team',gmail:'Gmail',mls:'MLS Search'};
 function sp(id){
   curPage=id;
   document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');});
@@ -1179,6 +1316,7 @@ function sp(id){
   }
   else if(id==='tc')initTC();
   else if(id==='scanner')initScanner();
+  else if(id==='calendar')initCalendar();
   else if(id==='team')initTeam();
   else if(id==='gmail')initGmail();
   else if(id==='mls')initMLS();
@@ -3225,6 +3363,609 @@ function showScannerError(msg){
   alert('Scanner error: ' + msg);
 }
 
+// -- CALENDAR ---
+var CAL = {
+  view: 'month',
+  year: new Date().getFullYear(),
+  month: new Date().getMonth(),
+  selectedDate: null,
+  filterMembers: {},  // memberId -> true/false
+  events: []  // custom events: [{id,title,date,time,endTime,type,memberId,contactId,notes}]
+};
+
+function initCalendar(){
+  // Load custom events
+  try{
+    var saved = localStorage.getItem('crm_cal_events');
+    if(saved) CAL.events = JSON.parse(saved);
+  }catch(e){}
+
+  // Init member filters - all on by default
+  TM.forEach(function(m){ CAL.filterMembers[m.id] = true; });
+
+  renderCalMemberFilters();
+  renderCalendar();
+}
+
+function saveCalEvents(){
+  try{ localStorage.setItem('crm_cal_events', JSON.stringify(CAL.events)); }catch(e){}
+  if(supaReady) dbSave('cal_events', CAL.events);
+}
+
+function renderCalMemberFilters(){
+  var el = ge('calMemberFilters');
+  if(!el) return;
+  el.innerHTML = '';
+  // All button
+  var allBtn = document.createElement('button');
+  allBtn.className = 'cal-member-pill active';
+  allBtn.style.background = 'var(--surface2)';
+  allBtn.style.color = 'var(--text2)';
+  allBtn.textContent = 'All';
+  allBtn.addEventListener('click', function(){
+    TM.forEach(function(m){ CAL.filterMembers[m.id] = true; });
+    renderCalMemberFilters();
+    renderCalendar();
+  });
+  el.appendChild(allBtn);
+
+  TM.forEach(function(m){
+    var pill = document.createElement('button');
+    pill.className = 'cal-member-pill' + (CAL.filterMembers[m.id] ? ' active' : '');
+    pill.style.background = (m.color||'#C9A84C') + '33';
+    pill.style.color = m.color||'#C9A84C';
+    pill.textContent = m.first;
+    (function(mid){ pill.addEventListener('click', function(){
+      CAL.filterMembers[mid] = !CAL.filterMembers[mid];
+      renderCalMemberFilters();
+      renderCalendar();
+    }); })(m.id);
+    el.appendChild(pill);
+  });
+}
+
+// Get all events for a given date string YYYY-MM-DD
+function getEventsForDate(dateStr){
+  var events = [];
+
+  // Deadlines
+  D.forEach(function(d){
+    if(d.date === dateStr){
+      var c = gc(d.contactId);
+      var n = du(d.date);
+      events.push({
+        type: n < 0 ? 'ev-overdue' : 'ev-deadline',
+        label: d.type + (c ? ' - ' + fn(c) : ''),
+        time: '',
+        data: d,
+        dataType: 'deadline',
+        memberId: d.assignedTo || null,
+        color: n < 0 ? '#ff6666' : '#ff9999'
+      });
+    }
+  });
+
+  // Follow-ups
+  F.forEach(function(f){
+    if(f.date === dateStr && !f.done){
+      var c = gc(f.contactId);
+      events.push({
+        type: 'ev-followup',
+        label: f.label + (c ? ' - ' + fn(c) : ''),
+        time: '',
+        data: f,
+        dataType: 'followup',
+        memberId: f.assignedTo || null,
+        color: '#6bc97a'
+      });
+    }
+  });
+
+  // Transaction closing dates
+  TX.forEach(function(tx){
+    if(tx.closingDate === dateStr){
+      var c = gc(tx.contactId);
+      events.push({
+        type: 'ev-transaction',
+        label: 'CLOSE: ' + (tx.address || (c ? fn(c) : 'Unknown')),
+        time: '',
+        data: tx,
+        dataType: 'transaction',
+        memberId: tx.assignedTo || null,
+        color: '#c9a84c'
+      });
+    }
+    // Also show earnest, due diligence etc
+    var txDates = [
+      {key:'earnestDate', label:'Earnest Money'},
+      {key:'dueDiligDate', label:'Due Diligence'},
+      {key:'financingDate', label:'Financing'},
+      {key:'appraisalDate', label:'Appraisal'}
+    ];
+    txDates.forEach(function(td){
+      if(tx[td.key] === dateStr){
+        var c2 = gc(tx.contactId);
+        events.push({
+          type: 'ev-deadline',
+          label: td.label + ': ' + (tx.address || (c2 ? fn(c2) : '')),
+          time: '',
+          data: tx,
+          dataType: 'txdate',
+          txDateKey: td.key,
+          memberId: tx.assignedTo || null,
+          color: '#ff9999'
+        });
+      }
+    });
+  });
+
+  // Custom events
+  CAL.events.forEach(function(ev){
+    if(ev.date === dateStr){
+      events.push({
+        type: 'ev-custom',
+        label: ev.title,
+        time: ev.time || '',
+        data: ev,
+        dataType: 'custom',
+        memberId: ev.memberId || null,
+        color: '#7ab8f5'
+      });
+    }
+  });
+
+  // Filter by member
+  var anyActive = Object.values(CAL.filterMembers).some(function(v){ return v; });
+  if(anyActive){
+    events = events.filter(function(ev){
+      if(!ev.memberId) return true; // unassigned shows for everyone
+      return CAL.filterMembers[ev.memberId];
+    });
+  }
+
+  // Sort by time
+  events.sort(function(a,b){
+    if(!a.time && !b.time) return 0;
+    if(!a.time) return 1;
+    if(!b.time) return -1;
+    return a.time.localeCompare(b.time);
+  });
+
+  return events;
+}
+
+function renderCalendar(){
+  var months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  var days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+  ge('calTitle').textContent = months[CAL.month] + ' ' + CAL.year;
+
+  if(CAL.view === 'month') renderMonthView(days);
+  else if(CAL.view === 'week') renderWeekView(days);
+  else renderAgendaView();
+}
+
+function renderMonthView(days){
+  var body = ge('calBody');
+  body.innerHTML = '';
+
+  var grid = document.createElement('div');
+  grid.className = 'cal-grid';
+
+  // Day of week headers
+  days.forEach(function(d){
+    var hdr = document.createElement('div');
+    hdr.className = 'cal-dow';
+    hdr.textContent = d;
+    grid.appendChild(hdr);
+  });
+
+  // Get first day of month
+  var firstDay = new Date(CAL.year, CAL.month, 1).getDay();
+  var daysInMonth = new Date(CAL.year, CAL.month + 1, 0).getDate();
+  var daysInPrevMonth = new Date(CAL.year, CAL.month, 0).getDate();
+  var today = tod();
+
+  // Fill grid
+  var totalCells = Math.ceil((firstDay + daysInMonth) / 7) * 7;
+  for(var i = 0; i < totalCells; i++){
+    var cell = document.createElement('div');
+    cell.className = 'cal-cell';
+
+    var dayNum, month, year, isOther = false;
+    if(i < firstDay){
+      dayNum = daysInPrevMonth - firstDay + i + 1;
+      month = CAL.month - 1;
+      year = CAL.year;
+      if(month < 0){ month = 11; year--; }
+      isOther = true;
+    } else if(i >= firstDay + daysInMonth){
+      dayNum = i - firstDay - daysInMonth + 1;
+      month = CAL.month + 1;
+      year = CAL.year;
+      if(month > 11){ month = 0; year++; }
+      isOther = true;
+    } else {
+      dayNum = i - firstDay + 1;
+      month = CAL.month;
+      year = CAL.year;
+    }
+
+    var dateStr = year + '-' + String(month+1).padStart(2,'0') + '-' + String(dayNum).padStart(2,'0');
+    if(isOther) cell.classList.add('other-month');
+    if(dateStr === today) cell.classList.add('today');
+    if(dateStr === CAL.selectedDate) cell.classList.add('selected');
+
+    var num = document.createElement('div');
+    num.className = 'cal-day-num';
+    num.textContent = dayNum;
+    cell.appendChild(num);
+
+    // Add events
+    var evs = getEventsForDate(dateStr);
+    var maxShow = 3;
+    evs.slice(0, maxShow).forEach(function(ev){
+      var evEl = document.createElement('div');
+      evEl.className = 'cal-event ' + ev.type;
+      evEl.textContent = (ev.time ? ev.time + ' ' : '') + ev.label;
+      evEl.title = ev.label;
+      (function(e){ evEl.addEventListener('click', function(evt){
+        evt.stopPropagation();
+        openCalEventDetail(e);
+      }); })(ev);
+      cell.appendChild(evEl);
+    });
+    if(evs.length > maxShow){
+      var more = document.createElement('div');
+      more.style.cssText = 'font-size:12px;color:var(--text3);padding:1px 4px;';
+      more.textContent = '+' + (evs.length - maxShow) + ' more';
+      cell.appendChild(more);
+    }
+
+    (function(ds){ cell.addEventListener('click', function(){
+      CAL.selectedDate = ds;
+      ge('calEvDate').value = ds;
+      renderCalendar();
+    }); })(dateStr);
+
+    grid.appendChild(cell);
+  }
+
+  body.appendChild(grid);
+}
+
+function renderWeekView(days){
+  var body = ge('calBody');
+  body.innerHTML = '';
+
+  // Find start of week (Sunday)
+  var today = new Date(CAL.year, CAL.month, 1);
+  if(CAL.selectedDate){
+    var parts = CAL.selectedDate.split('-');
+    today = new Date(parseInt(parts[0]), parseInt(parts[1])-1, parseInt(parts[2]));
+  }
+  var startOfWeek = new Date(today);
+  startOfWeek.setDate(today.getDate() - today.getDay());
+
+  var grid = document.createElement('div');
+  grid.className = 'cal-week-grid';
+
+  // Header row
+  var emptyHdr = document.createElement('div');
+  emptyHdr.className = 'cal-week-hour';
+  emptyHdr.style.cssText += 'font-size:11px;';
+  grid.appendChild(emptyHdr);
+
+  var todayStr = tod();
+  for(var d = 0; d < 7; d++){
+    var dt = new Date(startOfWeek);
+    dt.setDate(startOfWeek.getDate() + d);
+    var ds = dt.getFullYear() + '-' + String(dt.getMonth()+1).padStart(2,'0') + '-' + String(dt.getDate()).padStart(2,'0');
+    var hdr = document.createElement('div');
+    hdr.className = 'cal-week-hour';
+    hdr.style.textAlign = 'center';
+    hdr.style.color = ds === todayStr ? 'var(--accent)' : 'var(--text2)';
+    hdr.style.fontWeight = ds === todayStr ? '700' : '400';
+    hdr.innerHTML = days[d] + '<br><span style="font-size:16px;font-weight:700;">' + dt.getDate() + '</span>';
+    grid.appendChild(hdr);
+  }
+
+  // Hour rows
+  for(var h = 7; h <= 20; h++){
+    var hourLbl = document.createElement('div');
+    hourLbl.className = 'cal-week-hour';
+    hourLbl.textContent = h <= 12 ? h + 'am' : (h-12) + 'pm';
+    if(h === 12) hourLbl.textContent = '12pm';
+    grid.appendChild(hourLbl);
+
+    for(var d2 = 0; d2 < 7; d2++){
+      var dt2 = new Date(startOfWeek);
+      dt2.setDate(startOfWeek.getDate() + d2);
+      var ds2 = dt2.getFullYear() + '-' + String(dt2.getMonth()+1).padStart(2,'0') + '-' + String(dt2.getDate()).padStart(2,'0');
+      var cell = document.createElement('div');
+      cell.className = 'cal-week-cell';
+      if(ds2 === todayStr) cell.style.background = 'rgba(201,168,76,0.04)';
+
+      // Show events at this hour
+      var evs2 = getEventsForDate(ds2).filter(function(ev){
+        if(!ev.time) return h === 8; // no-time events at 8am
+        var evH = parseInt(ev.time.split(':')[0]);
+        return evH === h;
+      });
+      evs2.forEach(function(ev){
+        var evEl = document.createElement('div');
+        evEl.className = 'cal-event ' + ev.type;
+        evEl.style.cssText += 'font-size:12px;';
+        evEl.textContent = ev.label;
+        (function(e){ evEl.addEventListener('click', function(evt){
+          evt.stopPropagation();
+          openCalEventDetail(e);
+        }); })(ev);
+        cell.appendChild(evEl);
+      });
+
+      (function(ds3){ cell.addEventListener('click', function(){
+        CAL.selectedDate = ds3;
+        var hStr = String(h).padStart(2,'0') + ':00';
+        ge('calEvDate').value = ds3;
+        ge('calEvTime').value = hStr;
+        populateCalModal();
+        om('calEventModal');
+      }); })(ds2);
+
+      grid.appendChild(cell);
+    }
+  }
+
+  // Update title for week view
+  var endOfWeek = new Date(startOfWeek);
+  endOfWeek.setDate(startOfWeek.getDate() + 6);
+  var months2 = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  ge('calTitle').textContent = months2[startOfWeek.getMonth()] + ' ' + startOfWeek.getDate() + ' - ' + months2[endOfWeek.getMonth()] + ' ' + endOfWeek.getDate() + ', ' + endOfWeek.getFullYear();
+
+  body.appendChild(grid);
+}
+
+function renderAgendaView(){
+  var body = ge('calBody');
+  body.innerHTML = '';
+
+  var months3 = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  var todayStr = tod();
+
+  // Show 60 days from today
+  var startDate = new Date();
+  startDate.setDate(startDate.getDate() - 7); // 7 days back
+
+  var hasAny = false;
+  for(var i = 0; i < 90; i++){
+    var dt = new Date(startDate);
+    dt.setDate(startDate.getDate() + i);
+    var ds = dt.getFullYear() + '-' + String(dt.getMonth()+1).padStart(2,'0') + '-' + String(dt.getDate()).padStart(2,'0');
+    var evs = getEventsForDate(ds);
+    if(!evs.length) continue;
+    hasAny = true;
+
+    var dayHdr = document.createElement('div');
+    dayHdr.className = 'cal-agenda-date' + (ds === todayStr ? ' today-header' : '');
+    var dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    dayHdr.textContent = dayNames[dt.getDay()] + ', ' + months3[dt.getMonth()] + ' ' + dt.getDate() + ', ' + dt.getFullYear() + (ds === todayStr ? ' - TODAY' : '');
+    body.appendChild(dayHdr);
+
+    evs.forEach(function(ev){
+      var row = document.createElement('div');
+      row.className = 'cal-agenda-item';
+      var dot = document.createElement('div');
+      dot.className = 'cal-agenda-dot';
+      dot.style.background = ev.color || '#c9a84c';
+      var time = document.createElement('div');
+      time.className = 'cal-agenda-time';
+      time.textContent = ev.time || 'All day';
+      var info = document.createElement('div');
+      info.style.flex = '1';
+      var title = document.createElement('div');
+      title.className = 'cal-agenda-title';
+      title.textContent = ev.label;
+      var sub = document.createElement('div');
+      sub.className = 'cal-agenda-sub';
+      if(ev.memberId){
+        var m = TM.find(function(x){ return x.id == ev.memberId; });
+        if(m) sub.textContent = m.first + ' ' + m.last;
+      }
+      info.appendChild(title);
+      if(sub.textContent) info.appendChild(sub);
+      row.appendChild(dot); row.appendChild(time); row.appendChild(info);
+      (function(e){ row.addEventListener('click', function(){ openCalEventDetail(e); }); })(ev);
+      body.appendChild(row);
+    });
+  }
+
+  if(!hasAny){
+    body.innerHTML = '<div class="empty" style="padding:40px;">No events in the next 90 days. Add deadlines, follow-ups, or transactions to see them here.</div>';
+  }
+}
+
+function openCalEventDetail(ev){
+  var detOv = ge('calDetOv');
+  ge('calDetTitle').textContent = ev.label;
+
+  var sub = '';
+  if(ev.time) sub += ev.time + ' ';
+  if(ev.memberId){
+    var m = TM.find(function(x){ return x.id == ev.memberId; });
+    if(m) sub += '- ' + m.first + ' ' + m.last;
+  }
+  ge('calDetSub').textContent = sub;
+
+  var body = ge('calDetBody');
+  body.innerHTML = '';
+  var actions = ge('calDetActions');
+  actions.innerHTML = '';
+
+  if(ev.dataType === 'custom'){
+    var fields = [
+      {label:'Type', val:ev.data.type||'Event'},
+      {label:'Date', val:fd(ev.data.date)},
+      {label:'Time', val:ev.data.time || 'Not set'},
+      {label:'Notes', val:ev.data.notes || ''}
+    ];
+    fields.forEach(function(f){
+      if(!f.val) return;
+      var row = document.createElement('div');
+      row.style.cssText = 'display:flex;gap:10px;padding:6px 0;border-bottom:1px solid var(--border);font-size:15px;';
+      row.innerHTML = '<span style="color:var(--text3);min-width:60px;">' + f.label + ':</span><span style="color:var(--text);">' + f.val + '</span>';
+      body.appendChild(row);
+    });
+
+    // Edit button for custom events
+    var editBtn = document.createElement('button');
+    editBtn.className = 'btn btn-g';
+    editBtn.textContent = 'Edit';
+    (function(evData){ editBtn.addEventListener('click', function(){
+      openEditCalEvent(evData);
+      ge('calDetOv').classList.remove('open');
+    }); })(ev.data);
+    actions.appendChild(editBtn);
+
+    // Delete button
+    var delBtn = document.createElement('button');
+    delBtn.style.cssText = 'background:rgba(201,76,76,0.15);color:var(--danger);border:1px solid rgba(201,76,76,0.3);border-radius:7px;padding:8px 14px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:14px;';
+    delBtn.textContent = 'Delete';
+    (function(evId){ delBtn.addEventListener('click', function(){
+      if(!confirm('Delete this event?')) return;
+      CAL.events = CAL.events.filter(function(e){ return e.id !== evId; });
+      saveCalEvents();
+      ge('calDetOv').classList.remove('open');
+      renderCalendar();
+    }); })(ev.data.id);
+    actions.appendChild(delBtn);
+
+  } else if(ev.dataType === 'deadline'){
+    var c2 = gc(ev.data.contactId);
+    body.innerHTML = '<div style="font-size:15px;color:var(--text2);">'
+      + '<div style="margin-bottom:8px;"><b style="color:var(--text);">Type:</b> ' + ev.data.type + '</div>'
+      + '<div style="margin-bottom:8px;"><b style="color:var(--text);">Date:</b> ' + fd(ev.data.date) + '</div>'
+      + (c2 ? '<div><b style="color:var(--text);">Client:</b> ' + fn(c2) + '</div>' : '')
+      + '</div>';
+    var goBtn = document.createElement('button');
+    goBtn.className = 'btn btn-p';
+    goBtn.textContent = 'View Deadlines';
+    goBtn.addEventListener('click', function(){ sp('deadlines'); ge('calDetOv').classList.remove('open'); });
+    actions.appendChild(goBtn);
+
+  } else if(ev.dataType === 'followup'){
+    var c3 = gc(ev.data.contactId);
+    body.innerHTML = '<div style="font-size:15px;color:var(--text2);">'
+      + '<div style="margin-bottom:8px;"><b style="color:var(--text);">Task:</b> ' + ev.data.label + '</div>'
+      + '<div style="margin-bottom:8px;"><b style="color:var(--text);">Priority:</b> ' + (ev.data.pri||'normal') + '</div>'
+      + (c3 ? '<div><b style="color:var(--text);">Client:</b> ' + fn(c3) + '</div>' : '')
+      + '</div>';
+    var goBtn2 = document.createElement('button');
+    goBtn2.className = 'btn btn-p';
+    goBtn2.textContent = 'View Follow-ups';
+    goBtn2.addEventListener('click', function(){ sp('followups'); ge('calDetOv').classList.remove('open'); });
+    actions.appendChild(goBtn2);
+
+  } else if(ev.dataType === 'transaction' || ev.dataType === 'txdate'){
+    var c4 = gc(ev.data.contactId);
+    body.innerHTML = '<div style="font-size:15px;color:var(--text2);">'
+      + '<div style="margin-bottom:8px;"><b style="color:var(--text);">Property:</b> ' + (ev.data.address||'Unknown') + '</div>'
+      + '<div style="margin-bottom:8px;"><b style="color:var(--text);">Price:</b> ' + (ev.data.price||'-') + '</div>'
+      + (c4 ? '<div><b style="color:var(--text);">Client:</b> ' + fn(c4) + '</div>' : '')
+      + '</div>';
+    var goBtn3 = document.createElement('button');
+    goBtn3.className = 'btn btn-p';
+    goBtn3.textContent = 'View Transaction';
+    (function(txId){ goBtn3.addEventListener('click', function(){ sp('tc'); openTCDetail(txId); ge('calDetOv').classList.remove('open'); }); })(ev.data.id);
+    actions.appendChild(goBtn3);
+  }
+
+  var closeBtn = document.createElement('button');
+  closeBtn.className = 'btn btn-g';
+  closeBtn.textContent = 'Close';
+  closeBtn.addEventListener('click', function(){ ge('calDetOv').classList.remove('open'); });
+  actions.appendChild(closeBtn);
+
+  detOv.classList.add('open');
+}
+
+function populateCalModal(){
+  var cSel = ge('calEvContact');
+  cSel.innerHTML = '<option value="">None</option>';
+  C.forEach(function(c){ var o=document.createElement('option'); o.value=c.id; o.textContent=fn(c); cSel.appendChild(o); });
+  populateAssignDropdowns();
+}
+
+function openAddCalEvent(){
+  ge('calEventModalTitle').textContent = 'Add Event';
+  ge('btnSaveCalEvent').setAttribute('data-edit-id','');
+  ge('btnDeleteCalEvent').style.display = 'none';
+  ge('calEvTitle').value = '';
+  ge('calEvDate').value = CAL.selectedDate || tod();
+  ge('calEvTime').value = '';
+  ge('calEvEndTime').value = '';
+  ge('calEvType').value = 'custom';
+  ge('calEvNotes').value = '';
+  populateCalModal();
+  om('calEventModal');
+}
+
+function openEditCalEvent(ev){
+  ge('calEventModalTitle').textContent = 'Edit Event';
+  ge('btnSaveCalEvent').setAttribute('data-edit-id', ev.id);
+  ge('btnDeleteCalEvent').style.display = 'inline-flex';
+  ge('calEvTitle').value = ev.title||'';
+  ge('calEvDate').value = ev.date||'';
+  ge('calEvTime').value = ev.time||'';
+  ge('calEvEndTime').value = ev.endTime||'';
+  ge('calEvType').value = ev.type||'custom';
+  ge('calEvNotes').value = ev.notes||'';
+  populateCalModal();
+  ge('calEvMember').value = ev.memberId||'';
+  ge('calEvContact').value = ev.contactId||'';
+  om('calEventModal');
+}
+
+function saveCalEvent(){
+  var title = ge('calEvTitle').value.trim();
+  if(!title){ alert('Please enter a title.'); return; }
+  var editId = ge('btnSaveCalEvent').getAttribute('data-edit-id');
+  if(editId){
+    var ev = CAL.events.find(function(e){ return String(e.id)===String(editId); });
+    if(ev){
+      ev.title=title; ev.date=ge('calEvDate').value; ev.time=ge('calEvTime').value;
+      ev.endTime=ge('calEvEndTime').value; ev.type=ge('calEvType').value;
+      ev.memberId=parseInt(ge('calEvMember').value)||null;
+      ev.contactId=parseInt(ge('calEvContact').value)||null;
+      ev.notes=ge('calEvNotes').value;
+    }
+  } else {
+    CAL.events.push({
+      id: Date.now(),
+      title: title,
+      date: ge('calEvDate').value,
+      time: ge('calEvTime').value,
+      endTime: ge('calEvEndTime').value,
+      type: ge('calEvType').value,
+      memberId: parseInt(ge('calEvMember').value)||null,
+      contactId: parseInt(ge('calEvContact').value)||null,
+      notes: ge('calEvNotes').value
+    });
+  }
+  saveCalEvents();
+  cm('calEventModal');
+  renderCalendar();
+}
+
+function deleteCalEvent(){
+  var editId = ge('btnSaveCalEvent').getAttribute('data-edit-id');
+  if(!editId || !confirm('Delete this event?')) return;
+  CAL.events = CAL.events.filter(function(e){ return String(e.id)!==String(editId); });
+  saveCalEvents();
+  cm('calEventModal');
+  renderCalendar();
+}
+
 // -- TEAM MANAGEMENT ---
 var selectedMemberColor = '#C9A84C';
 
@@ -3606,7 +4347,6 @@ async function checkConnectedAccounts(){
       ge('gmailConnected').style.display = 'block';
       ge('btnGmailCompose').style.display = 'inline-flex';
       ge('btnGmailRefresh').style.display = 'inline-flex';
-      ge('btnGmailDebug').style.display = 'inline-flex';
       loadGmailInbox();
     }
   }catch(e){ console.log('checkConnectedAccounts error:', e); }
@@ -4585,6 +5325,7 @@ function openAttachModal(listing){
 ge('nav-briefing').addEventListener('click',function(){sp('briefing');});
 ge('nav-tc').addEventListener('click',function(){sp('tc');});
 ge('nav-scanner').addEventListener('click',function(){sp('scanner');});
+ge('nav-calendar').addEventListener('click',function(){sp('calendar');});
 ge('nav-team').addEventListener('click',function(){sp('team');});
 ge('nav-gmail').addEventListener('click',function(){sp('gmail');});
 ge('nav-mls').addEventListener('click',function(){sp('mls');});
@@ -4722,17 +5463,36 @@ ge('btnSaveDL').addEventListener('click',svdl);
 ge('btnSaveDetNote').addEventListener('click',adn);
 ge('detOv').addEventListener('click',function(e){if(e.target===ge('detOv'))cd();});
 ge('searchBox').addEventListener('input',function(){if(curPage==='contacts')rc();});
+ge('btnAddCalEvent').addEventListener('click', openAddCalEvent);
+ge('btnSaveCalEvent').addEventListener('click', saveCalEvent);
+ge('btnDeleteCalEvent').addEventListener('click', deleteCalEvent);
+ge('calDetClose').addEventListener('click', function(){ ge('calDetOv').classList.remove('open'); });
+ge('calDetOv').addEventListener('click', function(e){ if(e.target===ge('calDetOv')) ge('calDetOv').classList.remove('open'); });
+ge('calPrev').addEventListener('click', function(){
+  if(CAL.view==='month'){ CAL.month--; if(CAL.month<0){CAL.month=11;CAL.year--;} }
+  else if(CAL.view==='week'){ var d=new Date(CAL.selectedDate||tod()); d.setDate(d.getDate()-7); CAL.selectedDate=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+  renderCalendar();
+});
+ge('calNext').addEventListener('click', function(){
+  if(CAL.view==='month'){ CAL.month++; if(CAL.month>11){CAL.month=0;CAL.year++;} }
+  else if(CAL.view==='week'){ var d=new Date(CAL.selectedDate||tod()); d.setDate(d.getDate()+7); CAL.selectedDate=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+  renderCalendar();
+});
+ge('calToday').addEventListener('click', function(){
+  CAL.month=new Date().getMonth(); CAL.year=new Date().getFullYear();
+  CAL.selectedDate=tod(); renderCalendar();
+});
+document.querySelectorAll('[data-cal-view]').forEach(function(btn){
+  btn.addEventListener('click', function(){
+    CAL.view = this.getAttribute('data-cal-view');
+    document.querySelectorAll('[data-cal-view]').forEach(function(b){ b.classList.remove('active'); });
+    this.classList.add('active');
+    renderCalendar();
+  });
+});
 ge('btnGmailCompose').addEventListener('click', function(){ openCompose(); });
 ge('btnGmailRefresh').addEventListener('click', loadGmailInbox);
-ge('btnGmailDebug').addEventListener('click', async function(){
-  var resp = await fetch('/api/gmail-api', {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({action:'inbox', memberId:gmailState.activeMemberId, query:'debug'})
-  });
-  var text = await resp.text();
-  console.log('GMAIL DEBUG RESPONSE:', text);
-  alert('Debug info logged to console. Press F12 to see it.');
-});
+
 ge('btnSendEmail').addEventListener('click', sendComposedEmail);
 ge('btnSaveDraft').addEventListener('click', function(){ alert('Draft saving coming soon!'); });
 document.querySelectorAll('.gmail-template-btn').forEach(function(btn){
