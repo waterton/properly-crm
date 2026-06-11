@@ -97,9 +97,18 @@ export default async function handler(req, res) {
       const msgs = await Promise.all(
         listData.messages.slice(0, 15).map(async (m) => {
           const msgResp = await fetch(`${gmailBase}/messages/${m.id}?format=metadata&metadataHeaders=From,To,Subject,Date`, { headers });
-          return msgResp.json();
+          const msgData = await msgResp.json();
+          return msgData;
         })
       );
+
+      // Log first message headers for debugging
+      if (msgs[0] && msgs[0].payload && msgs[0].payload.headers) {
+        console.log('First message headers:', JSON.stringify(msgs[0].payload.headers));
+      } else {
+        console.log('First message structure:', JSON.stringify(Object.keys(msgs[0] || {})));
+        console.log('First message payload keys:', JSON.stringify(Object.keys((msgs[0] && msgs[0].payload) || {})));
+      }
 
       const parsed = msgs.filter(m => m && m.id).map(m => {
         const hdrs = {};
