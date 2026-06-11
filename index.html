@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-  <meta name="version" content="4.2">
+  <meta name="version" content="4.3">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>Properly CRM</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -540,7 +540,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
       <div class="topbar-right">
         <input class="sbox" type="text" placeholder="Search..." id="searchBox">
         <button class="btn btn-p" id="btnAdd">+ Add</button>
-        <div style="font-size:11px;color:var(--text3);margin-right:4px;">v4.2</div>
+        <div style="font-size:11px;color:var(--text3);margin-right:4px;">v4.3</div>
         <div class="topbar-user" id="topbarUser" title="Click to sign out" style="cursor:pointer;position:relative;" id="topbarUserBtn">RE</div>
       </div>
     </div>
@@ -1265,7 +1265,14 @@ var supaReady = false;
 function initSupabase(){
   try{
     if(SUPA_URL && SUPA_KEY && window.supabase){
-      supa = window.supabase.createClient(SUPA_URL, SUPA_KEY);
+      supa = window.supabase.createClient(SUPA_URL, SUPA_KEY, {
+        auth: {
+          detectSessionInUrl: true,
+          persistSession: true,
+          autoRefreshToken: true,
+          flowType: 'implicit'
+        }
+      });
       supaReady = true;
       return true;
     }
@@ -6589,8 +6596,21 @@ async function startup(){
     if(session && session.user){
       onAuthSuccess(session.user);
     } else if(window.location.hash && window.location.hash.includes('access_token')){
-      // OAuth redirect - show "completing sign in" while onAuthStateChange fires
-      showLoginMsg('Completing sign in...');
+      // OAuth redirect - Supabase is processing the token via detectSessionInUrl
+      // Wait up to 5 seconds for onAuthStateChange to fire
+      showLoginMsg('Completing Google sign in...');
+      var hashWait = 0;
+      var hashTimer = setInterval(function(){
+        hashWait++;
+        if(currentUser){
+          clearInterval(hashTimer);
+          window.history.replaceState(null, '', window.location.pathname);
+        } else if(hashWait > 50){
+          clearInterval(hashTimer);
+          showLoginScreen();
+          showLoginErr('Sign in timed out. Please try again.');
+        }
+      }, 100);
     } else {
       showLoginScreen();
     }
