@@ -13,7 +13,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 
 ::-webkit-scrollbar{width:5px;}::-webkit-scrollbar-track{background:var(--bg);}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
 .app{display:flex;height:100vh;overflow:hidden;}
-.sidebar{width:220px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;transition:transform 0.3s;z-index:100;}
+.sidebar{width:220px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;transition:transform 0.3s;z-index:100;overflow-y:auto;}
 .main{flex:1;display:flex;flex-direction:column;overflow:hidden;}
 .topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 20px;height:56px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
 .content{flex:1;overflow-y:auto;padding:20px;}
@@ -527,6 +527,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
       <button class="ni" id="nav-gmail"><svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>Gmail<span class="nbadge" id="nbGmail">0</span></button>
       <div class="nav-sec">MLS</div>
       <button class="ni" id="nav-mls"><svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg>MLS Search<span class="nbadge" style="background:var(--lead);font-size:9px;">LIVE</span></button>
+      <div class="nav-sec">Marketing</div>
+      <button class="ni" id="nav-drips"><svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/><circle cx="19" cy="5" r="3" fill="var(--accent)" stroke="none"/></svg>Drip Campaigns<span class="nbadge" id="nbDrips">0</span></button>
     </nav>
   </aside>
   <div class="main">
@@ -1166,6 +1168,36 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
         <div id="mlsResults"></div>
         <div id="mlsPagination" style="display:flex;justify-content:center;gap:8px;margin-top:20px;"></div>
       </div>
+      <div class="page" id="page-drips">
+        <div id="dripStatusBanner" style="background:rgba(201,168,76,0.1);border:1px solid var(--accent);border-radius:9px;padding:13px 18px;margin-bottom:18px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+          <svg width="16" height="16" fill="none" stroke="var(--accent)" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>
+          <div style="flex:1;font-size:16px;color:var(--text2);" id="dripStatusText">Automated email sequences. Enroll contacts manually or auto-enroll on pipeline stage changes.</div>
+          <button class="btn btn-g" id="btnRunDripsNow" style="padding:6px 14px;font-size:16px;">Run due steps now</button>
+        </div>
+        <div style="display:flex;gap:10px;margin-bottom:18px;border-bottom:1px solid var(--border);">
+          <button class="drip-tab active" id="dripTabCampaigns" data-drip-tab="campaigns" style="background:none;border:none;border-bottom:2px solid var(--accent);color:var(--accent);font-family:'DM Sans',sans-serif;font-size:16px;font-weight:600;padding:10px 14px;cursor:pointer;">Campaigns</button>
+          <button class="drip-tab" id="dripTabEnrollments" data-drip-tab="enrollments" style="background:none;border:none;border-bottom:2px solid transparent;color:var(--text3);font-family:'DM Sans',sans-serif;font-size:16px;font-weight:600;padding:10px 14px;cursor:pointer;">Active Enrollments<span class="nbadge" id="nbEnrollments" style="margin-left:6px;">0</span></button>
+          <button class="drip-tab" id="dripTabLog" data-drip-tab="log" style="background:none;border:none;border-bottom:2px solid transparent;color:var(--text3);font-family:'DM Sans',sans-serif;font-size:16px;font-weight:600;padding:10px 14px;cursor:pointer;">Send Log</button>
+        </div>
+        <div id="dripPaneCampaigns">
+          <div class="card">
+            <div class="card-hdr"><div class="card-title">Email Campaigns</div><button class="btn btn-p" id="btnNewCampaign">+ New Campaign</button></div>
+            <div id="dripCampaignList" style="padding:8px 16px 16px;"></div>
+          </div>
+        </div>
+        <div id="dripPaneEnrollments" style="display:none;">
+          <div class="card">
+            <div class="card-hdr"><div class="card-title">Active Enrollments</div></div>
+            <div id="dripEnrollmentList" style="padding:8px 16px 16px;"></div>
+          </div>
+        </div>
+        <div id="dripPaneLog" style="display:none;">
+          <div class="card">
+            <div class="card-hdr"><div class="card-title">Sent &amp; Scheduled</div></div>
+            <div id="dripLogList" style="padding:8px 16px 16px;"></div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -1215,6 +1247,37 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
       <div class="fg"><label class="fl">Notes</label><textarea class="fi" id="fNotes" rows="3" placeholder="Source, preferences..."></textarea></div>
     </div>
     <div class="mftr"><button class="btn btn-g" data-close="addModal">Cancel</button><button class="btn btn-p" id="btnSaveContact">Save Contact</button></div>
+  </div>
+</div>
+<div class="modal-ov" id="campaignModal">
+  <div class="modal" style="max-width:640px;">
+    <div class="mhdr"><div class="mtitle" id="campModalTitle">New Campaign</div><button class="mx" data-close="campaignModal">&#x2715;</button></div>
+    <div class="mbody">
+      <div class="frow">
+        <div class="fg" style="flex:2;"><label class="fl">Campaign Name</label><input class="fi" id="campName" placeholder="New Buyer Lead Nurture"></div>
+        <div class="fg"><label class="fl">Status</label><select class="fsel" id="campActive"><option value="true">Active</option><option value="false">Paused</option></select></div>
+      </div>
+      <div class="fg"><label class="fl">Auto-enroll trigger (optional)</label><select class="fsel" id="campTrigger"><option value="">None - manual enroll only</option><option value="stage:New Lead">When contact enters stage: New Lead</option><option value="stage:Contacted">When contact enters stage: Contacted</option><option value="stage:Showing">When contact enters stage: Showing</option><option value="stage:Under Contract">When contact enters stage: Under Contract</option><option value="stage:Closed">When contact enters stage: Closed</option></select></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin:14px 0 8px;">
+        <label class="fl" style="margin:0;">Email Steps</label>
+        <button class="btn btn-g" id="btnAddStep" style="padding:5px 11px;font-size:16px;">+ Add Step</button>
+      </div>
+      <div id="campStepsWrap"></div>
+      <div style="font-size:14px;color:var(--text3);margin-top:10px;line-height:1.5;">Merge tags: <b style="color:var(--accent);">{{first}}</b> <b style="color:var(--accent);">{{last}}</b> <b style="color:var(--accent);">{{property}}</b> <b style="color:var(--accent);">{{agent}}</b> <b style="color:var(--accent);">{{price}}</b></div>
+    </div>
+    <div class="mftr"><button class="btn btn-g" data-close="campaignModal">Cancel</button><button class="btn btn-p" id="btnSaveCampaign">Save Campaign</button></div>
+  </div>
+</div>
+<div class="modal-ov" id="enrollModal">
+  <div class="modal">
+    <div class="mhdr"><div class="mtitle">Enroll Contact</div><button class="mx" data-close="enrollModal">&#x2715;</button></div>
+    <div class="mbody">
+      <div class="fg"><label class="fl">Campaign</label><select class="fsel" id="enrollCampaign"></select></div>
+      <div class="fg"><label class="fl">Contact</label><select class="fsel" id="enrollContact"></select></div>
+      <div class="fg"><label class="fl">Send from (Gmail account)</label><select class="fsel" id="enrollFrom"></select></div>
+      <div style="font-size:14px;color:var(--text3);line-height:1.5;">First email sends immediately. Later steps follow the delay per step.</div>
+    </div>
+    <div class="mftr"><button class="btn btn-g" data-close="enrollModal">Cancel</button><button class="btn btn-p" id="btnConfirmEnroll">Enroll</button></div>
   </div>
 </div>
 <div class="modal-ov" id="noteModal">
@@ -1307,6 +1370,7 @@ async function getAuthHeaders(extra) {
 // Auth disabled for testing
 
 var C=[],N=[],F=[],D=[],TX=[],TM=[],curDet=null,curFilter='all',curPage='dashboard';
+var CAMP=[],ENR=[],SENDLOG=[];
 // TM = Team Members: [{id, first, last, role, email, phone, color, calLink}]
 
 // -- SAVE / LOAD -------------------------------------------------------
@@ -1318,6 +1382,9 @@ function sv(){
     localStorage.setItem('crm_d',JSON.stringify(D));
     localStorage.setItem('crm_tx',JSON.stringify(TX));
     localStorage.setItem('crm_tm',JSON.stringify(TM));
+    localStorage.setItem('crm_camp',JSON.stringify(CAMP));
+    localStorage.setItem('crm_enr',JSON.stringify(ENR));
+    localStorage.setItem('crm_sendlog',JSON.stringify(SENDLOG));
   }catch(e){}
 }
 
@@ -1363,7 +1430,10 @@ async function loadFromDB(){
       fetch(base + 'notes?order=date.asc', {headers:headers}).then(function(r){return r.json();}),
       fetch(base + 'followups?order=date.asc', {headers:headers}).then(function(r){return r.json();}),
       fetch(base + 'deadlines?order=date.asc', {headers:headers}).then(function(r){return r.json();}),
-      fetch(base + 'transactions?order=created_at.asc', {headers:headers}).then(function(r){return r.json();})
+      fetch(base + 'transactions?order=created_at.asc', {headers:headers}).then(function(r){return r.json();}),
+      fetch(base + 'campaigns?order=created_at.asc', {headers:headers}).then(function(r){return r.json();}).catch(function(){return [];}),
+      fetch(base + 'enrollments?order=created_at.asc', {headers:headers}).then(function(r){return r.json();}).catch(function(){return [];}),
+      fetch(base + 'send_log?order=created_at.asc', {headers:headers}).then(function(r){return r.json();}).catch(function(){return []; })
     ]);
 
     var rc = results[0], rn = results[1], rf = results[2], rd = results[3], rtx = results[4];
@@ -1380,6 +1450,11 @@ async function loadFromDB(){
     if(Array.isArray(rf)) F = rf;
     if(Array.isArray(rd)) D = rd;
     if(Array.isArray(rtx)) TX = rtx;
+    var rcamp = results[5], renr = results[6], rsl = results[7];
+    if(Array.isArray(rcamp)) CAMP = rcamp;
+    if(Array.isArray(renr)) ENR = renr;
+    if(Array.isArray(rsl)) SENDLOG = rsl;
+    CAMP.forEach(function(x){ if(typeof x.steps === 'string'){ try{ x.steps = JSON.parse(x.steps); }catch(e){ x.steps = []; } } if(!Array.isArray(x.steps)) x.steps = []; });
     // Convert id strings to numbers if needed
     C.forEach(function(c){ c.id = typeof c.id === 'string' ? parseInt(c.id)||c.id : c.id; });
     N.forEach(function(n){ n.id = typeof n.id === 'string' ? parseInt(n.id)||n.id : n.id; n.contactId = typeof n.contactId === 'string' ? parseInt(n.contactId) : n.contactId; });
@@ -1451,6 +1526,7 @@ function subscribeRealtime(){
         else if(curPage==='deadlines') rdl();
         else if(curPage==='briefing') rb();
         else if(curPage==='tc') renderTC();
+        else if(curPage==='drips'){ processDrips(); renderDrips(); }
       }
     });
   }, 30000); // Poll every 30 seconds
@@ -1508,7 +1584,7 @@ function pl(p){return p==='hot'?'HOT':p==='warn'?'SOON':'OK';}
 function pb(p){return p==='hot'?'b-hot':p==='warn'?'b-warn':'b-ok';}
 function ge(id){return document.getElementById(id);}
 function ck(){var s=document.createElementNS('http://www.w3.org/2000/svg','svg');s.setAttribute('width','9');s.setAttribute('height','9');s.setAttribute('fill','none');s.setAttribute('stroke','#0d0f14');s.setAttribute('stroke-width','3');s.setAttribute('viewBox','0 0 24 24');var p=document.createElementNS('http://www.w3.org/2000/svg','polyline');p.setAttribute('points','20,6 9,17 4,12');s.appendChild(p);return s;}
-var pn={briefing:'Daily Briefing',dashboard:'Dashboard',pipeline:'Pipeline',contacts:'Contacts',followups:'Follow-ups',notes:'Notes',deadlines:'Deadlines',tc:'Transactions',scanner:'Doc Scanner',cardscanner:'Card Scanner',calendar:'Calendar',team:'Team',gmail:'Gmail',mls:'MLS Search'};
+var pn={briefing:'Daily Briefing',dashboard:'Dashboard',pipeline:'Pipeline',contacts:'Contacts',followups:'Follow-ups',notes:'Notes',deadlines:'Deadlines',tc:'Transactions',scanner:'Doc Scanner',cardscanner:'Card Scanner',calendar:'Calendar',team:'Team',gmail:'Gmail',mls:'MLS Search',drips:'Drip Campaigns'};
 function sp(id){
   curPage=id;
   document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');});
@@ -1538,6 +1614,7 @@ function sp(id){
     rdl();
   }
   else if(id==='tc')initTC();
+  else if(id==='drips'){ processDrips(); renderDrips(); }
   else if(id==='scanner')initScanner();
   else if(id==='cardscanner')initCardScanner();
   else if(id==='calendar')initCalendar();
@@ -1799,7 +1876,7 @@ function vc(id){
 function mksec(title){var s=mkRow('det-sec');var t=mkDiv('det-sec-title',title);t.className='det-sec-title';s.appendChild(t);return s;}
 function mkfld(lbl,val,href,style){var r=mkRow('det-field');var l=mkDiv('det-flbl',lbl);l.className='det-flbl';var v=mkDiv('det-fval','');v.className='det-fval';if(style)v.style.cssText=style;if(href){var a=document.createElement('a');a.href=href;a.textContent=val;v.appendChild(a);}else v.textContent=val;r.appendChild(l);r.appendChild(v);return r;}
 function cd(){ge('detOv').classList.remove('open');curDet=null;}
-function ss(id,stage){var c=gc(id);if(!c)return;c.stage=stage;updateContact(c);vc(id);rd();if(curPage==='pipeline')rp();}
+function ss(id,stage){var c=gc(id);if(!c)return;c.stage=stage;updateContact(c);autoEnrollOnStage(c,stage);vc(id);rd();if(curPage==='pipeline')rp();}
 function delc(id){if(!confirm('Delete this contact?'))return;C=C.filter(function(c){return c.id!==id;});N=N.filter(function(n){return n.contactId!==id;});F=F.filter(function(f){return f.contactId!==id;});D=D.filter(function(d){return d.contactId!==id;});sv();deleteCfromDB(id);cd();rd();if(curPage==='contacts')rc();}
 
 function rfu(){
@@ -6373,6 +6450,7 @@ ge('nav-calendar').addEventListener('click',function(){sp('calendar');});
 ge('nav-team').addEventListener('click',function(){sp('team');});
 ge('nav-gmail').addEventListener('click',function(){sp('gmail');});
 ge('nav-mls').addEventListener('click',function(){sp('mls');});
+ge('nav-drips').addEventListener('click',function(){sp('drips');});
 ge('btnSaveToken').addEventListener('click', connectMLSToken);
 ge('btnClearToken').addEventListener('click', disconnectMLS);
 ge('btnMLSSearch').addEventListener('click', searchMLS);
@@ -6866,6 +6944,440 @@ document.querySelectorAll('.modal-ov').forEach(function(m){m.addEventListener('c
 document.querySelectorAll('.filter-btn').forEach(function(b){b.addEventListener('click',function(){curFilter=b.getAttribute('data-filter');document.querySelectorAll('.filter-btn').forEach(function(x){x.classList.remove('active');});b.classList.add('active');rc();});});
 
 startup();
+// ===================== DRIP CAMPAIGNS MODULE =====================
+// State model:
+//   CAMP:    [{id, name, active, trigger, steps:[{subject, body, delayDays}], created_at}]
+//   ENR:     [{id, campaignId, contactId, fromMemberId, stepIndex, status, nextSendAt, created_at}]
+//            status: 'active' | 'completed' | 'stopped'
+//   SENDLOG: [{id, enrollmentId, campaignId, contactId, stepIndex, subject, to, status, sentAt, error, created_at}]
+
+function dripSave(table, rows){ sv(); if(supaReady) dbSave(table, rows); }
+function dripDel(table, id){ if(supaReady) dbDelete(table, id); }
+
+// ---- merge tags ----
+function dripMerge(text, c){
+  if(!text) return '';
+  var agent = 'Randy Baker';
+  return text
+    .replace(/\{\{\s*first\s*\}\}/gi, (c&&c.first)||'there')
+    .replace(/\{\{\s*last\s*\}\}/gi, (c&&c.last)||'')
+    .replace(/\{\{\s*property\s*\}\}/gi, (c&&c.property)||'your property search')
+    .replace(/\{\{\s*price\s*\}\}/gi, (c&&c.price)||'')
+    .replace(/\{\{\s*agent\s*\}\}/gi, agent);
+}
+
+function dripDayMs(){ return 86400000; }
+function nowISO(){ return new Date().toISOString(); }
+
+// ---- enrollment creation ----
+function enrollContact(campaignId, contactId, fromMemberId){
+  var camp = CAMP.find(function(x){ return String(x.id)===String(campaignId); });
+  if(!camp || !camp.steps || !camp.steps.length) return null;
+  // avoid duplicate active enrollment in same campaign
+  var dup = ENR.find(function(e){ return String(e.campaignId)===String(campaignId) && String(e.contactId)===String(contactId) && e.status==='active'; });
+  if(dup) return dup;
+  var firstDelay = parseInt(camp.steps[0].delayDays)||0;
+  var enr = {
+    id: Date.now() + Math.floor(Math.random()*1000),
+    campaignId: campaignId,
+    contactId: contactId,
+    fromMemberId: fromMemberId || (typeof gmailState!=='undefined' ? gmailState.activeMemberId : null) || null,
+    stepIndex: 0,
+    status: 'active',
+    nextSendAt: new Date(Date.now() + firstDelay*dripDayMs()).toISOString(),
+    created_at: nowISO()
+  };
+  ENR.push(enr);
+  dripSave('enrollments', [enr]);
+  return enr;
+}
+
+// ---- auto-enroll on stage change ----
+function autoEnrollOnStage(c, stage){
+  if(!c) return;
+  CAMP.forEach(function(camp){
+    if(camp.active === false || camp.active === 'false') return;
+    if(camp.trigger === ('stage:' + stage)){
+      enrollContact(camp.id, c.id, null);
+    }
+  });
+  updateDripBadges();
+}
+
+// ---- process due steps (called on open, manual run, and 30s poll) ----
+function processDrips(){
+  var due = ENR.filter(function(e){
+    return e.status==='active' && e.nextSendAt && new Date(e.nextSendAt) <= new Date();
+  });
+  due.forEach(function(e){ dripFireStep(e); });
+  updateDripBadges();
+}
+
+function dripFireStep(enr){
+  var camp = CAMP.find(function(x){ return String(x.id)===String(enr.campaignId); });
+  var c = gc(typeof enr.contactId==='string' ? (parseInt(enr.contactId)||enr.contactId) : enr.contactId);
+  if(!camp || !c){ enr.status='stopped'; dripSave('enrollments',[enr]); return; }
+  var step = camp.steps[enr.stepIndex];
+  if(!step){ enr.status='completed'; dripSave('enrollments',[enr]); return; }
+
+  var subject = dripMerge(step.subject, c);
+  var body = dripMerge(step.body, c);
+  var to = c.email;
+
+  var logEntry = {
+    id: Date.now() + Math.floor(Math.random()*1000),
+    enrollmentId: enr.id, campaignId: camp.id, contactId: c.id,
+    stepIndex: enr.stepIndex, subject: subject, to: to||'',
+    status: 'pending', sentAt: null, error: '', created_at: nowISO()
+  };
+
+  function advance(){
+    enr.stepIndex += 1;
+    if(enr.stepIndex >= camp.steps.length){
+      enr.status = 'completed';
+      enr.nextSendAt = null;
+    }else{
+      var nextDelay = parseInt(camp.steps[enr.stepIndex].delayDays)||0;
+      enr.nextSendAt = new Date(Date.now() + nextDelay*dripDayMs()).toISOString();
+    }
+    dripSave('enrollments', [enr]);
+    if(curPage==='drips') renderDrips();
+    updateDripBadges();
+  }
+
+  if(!to){
+    logEntry.status='failed'; logEntry.error='No email address on contact';
+    SENDLOG.push(logEntry); dripSave('send_log',[logEntry]);
+    enr.status='stopped'; dripSave('enrollments',[enr]); return;
+  }
+  var fromMember = enr.fromMemberId || (typeof gmailState!=='undefined' ? gmailState.activeMemberId : null);
+  if(!fromMember || typeof sendEmail!=='function'){
+    // Gmail not connected -> leave queued, do not advance
+    logEntry.status='queued'; logEntry.error='Gmail account not connected - will retry';
+    SENDLOG.push(logEntry); dripSave('send_log',[logEntry]);
+    // push nextSendAt forward slightly so we retry next cycle but don't spin
+    enr.nextSendAt = new Date(Date.now() + 60000).toISOString();
+    dripSave('enrollments',[enr]);
+    return;
+  }
+
+  sendEmail({ to: to, subject: subject, body: body, memberId: fromMember }, function(){
+    logEntry.status='sent'; logEntry.sentAt=nowISO();
+    SENDLOG.push(logEntry); dripSave('send_log',[logEntry]);
+    // log the touch on the contact's notes
+    var nn={id:Date.now(),contactId:c.id,text:'Drip "'+camp.name+'" step '+(enr.stepIndex+1)+' sent: '+subject,date:nowISO()};
+    N.push(nn); if(typeof saveNote==='function') saveNote(nn);
+    advance();
+  });
+}
+
+function stopEnrollment(id){
+  var e = ENR.find(function(x){ return String(x.id)===String(id); });
+  if(!e) return;
+  e.status='stopped'; e.nextSendAt=null;
+  dripSave('enrollments',[e]); renderDrips(); updateDripBadges();
+}
+
+// ---- badges ----
+function updateDripBadges(){
+  var active = ENR.filter(function(e){ return e.status==='active'; }).length;
+  var nb = ge('nbDrips'); if(nb) nb.textContent = CAMP.filter(function(x){return x.active!==false&&x.active!=='false';}).length;
+  var ne = ge('nbEnrollments'); if(ne) ne.textContent = active;
+}
+
+// ---- tab switching ----
+function dripSwitchTab(tab){
+  ['campaigns','enrollments','log'].forEach(function(t){
+    var btn = ge('dripTab'+t.charAt(0).toUpperCase()+t.slice(1));
+    var pane = ge('dripPane'+t.charAt(0).toUpperCase()+t.slice(1));
+    var on = (t===tab);
+    if(btn){ btn.style.borderBottomColor = on?'var(--accent)':'transparent'; btn.style.color = on?'var(--accent)':'var(--text3)'; btn.classList.toggle('active', on); }
+    if(pane){ pane.style.display = on?'block':'none'; }
+  });
+  renderDrips();
+}
+
+// ===================== RENDER =====================
+function renderDrips(){
+  renderCampaignList();
+  renderEnrollmentList();
+  renderSendLog();
+  updateDripBadges();
+}
+
+function mkBtnEl(cls, txt, style){ var b=document.createElement('button'); b.className=cls; b.textContent=txt; if(style)b.style.cssText=style; return b; }
+
+function renderCampaignList(){
+  var wrap = ge('dripCampaignList'); if(!wrap) return;
+  wrap.textContent='';
+  if(!CAMP.length){
+    wrap.appendChild(mkDiv('font-size:16px;color:var(--text3);padding:20px;text-align:center;','No campaigns yet. Create one to start automating follow-up emails.'));
+    return;
+  }
+  CAMP.forEach(function(camp){
+    var enrolled = ENR.filter(function(e){ return String(e.campaignId)===String(camp.id) && e.status==='active'; }).length;
+    var isActive = camp.active!==false && camp.active!=='false';
+    var row = mkRow('li'); row.style.cssText='align-items:flex-start;gap:12px;padding:14px 0;border-bottom:1px solid var(--border);';
+
+    var left = mkDiv('flex:1;');
+    var titleRow = mkDiv('display:flex;align-items:center;gap:10px;flex-wrap:wrap;');
+    titleRow.appendChild(mkDiv('font-size:18px;font-weight:700;color:var(--text);', camp.name));
+    var badge = mkDiv('font-size:13px;font-weight:600;padding:2px 9px;border-radius:20px;'+(isActive?'background:rgba(107,201,122,0.15);color:var(--lead);':'background:var(--surface2);color:var(--text3);'), isActive?'ACTIVE':'PAUSED');
+    titleRow.appendChild(badge);
+    left.appendChild(titleRow);
+    var meta = (camp.steps?camp.steps.length:0)+' step'+((camp.steps&&camp.steps.length===1)?'':'s')+'  -  '+enrolled+' active enrolled';
+    if(camp.trigger){ meta += '  -  auto: '+camp.trigger.replace('stage:','stage = '); }
+    left.appendChild(mkDiv('font-size:15px;color:var(--text3);margin-top:4px;', meta));
+    row.appendChild(left);
+
+    var acts = mkDiv('display:flex;gap:7px;flex-wrap:wrap;');
+    var bEnroll = mkBtnEl('btn btn-p','Enroll','padding:5px 11px;font-size:15px;');
+    (function(id){ bEnroll.addEventListener('click', function(){ openEnrollModal(id); }); })(camp.id);
+    var bEdit = mkBtnEl('btn btn-g','Edit','padding:5px 11px;font-size:15px;');
+    (function(id){ bEdit.addEventListener('click', function(){ openCampaignModal(id); }); })(camp.id);
+    var bToggle = mkBtnEl('btn btn-g', isActive?'Pause':'Resume','padding:5px 11px;font-size:15px;');
+    (function(id){ bToggle.addEventListener('click', function(){ toggleCampaign(id); }); })(camp.id);
+    var bDel = mkBtnEl('btn btn-g','Delete','padding:5px 11px;font-size:15px;color:var(--danger);');
+    (function(id){ bDel.addEventListener('click', function(){ deleteCampaign(id); }); })(camp.id);
+    acts.appendChild(bEnroll); acts.appendChild(bEdit); acts.appendChild(bToggle); acts.appendChild(bDel);
+    row.appendChild(acts);
+    wrap.appendChild(row);
+  });
+}
+
+function renderEnrollmentList(){
+  var wrap = ge('dripEnrollmentList'); if(!wrap) return;
+  wrap.textContent='';
+  var active = ENR.filter(function(e){ return e.status==='active'; });
+  if(!active.length){
+    wrap.appendChild(mkDiv('font-size:16px;color:var(--text3);padding:20px;text-align:center;','No active enrollments.'));
+    return;
+  }
+  active.sort(function(a,b){ return new Date(a.nextSendAt||0)-new Date(b.nextSendAt||0); });
+  active.forEach(function(e){
+    var camp = CAMP.find(function(x){ return String(x.id)===String(e.campaignId); });
+    var c = gc(typeof e.contactId==='string'?(parseInt(e.contactId)||e.contactId):e.contactId);
+    var row = mkRow('li'); row.style.cssText='align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);';
+    var info = mkDiv('flex:1;');
+    info.appendChild(mkDiv('font-size:17px;font-weight:600;color:var(--text);', (c?fn(c):'Unknown contact')));
+    var total = camp&&camp.steps?camp.steps.length:0;
+    var when = e.nextSendAt ? fmtDripWhen(e.nextSendAt) : '-';
+    info.appendChild(mkDiv('font-size:15px;color:var(--text3);margin-top:3px;', (camp?camp.name:'(deleted)')+'  -  step '+(e.stepIndex+1)+' of '+total+'  -  next: '+when));
+    row.appendChild(info);
+    var bStop = mkBtnEl('btn btn-g','Stop','padding:5px 11px;font-size:15px;color:var(--danger);');
+    (function(id){ bStop.addEventListener('click', function(){ stopEnrollment(id); }); })(e.id);
+    row.appendChild(bStop);
+    wrap.appendChild(row);
+  });
+}
+
+function renderSendLog(){
+  var wrap = ge('dripLogList'); if(!wrap) return;
+  wrap.textContent='';
+  if(!SENDLOG.length){
+    wrap.appendChild(mkDiv('font-size:16px;color:var(--text3);padding:20px;text-align:center;','Nothing sent yet.'));
+    return;
+  }
+  var rows = SENDLOG.slice().sort(function(a,b){ return new Date(b.created_at||0)-new Date(a.created_at||0); }).slice(0,100);
+  rows.forEach(function(l){
+    var c = gc(typeof l.contactId==='string'?(parseInt(l.contactId)||l.contactId):l.contactId);
+    var camp = CAMP.find(function(x){ return String(x.id)===String(l.campaignId); });
+    var row = mkRow('li'); row.style.cssText='align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--border);';
+    var dot = mkDiv('width:8px;height:8px;border-radius:50%;flex-shrink:0;'+(l.status==='sent'?'background:var(--lead);':l.status==='failed'?'background:var(--danger);':'background:var(--accent);'),'');
+    row.appendChild(dot);
+    var info = mkDiv('flex:1;');
+    info.appendChild(mkDiv('font-size:16px;font-weight:600;color:var(--text);', l.subject||'(no subject)'));
+    var sub = (c?fn(c):'?')+'  -  '+(camp?camp.name:'?')+'  -  '+(l.status==='sent'?('sent '+fmtDripWhen(l.sentAt||l.created_at)):l.status)+(l.error?(' ('+l.error+')'):'');
+    info.appendChild(mkDiv('font-size:14px;color:var(--text3);margin-top:3px;', sub));
+    row.appendChild(info);
+    wrap.appendChild(row);
+  });
+}
+
+function fmtDripWhen(iso){
+  if(!iso) return '-';
+  var d = new Date(iso); var now = new Date();
+  var diff = d - now;
+  var days = Math.round(diff/dripDayMs());
+  var dateStr = d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+  if(diff < 0) return dateStr+' (overdue)';
+  if(days===0) return dateStr+' (today)';
+  if(days===1) return dateStr+' (tomorrow)';
+  return dateStr+' (in '+days+'d)';
+}
+
+// ===================== CAMPAIGN EDITOR =====================
+function buildStepRow(step, idx){
+  step = step || {subject:'',body:'',delayDays:idx===0?0:3};
+  var box = document.createElement('div');
+  box.className='drip-step-box';
+  box.style.cssText='border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px;background:var(--surface2);';
+  var hdr = mkDiv('display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;');
+  hdr.appendChild(mkDiv('font-size:15px;font-weight:700;color:var(--accent);','Step '+(idx+1)));
+  var del = mkBtnEl('btn btn-g','Remove','padding:3px 9px;font-size:14px;color:var(--danger);');
+  del.addEventListener('click', function(){ box.parentNode.removeChild(box); renumberSteps(); });
+  hdr.appendChild(del);
+  box.appendChild(hdr);
+
+  var delayFg = mkDiv('margin-bottom:8px;');
+  var delayLbl = document.createElement('label'); delayLbl.className='fl'; delayLbl.textContent = idx===0 ? 'Send delay (days after enrollment)' : 'Wait (days after previous step)';
+  var delayInp = document.createElement('input'); delayInp.className='fi drip-step-delay'; delayInp.type='number'; delayInp.min='0'; delayInp.value=(step.delayDays!=null?step.delayDays:(idx===0?0:3)); delayInp.style.cssText='width:120px;';
+  delayFg.appendChild(delayLbl); delayFg.appendChild(delayInp); box.appendChild(delayFg);
+
+  var subjFg = mkDiv('margin-bottom:8px;');
+  var subjLbl = document.createElement('label'); subjLbl.className='fl'; subjLbl.textContent='Subject';
+  var subjInp = document.createElement('input'); subjInp.className='fi drip-step-subject'; subjInp.placeholder='Hi {{first}}, following up'; subjInp.value=step.subject||'';
+  subjFg.appendChild(subjLbl); subjFg.appendChild(subjInp); box.appendChild(subjFg);
+
+  var bodyFg = mkDiv('');
+  var bodyLbl = document.createElement('label'); bodyLbl.className='fl'; bodyLbl.textContent='Body';
+  var bodyTA = document.createElement('textarea'); bodyTA.className='fi drip-step-body'; bodyTA.rows=5; bodyTA.placeholder='Hi {{first}},\n\nThanks for your interest in {{property}}...\n\n- {{agent}}'; bodyTA.value=step.body||'';
+  bodyFg.appendChild(bodyLbl); bodyFg.appendChild(bodyTA); box.appendChild(bodyFg);
+
+  return box;
+}
+
+function renumberSteps(){
+  var boxes = ge('campStepsWrap').querySelectorAll('.drip-step-box');
+  for(var i=0;i<boxes.length;i++){
+    boxes[i].querySelector('div > div').textContent = 'Step '+(i+1);
+    var lbl = boxes[i].querySelector('label.fl');
+    if(lbl) lbl.textContent = i===0 ? 'Send delay (days after enrollment)' : 'Wait (days after previous step)';
+  }
+}
+
+function openCampaignModal(id){
+  var wrap = ge('campStepsWrap'); wrap.textContent='';
+  if(id){
+    var camp = CAMP.find(function(x){ return String(x.id)===String(id); });
+    ge('campModalTitle').textContent='Edit Campaign';
+    ge('btnSaveCampaign').setAttribute('data-edit-id', id);
+    ge('campName').value = camp.name||'';
+    ge('campActive').value = (camp.active!==false && camp.active!=='false') ? 'true' : 'false';
+    ge('campTrigger').value = camp.trigger||'';
+    (camp.steps||[]).forEach(function(s,i){ wrap.appendChild(buildStepRow(s,i)); });
+    if(!camp.steps || !camp.steps.length) wrap.appendChild(buildStepRow(null,0));
+  }else{
+    ge('campModalTitle').textContent='New Campaign';
+    ge('btnSaveCampaign').setAttribute('data-edit-id','');
+    ge('campName').value=''; ge('campActive').value='true'; ge('campTrigger').value='';
+    wrap.appendChild(buildStepRow(null,0));
+  }
+  om('campaignModal');
+}
+
+function addCampaignStep(){
+  var wrap = ge('campStepsWrap');
+  var idx = wrap.querySelectorAll('.drip-step-box').length;
+  wrap.appendChild(buildStepRow(null, idx));
+}
+
+function saveCampaign(){
+  var name = ge('campName').value.trim();
+  if(!name){ alert('Please enter a campaign name.'); return; }
+  var boxes = ge('campStepsWrap').querySelectorAll('.drip-step-box');
+  var steps = [];
+  for(var i=0;i<boxes.length;i++){
+    var subj = boxes[i].querySelector('.drip-step-subject').value.trim();
+    var body = boxes[i].querySelector('.drip-step-body').value.trim();
+    var delay = parseInt(boxes[i].querySelector('.drip-step-delay').value)||0;
+    if(!subj && !body) continue;
+    steps.push({subject:subj, body:body, delayDays:delay});
+  }
+  if(!steps.length){ alert('Add at least one email step with a subject or body.'); return; }
+  var editId = ge('btnSaveCampaign').getAttribute('data-edit-id');
+  var camp;
+  if(editId){
+    camp = CAMP.find(function(x){ return String(x.id)===String(editId); });
+    camp.name=name; camp.active=(ge('campActive').value==='true'); camp.trigger=ge('campTrigger').value; camp.steps=steps;
+  }else{
+    camp = { id: Date.now(), name:name, active:(ge('campActive').value==='true'), trigger:ge('campTrigger').value, steps:steps, created_at:nowISO() };
+    CAMP.push(camp);
+  }
+  // Supabase stores steps as jsonb; send a copy with steps serialized for safety
+  var toSave = JSON.parse(JSON.stringify(camp));
+  dripSave('campaigns', [toSave]);
+  cm('campaignModal');
+  renderDrips();
+}
+
+function toggleCampaign(id){
+  var camp = CAMP.find(function(x){ return String(x.id)===String(id); });
+  if(!camp) return;
+  camp.active = !(camp.active!==false && camp.active!=='false');
+  dripSave('campaigns', [JSON.parse(JSON.stringify(camp))]);
+  renderDrips();
+}
+
+function deleteCampaign(id){
+  if(!confirm('Delete this campaign? Active enrollments will be stopped.')) return;
+  ENR.forEach(function(e){ if(String(e.campaignId)===String(id) && e.status==='active'){ e.status='stopped'; e.nextSendAt=null; dripSave('enrollments',[e]); } });
+  CAMP = CAMP.filter(function(x){ return String(x.id)!==String(id); });
+  dripDel('campaigns', id);
+  sv();
+  renderDrips();
+}
+
+// ===================== ENROLL MODAL =====================
+function openEnrollModal(presetCampaignId){
+  var cs = ge('enrollCampaign'); cs.textContent='';
+  CAMP.filter(function(x){ return x.active!==false && x.active!=='false'; }).forEach(function(camp){
+    var o=document.createElement('option'); o.value=camp.id; o.textContent=camp.name; cs.appendChild(o);
+  });
+  if(presetCampaignId) cs.value = presetCampaignId;
+
+  var cc = ge('enrollContact'); cc.textContent='';
+  C.forEach(function(c){ var o=document.createElement('option'); o.value=c.id; o.textContent=fn(c)+(c.email?'':' (no email)'); cc.appendChild(o); });
+
+  var fs = ge('enrollFrom'); fs.textContent='';
+  var accts = (typeof gmailState!=='undefined' && gmailState.connectedAccounts) ? gmailState.connectedAccounts : {};
+  var keys = Object.keys(accts);
+  if(!keys.length){
+    var o=document.createElement('option'); o.value=''; o.textContent='No Gmail connected (will queue)'; fs.appendChild(o);
+  }else{
+    keys.forEach(function(k){ var o=document.createElement('option'); o.value=k; o.textContent=(accts[k].email||accts[k].name||k); fs.appendChild(o); });
+    if(gmailState.activeMemberId) fs.value=gmailState.activeMemberId;
+  }
+  om('enrollModal');
+}
+
+function confirmEnroll(){
+  var campaignId = ge('enrollCampaign').value;
+  var contactId = ge('enrollContact').value;
+  var fromMember = ge('enrollFrom').value || null;
+  if(!campaignId){ alert('Select a campaign.'); return; }
+  if(!contactId){ alert('Select a contact.'); return; }
+  var cid = parseInt(contactId)||contactId;
+  var c = gc(cid);
+  if(c && !c.email){ if(!confirm('This contact has no email address. Enroll anyway? Steps will fail until an email is added.')){ return; } }
+  var enr = enrollContact(campaignId, cid, fromMember);
+  if(!enr){ alert('Could not enroll - campaign has no steps.'); return; }
+  cm('enrollModal');
+  processDrips();
+  renderDrips();
+}
+
+// ===================== WIRING =====================
+ge('nav-drips') && (function(){
+  ge('btnNewCampaign') && ge('btnNewCampaign').addEventListener('click', function(){ openCampaignModal(null); });
+  ge('btnAddStep') && ge('btnAddStep').addEventListener('click', addCampaignStep);
+  ge('btnSaveCampaign') && ge('btnSaveCampaign').addEventListener('click', saveCampaign);
+  ge('btnConfirmEnroll') && ge('btnConfirmEnroll').addEventListener('click', confirmEnroll);
+  ge('btnRunDripsNow') && ge('btnRunDripsNow').addEventListener('click', function(){ processDrips(); renderDrips(); });
+  ['campaigns','enrollments','log'].forEach(function(t){
+    var btn = ge('dripTab'+t.charAt(0).toUpperCase()+t.slice(1));
+    if(btn) btn.addEventListener('click', function(){ dripSwitchTab(t); });
+  });
+  // close handlers for new modals reuse existing data-close convention; ensure overlay click closes
+  ['campaignModal','enrollModal'].forEach(function(mid){
+    var m = ge(mid);
+    if(m) m.addEventListener('click', function(e){ if(e.target===m) cm(mid); });
+  });
+})();
+
+// Run a processing pass shortly after load and on the existing poll cycle
+setTimeout(function(){ try{ processDrips(); updateDripBadges(); }catch(e){ console.log('drip init', e); } }, 4000);
+// ===================== END DRIP CAMPAIGNS MODULE =====================
 })();
 </script>
 </body>
