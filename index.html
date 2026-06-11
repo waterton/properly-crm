@@ -1746,6 +1746,7 @@ function rp(){
         e.dataTransfer.effectAllowed='move';
         this.style.opacity='0.45';
         this.style.cursor='grabbing';
+        ge('pBoard').setAttribute('data-dragging','1');
       });
       card.addEventListener('dragend',function(){
         this.style.opacity='1';
@@ -1753,19 +1754,16 @@ function rp(){
         document.querySelectorAll('[data-stage]').forEach(function(z){
           z.style.background='';z.style.outline='';
         });
+        setTimeout(function(){ ge('pBoard').removeAttribute('data-dragging'); }, 100);
       });
       card.addEventListener('mouseenter',function(){this.style.borderColor='var(--accent)';this.style.transform='translateY(-1px)';});
       card.addEventListener('mouseleave',function(){this.style.borderColor='var(--border)';this.style.transform='none';});
 
-      // Click to open detail only if card was not dragged
-      var dragging=false;
-      card.addEventListener('dragstart',function(){dragging=true;});
-      card.addEventListener('dragend',function(){
-        // reset on next tick so the click that follows dragend is suppressed
-        setTimeout(function(){dragging=false;},50);
-      });
       (function(id){
-        card.addEventListener('click',function(){if(!dragging)vc(id);});
+        card.addEventListener('click',function(e){
+          if(e.target.closest('[data-dragging]')) return;
+          vc(id);
+        });
       })(c.id);
 
       var tg=document.createElement('span');tg.className='tag tag-'+c.type;tg.style.cssText='margin-bottom:5px;display:inline-block;';tg.textContent=c.type;
