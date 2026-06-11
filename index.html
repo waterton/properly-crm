@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-  <meta name="version" content="3.1">
+  <meta name="version" content="3.2">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Properly CRM</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -411,7 +411,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
       <div class="topbar-right">
         <input class="sbox" type="text" placeholder="Search..." id="searchBox">
         <button class="btn btn-p" id="btnAdd">+ Add</button>
-        <div style="font-size:11px;color:var(--text3);margin-right:4px;">v3.1</div>
+        <div style="font-size:11px;color:var(--text3);margin-right:4px;">v3.2</div>
         <div class="topbar-user" id="topbarUser" title="Sign out" style="cursor:pointer;">RE</div>
       </div>
     </div>
@@ -4501,8 +4501,17 @@ var EMAIL_TEMPLATES = {
 };
 
 function initGmail(){
+  // Load TM first if empty
+  if(!TM.length){
+    try{ var s=localStorage.getItem('crm_tm'); if(s) TM=JSON.parse(s); }catch(e){}
+    if(!TM.length){
+      TM=[
+        {id:1,first:'Randy',last:'Baker',role:'Agent',email:'randyknowsutah@gmail.com',phone:'801-910-2296',color:'#C9A84C',calLink:''},
+        {id:2,first:'Elda',last:'Palacios Baker',role:'Agent',email:'eldarealtor@gmail.com',phone:'801-706-3806',color:'#4C8EC9',calLink:''}
+      ];
+    }
+  }
   renderGmailAccountBar();
-  // Check which accounts are connected
   checkConnectedAccounts();
 }
 
@@ -4540,6 +4549,20 @@ function renderGmailAccountBar(){
   var connectBtns = ge('gmailConnectButtons');
   if(!bar) return;
   bar.innerHTML = '';
+
+  // Ensure TM is loaded - seed defaults if empty
+  if(!TM.length){
+    try{
+      var saved = localStorage.getItem('crm_tm');
+      if(saved) TM = JSON.parse(saved);
+    }catch(e){}
+    if(!TM.length){
+      TM = [
+        {id:1,first:'Randy',last:'Baker',role:'Agent',email:'randyknowsutah@gmail.com',phone:'801-910-2296',color:'#C9A84C',calLink:''},
+        {id:2,first:'Elda',last:'Palacios Baker',role:'Agent',email:'eldarealtor@gmail.com',phone:'801-706-3806',color:'#4C8EC9',calLink:''}
+      ];
+    }
+  }
 
   // Show connected accounts as tabs
   TM.forEach(function(m){
