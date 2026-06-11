@@ -689,6 +689,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
           </div>
           <button class="btn btn-p" id="btnGmailCompose" style="display:none;">+ Compose</button>
           <button class="btn btn-g" id="btnGmailRefresh" style="display:none;">Refresh</button>
+          <button class="btn btn-g" id="btnGmailDebug" style="display:none;font-size:14px;">Debug Headers</button>
         </div>
 
         <!-- Not connected state -->
@@ -3604,6 +3605,7 @@ async function checkConnectedAccounts(){
       ge('gmailConnected').style.display = 'block';
       ge('btnGmailCompose').style.display = 'inline-flex';
       ge('btnGmailRefresh').style.display = 'inline-flex';
+      ge('btnGmailDebug').style.display = 'inline-flex';
       loadGmailInbox();
     }
   }catch(e){ console.log('checkConnectedAccounts error:', e); }
@@ -4721,6 +4723,15 @@ ge('detOv').addEventListener('click',function(e){if(e.target===ge('detOv'))cd();
 ge('searchBox').addEventListener('input',function(){if(curPage==='contacts')rc();});
 ge('btnGmailCompose').addEventListener('click', function(){ openCompose(); });
 ge('btnGmailRefresh').addEventListener('click', loadGmailInbox);
+ge('btnGmailDebug').addEventListener('click', async function(){
+  var resp = await fetch('/api/gmail-api', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({action:'inbox', memberId:gmailState.activeMemberId, query:'debug'})
+  });
+  var text = await resp.text();
+  console.log('GMAIL DEBUG RESPONSE:', text);
+  alert('Debug info logged to console. Press F12 to see it.');
+});
 ge('btnSendEmail').addEventListener('click', sendComposedEmail);
 ge('btnSaveDraft').addEventListener('click', function(){ alert('Draft saving coming soon!'); });
 document.querySelectorAll('.gmail-template-btn').forEach(function(btn){
