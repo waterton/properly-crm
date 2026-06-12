@@ -3260,30 +3260,7 @@ function renderTC(){
 
     var card = document.createElement('div');
     card.className = 'tc-card';
-    (function(txId){ card.addEventListener('click', function(){
-      var tx = TX.find(function(t){ return t.id===txId; });
-      if(!tx) return;
-      curTx = txId;
-      ge('tcModalTitle').textContent = 'Edit Transaction';
-      ge('btnSaveTransaction').setAttribute('data-edit-id', tx.id);
-      ge('tcType').value = tx.type||'buyer';
-      ge('tcContact').innerHTML = '';
-      C.forEach(function(c){ var o=document.createElement('option'); o.value=c.id; o.textContent=fn(c)+' ('+ctype1(c)+')'; ge('tcContact').appendChild(o); });
-      ge('tcContact').value = tx.contactId||'';
-      ge('tcAddress').value = tx.address||'';
-      ge('tcPrice').value = tx.price||'';
-      ge('tcMLS').value = tx.mlsNum||'';
-      ge('tcLender').value = tx.lender||'';
-      ge('tcTitle').value = tx.titleCo||'';
-      ge('tcNotes').value = tx.notes||'';
-      ge('tcContractDate').value = tx.contractDate||'';
-      ge('tcClosingDate').value = tx.closingDate||'';
-      ge('tcEarnestDate').value = tx.earnestDate||'';
-      ge('tcDueDiligDate').value = tx.dueDiligDate||'';
-      ge('tcFinancingDate').value = tx.financingDate||'';
-      ge('tcAppraisalDate').value = tx.appraisalDate||'';
-      ge('tcModal').classList.add('open');
-    }); })(tx.id);
+    (function(txId){ card.addEventListener('click', function(){ openTCDetail(txId); }); })(tx.id);
 
     var hdr = document.createElement('div');
     hdr.className = 'tc-card-header';
@@ -3371,10 +3348,41 @@ function openTCDetail(id){
   var c = gc(tx.contactId);
 
   ge('tcDetTitle').textContent = tx.address || 'Transaction';
-  ge('tcDetSub').textContent = (c ? fn(c) : 'Unknown') + ' | ' + tx.type.toUpperCase() + (tx.price ? ' | ' + tx.price : '') + (tx.closingDate ? ' | Close: ' + fd(tx.closingDate) : '');
+  ge('tcDetSub').textContent = (tx.price ? tx.price + ' | ' : '') + tx.type.toUpperCase() + (tx.closingDate ? ' | Close: ' + fd(tx.closingDate) : '');
 
   var body = ge('tcDetBody');
   body.innerHTML = '';
+
+  // Contact reassign row at top of detail body
+  var cRow = document.createElement('div');
+  cRow.style.cssText = 'padding:10px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;background:var(--surface2);';
+  var cLbl = document.createElement('div');
+  cLbl.style.cssText = 'font-size:13px;color:var(--text3);white-space:nowrap;';
+  cLbl.textContent = 'Contact:';
+  var cSel = document.createElement('select');
+  cSel.className = 'fsel';
+  cSel.style.cssText = 'font-size:14px;flex:1;padding:4px 8px;';
+  var noOpt = document.createElement('option');
+  noOpt.value = ''; noOpt.textContent = '-- No contact assigned --';
+  cSel.appendChild(noOpt);
+  C.forEach(function(ct){
+    var o = document.createElement('option');
+    o.value = ct.id;
+    o.textContent = fn(ct) + (ctype1(ct) ? ' (' + ctype1(ct) + ')' : '');
+    cSel.appendChild(o);
+  });
+  cSel.value = tx.contactId || '';
+  (function(txId){ cSel.addEventListener('change', function(){
+    var t = TX.find(function(x){ return x.id===txId; });
+    if(!t) return;
+    t.contactId = parseInt(cSel.value)||cSel.value||null;
+    sv(); if(supaReady) dbSave('transactions',[t]);
+    // update subtitle
+    var nc = gc(t.contactId);
+    ge('tcDetSub').textContent = (t.price?t.price+' | ':'')+t.type.toUpperCase()+(t.closingDate?' | Close: '+fd(t.closingDate):'');
+  }); })(id);
+  cRow.appendChild(cLbl); cRow.appendChild(cSel);
+  body.appendChild(cRow);
 
   // Info section
   var infoSec = document.createElement('div');
