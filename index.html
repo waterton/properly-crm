@@ -1778,14 +1778,14 @@ function rd(){
   var pipEl=ge('dPipeline');pipEl.innerHTML='';
   ['New Lead','Contacted','Showing','Under Contract'].forEach(function(s){var cnt=C.filter(function(c){return c.stage===s;}).length;var row=mkRow('li');row.appendChild(mkDiv('flex:1;font-size:18px;font-weight:600;',s));row.appendChild(mkDiv('font-family:monospace;font-size:22px;font-weight:700;color:var(--accent);',cnt));pipEl.appendChild(row);});
   ge('nbFollowups').textContent=F.filter(function(f){return !f.done;}).length;
-  ge('nbPipeline').textContent=C.filter(function(c){return c.stage!=='Closed';}).length;
+  ge('nbPipeline').textContent=C.filter(function(c){return c.stage && c.stage!=='Closed';}).length;
 }
 
 function rp(){
   var board=ge('pBoard');board.innerHTML='';
   var stageColors={'New Lead':'var(--lead)','Contacted':'var(--buyer)','Showing':'var(--accent)','Under Contract':'var(--seller)','Closed':'var(--text3)'};
   ['New Lead','Contacted','Showing','Under Contract','Closed'].forEach(function(s){
-    var sc=C.filter(function(c){return c.stage===s;});
+    var sc=C.filter(function(c){return c.stage && c.stage===s;});
     var col=document.createElement('div');
     col.style.cssText='min-width:220px;flex-shrink:0;display:flex;flex-direction:column;';
     col.setAttribute('data-stage',s);
