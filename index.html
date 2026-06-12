@@ -1268,7 +1268,18 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
     <div class="mhdr"><div class="mtitle">Add Contact</div><button class="mx" data-close="addModal">&#x2715;</button></div>
     <div class="mbody">
       <div class="frow"><div class="fg"><label class="fl">First Name</label><input class="fi" id="fFirst" placeholder="Sarah"></div><div class="fg"><label class="fl">Last Name</label><input class="fi" id="fLast" placeholder="Johnson"></div></div>
-      <div class="fg"><label class="fl">Type <span style="color:var(--text3);font-weight:400;">(optional)</span></label><select class="fsel" id="fType"><option value="">-- No type --</option><option value="prospect">Prospect</option><option value="buyer">Buyer</option><option value="seller">Seller</option><option value="agent">Agent/Broker</option><option value="lender">Loan Officer/Lender</option><option value="title">Title Company</option><option value="vendor">Vendor</option><option value="other">Other</option></select></div>
+      <div class="fg"><label class="fl">Type <span style="color:var(--text3);font-weight:400;">(optional, select all that apply)</span></label>
+        <div id="fTypeWrap" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;">
+          <label style="display:flex;align-items:center;gap:5px;font-size:14px;cursor:pointer;"><input type="checkbox" class="ftype-chk" value="prospect" style="accent-color:var(--accent);"> Prospect</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:14px;cursor:pointer;"><input type="checkbox" class="ftype-chk" value="buyer" style="accent-color:var(--accent);"> Buyer</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:14px;cursor:pointer;"><input type="checkbox" class="ftype-chk" value="seller" style="accent-color:var(--accent);"> Seller</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:14px;cursor:pointer;"><input type="checkbox" class="ftype-chk" value="agent" style="accent-color:var(--accent);"> Agent/Broker</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:14px;cursor:pointer;"><input type="checkbox" class="ftype-chk" value="lender" style="accent-color:var(--accent);"> Loan Officer/Lender</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:14px;cursor:pointer;"><input type="checkbox" class="ftype-chk" value="title" style="accent-color:var(--accent);"> Title Company</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:14px;cursor:pointer;"><input type="checkbox" class="ftype-chk" value="vendor" style="accent-color:var(--accent);"> Vendor</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:14px;cursor:pointer;"><input type="checkbox" class="ftype-chk" value="other" style="accent-color:var(--accent);"> Other</label>
+        </div>
+      </div>
       <div class="fg"><label class="fl">Phone</label><input class="fi" id="fPhone" type="tel" placeholder="(555) 000-0000"></div>
       <div class="fg"><label class="fl">Email</label><input class="fi" id="fEmail" type="email" placeholder="sarah@email.com"></div>
       <div class="fg"><label class="fl">Property / Interest</label><input class="fi" id="fProp" placeholder="123 Oak St or Budget $400k-$500k"></div>
@@ -1623,6 +1634,13 @@ function demo(){
 }
 function ini(c){return (c.first[0]+c.last[0]).toUpperCase();}
 function fn(c){return c.first+' '+c.last;}
+function ctypes(c){
+  // Always returns an array of types, handles both legacy string and new array
+  if(Array.isArray(c.types) && c.types.length) return c.types;
+  if(c.type) return [c.type];
+  return [];
+}
+function ctype1(c){ var t=ctypes(c); return t[0]||''; } // primary type for CSS classes etc
 function gc(id){for(var i=0;i<C.length;i++){if(C[i].id===id)return C[i];}return null;}
 function du(s){var d=new Date(s);d.setHours(0,0,0,0);var n=new Date();n.setHours(0,0,0,0);return Math.round((d-n)/864e5);}
 function rt(iso){var m=Math.round((Date.now()-new Date(iso))/60000);if(m<1)return 'just now';if(m<60)return m+'m ago';if(m<1440)return Math.round(m/60)+'h ago';return Math.round(m/1440)+'d ago';}
@@ -1716,9 +1734,9 @@ function rb(){
 }
 
 function rd(){
-  ge('sBuyers').textContent=C.filter(function(c){return c.type==='buyer';}).length;
-  ge('sSellers').textContent=C.filter(function(c){return c.type==='seller';}).length;
-  ge('sLeads').textContent=C.filter(function(c){return c.type==='prospect'||c.type==='lead';}).length;
+  ge('sBuyers').textContent=C.filter(function(c){return ctypes(c).indexOf('buyer')>=0;}).length;
+  ge('sSellers').textContent=C.filter(function(c){return ctypes(c).indexOf('seller')>=0;}).length;
+  ge('sLeads').textContent=C.filter(function(c){var t=ctypes(c);return t.indexOf('prospect')>=0||t.indexOf('lead')>=0;}).length;
   ge('sClosing').textContent=D.filter(function(d){var n=du(d.date);return n>=0&&n<=30;}).length;
   var rEl=ge('dRecent');rEl.innerHTML='';
   var rec=N.slice().sort(function(a,b){return new Date(b.date)-new Date(a.date);}).slice(0,4);
@@ -1815,8 +1833,9 @@ function rp(){
         });
       })(c.id);
 
-      var tg=document.createElement('span');tg.className='tag tag-'+c.type;tg.style.cssText='margin-bottom:5px;display:inline-block;';tg.textContent=c.type;
-      card.appendChild(tg);
+      var tgRow=mkDiv('display:flex;gap:4px;flex-wrap:wrap;margin-bottom:5px;');
+      ctypes(c).forEach(function(t){ var tg=document.createElement('span');tg.className='tag tag-'+t;tg.style.cssText='font-size:12px;';tg.textContent=t;tgRow.appendChild(tg); });
+      if(ctypes(c).length) card.appendChild(tgRow);
       card.appendChild(mkDiv('font-size:16px;font-weight:600;margin-bottom:2px;',fn(c)));
       card.appendChild(mkDiv('font-size:14px;color:var(--text2);margin-bottom:7px;',c.property||'-'));
       var foot=mkDiv('display:flex;justify-content:space-between;');
@@ -2050,9 +2069,11 @@ function deleteSelectedContacts(){
 
 function rc(){
   var filter = curFilter==='all' ? null : curFilter;
-  // treat stored 'lead' as 'prospect' for filtering
   var list = filter
-    ? C.filter(function(c){ var t=c.type==='lead'?'prospect':c.type; return t===filter; })
+    ? C.filter(function(c){
+        var ts = ctypes(c).map(function(t){ return t==='lead'?'prospect':t; });
+        return ts.indexOf(filter) >= 0;
+      })
     : C.slice();
   var q=ge('searchBox').value.toLowerCase();
   if(q) list=list.filter(function(c){return fn(c).toLowerCase().indexOf(q)>=0||(c.email||'').toLowerCase().indexOf(q)>=0||(c.phone||'').indexOf(q)>=0;});
@@ -2123,9 +2144,11 @@ function vc(id){
   curDet=id;var c=gc(id);if(!c)return;
   var stgs=['New Lead','Contacted','Showing','Under Contract','Closed'];
   var hdr=ge('detHdr');hdr.innerHTML='';
-  var av=mkDiv('det-av av-'+c.type,ini(c));av.className='det-av av-'+c.type;
+  var av=mkDiv('det-av av-'+ctype1(c),ini(c));av.className='det-av av-'+ctype1(c);
   var nd=mkDiv('');nd.appendChild(mkDiv('det-name',fn(c)));nd.children[0].className='det-name';
-  var mt=mkDiv('det-meta','');mt.className='det-meta';var tg=document.createElement('span');tg.className='tag tag-'+c.type;tg.textContent=c.type;mt.appendChild(tg);mt.appendChild(document.createTextNode(' Added '+rt(c.added)));nd.appendChild(mt);
+  var mt=mkDiv('det-meta','');mt.className='det-meta';
+  ctypes(c).forEach(function(t){ var tg=document.createElement('span');tg.className='tag tag-'+t;tg.style.marginRight='4px';tg.textContent=t;mt.appendChild(tg); });
+  mt.appendChild(document.createTextNode(' Added '+rt(c.added)));nd.appendChild(mt);
   var xb=mkBtn('det-x','\u2715','');xb.addEventListener('click',cd);
   hdr.appendChild(av);hdr.appendChild(nd);hdr.appendChild(xb);
   var acts=ge('detActs');acts.innerHTML='';
@@ -2147,11 +2170,14 @@ function vc(id){
   var tsec=mksec('Type');var tr=mkRow('stage-row');tr.style.flexWrap='wrap';
   [['prospect','Prospect'],['buyer','Buyer'],['seller','Seller'],['agent','Agent'],['lender','Lender'],['title','Title'],['vendor','Vendor'],['other','Other']].forEach(function(pair){
     var t=pair[0],lbl=pair[1];
-    var b=mkBtn('sp'+(c.type===t?' active':''),lbl,'');
+    var ts=ctypes(c);
+    var b=mkBtn('sp'+(ts.indexOf(t)>=0?' active':''),lbl,'');
     (function(cid,type){b.addEventListener('click',function(){
       var ct=gc(cid);if(!ct)return;
-      // clicking active type clears it
-      ct.type=(ct.type===type?'':type);
+      var arr=ctypes(ct).slice();
+      var idx=arr.indexOf(type);
+      if(idx>=0) arr.splice(idx,1); else arr.push(type);
+      ct.types=arr; ct.type=arr[0]||'';
       updateContact(ct);vc(cid);
       rd();if(curPage==='contacts')rc();if(curPage==='pipeline')rp();
     });})(id,t);
@@ -2550,9 +2576,23 @@ function rdl(){
 
 function om(id){ge(id).classList.add('open');}
 function cm(id){ge(id).classList.remove('open');}
-function fs(sid){var sel=ge(sid);sel.innerHTML='';C.forEach(function(c){var o=document.createElement('option');o.value=c.id;o.textContent=fn(c)+' ('+c.type+')';sel.appendChild(o);});}
+function fs(sid){var sel=ge(sid);sel.innerHTML='';C.forEach(function(c){var o=document.createElement('option');o.value=c.id;o.textContent=fn(c)+(ctypes(c).length?' ('+ctypes(c).join(', ')+ ')':'');sel.appendChild(o);});}
 function ofc(id){fs('fuContact');ge('fuContact').value=id;ge('fuDate').value=tod();populateAssignDropdowns();om('fuModal');}
 function odc(id){fs('dlContact');ge('dlContact').value=id;ge('dlDate').value=tod();populateAssignDropdowns();om('dlModal');}
+
+function getFTypeValues(){
+  var vals=[];
+  document.querySelectorAll('.ftype-chk').forEach(function(cb){ if(cb.checked) vals.push(cb.value); });
+  return vals;
+}
+function setFTypeValues(types){
+  document.querySelectorAll('.ftype-chk').forEach(function(cb){
+    cb.checked = types.indexOf(cb.value) >= 0;
+  });
+}
+function clearFTypeValues(){
+  document.querySelectorAll('.ftype-chk').forEach(function(cb){ cb.checked=false; });
+}
 
 function openEditContact(id){
   var c = gc(id);
@@ -2561,7 +2601,7 @@ function openEditContact(id){
   ge('btnSaveContact') && ge('btnSaveContact').setAttribute('data-edit-id', id);
   ge('fFirst').value = c.first||'';
   ge('fLast').value = c.last||'';
-  ge('fType').value = c.type||'';
+  setFTypeValues(ctypes(c));
   ge('fPhone').value = c.phone||'';
   ge('fEmail').value = c.email||'';
   ge('fProp').value = c.property||'';
@@ -2582,7 +2622,8 @@ function svc(){
     // Edit existing
     var c = gc(parseInt(editId)||editId);
     if(c){
-      c.first=first; c.last=last; c.type=ge('fType').value;
+      c.first=first; c.last=last;
+      c.types=getFTypeValues(); c.type=c.types[0]||'';
       c.phone=ge('fPhone').value; c.email=ge('fEmail').value;
       c.property=ge('fProp').value; c.stage=ge('fStage').value;
       c.price=ge('fPrice').value; c.notes=ge('fNotes').value;
@@ -2592,7 +2633,8 @@ function svc(){
     ge('btnSaveContact') && ge('btnSaveContact').setAttribute('data-edit-id','');
     ge('addModalTitle') && (ge('addModalTitle').textContent = 'Add Contact');
   } else {
-    var nc={id:Date.now(),first:first,last:last,type:ge('fType').value,
+    var _ftypes=getFTypeValues();
+    var nc={id:Date.now(),first:first,last:last,types:_ftypes,type:_ftypes[0]||'',
       phone:ge('fPhone').value,email:ge('fEmail').value,
       property:ge('fProp').value,stage:ge('fStage').value,
       price:ge('fPrice').value,notes:ge('fNotes').value,
@@ -2602,7 +2644,7 @@ function svc(){
   }
   cm('addModal');
   ['fFirst','fLast','fPhone','fEmail','fProp','fPrice','fNotes','fCloseDate'].forEach(function(x){ge(x).value='';});
-  ge('fType').value=''; ge('fStage').value='';
+  clearFTypeValues(); ge('fStage').value='';
   rd(); if(curPage==='contacts')rc(); if(curPage==='pipeline')rp();
 }
 function svn(){
@@ -2660,7 +2702,7 @@ function exportCSV(){
   var rows = [headers.map(csvQ).join(',')];
   C.forEach(function(c){
     var row = [
-      csvQ(c.first||''), csvQ(c.last||''), csvQ(c.type||''), csvQ(c.phone||''),
+      csvQ(c.first||''), csvQ(c.last||''), csvQ(ctypes(c).join('|')), csvQ(c.phone||''),
       csvQ(c.email||''), csvQ(c.property||''), csvQ(c.stage||''),
       csvQ(c.price||''), csvQ((c.notes||'').replace(/[\r\n]+/g,' '))
     ];
@@ -2713,7 +2755,17 @@ function parseCSV(text){
       id: Date.now() + i + Math.floor(Math.random()*1000),
       first: first,
       last:  last,
-      type:  obj['type'] || obj['contact type'] ? normalizeType(obj['type'] || obj['contact type']) : '',
+      types: (function(){
+        var raw=obj['type']||obj['contact type']||'';
+        if(!raw) return [];
+        return raw.split('|').map(function(t){ return normalizeType(t.trim()); }).filter(Boolean);
+      })(),
+      type: (function(){
+        var raw=obj['type']||obj['contact type']||'';
+        if(!raw) return '';
+        var first=raw.split('|')[0].trim();
+        return first ? normalizeType(first) : '';
+      })(),
       phone: phone,
       email: email,
       property: obj['property'] || obj['address'] || obj['interest'] || '',
@@ -6856,7 +6908,7 @@ function openAttachModal(listing){
   selLabel.textContent = 'Select Client';
   var sel = document.createElement('select');
   sel.className = 'fsel';
-  C.filter(function(c){ return c.type === 'buyer' || c.type === 'prospect' || c.type === 'lead'; }).forEach(function(c){
+  C.filter(function(c){ var t=ctypes(c); return t.indexOf('buyer')>=0||t.indexOf('prospect')>=0||t.indexOf('lead')>=0; }).forEach(function(c){
     var opt = document.createElement('option');
     opt.value = c.id;
     opt.textContent = fn(c) + ' (' + c.type + ')';
