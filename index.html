@@ -2748,8 +2748,7 @@ function parseCSV(text){
   // Normalize line endings
   var lines = text.trim().replace(/\r\n/g,'\n').replace(/\r/g,'\n').split('\n');
   if(lines.length < 2) return [];
-  // Use csvSplit for headers too so quoted headers work
-  var headers = csvSplit(lines[0]).map(function(h){ return h.trim().toLowerCase().replace(/[^a-z ]/g,''); });
+  var headers = csvSplit(lines[0]).map(function(h){ return h.trim().toLowerCase().replace(/"/g,''); });
   var results = [];
   for(var i = 1; i < lines.length; i++){
     var line = lines[i].trim();
@@ -2757,35 +2756,65 @@ function parseCSV(text){
     var cols = csvSplit(line);
     var obj = {};
     headers.forEach(function(h, idx){ obj[h] = (cols[idx]||'').trim(); });
-    var first = obj['first name'] || obj['firstname'] || obj['first'] || '';
-    var last  = obj['last name']  || obj['lastname']  || obj['last']  || '';
-    var email = obj['email'] || obj['email address'] || '';
-    var phone = obj['phone'] || obj['phone number'] || obj['mobile'] || obj['cell'] || '';
-    // Skip rows that look like junk (no name, email, or phone)
+
+    // ---- Name: handle Google (Given Name/Family Name), FUB, plain First/Last ----
+    var first = obj['given name'] || obj['first name'] || obj['firstname'] || obj['first'] || '';
+    var last  = obj['family name'] || obj['last name'] || obj['lastname'] || obj['last'] || '';
+    // Handle "Name" as full name (split on first space)
+    if(!first && !last && obj['name']){
+      var parts = obj['name'].trim().split(/\s+/);
+      first = parts[0]||''; last = parts.slice(1).join(' ')||'';
+    }
+
+    // ---- Email: Google uses "e-mail 1 - value", FUB uses "email" ----
+    var email = obj['e-mail 1 - value'] || obj['email 1 - value'] || obj['email address'] || obj['email'] || obj['e-mail'] || '';
+    // fallback: any key containing 'email' and 'value'
+    if(!email){ Object.keys(obj).forEach(function(k){ if(!email && k.indexOf('email')>=0 && k.indexOf('value')>=0) email=obj[k]; }); }
+
+    // ---- Phone: Google uses "phone 1 - value", FUB uses "phone" ----
+    var phone = obj['phone 1 - value'] || obj['phone 1 value'] || obj['mobile phone'] || obj['cell phone'] || obj['phone'] || obj['phone number'] || obj['mobile'] || obj['cell'] || '';
+    if(!phone){ Object.keys(obj).forEach(function(k){ if(!phone && k.indexOf('phone')>=0 && k.indexOf('value')>=0) phone=obj[k]; }); }
+
+    // Skip junk rows
     if(!first && !last && !email && !phone) continue;
-    // Skip rows where first name looks like a timestamp or URL
-    if(first && (first.match(/^\d{4}-\d{2}-\d{2}/) || first.indexOf('http') === 0)) continue;
+    if(first && (/^\d{4}-\d{2}-\d{2}/.test(first) || first.indexOf('http')===0)) continue;
+
+    // ---- Address: combine FUB address fields or Google "address 1 - formatted" ----
+    var address = obj['address 1 - formatted'] || obj['address 1 formatted'] || '';
+    if(!address){
+      var street = obj['street'] || obj['address'] || obj['street address'] || '';
+      var city   = obj['city'] || '';
+      var state  = obj['state'] || '';
+      var zip    = obj['zip'] || obj['postal code'] || obj['zip code'] || '';
+      var parts2 = [street, city, state, zip].filter(Boolean);
+      address = parts2.join(', ');
+    }
+
+    // ---- Notes: combine FUB notes + tags ----
+    var notes = obj['notes'] || obj['note'] || obj['comments'] || '';
+    var tags  = obj['tags'] || obj['tag'] || '';
+    if(tags) notes = notes ? notes + ' | Tags: ' + tags : 'Tags: ' + tags;
+
+    // ---- Type from FUB "type" or our own format ----
+    var rawType = obj['type'] || obj['contact type'] || '';
+    var types = rawType ? rawType.split('|').map(function(t){ return normalizeType(t.trim()); }).filter(Boolean) : [];
+
+    // ---- Stage ----
+    var stageRaw = obj['stage'] || obj['status'] || obj['lead stage'] || '';
+    var stage = stageRaw.trim() ? normalizeStage(stageRaw) : '';
+
     var c = {
       id: Date.now() + i + Math.floor(Math.random()*1000),
       first: first,
       last:  last,
-      types: (function(){
-        var raw=obj['type']||obj['contact type']||'';
-        if(!raw) return [];
-        return raw.split('|').map(function(t){ return normalizeType(t.trim()); }).filter(Boolean);
-      })(),
-      type: (function(){
-        var raw=obj['type']||obj['contact type']||'';
-        if(!raw) return '';
-        var first=raw.split('|')[0].trim();
-        return first ? normalizeType(first) : '';
-      })(),
+      types: types,
+      type:  types[0]||'',
       phone: phone,
       email: email,
-      property: obj['property'] || obj['address'] || obj['interest'] || '',
-      stage: obj['stage'] && obj['stage'].trim() ? normalizeStage(obj['stage']) : (obj['status'] && obj['status'].trim() ? normalizeStage(obj['status']) : ''),
+      property: obj['property'] || obj['interest'] || address,
+      stage: stage,
       price: obj['price'] || obj['budget'] || '',
-      notes: obj['notes'] || obj['note'] || obj['comments'] || '',
+      notes: notes,
       added: new Date().toISOString()
     };
     results.push(c);
@@ -3231,7 +3260,30 @@ function renderTC(){
 
     var card = document.createElement('div');
     card.className = 'tc-card';
-    (function(txId){ card.addEventListener('click', function(){ openTCDetail(txId); }); })(tx.id);
+    (function(txId){ card.addEventListener('click', function(){
+      var tx = TX.find(function(t){ return t.id===txId; });
+      if(!tx) return;
+      curTx = txId;
+      ge('tcModalTitle').textContent = 'Edit Transaction';
+      ge('btnSaveTransaction').setAttribute('data-edit-id', tx.id);
+      ge('tcType').value = tx.type||'buyer';
+      ge('tcContact').innerHTML = '';
+      C.forEach(function(c){ var o=document.createElement('option'); o.value=c.id; o.textContent=fn(c)+' ('+ctype1(c)+')'; ge('tcContact').appendChild(o); });
+      ge('tcContact').value = tx.contactId||'';
+      ge('tcAddress').value = tx.address||'';
+      ge('tcPrice').value = tx.price||'';
+      ge('tcMLS').value = tx.mlsNum||'';
+      ge('tcLender').value = tx.lender||'';
+      ge('tcTitle').value = tx.titleCo||'';
+      ge('tcNotes').value = tx.notes||'';
+      ge('tcContractDate').value = tx.contractDate||'';
+      ge('tcClosingDate').value = tx.closingDate||'';
+      ge('tcEarnestDate').value = tx.earnestDate||'';
+      ge('tcDueDiligDate').value = tx.dueDiligDate||'';
+      ge('tcFinancingDate').value = tx.financingDate||'';
+      ge('tcAppraisalDate').value = tx.appraisalDate||'';
+      ge('tcModal').classList.add('open');
+    }); })(tx.id);
 
     var hdr = document.createElement('div');
     hdr.className = 'tc-card-header';
