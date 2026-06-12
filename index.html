@@ -1281,11 +1281,18 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 </div>
 <div class="modal-ov" id="mergeModal">
   <div class="modal" style="max-width:680px;">
-    <div class="mhdr"><div class="mtitle">Merge Contacts</div><button class="mx" data-close="mergeModal">&#x2715;</button></div>
+    <div class="mhdr">
+      <div>
+        <div class="mtitle" id="mergeModalTitle">Merge Contacts</div>
+        <div id="mergeStepLabel" style="font-size:13px;color:var(--text3);margin-top:2px;">Step 1 of 2 — Choose which values to keep</div>
+      </div>
+      <button class="mx" data-close="mergeModal">&#x2715;</button>
+    </div>
     <div class="mbody" id="mergeModalBody" style="padding:0;"></div>
     <div class="mftr">
+      <button class="btn btn-g" id="btnMergeBack" style="display:none;">&#8592; Back</button>
       <button class="btn btn-g" data-close="mergeModal">Cancel</button>
-      <button class="btn btn-p" id="btnConfirmMerge">Merge &amp; Save</button>
+      <button class="btn btn-p" id="btnConfirmMerge">Review Merged Contact &#8594;</button>
     </div>
   </div>
 </div>
@@ -1838,13 +1845,25 @@ function updateBulkBar(){
   if(mb) mb.style.display = selectedContacts.size===2 ? 'inline-flex' : 'none';
 }
 
+var mergeStep = 1;
+
 function openMergeModal(){
   var ids=Array.from(selectedContacts);
   if(ids.length!==2) return;
   var a=gc(ids[0]), b=gc(ids[1]);
   if(!a||!b) return;
-  var body=ge('mergeModalBody'); body.innerHTML='';
+  mergeStep=1;
+  ge('mergeStepLabel').textContent='Step 1 of 2 — Choose which values to keep';
+  ge('btnConfirmMerge').textContent='Review Merged Contact →';
+  ge('btnMergeBack').style.display='none';
+  ge('btnConfirmMerge').setAttribute('data-a', ids[0]);
+  ge('btnConfirmMerge').setAttribute('data-b', ids[1]);
+  showMergeStep1(a, b);
+  om('mergeModal');
+}
 
+function showMergeStep1(a, b){
+  var body=ge('mergeModalBody'); body.innerHTML='';
   var fields=[
     {key:'first',label:'First Name'},
     {key:'last',label:'Last Name'},
@@ -1858,57 +1877,115 @@ function openMergeModal(){
     {key:'notes',label:'Notes'}
   ];
 
+  var nameA=(a.first+' '+a.last).trim()||'Contact A';
+  var nameB=(b.first+' '+b.last).trim()||'Contact B';
+
   var tbl=document.createElement('table');
+  tbl.id='mergePickTable';
   tbl.style.cssText='width:100%;border-collapse:collapse;font-size:14px;';
   var thead=document.createElement('thead');
   var hr=document.createElement('tr');
   hr.style.background='var(--surface2)';
-  ['Field',a.first+' '+a.last,b.first+' '+b.last].forEach(function(h,i){
+  ['Field',nameA,nameB].forEach(function(h,i){
     var th=document.createElement('th');
-    th.style.cssText='padding:10px 12px;text-align:left;color:var(--text3);font-weight:600;font-size:13px;'+(i>0?'cursor:pointer;':'');
-    th.textContent=h;
-    if(i===1){ (function(){ th.title='Click to select all from this contact'; th.addEventListener('click',function(){ tbl.querySelectorAll('input[data-side="a"]').forEach(function(r){r.checked=true;}); }); })(); }
-    if(i===2){ (function(){ th.title='Click to select all from this contact'; th.addEventListener('click',function(){ tbl.querySelectorAll('input[data-side="b"]').forEach(function(r){r.checked=true;}); }); })(); }
+    th.style.cssText='padding:10px 12px;text-align:left;color:var(--text3);font-weight:600;font-size:13px;'+(i>0?'cursor:pointer;color:var(--accent);':'');
+    th.textContent=h+(i>0?' (select all)':'');
+    if(i===1){ th.addEventListener('click',function(){ tbl.querySelectorAll('input[data-side="a"]').forEach(function(r){r.checked=true;}); }); }
+    if(i===2){ th.addEventListener('click',function(){ tbl.querySelectorAll('input[data-side="b"]').forEach(function(r){r.checked=true;}); }); }
     hr.appendChild(th);
   });
   thead.appendChild(hr); tbl.appendChild(thead);
 
   var tbody=document.createElement('tbody');
-  fields.forEach(function(f,fi){
+  fields.forEach(function(f){
     var va=a[f.key]||'', vb=b[f.key]||'';
-    if(!va&&!vb) return; // skip empty fields
+    if(!va&&!vb) return;
     var tr=document.createElement('tr');
     tr.style.borderBottom='1px solid var(--border)';
-
     var tdl=document.createElement('td');
-    tdl.style.cssText='padding:9px 12px;color:var(--text3);font-size:13px;font-weight:600;white-space:nowrap;';
+    tdl.style.cssText='padding:9px 12px;color:var(--text3);font-size:13px;font-weight:600;white-space:nowrap;width:100px;';
     tdl.textContent=f.label; tr.appendChild(tdl);
-
-    [['a',va,ids[0]],['b',vb,ids[1]]].forEach(function(side){
-      var td=document.createElement('td'); td.style.cssText='padding:9px 12px;';
+    [['a',va],['b',vb]].forEach(function(side){
+      var td=document.createElement('td'); td.style.cssText='padding:8px 12px;';
       var lbl=document.createElement('label');
       lbl.style.cssText='display:flex;align-items:flex-start;gap:8px;cursor:pointer;';
       var radio=document.createElement('input');
       radio.type='radio'; radio.name='merge_'+f.key; radio.value=side[0];
-      radio.setAttribute('data-side',side[0]);
-      radio.setAttribute('data-key',f.key);
-      radio.style.cssText='margin-top:2px;flex-shrink:0;accent-color:var(--accent);';
-      // default: pick whichever side has a value; prefer 'a' if both have
-      if(side[0]==='a' && va) radio.checked=true;
-      else if(side[0]==='b' && vb && !va) radio.checked=true;
+      radio.setAttribute('data-side',side[0]); radio.setAttribute('data-key',f.key);
+      radio.style.cssText='margin-top:3px;flex-shrink:0;accent-color:var(--accent);';
+      if(side[0]==='a'&&va) radio.checked=true;
+      else if(side[0]==='b'&&vb&&!va) radio.checked=true;
       var span=document.createElement('span');
-      span.style.cssText='font-size:14px;color:'+(side[1]?'var(--text)':'var(--text3)')+';';
+      span.style.cssText='font-size:13px;color:'+(side[1]?'var(--text)':'var(--text3)')+';word-break:break-word;';
       span.textContent=side[1]||'(empty)';
       lbl.appendChild(radio); lbl.appendChild(span); td.appendChild(lbl); tr.appendChild(td);
     });
     tbody.appendChild(tr);
   });
   tbl.appendChild(tbody); body.appendChild(tbl);
+}
 
-  // store which ids we're merging
-  ge('btnConfirmMerge').setAttribute('data-a', ids[0]);
-  ge('btnConfirmMerge').setAttribute('data-b', ids[1]);
-  om('mergeModal');
+function showMergeStep2(merged){
+  var body=ge('mergeModalBody'); body.innerHTML='';
+  ge('mergeStepLabel').textContent='Step 2 of 2 — Review and edit before saving';
+  ge('btnConfirmMerge').textContent='Save Merged Contact';
+  ge('btnMergeBack').style.display='inline-flex';
+
+  var wrap=document.createElement('div'); wrap.style.padding='16px 20px';
+
+  function mfld(labelTxt, inputEl){
+    var fg=document.createElement('div'); fg.style.cssText='margin-bottom:12px;';
+    var lbl=document.createElement('label'); lbl.className='fl'; lbl.textContent=labelTxt;
+    fg.appendChild(lbl); fg.appendChild(inputEl); wrap.appendChild(fg);
+  }
+
+  var iFirst=document.createElement('input'); iFirst.className='fi'; iFirst.id='mFirst'; iFirst.value=merged.first||'';
+  var iLast=document.createElement('input'); iLast.className='fi'; iLast.id='mLast'; iLast.value=merged.last||'';
+  var iType=document.createElement('select'); iType.className='fsel'; iType.id='mType';
+  [['','-- No type --'],['prospect','Prospect'],['buyer','Buyer'],['seller','Seller'],
+   ['agent','Agent/Broker'],['lender','Loan Officer/Lender'],['title','Title Company'],
+   ['vendor','Vendor'],['other','Other']].forEach(function(o){
+    var opt=document.createElement('option'); opt.value=o[0]; opt.textContent=o[1]; iType.appendChild(opt);
+  });
+  iType.value=merged.type||'';
+  var iPhone=document.createElement('input'); iPhone.className='fi'; iPhone.id='mPhone'; iPhone.value=merged.phone||'';
+  var iEmail=document.createElement('input'); iEmail.className='fi'; iEmail.id='mEmail'; iEmail.value=merged.email||'';
+  var iProp=document.createElement('input'); iProp.className='fi'; iProp.id='mProp'; iProp.value=merged.property||'';
+  var iStage=document.createElement('select'); iStage.className='fsel'; iStage.id='mStage';
+  [['','-- No stage --'],['New Lead','New Lead'],['Contacted','Contacted'],['Showing','Showing'],
+   ['Under Contract','Under Contract'],['Closed','Closed']].forEach(function(o){
+    var opt=document.createElement('option'); opt.value=o[0]; opt.textContent=o[1]; iStage.appendChild(opt);
+  });
+  iStage.value=merged.stage||'';
+  var iPrice=document.createElement('input'); iPrice.className='fi'; iPrice.id='mPrice'; iPrice.value=merged.price||'';
+  var iClose=document.createElement('input'); iClose.className='fi'; iClose.id='mCloseDate'; iClose.type='date'; iClose.value=merged.closeDate||'';
+  var iNotes=document.createElement('textarea'); iNotes.className='fi'; iNotes.id='mNotes'; iNotes.rows=4; iNotes.value=merged.notes||'';
+
+  var nameRow=document.createElement('div'); nameRow.style.cssText='display:flex;gap:10px;margin-bottom:12px;';
+  var fg1=document.createElement('div'); fg1.style.flex='1';
+  var l1=document.createElement('label'); l1.className='fl'; l1.textContent='First Name';
+  fg1.appendChild(l1); fg1.appendChild(iFirst);
+  var fg2=document.createElement('div'); fg2.style.flex='1';
+  var l2=document.createElement('label'); l2.className='fl'; l2.textContent='Last Name';
+  fg2.appendChild(l2); fg2.appendChild(iLast);
+  nameRow.appendChild(fg1); nameRow.appendChild(fg2);
+  wrap.appendChild(nameRow);
+
+  mfld('Type', iType); mfld('Phone', iPhone); mfld('Email', iEmail);
+  mfld('Property / Interest', iProp); mfld('Stage', iStage); mfld('Price', iPrice);
+  mfld('Closing Date', iClose); mfld('Notes', iNotes);
+  body.appendChild(wrap);
+}
+
+function buildMergedFromStep1(a, b){
+  var merged=JSON.parse(JSON.stringify(a));
+  var radios=ge('mergeModalBody').querySelectorAll('input[type="radio"]:checked');
+  radios.forEach(function(r){
+    var key=r.getAttribute('data-key');
+    var src=r.value==='a'?a:b;
+    merged[key]=src[key]||'';
+  });
+  return merged;
 }
 
 function confirmMerge(){
@@ -1917,30 +1994,45 @@ function confirmMerge(){
   var idB=parseInt(btn.getAttribute('data-b'))||btn.getAttribute('data-b');
   var a=gc(idA), b=gc(idB); if(!a||!b) return;
 
-  // build merged contact based on radio selections
-  var merged=JSON.parse(JSON.stringify(a)); // start with A
-  var radios=ge('mergeModalBody').querySelectorAll('input[type="radio"]:checked');
-  radios.forEach(function(r){
-    var key=r.getAttribute('data-key');
-    var src=r.value==='a'?a:b;
-    merged[key]=src[key]||'';
-  });
+  if(mergeStep===1){
+    // build preview from selections and show editable form
+    var merged=buildMergedFromStep1(a,b);
+    mergeStep=2;
+    showMergeStep2(merged);
+    return;
+  }
+
+  // Step 2 — read editable form and save
+  var merged=JSON.parse(JSON.stringify(a));
+  merged.first=ge('mFirst').value.trim();
+  merged.last=ge('mLast').value.trim();
+  merged.type=ge('mType').value;
+  merged.phone=ge('mPhone').value.trim();
+  merged.email=ge('mEmail').value.trim();
+  merged.property=ge('mProp').value.trim();
+  merged.stage=ge('mStage').value;
+  merged.price=ge('mPrice').value.trim();
+  merged.closeDate=ge('mCloseDate').value;
+  merged.notes=ge('mNotes').value.trim();
+
+  if(!merged.first&&!merged.last){ alert('Please enter at least a first or last name.'); return; }
 
   // re-attach all notes/followups/deadlines from B to A
   N.forEach(function(n){ if(String(n.contactId)===String(idB)) n.contactId=idA; });
   F.forEach(function(f){ if(String(f.contactId)===String(idB)) f.contactId=idA; });
   D.forEach(function(d){ if(String(d.contactId)===String(idB)) d.contactId=idA; });
 
-  // update A, delete B
   var idx=C.findIndex(function(c){ return c.id===idA; });
   if(idx>=0) C[idx]=merged;
   updateContact(merged);
-  if(supaReady){ dbSave('notes',N.filter(function(n){return n.contactId===idA;})); dbSave('followups',F.filter(function(f){return f.contactId===idA;})); dbSave('deadlines',D.filter(function(d){return d.contactId===idA;})); }
+  if(supaReady){
+    dbSave('notes',N.filter(function(n){return n.contactId===idA;}));
+    dbSave('followups',F.filter(function(f){return f.contactId===idA;}));
+    dbSave('deadlines',D.filter(function(d){return d.contactId===idA;}));
+  }
   delc(idB, true);
-
   selectedContacts.clear(); updateBulkBar();
   cm('mergeModal'); rc(); rd();
-  alert('Contacts merged.');
 }
 
 function deleteSelectedContacts(){
@@ -2623,11 +2715,11 @@ function parseCSV(text){
       id: Date.now() + i + Math.floor(Math.random()*1000),
       first: first,
       last:  last,
-      type:  normalizeType(obj['type'] || obj['contact type'] || ''),
+      type:  obj['type'] || obj['contact type'] ? normalizeType(obj['type'] || obj['contact type']) : '',
       phone: phone,
       email: email,
       property: obj['property'] || obj['address'] || obj['interest'] || '',
-      stage: obj['stage'] ? normalizeStage(obj['stage']) : (obj['status'] ? normalizeStage(obj['status']) : ''),
+      stage: obj['stage'] && obj['stage'].trim() ? normalizeStage(obj['stage']) : (obj['status'] && obj['status'].trim() ? normalizeStage(obj['status']) : ''),
       price: obj['price'] || obj['budget'] || '',
       notes: obj['notes'] || obj['note'] || obj['comments'] || '',
       added: new Date().toISOString()
@@ -6820,6 +6912,17 @@ ge('btnClearSel').addEventListener('click',function(){
 });
 ge('btnDeleteSelected').addEventListener('click', deleteSelectedContacts);
 ge('btnMergeContacts').addEventListener('click', openMergeModal);
+ge('btnMergeBack').addEventListener('click', function(){
+  var btn=ge('btnConfirmMerge');
+  var idA=parseInt(btn.getAttribute('data-a'))||btn.getAttribute('data-a');
+  var idB=parseInt(btn.getAttribute('data-b'))||btn.getAttribute('data-b');
+  var a=gc(idA), b=gc(idB); if(!a||!b) return;
+  mergeStep=1;
+  ge('mergeStepLabel').textContent='Step 1 of 2 - Choose which values to keep';
+  ge('btnConfirmMerge').textContent='Review Merged Contact →';
+  ge('btnMergeBack').style.display='none';
+  showMergeStep1(a,b);
+});
 ge('btnConfirmMerge').addEventListener('click', confirmMerge);
 ge('sortByFirst').addEventListener('click',function(){
   curSort='first';
