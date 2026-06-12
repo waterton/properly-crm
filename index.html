@@ -2937,17 +2937,42 @@ function confirmImport(){
     rd(); if(curPage==='contacts') rc();
     alert(msg); return;
   }
-  // Pause poll while Supabase writes settle, then reload from DB
-  pausePoll(15000);
-  ge('syncBar') && showSyncStatus('loading');
-  dbSave('contacts', toSave);
-  // Reload from DB after writes settle to confirm all contacts persisted
-  setTimeout(function(){
-    loadFromDB().then(function(){
-      rd(); if(curPage==='contacts') rc();
-      alert(msg);
+  // Pause poll, chunk saves to avoid Supabase request size limits
+  pausePoll(60000);
+  showSyncStatus('loading');
+  var chunkSize = 20;
+  var chunks = [];
+  for(var ci=0; ci<toSave.length; ci+=chunkSize){
+    chunks.push(toSave.slice(ci, ci+chunkSize));
+  }
+  var chunkIndex = 0;
+  function saveNextChunk(){
+    if(chunkIndex >= chunks.length){
+      // All chunks done — reload from DB to confirm
+      setTimeout(function(){
+        loadFromDB().then(function(){
+          rd(); if(curPage==='contacts') rc();
+          alert(msg);
+        });
+      }, 1000);
+      return;
+    }
+    getAuthHeaders({'Prefer':'resolution=merge-duplicates'}).then(function(headers){
+      fetch(SUPA_URL+'/rest/v1/contacts', {
+        method:'POST', headers:headers,
+        body:JSON.stringify(chunks[chunkIndex])
+      }).then(function(r){
+        if(!r.ok){ r.text().then(function(t){ console.log('Chunk save error:', t); }); }
+        chunkIndex++;
+        saveNextChunk();
+      }).catch(function(e){
+        console.log('Chunk save fetch error:', e.message);
+        chunkIndex++;
+        saveNextChunk();
+      });
     });
-  }, 3000);
+  }
+  saveNextChunk();
 }
 
 // -- TRANSACTION COORDINATOR ------------------------------------------
