@@ -1828,7 +1828,7 @@ function rp(){
       var si=stages.indexOf(s);
       if(si>0){
         var bL=document.createElement('button');
-        bL.style.cssText='background:var(--surface3);border:1px solid var(--border);border-radius:5px;padding:2px 7px;cursor:pointer;color:var(--text2);font-size:13px;line-height:1;';
+        bL.style.cssText='background:var(--surface3);border:1px solid var(--accent);border-radius:5px;padding:3px 9px;cursor:pointer;color:var(--accent);font-size:15px;font-weight:700;line-height:1;';
         bL.textContent='←';
         bL.title='Move to '+stages[si-1];
         (function(cid,stage){ bL.addEventListener('click',function(e){ e.stopPropagation(); ss(cid,stage); }); })(c.id, stages[si-1]);
@@ -1836,7 +1836,7 @@ function rp(){
       }
       if(si<stages.length-1){
         var bR=document.createElement('button');
-        bR.style.cssText='background:var(--surface3);border:1px solid var(--border);border-radius:5px;padding:2px 7px;cursor:pointer;color:var(--text2);font-size:13px;line-height:1;';
+        bR.style.cssText='background:var(--surface3);border:1px solid var(--accent);border-radius:5px;padding:3px 9px;cursor:pointer;color:var(--accent);font-size:15px;font-weight:700;line-height:1;';
         bR.textContent='→';
         bR.title='Move to '+stages[si+1];
         (function(cid,stage){ bR.addEventListener('click',function(e){ e.stopPropagation(); ss(cid,stage); }); })(c.id, stages[si+1]);
@@ -2302,7 +2302,7 @@ function vc(id){
 function mksec(title){var s=mkRow('det-sec');var t=mkDiv('det-sec-title',title);t.className='det-sec-title';s.appendChild(t);return s;}
 function mkfld(lbl,val,href,style){var r=mkRow('det-field');var l=mkDiv('det-flbl',lbl);l.className='det-flbl';var v=mkDiv('det-fval','');v.className='det-fval';if(style)v.style.cssText=style;if(href){var a=document.createElement('a');a.href=href;a.textContent=val;v.appendChild(a);}else v.textContent=val;r.appendChild(l);r.appendChild(v);return r;}
 function cd(){ge('detOv').classList.remove('open');curDet=null;}
-function ss(id,stage){var c=gc(id);if(!c)return;c.stage=stage;updateContact(c);autoEnrollOnStage(c,stage);vc(id);rd();if(curPage==='pipeline')rp();}
+function ss(id,stage){var c=gc(id);if(!c)return;c.stage=stage;updateContact(c);autoEnrollOnStage(c,stage);rd();if(curPage==='pipeline'){rp();return;}vc(id);}
 function delc(id, silent){if(!silent&&!confirm('Delete this contact?'))return;C=C.filter(function(c){return c.id!==id;});N=N.filter(function(n){return n.contactId!==id;});F=F.filter(function(f){return f.contactId!==id;});D=D.filter(function(d){return d.contactId!==id;});sv();deleteCfromDB(id);if(!silent){cd();rd();if(curPage==='contacts')rc();}}
 
 function rfu(){
@@ -2619,6 +2619,7 @@ function svc(){
   var first=ge('fFirst').value.trim();
   var last=ge('fLast').value.trim();
   if(!first&&!last){alert('Please enter at least a first or last name.');return;}
+  if(!last) last='';
   var editId = ge('btnSaveContact') ? ge('btnSaveContact').getAttribute('data-edit-id') : '';
   if(editId){
     // Edit existing
