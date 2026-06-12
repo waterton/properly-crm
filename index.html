@@ -7227,6 +7227,7 @@ function onAuthSuccess(user){
   if(authInitDone) return; // prevent double-fire from SIGNED_IN + INITIAL_SESSION
   authInitDone = true;
   showApp(user);
+  updateSupaBanner(supaReady);
   loadFromDB().then(function(ok){
     if(!ok && !C.length) demo();
     rd();
