@@ -2636,7 +2636,6 @@ function svc(){
     ['fFirst','fLast','fPhone','fEmail','fProp','fPrice','fNotes','fCloseDate'].forEach(function(x){ge(x).value='';});
     clearFTypeValues(); ge('fStage').value='';
     rd(); if(curPage==='contacts')rc(); if(curPage==='pipeline')rp();
-    if(c) vc(c.id);
     return;
   } else {
     var _ftypes=getFTypeValues();
