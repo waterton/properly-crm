@@ -2632,6 +2632,12 @@ function svc(){
     }
     ge('btnSaveContact') && ge('btnSaveContact').setAttribute('data-edit-id','');
     ge('addModalTitle') && (ge('addModalTitle').textContent = 'Add Contact');
+    cm('addModal');
+    ['fFirst','fLast','fPhone','fEmail','fProp','fPrice','fNotes','fCloseDate'].forEach(function(x){ge(x).value='';});
+    clearFTypeValues(); ge('fStage').value='';
+    rd(); if(curPage==='contacts')rc(); if(curPage==='pipeline')rp();
+    if(c) vc(c.id);
+    return;
   } else {
     var _ftypes=getFTypeValues();
     var nc={id:Date.now(),first:first,last:last,types:_ftypes,type:_ftypes[0]||'',
