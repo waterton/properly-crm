@@ -2082,7 +2082,7 @@ function rc(){
     }
     var row=document.createElement('div');
     var isSelected = selectedContacts.has(c.id);
-    row.style.cssText='display:flex;align-items:center;gap:12px;padding:11px 18px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.12s;'+(isSelected?'background:rgba(201,76,76,0.07);':'');
+    row.style.cssText='display:flex;align-items:center;gap:10px;padding:7px 16px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.12s;'+(isSelected?'background:rgba(201,76,76,0.07);':'');
     row.addEventListener('mouseenter',function(){if(!selectedContacts.has(c.id))this.style.background='var(--surface2)';});
     row.addEventListener('mouseleave',function(){if(!selectedContacts.has(c.id))this.style.background='';});
 
@@ -2111,29 +2111,10 @@ function rc(){
     })(c.id, row, chk);
     chkWrap.appendChild(chk); row.appendChild(chkWrap);
 
-    // name + badges
-    var info=mkDiv('flex:1;min-width:0;');
+    // name only — clean compact row
     var displayName = curSort==='first' ? fn(c) : ((c.last||'') + (c.first ? ', '+c.first : ''));
-    info.appendChild(mkDiv('font-size:16px;font-weight:600;color:var(--text);', displayName));
-    var sub=mkDiv('display:flex;align-items:center;gap:8px;margin-top:2px;flex-wrap:wrap;');
-    var displayType=c.type==='lead'?'prospect':c.type;
-    if(displayType){
-      var tg=document.createElement('span');
-      tg.className='tag tag-'+displayType;
-      tg.style.cssText='font-size:12px;padding:1px 7px;';
-      tg.textContent=displayType;
-      sub.appendChild(tg);
-    }
-    if(c.stage) sub.appendChild(mkDiv('font-size:13px;color:var(--text3);', c.stage));
-    if(c.closeDate) sub.appendChild(mkDiv('font-size:13px;color:var(--accent);', 'Closed '+fd(c.closeDate)));
-    info.appendChild(sub);
-    row.appendChild(info);
-
-    // contact details
-    var dets=mkDiv('display:flex;flex-direction:column;align-items:flex-end;gap:2px;flex-shrink:0;');
-    if(c.phone) dets.appendChild(mkDiv('font-size:13px;color:var(--text2);',c.phone));
-    if(c.email) dets.appendChild(mkDiv('font-size:13px;color:var(--text3);',c.email));
-    row.appendChild(dets);
+    var nameEl = mkDiv('flex:1;min-width:0;font-size:15px;font-weight:600;color:var(--text);', displayName);
+    row.appendChild(nameEl);
     grid.appendChild(row);
   });
 }
@@ -2166,10 +2147,12 @@ function vc(id){
   var tsec=mksec('Type');var tr=mkRow('stage-row');tr.style.flexWrap='wrap';
   [['prospect','Prospect'],['buyer','Buyer'],['seller','Seller'],['agent','Agent'],['lender','Lender'],['title','Title'],['vendor','Vendor'],['other','Other']].forEach(function(pair){
     var t=pair[0],lbl=pair[1];
-    var b=mkBtn('sp'+((c.type===t||(!c.type&&t==='prospect'))?' active':''),lbl,'');
+    var b=mkBtn('sp'+(c.type===t?' active':''),lbl,'');
     (function(cid,type){b.addEventListener('click',function(){
       var ct=gc(cid);if(!ct)return;
-      ct.type=type;updateContact(ct);vc(cid);
+      // clicking active type clears it
+      ct.type=(ct.type===type?'':type);
+      updateContact(ct);vc(cid);
       rd();if(curPage==='contacts')rc();if(curPage==='pipeline')rp();
     });})(id,t);
     tr.appendChild(b);
@@ -2177,7 +2160,18 @@ function vc(id){
   tsec.appendChild(tr);body.appendChild(tsec);
 
   var ssec=mksec('Stage');var sr=mkRow('stage-row');
-  stgs.forEach(function(s){var b=mkBtn('sp'+(c.stage===s?' active':''),s,'');(function(cid,stage){b.addEventListener('click',function(){ss(cid,stage);});})(id,s);sr.appendChild(b);});
+  stgs.forEach(function(s){
+    var b=mkBtn('sp'+(c.stage===s?' active':''),s,'');
+    (function(cid,stage){b.addEventListener('click',function(){
+      var ct=gc(cid);if(!ct)return;
+      // clicking active stage clears it
+      var newStage = ct.stage===stage ? '' : stage;
+      ct.stage=newStage; updateContact(ct);
+      if(newStage) autoEnrollOnStage(ct,newStage);
+      vc(cid); rd(); if(curPage==='pipeline')rp();
+    });})(id,s);
+    sr.appendChild(b);
+  });
   ssec.appendChild(sr);body.appendChild(ssec);
   var dlsec=mksec('Deadlines');
   var dlab=mkBtn('','+ Add','background:none;border:none;color:var(--accent);cursor:pointer;font-size:18px;margin-left:8px;');
