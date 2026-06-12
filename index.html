@@ -1572,11 +1572,17 @@ function deleteFUfromDB(id){
 function updateContact(c){ sv(); if(supaReady) dbSave('contacts', [c]); }
 
 // Real-time subscription for live sync
+var _pollInterval = null;
+var _pollPaused = false;
+function pausePoll(ms){
+  _pollPaused = true;
+  setTimeout(function(){ _pollPaused = false; }, ms||10000);
+}
 function subscribeRealtime(){
   if(!supaReady) return;
-  // Use polling every 30 seconds as fallback for real-time sync
-  // This avoids the DataCloneError from Supabase's websocket implementation
-  setInterval(function(){
+  if(_pollInterval) clearInterval(_pollInterval);
+  _pollInterval = setInterval(function(){
+    if(_pollPaused) return;
     loadFromDB().then(function(ok){
       if(ok && curPage){
         if(curPage==='dashboard') rd();
@@ -2920,15 +2926,28 @@ function confirmImport(){
   var toSave=[], skipped=0;
   csvParsed.forEach(function(nc, i){
     if(csvDecisions[i]==='skip'){ skipped++; return; }
-    nc.id = Date.now() + Math.floor(Math.random()*100000);
+    nc.id = Date.now() + Math.floor(Math.random()*100000) + i;
     nc.added = nc.added || new Date().toISOString();
     C.push(nc); toSave.push(nc);
   });
   sv();
-  if(supaReady && toSave.length) dbSave('contacts', toSave);
   cm('csvModal');
-  rd(); if(curPage==='contacts') rc();
-  alert('Imported '+toSave.length+' contact'+(toSave.length!==1?'s':'')+'.'+(skipped?' Skipped '+skipped+'.':''));
+  var msg = 'Imported '+toSave.length+' contact'+(toSave.length!==1?'s':'')+'.'+(skipped?' Skipped '+skipped+'.':'');
+  if(!supaReady || !toSave.length){
+    rd(); if(curPage==='contacts') rc();
+    alert(msg); return;
+  }
+  // Pause poll while Supabase writes settle, then reload from DB
+  pausePoll(15000);
+  ge('syncBar') && showSyncStatus('loading');
+  dbSave('contacts', toSave);
+  // Reload from DB after writes settle to confirm all contacts persisted
+  setTimeout(function(){
+    loadFromDB().then(function(){
+      rd(); if(curPage==='contacts') rc();
+      alert(msg);
+    });
+  }, 3000);
 }
 
 // -- TRANSACTION COORDINATOR ------------------------------------------
