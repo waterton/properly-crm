@@ -1939,27 +1939,27 @@ function showMergeStep2(merged){
     fg.appendChild(lbl); fg.appendChild(inputEl); wrap.appendChild(fg);
   }
 
-  var iFirst=document.createElement('input'); iFirst.className='fi'; iFirst.id='mFirst'; iFirst.value=merged.first||'';
-  var iLast=document.createElement('input'); iLast.className='fi'; iLast.id='mLast'; iLast.value=merged.last||'';
-  var iType=document.createElement('select'); iType.className='fsel'; iType.id='mType';
+  var iFirst=document.createElement('input'); iFirst.className='fi'; iFirst.id='mrg_first'; iFirst.value=merged.first||'';
+  var iLast=document.createElement('input'); iLast.className='fi'; iLast.id='mrg_last'; iLast.value=merged.last||'';
+  var iType=document.createElement('select'); iType.className='fsel'; iType.id='mrg_type';
   [['','-- No type --'],['prospect','Prospect'],['buyer','Buyer'],['seller','Seller'],
    ['agent','Agent/Broker'],['lender','Loan Officer/Lender'],['title','Title Company'],
    ['vendor','Vendor'],['other','Other']].forEach(function(o){
     var opt=document.createElement('option'); opt.value=o[0]; opt.textContent=o[1]; iType.appendChild(opt);
   });
   iType.value=merged.type||'';
-  var iPhone=document.createElement('input'); iPhone.className='fi'; iPhone.id='mPhone'; iPhone.value=merged.phone||'';
-  var iEmail=document.createElement('input'); iEmail.className='fi'; iEmail.id='mEmail'; iEmail.value=merged.email||'';
-  var iProp=document.createElement('input'); iProp.className='fi'; iProp.id='mProp'; iProp.value=merged.property||'';
-  var iStage=document.createElement('select'); iStage.className='fsel'; iStage.id='mStage';
+  var iPhone=document.createElement('input'); iPhone.className='fi'; iPhone.id='mrg_phone'; iPhone.value=merged.phone||'';
+  var iEmail=document.createElement('input'); iEmail.className='fi'; iEmail.id='mrg_email'; iEmail.value=merged.email||'';
+  var iProp=document.createElement('input'); iProp.className='fi'; iProp.id='mrg_prop'; iProp.value=merged.property||'';
+  var iStage=document.createElement('select'); iStage.className='fsel'; iStage.id='mrg_stage';
   [['','-- No stage --'],['New Lead','New Lead'],['Contacted','Contacted'],['Showing','Showing'],
    ['Under Contract','Under Contract'],['Closed','Closed']].forEach(function(o){
     var opt=document.createElement('option'); opt.value=o[0]; opt.textContent=o[1]; iStage.appendChild(opt);
   });
   iStage.value=merged.stage||'';
-  var iPrice=document.createElement('input'); iPrice.className='fi'; iPrice.id='mPrice'; iPrice.value=merged.price||'';
-  var iClose=document.createElement('input'); iClose.className='fi'; iClose.id='mCloseDate'; iClose.type='date'; iClose.value=merged.closeDate||'';
-  var iNotes=document.createElement('textarea'); iNotes.className='fi'; iNotes.id='mNotes'; iNotes.rows=4; iNotes.value=merged.notes||'';
+  var iPrice=document.createElement('input'); iPrice.className='fi'; iPrice.id='mrg_price'; iPrice.value=merged.price||'';
+  var iClose=document.createElement('input'); iClose.className='fi'; iClose.id='mrg_closedate'; iClose.type='date'; iClose.value=merged.closeDate||'';
+  var iNotes=document.createElement('textarea'); iNotes.className='fi'; iNotes.id='mrg_notes'; iNotes.rows=4; iNotes.value=merged.notes||'';
 
   var nameRow=document.createElement('div'); nameRow.style.cssText='display:flex;gap:10px;margin-bottom:12px;';
   var fg1=document.createElement('div'); fg1.style.flex='1';
@@ -2004,16 +2004,16 @@ function confirmMerge(){
 
   // Step 2 — read editable form and save
   var merged=JSON.parse(JSON.stringify(a));
-  merged.first=ge('mFirst').value.trim();
-  merged.last=ge('mLast').value.trim();
-  merged.type=ge('mType').value;
-  merged.phone=ge('mPhone').value.trim();
-  merged.email=ge('mEmail').value.trim();
-  merged.property=ge('mProp').value.trim();
-  merged.stage=ge('mStage').value;
-  merged.price=ge('mPrice').value.trim();
-  merged.closeDate=ge('mCloseDate').value;
-  merged.notes=ge('mNotes').value.trim();
+  merged.first=ge('mrg_first').value.trim();
+  merged.last=ge('mrg_last').value.trim();
+  merged.type=ge('mrg_type').value;
+  merged.phone=ge('mrg_phone').value.trim();
+  merged.email=ge('mrg_email').value.trim();
+  merged.property=ge('mrg_prop').value.trim();
+  merged.stage=ge('mrg_stage').value;
+  merged.price=ge('mrg_price').value.trim();
+  merged.closeDate=ge('mrg_closedate').value;
+  merged.notes=ge('mrg_notes').value.trim();
 
   if(!merged.first&&!merged.last){ alert('Please enter at least a first or last name.'); return; }
 
