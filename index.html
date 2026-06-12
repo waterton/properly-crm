@@ -1449,9 +1449,28 @@ function sv(){
 }
 
 // Supabase sync functions
+// Known columns per table — strips unknown fields before sending to Supabase
+var DB_COLS = {
+  contacts: ['id','first','last','type','phone','email','property','stage','price','notes','added','closeDate','assignedTo'],
+  notes: ['id','contactId','text','date'],
+  followups: ['id','contactId','label','date','pri','done','assignedTo'],
+  deadlines: ['id','contactId','type','date','assignedTo'],
+  transactions: null, // allow all
+  campaigns: null,
+  enrollments: null,
+  send_log: null,
+  gmail_tokens: null
+};
+function stripForDB(table, row){
+  var cols = DB_COLS[table];
+  if(!cols) return row;
+  var out = {};
+  cols.forEach(function(k){ if(row[k] !== undefined) out[k] = row[k]; });
+  return out;
+}
 function dbSave(table, rows){
   if(!supaReady) return;
-  var cleanRows = JSON.parse(JSON.stringify(rows));
+  var cleanRows = JSON.parse(JSON.stringify(rows)).map(function(r){ return stripForDB(table, r); });
   getAuthHeaders({'Prefer': 'resolution=merge-duplicates'}).then(function(headers){
   fetch(SUPA_URL + '/rest/v1/' + table, {
     method: 'POST',
@@ -2960,7 +2979,7 @@ function confirmImport(){
     getAuthHeaders({'Prefer':'resolution=merge-duplicates'}).then(function(headers){
       fetch(SUPA_URL+'/rest/v1/contacts', {
         method:'POST', headers:headers,
-        body:JSON.stringify(chunks[chunkIndex])
+        body:JSON.stringify(chunks[chunkIndex].map(function(r){ return stripForDB('contacts',r); }))
       }).then(function(r){
         if(!r.ok){ r.text().then(function(t){ console.log('Chunk save error:', t); }); }
         chunkIndex++;
