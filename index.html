@@ -2032,7 +2032,11 @@ function confirmMerge(){
   }
   delc(idB, true);
   selectedContacts.clear(); updateBulkBar();
-  cm('mergeModal'); rc(); rd();
+  cm('mergeModal');
+  // Wait for Supabase writes to settle then reload from DB to confirm
+  setTimeout(function(){
+    loadFromDB().then(function(){ rc(); rd(); });
+  }, 1500);
 }
 
 function deleteSelectedContacts(){
