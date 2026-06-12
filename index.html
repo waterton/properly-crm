@@ -2981,11 +2981,17 @@ function confirmImport(){
         method:'POST', headers:headers,
         body:JSON.stringify(chunks[chunkIndex].map(function(r){ return stripForDB('contacts',r); }))
       }).then(function(r){
-        if(!r.ok){ r.text().then(function(t){ console.log('Chunk save error:', t); }); }
+        if(!r.ok){
+          r.text().then(function(t){
+            console.error('Chunk '+(chunkIndex+1)+' save error (status '+r.status+'):', t);
+            // Show first error to user so we can diagnose
+            if(chunkIndex===0) alert('Supabase save error: ' + t.substring(0,200));
+          });
+        }
         chunkIndex++;
         saveNextChunk();
       }).catch(function(e){
-        console.log('Chunk save fetch error:', e.message);
+        console.error('Chunk save fetch error:', e.message);
         chunkIndex++;
         saveNextChunk();
       });
