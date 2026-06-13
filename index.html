@@ -1352,8 +1352,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 </div>
 <div class="modal-ov" id="fuModal">
   <div class="modal">
-    <div class="mhdr"><div class="mtitle">Add Follow-up</div><button class="mx" data-close="fuModal">&#x2715;</button></div>
-    <div class="mbody"><div class="fg"><label class="fl">Contact</label><select class="fsel" id="fuContact"></select></div><div class="fg"><label class="fl">Task</label><input class="fi" id="fuLabel" placeholder="Call to discuss offer..."></div><div class="fg"><label class="fl">Due Date</label><input class="fi" id="fuDate" type="date"></div><div class="fg"><label class="fl">Priority</label><select class="fsel" id="fuPri"><option value="hot">Hot - Do today</option><option value="warn">This week</option><option value="ok">No rush</option></select></div></div>
+    <div class="mhdr"><div class="mtitle" id="fuModalTitle">Add Follow-up</div><button class="mx" data-close="fuModal">&#x2715;</button></div>
+    <div class="mbody"><div class="fg"><label class="fl">Contact</label><select class="fsel" id="fuContact"></select></div><div class="fg"><label class="fl">Task</label><input class="fi" id="fuLabel" placeholder="Call to discuss offer..."></div><div class="fg"><label class="fl">Due Date</label><input class="fi" id="fuDate" type="date"></div><div class="fg"><label class="fl">Priority</label><select class="fsel" id="fuPri"><option value="hot">Hot - Do today</option><option value="warn">This week</option><option value="ok">No rush</option></select></div><div class="fg"><label class="fl">Notes <span style="color:var(--text3);font-weight:400;">(optional)</span></label><textarea class="fi" id="fuNotes" rows="3" placeholder="Additional details..."></textarea></div></div>
     <div class="mbody" style="padding-top:0;"><div class="fg"><label class="fl">Assign To</label><select class="fsel assign-to-select" id="fuAssign"><option value="">Unassigned</option></select></div></div>
     <div class="mftr"><button class="btn btn-g" data-close="fuModal">Cancel</button><button class="btn btn-p" id="btnSaveFU">Save</button></div>
   </div>
@@ -1458,7 +1458,7 @@ function sv(){
 var DB_COLS = {
   contacts: ['id','first','last','type','phone','email','property','stage','price','notes','added','closeDate','assignedTo'],
   notes: ['id','contactId','text','date'],
-  followups: ['id','contactId','label','date','pri','done','assignedTo'],
+  followups: ['id','contactId','label','date','pri','done','notes','assignedTo'],
   deadlines: ['id','contactId','type','date','assignedTo'],
   transactions: null, // allow all
   campaigns: null,
@@ -2318,7 +2318,16 @@ function rfu(){
   var el=ge('fuList');el.innerHTML='';
   var sorted=F.slice().sort(function(a,b){return new Date(a.date)-new Date(b.date);});
   if(!sorted.length){el.innerHTML='<div class="empty">No follow-ups yet.</div>';return;}
-  sorted.forEach(function(f){var c=gc(f.contactId);var row=mkRow('fu-row');var chk=mkRow('chk'+(f.done?' done':''));if(f.done)chk.appendChild(ck());(function(id){chk.addEventListener('click',function(){tfu(id);rfu();});})(f.id);var info=mkDiv('flex:1;');info.appendChild(mkDiv('font-size:18px;'+(f.done?'text-decoration:line-through;color:var(--text3);':''),f.label));info.appendChild(mkDiv('font-size:18px;color:var(--text3);',(c?fn(c):'Unknown')+' - '+fd(f.date)));var right=mkDiv('display:flex;align-items:center;gap:7px;');right.appendChild(mkBadge(f.pri));var del=mkBtn('','\u00d7','background:none;border:none;color:var(--text3);cursor:pointer;font-size:18px;line-height:1;');// GCal sync for follow-up
+  sorted.forEach(function(f){var c=gc(f.contactId);var row=mkRow('fu-row');var chk=mkRow('chk'+(f.done?' done':''));if(f.done)chk.appendChild(ck());(function(id){chk.addEventListener('click',function(){tfu(id);rfu();});})(f.id);
+    var info=mkDiv('flex:1;');
+    info.appendChild(mkDiv('font-size:16px;font-weight:600;'+(f.done?'text-decoration:line-through;color:var(--text3);':''),f.label));
+    info.appendChild(mkDiv('font-size:14px;color:var(--text3);',(c?fn(c):'Unknown')+' — '+fd(f.date)));
+    if(f.notes) info.appendChild(mkDiv('font-size:13px;color:var(--text2);margin-top:2px;',f.notes));
+    var right=mkDiv('display:flex;align-items:center;gap:7px;');right.appendChild(mkBadge(f.pri));
+    var editBtn=mkBtn('btn btn-g','Edit','font-size:13px;padding:3px 9px;');
+    (function(fu){ editBtn.addEventListener('click',function(e){ e.stopPropagation(); openEditFU(fu); }); })(f);
+    right.appendChild(editBtn);
+    var del=mkBtn('','\u00d7','background:none;border:none;color:var(--text3);cursor:pointer;font-size:18px;line-height:1;');// GCal sync for follow-up
     var gcalFuBtn=document.createElement('button');
     gcalFuBtn.style.cssText='background:rgba(76,142,201,0.1);border:1px solid rgba(76,142,201,0.2);border-radius:5px;padding:3px 8px;cursor:pointer;font-size:14px;color:var(--buyer);font-family:DM Sans,sans-serif;';
     gcalFuBtn.textContent='+ GCal';
@@ -2334,7 +2343,7 @@ function rfu(){
       }, fu.assignedTo);
     }); })(f);
     right.appendChild(gcalFuBtn);
-    (function(id){del.addEventListener('click',function(){F=F.filter(function(f){return f.id!==id;});sv();if(supaReady) fetch(SUPA_URL+'/rest/v1/followups?id=eq.'+id,{method:'DELETE',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}});rfu();rd();});})(f.id);right.appendChild(del);row.appendChild(chk);row.appendChild(info);row.appendChild(right);el.appendChild(row);});
+    (function(id){del.addEventListener('click',function(){if(!confirm('Delete this follow-up?'))return;F=F.filter(function(f){return f.id!==id;});sv();dbDelete('followups',id);rfu();rd();});})(f.id);right.appendChild(del);row.appendChild(chk);row.appendChild(info);row.appendChild(right);el.appendChild(row);});
   ge('nbFollowups').textContent=F.filter(function(f){return !f.done;}).length;
 }
 function tfu(id){var f=F.find(function(x){return x.id===id;});if(f){f.done=!f.done;sv();if(supaReady) dbSave('followups',[f]);}}
@@ -2687,7 +2696,43 @@ function svn(){
   }
   cm('noteModal'); ge('nText').value=''; rn(); rd();
 }
-function svfu(){var lbl=ge('fuLabel').value.trim();if(!lbl)return;var nf={id:Date.now(),contactId:parseInt(ge('fuContact').value),label:lbl,date:ge('fuDate').value,pri:ge('fuPri').value,done:false,assignedTo:parseInt(ge('fuAssign')&&ge('fuAssign').value)||null};F.push(nf);saveFU(nf);cm('fuModal');ge('fuLabel').value='';rfu();rd();if(curDet)vc(curDet);}
+function openEditFU(f){
+  ge('fuModalTitle') && (ge('fuModalTitle').textContent='Edit Follow-up');
+  ge('btnSaveFU').setAttribute('data-edit-id', f.id);
+  fs('fuContact'); ge('fuContact').value=f.contactId||'';
+  ge('fuLabel').value=f.label||'';
+  ge('fuDate').value=f.date||'';
+  ge('fuPri').value=f.pri||'ok';
+  ge('fuNotes') && (ge('fuNotes').value=f.notes||'');
+  populateAssignDropdowns();
+  if(ge('fuAssign')) ge('fuAssign').value=f.assignedTo||'';
+  om('fuModal');
+}
+
+function svfu(){
+  var lbl=ge('fuLabel').value.trim();
+  if(!lbl){ alert('Please enter a task description.'); return; }
+  var editId=ge('btnSaveFU').getAttribute('data-edit-id')||'';
+  if(editId){
+    var existing=F.find(function(x){ return String(x.id)===String(editId); });
+    if(existing){
+      existing.contactId=parseInt(ge('fuContact').value)||existing.contactId;
+      existing.label=lbl;
+      existing.date=ge('fuDate').value;
+      existing.pri=ge('fuPri').value;
+      existing.notes=ge('fuNotes')?ge('fuNotes').value.trim():'';
+      existing.assignedTo=parseInt(ge('fuAssign')&&ge('fuAssign').value)||null;
+      sv(); if(supaReady) dbSave('followups',[existing]);
+    }
+    ge('btnSaveFU').setAttribute('data-edit-id','');
+  } else {
+    var nf={id:Date.now(),contactId:parseInt(ge('fuContact').value),label:lbl,date:ge('fuDate').value,pri:ge('fuPri').value,done:false,notes:ge('fuNotes')?ge('fuNotes').value.trim():'',assignedTo:parseInt(ge('fuAssign')&&ge('fuAssign').value)||null};
+    F.push(nf); saveFU(nf);
+  }
+  ge('fuModalTitle') && (ge('fuModalTitle').textContent='Add Follow-up');
+  cm('fuModal'); ge('fuLabel').value=''; ge('fuNotes') && (ge('fuNotes').value='');
+  rfu(); rd(); if(curDet)vc(curDet);
+}
 function openEditDL(d){
   fs('dlContact'); ge('dlContact').value=d.contactId;
   ge('dlType').value=d.type||'';
@@ -7380,7 +7425,13 @@ ge('fab').addEventListener('click',function(){om('addModal');});
 ge('btnAdd').addEventListener('click',function(){om('addModal');});
 ge('btnPipelineAdd').addEventListener('click',function(){om('addModal');});
 ge('btnContactAdd').addEventListener('click',function(){om('addModal');});
-ge('btnAddFU').addEventListener('click',function(){fs('fuContact');ge('fuDate').value=tod();om('fuModal');});
+ge('btnAddFU').addEventListener('click',function(){
+  ge('fuModalTitle') && (ge('fuModalTitle').textContent='Add Follow-up');
+  ge('btnSaveFU').setAttribute('data-edit-id','');
+  fs('fuContact'); ge('fuDate').value=tod(); ge('fuLabel').value='';
+  ge('fuNotes') && (ge('fuNotes').value='');
+  populateAssignDropdowns(); om('fuModal');
+});
 ge('btnAddNote').addEventListener('click',function(){fs('nContact');om('noteModal');});
 ge('btnAddDL').addEventListener('click',function(){fs('dlContact');ge('dlDate').value=tod();om('dlModal');});
 ge('btnViewNotes').addEventListener('click',function(){sp('notes');});
