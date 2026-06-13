@@ -2443,13 +2443,10 @@ function rn(){
     var d=mkRow('note-item');
     d.style.position='relative';
     var h=mkRow('note-hdr');
-    var av=mkDiv('av av-'+(c?c.type:'lead'),c?ini(c):'?');
-    av.className='av av-'+(c?c.type:'lead');
-    av.style.cssText='width:26px;height:26px;font-size:18px;';
     var b=document.createElement('b');
-    b.style.fontSize='12px';
+    b.style.fontSize='13px';
     b.textContent=c?fn(c):'Unknown';
-    h.appendChild(av);h.appendChild(b);
+    h.appendChild(b);
     if(c){var tg=document.createElement('span');tg.className='tag tag-'+ctype1(c);tg.textContent=ctype1(c);h.appendChild(tg);}
     h.appendChild(mkDiv('font-size:18px;color:var(--text3);',rt(note.date)));
     // Edit/Delete buttons
