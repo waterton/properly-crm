@@ -801,18 +801,23 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
               </div>
               <canvas id="qrCanvas" style="display:none;"></canvas>
             </div>
-            <div id="qrStartWrap" style="text-align:center;padding:32px 20px;background:var(--surface);border:1px solid var(--border);border-radius:12px;">
-              <div style="font-size:48px;margin-bottom:12px;">&#9638;</div>
-              <div style="font-size:16px;font-weight:600;color:var(--text);margin-bottom:8px;">QR Code Scanner</div>
-              <div style="font-size:14px;color:var(--text3);margin-bottom:18px;">Point your camera at a QR code on a business card to instantly extract contact info.</div>
-              <button class="btn btn-p" id="btnStartQR" style="font-size:16px;padding:12px 24px;">Start Camera</button>
+            <div id="qrStartWrap" style="text-align:center;padding:16px 16px;background:var(--surface);border:1px solid var(--border);border-radius:12px;">
+              <div style="font-size:32px;margin-bottom:6px;">&#9638;</div>
+              <div style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:4px;">QR Code Scanner</div>
+              <div style="font-size:13px;color:var(--text3);margin-bottom:12px;">Point your camera at a QR code to extract contact info.</div>
+              <button class="btn btn-p" id="btnStartQR" style="font-size:15px;padding:10px 22px;">Start Camera</button>
             </div>
-            <div id="qrManualInput" style="margin-top:14px;display:none;">
-              <div style="font-size:12px;color:var(--text3);margin-bottom:6px;">Or paste QR code URL / vCard text manually:</div>
-              <textarea class="fi" id="qrManualText" rows="3" placeholder="Paste vCard, URL, or contact text here..."></textarea>
-              <button class="btn btn-p" id="btnParseQRText" style="margin-top:8px;">Parse Text</button>
+            <div id="qrManualInput" style="margin-top:10px;display:none;">
+              <div id="qrManualTextWrap">
+                <div style="font-size:12px;color:var(--text3);margin-bottom:6px;">Paste vCard, URL, or contact text:</div>
+                <textarea class="fi" id="qrManualText" rows="3" placeholder="Paste vCard, URL, or contact text here..."></textarea>
+              </div>
+              <div id="qrMobileShareWrap" style="display:none;margin-bottom:8px;">
+                <button class="btn btn-g" id="btnQRShare" style="width:100%;font-size:14px;padding:10px;">&#128203; Paste from clipboard</button>
+              </div>
+              <button class="btn btn-p" id="btnParseQRText" style="margin-top:8px;width:100%;">Parse</button>
             </div>
-            <button class="btn btn-g" id="btnQRManualToggle" style="margin-top:10px;font-size:13px;">Enter text manually instead</button>
+            <button class="btn btn-g" id="btnQRManualToggle" style="margin-top:8px;font-size:13px;">Enter text manually instead</button>
           </div>
 
           <!-- Processing -->
@@ -7428,13 +7433,39 @@ ge('tabQRCode').addEventListener('click', function(){
   ge('cardPhotoTab').style.display='none'; ge('qrCodeTab').style.display='block';
 });
 ge('btnStartQR').addEventListener('click', startQRScanner);
+
+// Detect mobile: show clipboard paste button instead of textarea
+var isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || window.innerWidth < 640;
+if(isMobile){
+  ge('qrManualTextWrap').style.display = 'none';
+  ge('qrMobileShareWrap').style.display = 'block';
+}
+
 ge('btnQRManualToggle').addEventListener('click', function(){
   var mi = ge('qrManualInput');
   mi.style.display = mi.style.display==='none' ? 'block' : 'none';
+  ge('btnQRManualToggle').style.display = 'none';
 });
+
+ge('btnQRShare') && ge('btnQRShare').addEventListener('click', function(){
+  if(navigator.clipboard && navigator.clipboard.readText){
+    navigator.clipboard.readText().then(function(text){
+      if(!text.trim()){ alert('Clipboard is empty. Copy a vCard or URL first, then tap Paste.'); return; }
+      parseQRData(text.trim());
+    }).catch(function(){
+      // Clipboard permission denied — fall back to showing the textarea
+      ge('qrMobileShareWrap').style.display='none';
+      ge('qrManualTextWrap').style.display='block';
+    });
+  } else {
+    ge('qrMobileShareWrap').style.display='none';
+    ge('qrManualTextWrap').style.display='block';
+  }
+});
+
 ge('btnParseQRText').addEventListener('click', function(){
   var text = ge('qrManualText').value.trim();
-  if(!text){ alert('Please enter some text or a URL to parse.'); return; }
+  if(!text){ alert('Please paste some text or a URL to parse.'); return; }
   parseQRData(text);
 });
 ge('btnAddCalEvent').addEventListener('click', openAddCalEvent);
