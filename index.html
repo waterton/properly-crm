@@ -75,7 +75,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .note-item{padding:13px 18px;border-bottom:1px solid var(--border);}
 .note-item:last-child{border-bottom:none;}
 .note-hdr{display:flex;align-items:center;gap:8px;margin-bottom:5px;flex-wrap:wrap;}
-.note-text{font-size:14px;color:var(--text2);line-height:1.5;}
+.note-text{font-size:16px;color:var(--text2);line-height:1.5;}
 .li{display:flex;align-items:center;gap:12px;padding:12px 18px;border-bottom:1px solid var(--border);}
 .li:last-child{border-bottom:none;}
 .fu-row{display:flex;align-items:flex-start;gap:12px;padding:12px 18px;border-bottom:1px solid var(--border);}
@@ -527,6 +527,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
       <button class="ni" id="nav-notes"><svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>Notes</button>
       <div class="nav-sec">Tools</div>
       <button class="ni" id="nav-deadlines"><svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Deadlines</button>
+      <button class="ni" id="nav-gmail"><svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>Gmail<span class="nbadge" id="nbGmail">0</span></button>
       <div class="nav-sec">Transactions</div>
       <button class="ni" id="nav-tc"><svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Transactions<span class="nbadge" id="nbTC">0</span></button>
       <div class="nav-sec">AI Tools</div>
@@ -536,7 +537,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
       <button class="ni" id="nav-calendar"><svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Calendar</button>
       <div class="nav-sec">Team</div>
       <button class="ni" id="nav-team"><svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Team</button>
-      <button class="ni" id="nav-gmail"><svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>Gmail<span class="nbadge" id="nbGmail">0</span></button>
       <div class="nav-sec">MLS</div>
       <button class="ni" id="nav-mls"><svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg>MLS Search<span class="nbadge" style="background:var(--lead);font-size:9px;">LIVE</span></button>
       <div class="nav-sec">Marketing</div>
@@ -638,38 +638,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
         </div>
       </div>
       <div class="page" id="page-followups">
-        <div class="card">
-          <div class="card-hdr">
-            <div class="card-title">Follow-up Reminders</div>
-            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-              <span style="font-size:13px;color:var(--text3);">Sort:</span>
-              <select class="fsel" id="fuSort" style="font-size:13px;padding:4px 8px;width:auto;">
-                <option value="date">Due Date</option>
-                <option value="pri">Priority</option>
-                <option value="contact">Contact</option>
-                <option value="assignedTo">Assigned To</option>
-              </select>
-              <select class="fsel" id="fuSortDir" style="font-size:13px;padding:4px 8px;width:auto;">
-                <option value="asc">Asc</option>
-                <option value="desc">Desc</option>
-              </select>
-              <button class="btn btn-p" id="btnAddFU">+ Add Reminder</button>
-            </div>
-          </div>
-          <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
-            <div style="min-width:680px;">
-              <div style="display:grid;grid-template-columns:24px 1fr 90px 110px 90px 160px;gap:0;padding:8px 14px;border-bottom:1px solid var(--border);background:var(--surface2);" id="fuHeader">
-                <div></div>
-                <div style="font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1px;">Task / Contact</div>
-                <div style="font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1px;">Due</div>
-                <div style="font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1px;">Assigned</div>
-                <div style="font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1px;">Status</div>
-                <div style="font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1px;">Actions</div>
-              </div>
-              <div id="fuList"></div>
-            </div>
-          </div>
-        </div>
+        <div class="card"><div class="card-hdr"><div class="card-title">Follow-up Reminders</div><button class="btn btn-p" id="btnAddFU">+ Add Reminder</button></div><div id="fuList"></div></div>
       </div>
       <div class="page" id="page-notes">
         <div class="card"><div class="card-hdr"><div class="card-title">All Notes</div><button class="btn btn-p" id="btnAddNote">+ Add Note</button></div><div id="nList"></div></div>
@@ -832,23 +801,18 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
               </div>
               <canvas id="qrCanvas" style="display:none;"></canvas>
             </div>
-            <div id="qrStartWrap" style="text-align:center;padding:16px 16px;background:var(--surface);border:1px solid var(--border);border-radius:12px;">
-              <div style="font-size:32px;margin-bottom:6px;">&#9638;</div>
-              <div style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:4px;">QR Code Scanner</div>
-              <div style="font-size:13px;color:var(--text3);margin-bottom:12px;">Point your camera at a QR code to extract contact info.</div>
-              <button class="btn btn-p" id="btnStartQR" style="font-size:15px;padding:10px 22px;">Start Camera</button>
+            <div id="qrStartWrap" style="text-align:center;padding:32px 20px;background:var(--surface);border:1px solid var(--border);border-radius:12px;">
+              <div style="font-size:48px;margin-bottom:12px;">&#9638;</div>
+              <div style="font-size:16px;font-weight:600;color:var(--text);margin-bottom:8px;">QR Code Scanner</div>
+              <div style="font-size:14px;color:var(--text3);margin-bottom:18px;">Point your camera at a QR code on a business card to instantly extract contact info.</div>
+              <button class="btn btn-p" id="btnStartQR" style="font-size:16px;padding:12px 24px;">Start Camera</button>
             </div>
-            <div id="qrManualInput" style="margin-top:10px;display:none;">
-              <div id="qrManualTextWrap">
-                <div style="font-size:12px;color:var(--text3);margin-bottom:6px;">Paste vCard, URL, or contact text:</div>
-                <textarea class="fi" id="qrManualText" rows="3" placeholder="Paste vCard, URL, or contact text here..."></textarea>
-              </div>
-              <div id="qrMobileShareWrap" style="display:none;margin-bottom:8px;">
-                <button class="btn btn-g" id="btnQRShare" style="width:100%;font-size:14px;padding:10px;">&#128203; Paste from clipboard</button>
-              </div>
-              <button class="btn btn-p" id="btnParseQRText" style="margin-top:8px;width:100%;">Parse</button>
+            <div id="qrManualInput" style="margin-top:14px;display:none;">
+              <div style="font-size:12px;color:var(--text3);margin-bottom:6px;">Or paste QR code URL / vCard text manually:</div>
+              <textarea class="fi" id="qrManualText" rows="3" placeholder="Paste vCard, URL, or contact text here..."></textarea>
+              <button class="btn btn-p" id="btnParseQRText" style="margin-top:8px;">Parse Text</button>
             </div>
-            <button class="btn btn-g" id="btnQRManualToggle" style="margin-top:8px;font-size:13px;">Enter text manually instead</button>
+            <button class="btn btn-g" id="btnQRManualToggle" style="margin-top:10px;font-size:13px;">Enter text manually instead</button>
           </div>
 
           <!-- Processing -->
@@ -1173,16 +1137,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
                   <option value="">None</option>
                 </select>
               </div>
-              <!-- Attachments -->
-              <div class="fg" style="margin-top:8px;">
-                <label class="fl">Attachments <span style="color:var(--text3);font-weight:400;">(optional)</span></label>
-                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-                  <button type="button" class="btn btn-g" id="btnAddAttachment" style="font-size:13px;padding:5px 12px;">+ Add File</button>
-                  <input type="file" id="attachmentInput" multiple style="display:none;">
-                  <span style="font-size:12px;color:var(--text3);">Max 20MB total</span>
-                </div>
-                <div id="attachmentList" style="margin-top:6px;display:flex;flex-wrap:wrap;gap:6px;"></div>
-              </div>
             </div>
             <div class="mftr">
               <button class="btn btn-g" data-close="composeModal">Cancel</button>
@@ -1393,8 +1347,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 </div>
 <div class="modal-ov" id="fuModal">
   <div class="modal">
-    <div class="mhdr"><div class="mtitle" id="fuModalTitle">Add Follow-up</div><button class="mx" data-close="fuModal">&#x2715;</button></div>
-    <div class="mbody"><div class="fg"><label class="fl">Contact</label><select class="fsel" id="fuContact"></select></div><div class="fg"><label class="fl">Task</label><input class="fi" id="fuLabel" placeholder="Call to discuss offer..."></div><div class="fg"><label class="fl">Due Date</label><input class="fi" id="fuDate" type="date"></div><div class="fg"><label class="fl">Priority</label><select class="fsel" id="fuPri"><option value="hot">Hot - Do today</option><option value="warn">This week</option><option value="ok">No rush</option></select></div><div class="fg"><label class="fl">Notes <span style="color:var(--text3);font-weight:400;">(optional)</span></label><textarea class="fi" id="fuNotes" rows="3" placeholder="Additional details..."></textarea></div></div>
+    <div class="mhdr"><div class="mtitle">Add Follow-up</div><button class="mx" data-close="fuModal">&#x2715;</button></div>
+    <div class="mbody"><div class="fg"><label class="fl">Contact</label><select class="fsel" id="fuContact"></select></div><div class="fg"><label class="fl">Task</label><input class="fi" id="fuLabel" placeholder="Call to discuss offer..."></div><div class="fg"><label class="fl">Due Date</label><input class="fi" id="fuDate" type="date"></div><div class="fg"><label class="fl">Priority</label><select class="fsel" id="fuPri"><option value="hot">Hot - Do today</option><option value="warn">This week</option><option value="ok">No rush</option></select></div></div>
     <div class="mbody" style="padding-top:0;"><div class="fg"><label class="fl">Assign To</label><select class="fsel assign-to-select" id="fuAssign"><option value="">Unassigned</option></select></div></div>
     <div class="mftr"><button class="btn btn-g" data-close="fuModal">Cancel</button><button class="btn btn-p" id="btnSaveFU">Save</button></div>
   </div>
@@ -1476,7 +1430,6 @@ async function getAuthHeaders(extra) {
 var C=[],N=[],F=[],D=[],TX=[],TM=[],curDet=null,curFilter='all',curPage='dashboard';
 var CAMP=[],ENR=[],SENDLOG=[];
 var curSort='last'; // 'last' or 'first'
-var fuSortField='date', fuSortDir='asc';
 var selectedContacts = new Set();
 // TM = Team Members: [{id, first, last, role, email, phone, color, calLink}]
 
@@ -1500,7 +1453,7 @@ function sv(){
 var DB_COLS = {
   contacts: ['id','first','last','type','phone','email','property','stage','price','notes','added','closeDate','assignedTo'],
   notes: ['id','contactId','text','date'],
-  followups: ['id','contactId','label','date','pri','done','notes','assignedTo'],
+  followups: ['id','contactId','label','date','pri','done','assignedTo'],
   deadlines: ['id','contactId','type','date','assignedTo'],
   transactions: null, // allow all
   campaigns: null,
@@ -2356,90 +2309,27 @@ function cd(){ge('detOv').classList.remove('open');curDet=null;}
 function ss(id,stage){var c=gc(id);if(!c)return;c.stage=stage;updateContact(c);autoEnrollOnStage(c,stage);rd();if(curPage==='pipeline')rp();if(curPage==='contacts')rc();}
 function delc(id, silent){if(!silent&&!confirm('Delete this contact?'))return;C=C.filter(function(c){return c.id!==id;});N=N.filter(function(n){return n.contactId!==id;});F=F.filter(function(f){return f.contactId!==id;});D=D.filter(function(d){return d.contactId!==id;});sv();deleteCfromDB(id);if(!silent){cd();rd();if(curPage==='contacts')rc();}}
 
-var priOrder={'hot':0,'warn':1,'ok':2};
-var priLabel={'hot':'Hot','warn':'This Week','ok':'No Rush'};
-var priColor={'hot':'var(--danger)','warn':'var(--warn)','ok':'var(--lead)'};
-
 function rfu(){
   var el=ge('fuList');el.innerHTML='';
-  var list=F.slice();
-  // Sort
-  list.sort(function(a,b){
-    var va,vb;
-    if(fuSortField==='date'){ va=a.date||''; vb=b.date||''; }
-    else if(fuSortField==='pri'){ va=priOrder[a.pri]||2; vb=priOrder[b.pri]||2; }
-    else if(fuSortField==='contact'){ var ca=gc(a.contactId),cb=gc(b.contactId); va=(ca?fn(ca):'').toLowerCase(); vb=(cb?fn(cb):'').toLowerCase(); }
-    else if(fuSortField==='assignedTo'){ var ma=TM.find(function(m){return m.id===a.assignedTo;}),mb=TM.find(function(m){return m.id===b.assignedTo;}); va=(ma?ma.first:'').toLowerCase(); vb=(mb?mb.first:'').toLowerCase(); }
-    else { va=a.date||''; vb=b.date||''; }
-    if(va<vb) return fuSortDir==='asc'?-1:1;
-    if(va>vb) return fuSortDir==='asc'?1:-1;
-    return 0;
-  });
-  if(!list.length){el.innerHTML='<div class="empty" style="padding:20px;">No follow-ups yet.</div>';return;}
-  list.forEach(function(f){
-    var c=gc(f.contactId);
-    var assignedM=f.assignedTo?TM.find(function(m){return m.id===f.assignedTo;}):null;
-    var row=document.createElement('div');
-    row.style.cssText='display:grid;grid-template-columns:24px 1fr 90px 110px 90px 160px;min-width:680px;gap:0;padding:10px 14px;border-bottom:1px solid var(--border);align-items:center;transition:background 0.12s;'+(f.done?'opacity:0.55;':'');
-    row.addEventListener('mouseenter',function(){this.style.background='var(--surface2)';});
-    row.addEventListener('mouseleave',function(){this.style.background='';});
-
-    // Checkbox
-    var chkWrap=document.createElement('div');
-    var chk=document.createElement('input'); chk.type='checkbox'; chk.checked=f.done;
-    chk.style.cssText='width:15px;height:15px;cursor:pointer;accent-color:var(--accent);';
-    (function(id){ chk.addEventListener('change',function(){ tfu(id); rfu(); }); })(f.id);
-    chkWrap.appendChild(chk); row.appendChild(chkWrap);
-
-    // Task + Contact + Notes
-    var info=document.createElement('div');
-    var taskEl=mkDiv('font-size:15px;font-weight:600;'+(f.done?'text-decoration:line-through;color:var(--text3);':'color:var(--text);'),f.label);
-    info.appendChild(taskEl);
-    info.appendChild(mkDiv('font-size:13px;color:var(--text3);',c?fn(c):'No contact'));
-    if(f.notes) info.appendChild(mkDiv('font-size:12px;color:var(--text2);margin-top:2px;font-style:italic;',f.notes));
-    row.appendChild(info);
-
-    // Due Date
-    var dueEl=document.createElement('div');
-    var daysLeft=f.date?Math.round((new Date(f.date)-new Date())/864e5):null;
-    var dueColor=daysLeft!==null?(daysLeft<0?'var(--danger)':daysLeft===0?'var(--warn)':'var(--text2)'):'var(--text3)';
-    dueEl.style.cssText='font-size:13px;color:'+dueColor+';';
-    dueEl.textContent=f.date?fd(f.date):'-';
-    row.appendChild(dueEl);
-
-    // Assigned To
-    row.appendChild(mkDiv('font-size:13px;color:var(--text2);',assignedM?(assignedM.first+' '+assignedM.last):'-'));
-
-    // Status/Priority
-    var statusEl=document.createElement('div');
-    statusEl.style.cssText='font-size:12px;font-weight:700;padding:2px 8px;border-radius:20px;text-align:center;display:inline-block;background:rgba(0,0,0,0.2);color:'+(priColor[f.pri]||'var(--text3)')+';border:1px solid '+(priColor[f.pri]||'var(--border)')+';';
-    statusEl.textContent=priLabel[f.pri]||f.pri||'-';
-    var statusWrap=document.createElement('div'); statusWrap.appendChild(statusEl);
-    row.appendChild(statusWrap);
-
-    // Actions
-    var acts=mkDiv('display:flex;align-items:center;gap:5px;flex-wrap:wrap;');
-    var editBtn=mkBtn('btn btn-g','Edit','font-size:12px;padding:3px 8px;');
-    (function(fu){ editBtn.addEventListener('click',function(e){ e.stopPropagation(); openEditFU(fu); }); })(f);
-    acts.appendChild(editBtn);
-
-    var calBtn=document.createElement('button');
-    calBtn.style.cssText='background:rgba(76,142,201,0.1);border:1px solid rgba(76,142,201,0.2);border-radius:5px;padding:3px 8px;cursor:pointer;font-size:12px;color:var(--buyer);font-family:DM Sans,sans-serif;';
-    calBtn.textContent='+Cal'; calBtn.title='Add to Google Calendar';
-    (function(fu){ calBtn.addEventListener('click',function(e){
+  var sorted=F.slice().sort(function(a,b){return new Date(a.date)-new Date(b.date);});
+  if(!sorted.length){el.innerHTML='<div class="empty">No follow-ups yet.</div>';return;}
+  sorted.forEach(function(f){var c=gc(f.contactId);var row=mkRow('fu-row');var chk=mkRow('chk'+(f.done?' done':''));if(f.done)chk.appendChild(ck());(function(id){chk.addEventListener('click',function(){tfu(id);rfu();});})(f.id);var info=mkDiv('flex:1;');info.appendChild(mkDiv('font-size:18px;'+(f.done?'text-decoration:line-through;color:var(--text3);':''),f.label));info.appendChild(mkDiv('font-size:18px;color:var(--text3);',(c?fn(c):'Unknown')+' - '+fd(f.date)));var right=mkDiv('display:flex;align-items:center;gap:7px;');right.appendChild(mkBadge(f.pri));var del=mkBtn('','\u00d7','background:none;border:none;color:var(--text3);cursor:pointer;font-size:18px;line-height:1;');// GCal sync for follow-up
+    var gcalFuBtn=document.createElement('button');
+    gcalFuBtn.style.cssText='background:rgba(76,142,201,0.1);border:1px solid rgba(76,142,201,0.2);border-radius:5px;padding:3px 8px;cursor:pointer;font-size:14px;color:var(--buyer);font-family:DM Sans,sans-serif;';
+    gcalFuBtn.textContent='+ GCal';
+    gcalFuBtn.title='Add to Google Calendar';
+    (function(fu){ gcalFuBtn.addEventListener('click',function(e){
       e.stopPropagation();
       var c6=gc(fu.contactId);
-      syncToGCal({title:fu.label+(c6?' - '+fn(c6):''),date:fu.date,time:'',type:'followup',clientName:c6?fn(c6):'',notes:'Follow-up from Properly CRM'},fu.assignedTo);
+      syncToGCal({
+        title:fu.label+(c6?' - '+fn(c6):''),
+        date:fu.date,time:'',type:'followup',
+        clientName:c6?fn(c6):'',
+        notes:'Follow-up from Properly CRM'
+      }, fu.assignedTo);
     }); })(f);
-    acts.appendChild(calBtn);
-
-    var delBtn=mkBtn('btn','Delete','font-size:12px;padding:3px 8px;background:rgba(201,76,76,0.12);color:var(--danger);border:1px solid rgba(201,76,76,0.3);border-radius:7px;');
-    (function(id){ delBtn.addEventListener('click',function(e){ e.stopPropagation(); if(!confirm('Delete this follow-up?'))return; F=F.filter(function(x){return x.id!==id;}); sv(); dbDelete('followups',id); rfu(); rd(); }); })(f.id);
-    acts.appendChild(delBtn);
-
-    row.appendChild(acts);
-    el.appendChild(row);
-  });
+    right.appendChild(gcalFuBtn);
+    (function(id){del.addEventListener('click',function(){F=F.filter(function(f){return f.id!==id;});sv();if(supaReady) fetch(SUPA_URL+'/rest/v1/followups?id=eq.'+id,{method:'DELETE',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}});rfu();rd();});})(f.id);right.appendChild(del);row.appendChild(chk);row.appendChild(info);row.appendChild(right);el.appendChild(row);});
   ge('nbFollowups').textContent=F.filter(function(f){return !f.done;}).length;
 }
 function tfu(id){var f=F.find(function(x){return x.id===id;});if(f){f.done=!f.done;sv();if(supaReady) dbSave('followups',[f]);}}
@@ -2453,21 +2343,24 @@ function rn(){
     var d=mkRow('note-item');
     d.style.position='relative';
     var h=mkRow('note-hdr');
+    var av=mkDiv('av av-'+(c?c.type:'lead'),c?ini(c):'?');
+    av.className='av av-'+(c?c.type:'lead');
+    av.style.cssText='width:26px;height:26px;font-size:18px;';
     var b=document.createElement('b');
-    b.style.fontSize='14px';
+    b.style.fontSize='12px';
     b.textContent=c?fn(c):'Unknown';
-    h.appendChild(b);
+    h.appendChild(av);h.appendChild(b);
     if(c){var tg=document.createElement('span');tg.className='tag tag-'+ctype1(c);tg.textContent=ctype1(c);h.appendChild(tg);}
-    h.appendChild(mkDiv('font-size:14px;color:var(--text3);',rt(note.date)));
+    h.appendChild(mkDiv('font-size:18px;color:var(--text3);',rt(note.date)));
     // Edit/Delete buttons
     var acts=document.createElement('div');
     acts.style.cssText='margin-left:auto;display:flex;gap:6px;flex-shrink:0;';
     var editBtn=document.createElement('button');
-    editBtn.style.cssText='background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:3px 8px;cursor:pointer;font-size:14px;color:var(--text2);font-family:DM Sans,sans-serif;';
+    editBtn.style.cssText='background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:3px 8px;cursor:pointer;font-size:18px;color:var(--text2);font-family:DM Sans,sans-serif;';
     editBtn.textContent='Edit';
     (function(n2){ editBtn.addEventListener('click',function(){ openEditNote(n2); }); })(note);
     var delBtn=document.createElement('button');
-    delBtn.style.cssText='background:rgba(201,76,76,0.1);border:1px solid rgba(201,76,76,0.2);border-radius:5px;padding:3px 8px;cursor:pointer;font-size:14px;color:var(--danger);font-family:DM Sans,sans-serif;';
+    delBtn.style.cssText='background:rgba(201,76,76,0.1);border:1px solid rgba(201,76,76,0.2);border-radius:5px;padding:3px 8px;cursor:pointer;font-size:18px;color:var(--danger);font-family:DM Sans,sans-serif;';
     delBtn.textContent='Del';
     (function(nid){ delBtn.addEventListener('click',function(){
       if(!confirm('Delete this note?')) return;
@@ -2789,43 +2682,7 @@ function svn(){
   }
   cm('noteModal'); ge('nText').value=''; rn(); rd();
 }
-function openEditFU(f){
-  ge('fuModalTitle') && (ge('fuModalTitle').textContent='Edit Follow-up');
-  ge('btnSaveFU').setAttribute('data-edit-id', f.id);
-  fs('fuContact'); ge('fuContact').value=f.contactId||'';
-  ge('fuLabel').value=f.label||'';
-  ge('fuDate').value=f.date||'';
-  ge('fuPri').value=f.pri||'ok';
-  ge('fuNotes') && (ge('fuNotes').value=f.notes||'');
-  populateAssignDropdowns();
-  if(ge('fuAssign')) ge('fuAssign').value=f.assignedTo||'';
-  om('fuModal');
-}
-
-function svfu(){
-  var lbl=ge('fuLabel').value.trim();
-  if(!lbl){ alert('Please enter a task description.'); return; }
-  var editId=ge('btnSaveFU').getAttribute('data-edit-id')||'';
-  if(editId){
-    var existing=F.find(function(x){ return String(x.id)===String(editId); });
-    if(existing){
-      existing.contactId=parseInt(ge('fuContact').value)||existing.contactId;
-      existing.label=lbl;
-      existing.date=ge('fuDate').value;
-      existing.pri=ge('fuPri').value;
-      existing.notes=ge('fuNotes')?ge('fuNotes').value.trim():'';
-      existing.assignedTo=parseInt(ge('fuAssign')&&ge('fuAssign').value)||null;
-      sv(); if(supaReady) dbSave('followups',[existing]);
-    }
-    ge('btnSaveFU').setAttribute('data-edit-id','');
-  } else {
-    var nf={id:Date.now(),contactId:parseInt(ge('fuContact').value),label:lbl,date:ge('fuDate').value,pri:ge('fuPri').value,done:false,notes:ge('fuNotes')?ge('fuNotes').value.trim():'',assignedTo:parseInt(ge('fuAssign')&&ge('fuAssign').value)||null};
-    F.push(nf); saveFU(nf);
-  }
-  ge('fuModalTitle') && (ge('fuModalTitle').textContent='Add Follow-up');
-  cm('fuModal'); ge('fuLabel').value=''; ge('fuNotes') && (ge('fuNotes').value='');
-  rfu(); rd(); if(curDet)vc(curDet);
-}
+function svfu(){var lbl=ge('fuLabel').value.trim();if(!lbl)return;var nf={id:Date.now(),contactId:parseInt(ge('fuContact').value),label:lbl,date:ge('fuDate').value,pri:ge('fuPri').value,done:false,assignedTo:parseInt(ge('fuAssign')&&ge('fuAssign').value)||null};F.push(nf);saveFU(nf);cm('fuModal');ge('fuLabel').value='';rfu();rd();if(curDet)vc(curDet);}
 function openEditDL(d){
   fs('dlContact'); ge('dlContact').value=d.contactId;
   ge('dlType').value=d.type||'';
@@ -4339,12 +4196,13 @@ function parseVCard(vcardText){
 }
 
 async function analyzeQRText(text){
-  var prompt = 'I scanned a QR code and got this content:\n\n' + text + '\n\n' +
-    'Please extract any contact information from that content and fill in the following JSON. ' +
-    'Replace the empty strings with the actual values you find. ' +
-    'If a field is not present in the content, leave it as an empty string. ' +
-    'Return ONLY the filled JSON object with no markdown, no backticks, no explanation:\n' +
-    '{"firstName":"","lastName":"","fullName":"","title":"","company":"","phone":"","mobile":"","email":"","website":"","address":"","linkedin":"","instagram":"","twitter":"","notes":"","cardType":"business"}';
+  var prompt = [
+    'Extract contact information from this text/URL from a QR code.',
+    'Return ONLY a valid JSON object with these fields (empty string if not found):',
+    '{"firstName":"","lastName":"","fullName":"","title":"","company":"","phone":"","mobile":"","phone2":"","email":"","email2":"","website":"","address":"","linkedin":"","instagram":"","facebook":"","twitter":"","tiktok":"","whatsapp":"","notes":"","cardType":"business"}',
+    'Text/URL to parse:',
+    text
+  ].join('\n');
 
   try{
     var resp = await fetch('/api/claude', {
@@ -4360,17 +4218,12 @@ async function analyzeQRText(text){
     if(!data.content || !data.content[0]){ showCardError('Could not parse QR data.'); return; }
     var responseText = data.content[0].text;
     try{
-      var clean = responseText.replace(/```json/gi,'').replace(/```/g,'').trim();
-      // Extract JSON object from anywhere in the response
+      var clean = responseText.replace(/```json/g,'').replace(/```/g,'').trim();
       var fb = clean.indexOf('{'); var lb = clean.lastIndexOf('}');
       if(fb !== -1 && lb > fb) clean = clean.substring(fb, lb+1);
       var result = JSON.parse(clean);
       showCardResult(result);
-    }catch(e){
-      // Fallback: treat the raw text as notes and create a minimal contact
-      console.log('QR JSON parse failed, raw response:', responseText);
-      showCardResult({firstName:'',lastName:'',fullName:'',phone:'',email:'',notes:responseText.substring(0,500),cardType:'business'});
-    }
+    }catch(e){ showCardError('Could not parse QR response.'); }
   }catch(e){ showCardError('QR parse error: ' + e.message); }
 }
 
@@ -6529,31 +6382,6 @@ function renderThread(messages, threadId){
     }); })(fromEmail, firstMsg.from);
     hdr.appendChild(subj); hdr.appendChild(newCBtn);
   }
-  // Trash button
-  var trashRow = document.createElement('div');
-  trashRow.style.cssText = 'display:flex;justify-content:flex-end;padding:6px 0 2px;';
-  var trashBtn = document.createElement('button');
-  trashBtn.style.cssText = 'background:rgba(201,76,76,0.1);border:1px solid rgba(201,76,76,0.25);border-radius:6px;padding:5px 14px;cursor:pointer;font-size:13px;color:var(--danger);font-family:DM Sans,sans-serif;display:flex;align-items:center;gap:5px;';
-  trashBtn.innerHTML = '<svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3,6 5,6 21,6"/><path d="M19,6l-1,14a2,2,0,0,1-2,2H8a2,2,0,0,1-2-2L5,6"/><path d="M10,11v6M14,11v6"/><path d="M9,6V4a1,1,0,0,1,1-1h4a1,1,0,0,1,1,1V6"/></svg> Move to Trash';
-  (function(tid){ trashBtn.addEventListener('click', function(){
-    if(!confirm('Move this conversation to Trash?')) return;
-    trashBtn.disabled = true; trashBtn.textContent = 'Trashing...';
-    var memberId = gmailState.activeMemberId;
-    if(!memberId){ alert('No Gmail account selected.'); return; }
-    fetch('/api/gmail-api', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ action:'trash', memberId:memberId, threadId:tid })
-    }).then(function(r){ return r.json(); }).then(function(data){
-      if(data.error){ alert('Trash failed: ' + data.error); trashBtn.disabled=false; trashBtn.innerHTML='<svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3,6 5,6 21,6"/><path d="M19,6l-1,14a2,2,0,0,1-2,2H8a2,2,0,0,1-2-2L5,6"/></svg> Move to Trash'; return; }
-      // Refresh inbox and clear thread view
-      loadGmailInbox();
-      ge('gmailThread').innerHTML = '<div class="gmail-empty" id="gmailEmptyState"><svg width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg><div>Conversation moved to Trash.</div></div>';
-      var layout = ge('gmailLayout');
-      if(layout) layout.classList.remove('thread-open');
-    }).catch(function(e){ alert('Error: ' + e.message); trashBtn.disabled=false; });
-  }); })(threadId);
-  trashRow.appendChild(trashBtn);
-  hdr.appendChild(trashRow);
   thread.appendChild(hdr);
 
   // Messages
@@ -6699,27 +6527,9 @@ async function importAttachmentToScanner(messageId, attachmentId, filename, mime
   }catch(e){ showScannerError('Import failed: '+e.message); }
 }
 
-var composeAttachments = []; // [{name, mimeType, data (base64)}]
-
-function renderAttachmentList(){
-  var list = ge('attachmentList'); if(!list) return;
-  list.innerHTML = '';
-  composeAttachments.forEach(function(att, i){
-    var chip = document.createElement('div');
-    chip.style.cssText = 'background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:3px 10px;font-size:12px;color:var(--text2);display:flex;align-items:center;gap:6px;';
-    chip.textContent = att.name + ' (' + (att.data.length * 0.75 / 1024).toFixed(0) + 'KB)';
-    var x = document.createElement('span');
-    x.textContent = '×'; x.style.cssText = 'cursor:pointer;color:var(--danger);font-weight:700;';
-    (function(idx){ x.addEventListener('click', function(){ composeAttachments.splice(idx,1); renderAttachmentList(); }); })(i);
-    chip.appendChild(x); list.appendChild(chip);
-  });
-}
-
 function openCompose(opts){
   opts = opts||{};
   ge('composeTitle').textContent = opts.replyToMessageId ? 'Reply' : 'New Email';
-  composeAttachments = [];
-  renderAttachmentList();
   ge('composeTo').value = opts.to||'';
   ge('composeSubject').value = opts.subject||'';
   ge('composeBody').value = opts.body||'';
@@ -6806,25 +6616,7 @@ async function sendComposedEmail(){
     N.push(nn); saveNote(nn);
   }
   ge('btnSendEmail').textContent='Sending...'; ge('btnSendEmail').disabled=true;
-  if(composeAttachments.length > 0){
-    try{
-      var resp = await fetch('/api/gmail-api',{
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({
-          action:'send', memberId:from,
-          to:to, subject:subject,
-          body:body.replace(/\n/g,'<br>'),
-          threadId:threadId||null, replyTo:replyTo||null,
-          attachments: composeAttachments
-        })
-      });
-      var data = await resp.json();
-      if(data.error){ alert('Send failed: '+data.error); }
-      else { cm('composeModal'); alert('Email sent!'); loadGmailInbox(); composeAttachments=[]; renderAttachmentList(); }
-    }catch(e){ alert('Send error: '+e.message); }
-  } else {
-    await sendEmail({to,subject,body,memberId:from,threadId,replyTo});
-  }
+  await sendEmail({to,subject,body,memberId:from,threadId,replyTo});
   ge('btnSendEmail').textContent='Send Email'; ge('btnSendEmail').disabled=false;
 }
 
@@ -7579,15 +7371,7 @@ ge('fab').addEventListener('click',function(){om('addModal');});
 ge('btnAdd').addEventListener('click',function(){om('addModal');});
 ge('btnPipelineAdd').addEventListener('click',function(){om('addModal');});
 ge('btnContactAdd').addEventListener('click',function(){om('addModal');});
-ge('fuSort') && ge('fuSort').addEventListener('change',function(){ fuSortField=this.value; rfu(); });
-ge('fuSortDir') && ge('fuSortDir').addEventListener('change',function(){ fuSortDir=this.value; rfu(); });
-ge('btnAddFU').addEventListener('click',function(){
-  ge('fuModalTitle') && (ge('fuModalTitle').textContent='Add Follow-up');
-  ge('btnSaveFU').setAttribute('data-edit-id','');
-  fs('fuContact'); ge('fuDate').value=tod(); ge('fuLabel').value='';
-  ge('fuNotes') && (ge('fuNotes').value='');
-  populateAssignDropdowns(); om('fuModal');
-});
+ge('btnAddFU').addEventListener('click',function(){fs('fuContact');ge('fuDate').value=tod();om('fuModal');});
 ge('btnAddNote').addEventListener('click',function(){fs('nContact');om('noteModal');});
 ge('btnAddDL').addEventListener('click',function(){fs('dlContact');ge('dlDate').value=tod();om('dlModal');});
 ge('btnViewNotes').addEventListener('click',function(){sp('notes');});
@@ -7640,39 +7424,13 @@ ge('tabQRCode').addEventListener('click', function(){
   ge('cardPhotoTab').style.display='none'; ge('qrCodeTab').style.display='block';
 });
 ge('btnStartQR').addEventListener('click', startQRScanner);
-
-// Detect mobile: show clipboard paste button instead of textarea
-var isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || window.innerWidth < 640;
-if(isMobile){
-  ge('qrManualTextWrap').style.display = 'none';
-  ge('qrMobileShareWrap').style.display = 'block';
-}
-
 ge('btnQRManualToggle').addEventListener('click', function(){
   var mi = ge('qrManualInput');
   mi.style.display = mi.style.display==='none' ? 'block' : 'none';
-  ge('btnQRManualToggle').style.display = 'none';
 });
-
-ge('btnQRShare') && ge('btnQRShare').addEventListener('click', function(){
-  if(navigator.clipboard && navigator.clipboard.readText){
-    navigator.clipboard.readText().then(function(text){
-      if(!text.trim()){ alert('Clipboard is empty. Copy a vCard or URL first, then tap Paste.'); return; }
-      parseQRData(text.trim());
-    }).catch(function(){
-      // Clipboard permission denied — fall back to showing the textarea
-      ge('qrMobileShareWrap').style.display='none';
-      ge('qrManualTextWrap').style.display='block';
-    });
-  } else {
-    ge('qrMobileShareWrap').style.display='none';
-    ge('qrManualTextWrap').style.display='block';
-  }
-});
-
 ge('btnParseQRText').addEventListener('click', function(){
   var text = ge('qrManualText').value.trim();
-  if(!text){ alert('Please paste some text or a URL to parse.'); return; }
+  if(!text){ alert('Please enter some text or a URL to parse.'); return; }
   parseQRData(text);
 });
 ge('btnAddCalEvent').addEventListener('click', openAddCalEvent);
@@ -7714,23 +7472,6 @@ ge('btnGmailCompose').addEventListener('click', function(){ openCompose(); });
 ge('btnGmailRefresh').addEventListener('click', loadGmailInbox);
 
 ge('btnSendEmail').addEventListener('click', sendComposedEmail);
-ge('btnAddAttachment') && ge('btnAddAttachment').addEventListener('click', function(){ ge('attachmentInput').click(); });
-ge('attachmentInput') && ge('attachmentInput').addEventListener('change', function(){
-  var files = Array.from(this.files);
-  var totalSize = composeAttachments.reduce(function(s,a){ return s + a.data.length * 0.75; }, 0);
-  files.forEach(function(file){
-    totalSize += file.size;
-    if(totalSize > 20 * 1024 * 1024){ alert('Total attachment size exceeds 20MB. File not added: ' + file.name); return; }
-    var reader = new FileReader();
-    reader.onload = function(e){
-      var b64 = e.target.result.split(',')[1];
-      composeAttachments.push({ name: file.name, mimeType: file.type || 'application/octet-stream', data: b64 });
-      renderAttachmentList();
-    };
-    reader.readAsDataURL(file);
-  });
-  this.value = '';
-});
 ge('btnSaveDraft').addEventListener('click', function(){ alert('Draft saving coming soon!'); });
 document.querySelectorAll('.gmail-template-btn').forEach(function(btn){
   btn.addEventListener('click', function(){ applyTemplate(this.getAttribute('data-tpl')); });
