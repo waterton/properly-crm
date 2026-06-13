@@ -75,7 +75,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .note-item{padding:13px 18px;border-bottom:1px solid var(--border);}
 .note-item:last-child{border-bottom:none;}
 .note-hdr{display:flex;align-items:center;gap:8px;margin-bottom:5px;flex-wrap:wrap;}
-.note-text{font-size:16px;color:var(--text2);line-height:1.5;}
+.note-text{font-size:14px;color:var(--text2);line-height:1.5;}
 .li{display:flex;align-items:center;gap:12px;padding:12px 18px;border-bottom:1px solid var(--border);}
 .li:last-child{border-bottom:none;}
 .fu-row{display:flex;align-items:flex-start;gap:12px;padding:12px 18px;border-bottom:1px solid var(--border);}
@@ -2444,20 +2444,20 @@ function rn(){
     d.style.position='relative';
     var h=mkRow('note-hdr');
     var b=document.createElement('b');
-    b.style.fontSize='13px';
+    b.style.fontSize='14px';
     b.textContent=c?fn(c):'Unknown';
     h.appendChild(b);
     if(c){var tg=document.createElement('span');tg.className='tag tag-'+ctype1(c);tg.textContent=ctype1(c);h.appendChild(tg);}
-    h.appendChild(mkDiv('font-size:18px;color:var(--text3);',rt(note.date)));
+    h.appendChild(mkDiv('font-size:14px;color:var(--text3);',rt(note.date)));
     // Edit/Delete buttons
     var acts=document.createElement('div');
     acts.style.cssText='margin-left:auto;display:flex;gap:6px;flex-shrink:0;';
     var editBtn=document.createElement('button');
-    editBtn.style.cssText='background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:3px 8px;cursor:pointer;font-size:18px;color:var(--text2);font-family:DM Sans,sans-serif;';
+    editBtn.style.cssText='background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:3px 8px;cursor:pointer;font-size:14px;color:var(--text2);font-family:DM Sans,sans-serif;';
     editBtn.textContent='Edit';
     (function(n2){ editBtn.addEventListener('click',function(){ openEditNote(n2); }); })(note);
     var delBtn=document.createElement('button');
-    delBtn.style.cssText='background:rgba(201,76,76,0.1);border:1px solid rgba(201,76,76,0.2);border-radius:5px;padding:3px 8px;cursor:pointer;font-size:18px;color:var(--danger);font-family:DM Sans,sans-serif;';
+    delBtn.style.cssText='background:rgba(201,76,76,0.1);border:1px solid rgba(201,76,76,0.2);border-radius:5px;padding:3px 8px;cursor:pointer;font-size:14px;color:var(--danger);font-family:DM Sans,sans-serif;';
     delBtn.textContent='Del';
     (function(nid){ delBtn.addEventListener('click',function(){
       if(!confirm('Delete this note?')) return;
