@@ -1660,9 +1660,13 @@ function demo(){
 function ini(c){return (c.first[0]+c.last[0]).toUpperCase();}
 function fn(c){return c.first+' '+c.last;}
 function ctypes(c){
-  // Always returns an array of types, handles both legacy string and new array
+  // Always returns an array of types. Handles new array, legacy single string,
+  // and pipe-joined string stored in the 'type' column for Supabase persistence.
   if(Array.isArray(c.types) && c.types.length) return c.types;
-  if(c.type) return [c.type];
+  if(c.type){
+    if(c.type.indexOf('|')>=0) return c.type.split('|').filter(Boolean);
+    return [c.type];
+  }
   return [];
 }
 function ctype1(c){ var t=ctypes(c); return t[0]||''; } // primary type for CSS classes etc
@@ -2027,7 +2031,7 @@ function confirmMerge(){
   var merged=JSON.parse(JSON.stringify(a));
   merged.first=ge('mrg_first').value.trim();
   merged.last=ge('mrg_last').value.trim();
-  merged.type=ge('mrg_type').value;
+  merged.type=ge('mrg_type').value; merged.types=merged.type?[merged.type]:[];
   merged.phone=ge('mrg_phone').value.trim();
   merged.email=ge('mrg_email').value.trim();
   merged.property=ge('mrg_prop').value.trim();
@@ -2179,7 +2183,7 @@ function vc(id){
       var arr=ctypes(ct).slice();
       var idx=arr.indexOf(type);
       if(idx>=0) arr.splice(idx,1); else arr.push(type);
-      ct.types=arr; ct.type=arr[0]||'';
+      ct.types=arr; ct.type=arr.join('|');
       updateContact(ct);vc(cid);
       rd();if(curPage==='contacts')rc();if(curPage==='pipeline')rp();
     });})(id,t);
@@ -2346,7 +2350,7 @@ function rn(){
     b.style.fontSize='12px';
     b.textContent=c?fn(c):'Unknown';
     h.appendChild(av);h.appendChild(b);
-    if(c){var tg=document.createElement('span');tg.className='tag tag-'+c.type;tg.textContent=c.type;h.appendChild(tg);}
+    if(c){var tg=document.createElement('span');tg.className='tag tag-'+ctype1(c);tg.textContent=ctype1(c);h.appendChild(tg);}
     h.appendChild(mkDiv('font-size:18px;color:var(--text3);',rt(note.date)));
     // Edit/Delete buttons
     var acts=document.createElement('div');
@@ -2633,7 +2637,7 @@ function svc(){
       return;
     }
     c.first=first; c.last=last;
-    c.types=getFTypeValues(); c.type=c.types[0]||'';
+    c.types=getFTypeValues(); c.type=c.types.join('|');
     c.phone=ge('fPhone').value; c.email=ge('fEmail').value;
     c.property=ge('fProp').value; c.stage=ge('fStage').value;
     c.price=ge('fPrice').value; c.notes=ge('fNotes').value;
@@ -2648,7 +2652,7 @@ function svc(){
     return;
   } else {
     var _ftypes=getFTypeValues();
-    var nc={id:Date.now(),first:first,last:last,types:_ftypes,type:_ftypes[0]||'',
+    var nc={id:Date.now(),first:first,last:last,types:_ftypes,type:_ftypes.join('|'),
       phone:ge('fPhone').value,email:ge('fEmail').value,
       property:ge('fProp').value,stage:ge('fStage').value,
       price:ge('fPrice').value,notes:ge('fNotes').value,
@@ -2808,7 +2812,7 @@ function parseCSV(text){
       first: first,
       last:  last,
       types: types,
-      type:  types[0]||'',
+      type:  types.join('|'),
       phone: phone,
       email: email,
       property: obj['property'] || obj['interest'] || address,
@@ -2917,7 +2921,7 @@ function showCSVPreview(contacts){
     }
 
     var td2=document.createElement('td'); td2.style.padding='8px 10px';
-    if(c.type){ var tg=document.createElement('span'); tg.className='tag tag-'+c.type; tg.style.fontSize='12px'; tg.textContent=c.type; td2.appendChild(tg); }
+    ctypes(c).forEach(function(_t){ var tg=document.createElement('span'); tg.className='tag tag-'+_t; tg.style.cssText='font-size:12px;margin-right:3px;'; tg.textContent=_t; td2.appendChild(tg); });
 
     var td3=document.createElement('td'); td3.style.cssText='padding:8px 10px;color:var(--text2);font-size:13px;';
     td3.textContent=c.phone||'-';
@@ -6371,7 +6375,9 @@ function renderThread(messages, threadId){
       ge('fFirst').value = parts[0]||'';
       ge('fLast').value = parts.slice(1).join(' ')||'';
       ge('fEmail').value = email;
-      ge('fType').value = 'prospect';
+      clearFTypeValues();
+      ge('btnSaveContact') && ge('btnSaveContact').setAttribute('data-edit-id','');
+      ge('addModalTitle') && (ge('addModalTitle').textContent='Add Contact');
       ge('addModal').classList.add('open');
     }); })(fromEmail, firstMsg.from);
     hdr.appendChild(subj); hdr.appendChild(newCBtn);
