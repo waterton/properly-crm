@@ -656,15 +656,19 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
               <button class="btn btn-p" id="btnAddFU">+ Add Reminder</button>
             </div>
           </div>
-          <div style="display:grid;grid-template-columns:24px 1fr 90px 110px 90px 160px;gap:0;padding:8px 14px;border-bottom:1px solid var(--border);background:var(--surface2);" id="fuHeader">
-            <div></div>
-            <div style="font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1px;">Task / Contact</div>
-            <div style="font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1px;">Due</div>
-            <div style="font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1px;">Assigned</div>
-            <div style="font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1px;">Status</div>
-            <div style="font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1px;">Actions</div>
+          <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
+            <div style="min-width:680px;">
+              <div style="display:grid;grid-template-columns:24px 1fr 90px 110px 90px 160px;gap:0;padding:8px 14px;border-bottom:1px solid var(--border);background:var(--surface2);" id="fuHeader">
+                <div></div>
+                <div style="font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1px;">Task / Contact</div>
+                <div style="font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1px;">Due</div>
+                <div style="font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1px;">Assigned</div>
+                <div style="font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1px;">Status</div>
+                <div style="font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1px;">Actions</div>
+              </div>
+              <div id="fuList"></div>
+            </div>
           </div>
-          <div id="fuList"></div>
         </div>
       </div>
       <div class="page" id="page-notes">
@@ -2366,7 +2370,7 @@ function rfu(){
     var c=gc(f.contactId);
     var assignedM=f.assignedTo?TM.find(function(m){return m.id===f.assignedTo;}):null;
     var row=document.createElement('div');
-    row.style.cssText='display:grid;grid-template-columns:24px 1fr 90px 110px 90px 160px;gap:0;padding:10px 14px;border-bottom:1px solid var(--border);align-items:center;transition:background 0.12s;'+(f.done?'opacity:0.55;':'');
+    row.style.cssText='display:grid;grid-template-columns:24px 1fr 90px 110px 90px 160px;min-width:680px;gap:0;padding:10px 14px;border-bottom:1px solid var(--border);align-items:center;transition:background 0.12s;'+(f.done?'opacity:0.55;':'');
     row.addEventListener('mouseenter',function(){this.style.background='var(--surface2)';});
     row.addEventListener('mouseleave',function(){this.style.background='';});
 
