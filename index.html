@@ -4197,10 +4197,11 @@ function parseVCard(vcardText){
 
 async function analyzeQRText(text){
   var prompt = [
-    'Extract contact information from this text/URL from a QR code.',
-    'Return ONLY a valid JSON object with these fields (empty string if not found):',
+    'Extract contact information from this QR code text or URL.',
+    'Return ONLY a raw JSON object — no markdown, no backticks, no explanation, just the JSON.',
+    'Use exactly these fields (empty string if unknown):',
     '{"firstName":"","lastName":"","fullName":"","title":"","company":"","phone":"","mobile":"","phone2":"","email":"","email2":"","website":"","address":"","linkedin":"","instagram":"","facebook":"","twitter":"","tiktok":"","whatsapp":"","notes":"","cardType":"business"}',
-    'Text/URL to parse:',
+    'QR code content:',
     text
   ].join('\n');
 
@@ -4218,12 +4219,17 @@ async function analyzeQRText(text){
     if(!data.content || !data.content[0]){ showCardError('Could not parse QR data.'); return; }
     var responseText = data.content[0].text;
     try{
-      var clean = responseText.replace(/```json/g,'').replace(/```/g,'').trim();
+      var clean = responseText.replace(/```json/gi,'').replace(/```/g,'').trim();
+      // Extract JSON object from anywhere in the response
       var fb = clean.indexOf('{'); var lb = clean.lastIndexOf('}');
       if(fb !== -1 && lb > fb) clean = clean.substring(fb, lb+1);
       var result = JSON.parse(clean);
       showCardResult(result);
-    }catch(e){ showCardError('Could not parse QR response.'); }
+    }catch(e){
+      // Fallback: treat the raw text as notes and create a minimal contact
+      console.log('QR JSON parse failed, raw response:', responseText);
+      showCardResult({firstName:'',lastName:'',fullName:'',phone:'',email:'',notes:responseText.substring(0,500),cardType:'business'});
+    }
   }catch(e){ showCardError('QR parse error: ' + e.message); }
 }
 
