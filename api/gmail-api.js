@@ -203,23 +203,56 @@ export default async function handler(req, res) {
     }
 
     if (action === 'send') {
-      const emailLines = [
-        'To: ' + to,
-        'Subject: ' + subject,
-        'Content-Type: text/html; charset=utf-8',
-        'MIME-Version: 1.0',
-        '',
-        body || ''
-      ];
-      if (replyTo) {
-        emailLines.unshift('References: ' + replyTo);
-        emailLines.unshift('In-Reply-To: ' + replyTo);
+      const attachments = req.body.attachments || [];
+      let raw;
+
+      if (attachments.length === 0) {
+        // Simple text/html email (existing path)
+        const emailLines = [
+          'To: ' + to,
+          'Subject: ' + subject,
+          'Content-Type: text/html; charset=utf-8',
+          'MIME-Version: 1.0',
+          '',
+          body || ''
+        ];
+        if (replyTo) {
+          emailLines.unshift('References: ' + replyTo);
+          emailLines.unshift('In-Reply-To: ' + replyTo);
+        }
+        raw = Buffer.from(emailLines.join('\r\n'))
+          .toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      } else {
+        // Multipart MIME with attachments
+        const boundary = 'pb_crm_' + Date.now().toString(36);
+        const lines = [];
+        if (replyTo) { lines.push('In-Reply-To: ' + replyTo); lines.push('References: ' + replyTo); }
+        lines.push('To: ' + to);
+        lines.push('Subject: ' + subject);
+        lines.push('MIME-Version: 1.0');
+        lines.push('Content-Type: multipart/mixed; boundary="' + boundary + '"');
+        lines.push('');
+        // HTML body part
+        lines.push('--' + boundary);
+        lines.push('Content-Type: text/html; charset=utf-8');
+        lines.push('Content-Transfer-Encoding: quoted-printable');
+        lines.push('');
+        lines.push(body || '');
+        // Attachment parts
+        for (const att of attachments) {
+          lines.push('--' + boundary);
+          lines.push('Content-Type: ' + att.mimeType + '; name="' + att.name + '"');
+          lines.push('Content-Transfer-Encoding: base64');
+          lines.push('Content-Disposition: attachment; filename="' + att.name + '"');
+          lines.push('');
+          // Chunk base64 data at 76 chars per line (RFC 2045)
+          const b64 = att.data;
+          for (let i = 0; i < b64.length; i += 76) lines.push(b64.slice(i, i + 76));
+        }
+        lines.push('--' + boundary + '--');
+        raw = Buffer.from(lines.join('\r\n'))
+          .toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
       }
-      const raw = Buffer.from(emailLines.join('\r\n'))
-        .toString('base64')
-        .replace(/\+/g, '-')
-        .replace(/\//g, '_')
-        .replace(/=+$/, '');
 
       const sendBody = { raw };
       if (threadId) sendBody.threadId = threadId;
@@ -231,6 +264,26 @@ export default async function handler(req, res) {
       const sendData = await sendResp.json();
       if (sendData.error) return res.status(400).json({ error: sendData.error.message });
       return res.status(200).json({ success: true, messageId: sendData.id });
+    }
+
+    if (action === 'trash') {
+      // Move thread to Trash (reversible — appears in Gmail Trash for 30 days)
+      const trashResp = await fetch(`${gmailBase}/threads/${threadId}/trash`, {
+        method: 'POST', headers
+      });
+      const trashData = await trashResp.json();
+      if (trashData.error) return res.status(400).json({ error: trashData.error.message });
+      return res.status(200).json({ success: true });
+    }
+
+    if (action === 'untrash') {
+      // Restore from Trash
+      const untrashResp = await fetch(`${gmailBase}/threads/${threadId}/untrash`, {
+        method: 'POST', headers
+      });
+      const untrashData = await untrashResp.json();
+      if (untrashData.error) return res.status(400).json({ error: untrashData.error.message });
+      return res.status(200).json({ success: true });
     }
 
     return res.status(400).json({ error: 'Unknown action: ' + action });
