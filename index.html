@@ -638,7 +638,34 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
         </div>
       </div>
       <div class="page" id="page-followups">
-        <div class="card"><div class="card-hdr"><div class="card-title">Follow-up Reminders</div><button class="btn btn-p" id="btnAddFU">+ Add Reminder</button></div><div id="fuList"></div></div>
+        <div class="card">
+          <div class="card-hdr">
+            <div class="card-title">Follow-up Reminders</div>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <span style="font-size:13px;color:var(--text3);">Sort:</span>
+              <select class="fsel" id="fuSort" style="font-size:13px;padding:4px 8px;width:auto;">
+                <option value="date">Due Date</option>
+                <option value="pri">Priority</option>
+                <option value="contact">Contact</option>
+                <option value="assignedTo">Assigned To</option>
+              </select>
+              <select class="fsel" id="fuSortDir" style="font-size:13px;padding:4px 8px;width:auto;">
+                <option value="asc">Asc</option>
+                <option value="desc">Desc</option>
+              </select>
+              <button class="btn btn-p" id="btnAddFU">+ Add Reminder</button>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:24px 1fr 90px 110px 90px 160px;gap:0;padding:8px 14px;border-bottom:1px solid var(--border);background:var(--surface2);" id="fuHeader">
+            <div></div>
+            <div style="font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1px;">Task / Contact</div>
+            <div style="font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1px;">Due</div>
+            <div style="font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1px;">Assigned</div>
+            <div style="font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1px;">Status</div>
+            <div style="font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1px;">Actions</div>
+          </div>
+          <div id="fuList"></div>
+        </div>
       </div>
       <div class="page" id="page-notes">
         <div class="card"><div class="card-hdr"><div class="card-title">All Notes</div><button class="btn btn-p" id="btnAddNote">+ Add Note</button></div><div id="nList"></div></div>
@@ -1435,6 +1462,7 @@ async function getAuthHeaders(extra) {
 var C=[],N=[],F=[],D=[],TX=[],TM=[],curDet=null,curFilter='all',curPage='dashboard';
 var CAMP=[],ENR=[],SENDLOG=[];
 var curSort='last'; // 'last' or 'first'
+var fuSortField='date', fuSortDir='asc';
 var selectedContacts = new Set();
 // TM = Team Members: [{id, first, last, role, email, phone, color, calLink}]
 
@@ -2314,36 +2342,90 @@ function cd(){ge('detOv').classList.remove('open');curDet=null;}
 function ss(id,stage){var c=gc(id);if(!c)return;c.stage=stage;updateContact(c);autoEnrollOnStage(c,stage);rd();if(curPage==='pipeline')rp();if(curPage==='contacts')rc();}
 function delc(id, silent){if(!silent&&!confirm('Delete this contact?'))return;C=C.filter(function(c){return c.id!==id;});N=N.filter(function(n){return n.contactId!==id;});F=F.filter(function(f){return f.contactId!==id;});D=D.filter(function(d){return d.contactId!==id;});sv();deleteCfromDB(id);if(!silent){cd();rd();if(curPage==='contacts')rc();}}
 
+var priOrder={'hot':0,'warn':1,'ok':2};
+var priLabel={'hot':'Hot','warn':'This Week','ok':'No Rush'};
+var priColor={'hot':'var(--danger)','warn':'var(--warn)','ok':'var(--lead)'};
+
 function rfu(){
   var el=ge('fuList');el.innerHTML='';
-  var sorted=F.slice().sort(function(a,b){return new Date(a.date)-new Date(b.date);});
-  if(!sorted.length){el.innerHTML='<div class="empty">No follow-ups yet.</div>';return;}
-  sorted.forEach(function(f){var c=gc(f.contactId);var row=mkRow('fu-row');var chk=mkRow('chk'+(f.done?' done':''));if(f.done)chk.appendChild(ck());(function(id){chk.addEventListener('click',function(){tfu(id);rfu();});})(f.id);
-    var info=mkDiv('flex:1;');
-    info.appendChild(mkDiv('font-size:16px;font-weight:600;'+(f.done?'text-decoration:line-through;color:var(--text3);':''),f.label));
-    info.appendChild(mkDiv('font-size:14px;color:var(--text3);',(c?fn(c):'Unknown')+' — '+fd(f.date)));
-    if(f.notes) info.appendChild(mkDiv('font-size:13px;color:var(--text2);margin-top:2px;',f.notes));
-    var right=mkDiv('display:flex;align-items:center;gap:7px;');right.appendChild(mkBadge(f.pri));
-    var editBtn=mkBtn('btn btn-g','Edit','font-size:13px;padding:3px 9px;');
+  var list=F.slice();
+  // Sort
+  list.sort(function(a,b){
+    var va,vb;
+    if(fuSortField==='date'){ va=a.date||''; vb=b.date||''; }
+    else if(fuSortField==='pri'){ va=priOrder[a.pri]||2; vb=priOrder[b.pri]||2; }
+    else if(fuSortField==='contact'){ var ca=gc(a.contactId),cb=gc(b.contactId); va=(ca?fn(ca):'').toLowerCase(); vb=(cb?fn(cb):'').toLowerCase(); }
+    else if(fuSortField==='assignedTo'){ var ma=TM.find(function(m){return m.id===a.assignedTo;}),mb=TM.find(function(m){return m.id===b.assignedTo;}); va=(ma?ma.first:'').toLowerCase(); vb=(mb?mb.first:'').toLowerCase(); }
+    else { va=a.date||''; vb=b.date||''; }
+    if(va<vb) return fuSortDir==='asc'?-1:1;
+    if(va>vb) return fuSortDir==='asc'?1:-1;
+    return 0;
+  });
+  if(!list.length){el.innerHTML='<div class="empty" style="padding:20px;">No follow-ups yet.</div>';return;}
+  list.forEach(function(f){
+    var c=gc(f.contactId);
+    var assignedM=f.assignedTo?TM.find(function(m){return m.id===f.assignedTo;}):null;
+    var row=document.createElement('div');
+    row.style.cssText='display:grid;grid-template-columns:24px 1fr 90px 110px 90px 160px;gap:0;padding:10px 14px;border-bottom:1px solid var(--border);align-items:center;transition:background 0.12s;'+(f.done?'opacity:0.55;':'');
+    row.addEventListener('mouseenter',function(){this.style.background='var(--surface2)';});
+    row.addEventListener('mouseleave',function(){this.style.background='';});
+
+    // Checkbox
+    var chkWrap=document.createElement('div');
+    var chk=document.createElement('input'); chk.type='checkbox'; chk.checked=f.done;
+    chk.style.cssText='width:15px;height:15px;cursor:pointer;accent-color:var(--accent);';
+    (function(id){ chk.addEventListener('change',function(){ tfu(id); rfu(); }); })(f.id);
+    chkWrap.appendChild(chk); row.appendChild(chkWrap);
+
+    // Task + Contact + Notes
+    var info=document.createElement('div');
+    var taskEl=mkDiv('font-size:15px;font-weight:600;'+(f.done?'text-decoration:line-through;color:var(--text3);':'color:var(--text);'),f.label);
+    info.appendChild(taskEl);
+    info.appendChild(mkDiv('font-size:13px;color:var(--text3);',c?fn(c):'No contact'));
+    if(f.notes) info.appendChild(mkDiv('font-size:12px;color:var(--text2);margin-top:2px;font-style:italic;',f.notes));
+    row.appendChild(info);
+
+    // Due Date
+    var dueEl=document.createElement('div');
+    var daysLeft=f.date?Math.round((new Date(f.date)-new Date())/864e5):null;
+    var dueColor=daysLeft!==null?(daysLeft<0?'var(--danger)':daysLeft===0?'var(--warn)':'var(--text2)'):'var(--text3)';
+    dueEl.style.cssText='font-size:13px;color:'+dueColor+';';
+    dueEl.textContent=f.date?fd(f.date):'-';
+    row.appendChild(dueEl);
+
+    // Assigned To
+    row.appendChild(mkDiv('font-size:13px;color:var(--text2);',assignedM?(assignedM.first+' '+assignedM.last):'-'));
+
+    // Status/Priority
+    var statusEl=document.createElement('div');
+    statusEl.style.cssText='font-size:12px;font-weight:700;padding:2px 8px;border-radius:20px;text-align:center;display:inline-block;background:rgba(0,0,0,0.2);color:'+(priColor[f.pri]||'var(--text3)')+';border:1px solid '+(priColor[f.pri]||'var(--border)')+';';
+    statusEl.textContent=priLabel[f.pri]||f.pri||'-';
+    var statusWrap=document.createElement('div'); statusWrap.appendChild(statusEl);
+    row.appendChild(statusWrap);
+
+    // Actions
+    var acts=mkDiv('display:flex;align-items:center;gap:5px;flex-wrap:wrap;');
+    var editBtn=mkBtn('btn btn-g','Edit','font-size:12px;padding:3px 8px;');
     (function(fu){ editBtn.addEventListener('click',function(e){ e.stopPropagation(); openEditFU(fu); }); })(f);
-    right.appendChild(editBtn);
-    var del=mkBtn('','\u00d7','background:none;border:none;color:var(--text3);cursor:pointer;font-size:18px;line-height:1;');// GCal sync for follow-up
-    var gcalFuBtn=document.createElement('button');
-    gcalFuBtn.style.cssText='background:rgba(76,142,201,0.1);border:1px solid rgba(76,142,201,0.2);border-radius:5px;padding:3px 8px;cursor:pointer;font-size:14px;color:var(--buyer);font-family:DM Sans,sans-serif;';
-    gcalFuBtn.textContent='+ GCal';
-    gcalFuBtn.title='Add to Google Calendar';
-    (function(fu){ gcalFuBtn.addEventListener('click',function(e){
+    acts.appendChild(editBtn);
+
+    var calBtn=document.createElement('button');
+    calBtn.style.cssText='background:rgba(76,142,201,0.1);border:1px solid rgba(76,142,201,0.2);border-radius:5px;padding:3px 8px;cursor:pointer;font-size:12px;color:var(--buyer);font-family:DM Sans,sans-serif;';
+    calBtn.textContent='+Cal'; calBtn.title='Add to Google Calendar';
+    (function(fu){ calBtn.addEventListener('click',function(e){
       e.stopPropagation();
       var c6=gc(fu.contactId);
-      syncToGCal({
-        title:fu.label+(c6?' - '+fn(c6):''),
-        date:fu.date,time:'',type:'followup',
-        clientName:c6?fn(c6):'',
-        notes:'Follow-up from Properly CRM'
-      }, fu.assignedTo);
+      syncToGCal({title:fu.label+(c6?' - '+fn(c6):''),date:fu.date,time:'',type:'followup',clientName:c6?fn(c6):'',notes:'Follow-up from Properly CRM'},fu.assignedTo);
     }); })(f);
-    right.appendChild(gcalFuBtn);
-    (function(id){del.addEventListener('click',function(){if(!confirm('Delete this follow-up?'))return;F=F.filter(function(f){return f.id!==id;});sv();dbDelete('followups',id);rfu();rd();});})(f.id);right.appendChild(del);row.appendChild(chk);row.appendChild(info);row.appendChild(right);el.appendChild(row);});
+    acts.appendChild(calBtn);
+
+    var delBtn=mkBtn('btn','Delete','font-size:12px;padding:3px 8px;background:rgba(201,76,76,0.12);color:var(--danger);border:1px solid rgba(201,76,76,0.3);border-radius:7px;');
+    (function(id){ delBtn.addEventListener('click',function(e){ e.stopPropagation(); if(!confirm('Delete this follow-up?'))return; F=F.filter(function(x){return x.id!==id;}); sv(); dbDelete('followups',id); rfu(); rd(); }); })(f.id);
+    acts.appendChild(delBtn);
+
+    row.appendChild(acts);
+    el.appendChild(row);
+  });
   ge('nbFollowups').textContent=F.filter(function(f){return !f.done;}).length;
 }
 function tfu(id){var f=F.find(function(x){return x.id===id;});if(f){f.done=!f.done;sv();if(supaReady) dbSave('followups',[f]);}}
@@ -7425,6 +7507,8 @@ ge('fab').addEventListener('click',function(){om('addModal');});
 ge('btnAdd').addEventListener('click',function(){om('addModal');});
 ge('btnPipelineAdd').addEventListener('click',function(){om('addModal');});
 ge('btnContactAdd').addEventListener('click',function(){om('addModal');});
+ge('fuSort') && ge('fuSort').addEventListener('change',function(){ fuSortField=this.value; rfu(); });
+ge('fuSortDir') && ge('fuSortDir').addEventListener('change',function(){ fuSortDir=this.value; rfu(); });
 ge('btnAddFU').addEventListener('click',function(){
   ge('fuModalTitle') && (ge('fuModalTitle').textContent='Add Follow-up');
   ge('btnSaveFU').setAttribute('data-edit-id','');
