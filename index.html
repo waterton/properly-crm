@@ -4196,14 +4196,12 @@ function parseVCard(vcardText){
 }
 
 async function analyzeQRText(text){
-  var prompt = [
-    'Extract contact information from this QR code text or URL.',
-    'Return ONLY a raw JSON object — no markdown, no backticks, no explanation, just the JSON.',
-    'Use exactly these fields (empty string if unknown):',
-    '{"firstName":"","lastName":"","fullName":"","title":"","company":"","phone":"","mobile":"","phone2":"","email":"","email2":"","website":"","address":"","linkedin":"","instagram":"","facebook":"","twitter":"","tiktok":"","whatsapp":"","notes":"","cardType":"business"}',
-    'QR code content:',
-    text
-  ].join('\n');
+  var prompt = 'I scanned a QR code and got this content:\n\n' + text + '\n\n' +
+    'Please extract any contact information from that content and fill in the following JSON. ' +
+    'Replace the empty strings with the actual values you find. ' +
+    'If a field is not present in the content, leave it as an empty string. ' +
+    'Return ONLY the filled JSON object with no markdown, no backticks, no explanation:\n' +
+    '{"firstName":"","lastName":"","fullName":"","title":"","company":"","phone":"","mobile":"","email":"","website":"","address":"","linkedin":"","instagram":"","twitter":"","notes":"","cardType":"business"}';
 
   try{
     var resp = await fetch('/api/claude', {
