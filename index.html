@@ -11,7 +11,10 @@
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden;font-size:16px !important;}
 
-::-webkit-scrollbar{width:5px;}::-webkit-scrollbar-track{background:var(--bg);}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+::-webkit-scrollbar{width:5px;}
+.bs-day{display:inline-flex;align-items:center;gap:5px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:15px;color:var(--text2);cursor:pointer;transition:all 0.15s;}
+.bs-day input{accent-color:var(--accent);cursor:pointer;}
+.bs-day:has(input:checked){border-color:var(--accent);color:var(--accent);}::-webkit-scrollbar-track{background:var(--bg);}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
 .app{display:flex;height:100vh;overflow:hidden;}
 .sidebar{width:220px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;transition:transform 0.3s;z-index:100;overflow-y:auto;}
 .main{flex:1;display:flex;flex-direction:column;overflow:hidden;}
@@ -571,6 +574,45 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
         <div class="bsec"><div class="bsechdr">DEADLINES THIS WEEK</div><div id="bWeek"></div></div>
         <div class="bsec"><div class="bsechdr">PIPELINE SNAPSHOT</div><div id="bSnap"></div></div>
         <div class="bsec"><div class="bsechdr" style="color:var(--buyer);">ACTIVE TRANSACTIONS</div><div id="bTransactions"></div></div>
+        <div class="bsec" id="briefingScheduleSection">
+          <div class="bsechdr" style="display:flex;align-items:center;justify-content:space-between;">
+            EMAIL SCHEDULE
+            <span id="briefingScheduleStatus" style="font-size:13px;font-weight:400;color:var(--text3);letter-spacing:0;text-transform:none;"></span>
+          </div>
+          <div style="padding:16px 18px;">
+            <div style="display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap;">
+              <div>
+                <div style="font-size:13px;color:var(--text3);margin-bottom:8px;text-transform:uppercase;letter-spacing:1px;">Days</div>
+                <div style="display:flex;gap:6px;flex-wrap:wrap;" id="bsDays">
+                  <label class="bs-day"><input type="checkbox" value="Mon" checked> Mon</label>
+                  <label class="bs-day"><input type="checkbox" value="Tue" checked> Tue</label>
+                  <label class="bs-day"><input type="checkbox" value="Wed" checked> Wed</label>
+                  <label class="bs-day"><input type="checkbox" value="Thu" checked> Thu</label>
+                  <label class="bs-day"><input type="checkbox" value="Fri" checked> Fri</label>
+                  <label class="bs-day"><input type="checkbox" value="Sat"> Sat</label>
+                  <label class="bs-day"><input type="checkbox" value="Sun"> Sun</label>
+                </div>
+              </div>
+              <div>
+                <div style="font-size:13px;color:var(--text3);margin-bottom:8px;text-transform:uppercase;letter-spacing:1px;">Send Time</div>
+                <input type="time" id="bsTime" value="07:00" style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:16px;color:var(--text);font-family:'DM Sans',sans-serif;outline:none;">
+              </div>
+              <div>
+                <div style="font-size:13px;color:var(--text3);margin-bottom:8px;text-transform:uppercase;letter-spacing:1px;">Timezone</div>
+                <select id="bsTZ" style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:16px;color:var(--text);font-family:'DM Sans',sans-serif;outline:none;">
+                  <option value="America/Denver">Mountain (MT)</option>
+                  <option value="America/Los_Angeles">Pacific (PT)</option>
+                  <option value="America/Chicago">Central (CT)</option>
+                  <option value="America/New_York">Eastern (ET)</option>
+                </select>
+              </div>
+              <div style="display:flex;flex-direction:column;justify-content:flex-end;padding-bottom:2px;">
+                <div style="font-size:13px;color:var(--text3);margin-bottom:8px;text-transform:uppercase;letter-spacing:1px;">&nbsp;</div>
+                <button class="btn btn-p" id="btnSaveBriefingSchedule" style="padding:7px 18px;">Save Schedule</button>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
       <div class="page active" id="page-dashboard">
         <!-- Cloud Setup Banner (shown only when not connected) -->
@@ -1691,7 +1733,7 @@ function sp(id){
   var nv=ge('nav-'+id);if(nv)nv.classList.add('active');
   ge('pageTitle').textContent=pn[id]||id;
   csb();
-  if(id==='briefing')rb();
+  if(id==='briefing'){rb();loadBriefingSchedule();}
   else if(id==='dashboard')rd();
   else if(id==='pipeline')rp();
   else if(id==='contacts'){ selectedContacts.clear(); updateBulkBar(); rc(); }
@@ -7304,7 +7346,47 @@ function onAuthSuccess(user){
   });
 }
 
-async function startup(){
+async 
+// ---- Briefing Schedule ----
+async function loadBriefingSchedule(){
+  if(!supaReady) return;
+  try{
+    var r=await fetch(SUPA_URL+'/rest/v1/settings?key=eq.briefing_schedule&select=value',{
+      headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}
+    });
+    var rows=await r.json();
+    if(rows.length){
+      var s=rows[0].value;
+      if(s.time) ge('bsTime').value=s.time;
+      if(s.timezone) ge('bsTZ').value=s.timezone;
+      if(s.days){
+        ge('bsDays').querySelectorAll('input[type=checkbox]').forEach(function(cb){
+          cb.checked=s.days.includes(cb.value);
+        });
+      }
+      if(s.lastSent) ge('briefingScheduleStatus').textContent='Last sent: '+s.lastSent;
+    }
+  }catch(e){}
+}
+async function saveBriefingSchedule(){
+  if(!supaReady){alert('Connect to Supabase first.');return;}
+  var days=[];
+  ge('bsDays').querySelectorAll('input[type=checkbox]').forEach(function(cb){if(cb.checked)days.push(cb.value);});
+  if(!days.length){alert('Pick at least one day.');return;}
+  var payload={key:'briefing_schedule',value:{days:days,time:ge('bsTime').value,timezone:ge('bsTZ').value}};
+  try{
+    var r=await fetch(SUPA_URL+'/rest/v1/settings',{
+      method:'POST',
+      headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates'},
+      body:JSON.stringify(payload)
+    });
+    if(r.ok){ge('briefingScheduleStatus').textContent='Saved ✓';}
+    else{alert('Save failed.');}
+  }catch(e){alert('Save failed.');}
+}
+ge('btnSaveBriefingSchedule').addEventListener('click',saveBriefingSchedule);
+
+function startup(){
   try{
     // Show login screen immediately
     ge('loginScreen').classList.add('visible');
