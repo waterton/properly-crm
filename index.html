@@ -7346,7 +7346,6 @@ function onAuthSuccess(user){
   });
 }
 
-async 
 // ---- Briefing Schedule ----
 async function loadBriefingSchedule(){
   if(!supaReady) return;
@@ -7380,13 +7379,13 @@ async function saveBriefingSchedule(){
       headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates'},
       body:JSON.stringify(payload)
     });
-    if(r.ok){ge('briefingScheduleStatus').textContent='Saved ✓';}
+    if(r.ok){ge('briefingScheduleStatus').textContent='Saved!';}
     else{alert('Save failed.');}
   }catch(e){alert('Save failed.');}
 }
 ge('btnSaveBriefingSchedule').addEventListener('click',saveBriefingSchedule);
 
-function startup(){
+async function startup(){
   try{
     // Show login screen immediately
     ge('loginScreen').classList.add('visible');
