@@ -1427,7 +1427,7 @@ async function getAuthHeaders(extra) {
 
 // Auth disabled for testing
 
-var C=[],N=[],F=[],D=[],TX=[],TM=[],curDet=null,curFilter='all',curPage='dashboard';
+var C=[],N=[],F=[],D=[],TX=[],TM=[],A=[],curDet=null,curFilter='all',curPage='dashboard';
 var CAMP=[],ENR=[],SENDLOG=[];
 var curSort='last'; // 'last' or 'first'
 var selectedContacts = new Set();
@@ -1445,6 +1445,7 @@ function sv(){
     localStorage.setItem('crm_camp',JSON.stringify(CAMP));
     localStorage.setItem('crm_enr',JSON.stringify(ENR));
     localStorage.setItem('crm_sendlog',JSON.stringify(SENDLOG));
+    localStorage.setItem('crm_a',JSON.stringify(A));
   }catch(e){}
 }
 
@@ -1571,6 +1572,7 @@ function showSyncStatus(status){
 // Wrapped save functions that sync to Supabase
 function saveContact(c){ sv(); if(supaReady) dbSave('contacts', [c]); }
 function saveNote(n){ sv(); if(supaReady) dbSave('notes', [n]); }
+function logActivity(contactId,type){A.unshift({contactId:contactId,type:type,date:new Date().toISOString()});if(A.length>30)A=A.slice(0,30);sv();}
 function saveFU(f){ sv(); if(supaReady) dbSave('followups', [f]); }
 function saveDL(d){ sv(); if(supaReady) dbSave('deadlines', [d]); }
 function deleteCfromDB(id){
@@ -1768,9 +1770,9 @@ function rd(){
   ge('sLeads').textContent=C.filter(function(c){var t=ctypes(c);return t.indexOf('prospect')>=0||t.indexOf('lead')>=0;}).length;
   ge('sClosing').textContent=D.filter(function(d){var n=du(d.date);return n>=0&&n<=30;}).length;
   var rEl=ge('dRecent');rEl.innerHTML='';
-  var rec=N.slice().sort(function(a,b){return new Date(b.date)-new Date(a.date);}).slice(0,4);
-  if(!rec.length){rEl.innerHTML='<div class="empty">No notes yet</div>';}
-  else rec.forEach(function(note){var c=gc(note.contactId);var d=mkRow('note-item');var h=mkRow('note-hdr');var b=document.createElement('b');b.style.fontSize='12px';b.textContent=c?fn(c):'Unknown';var ts=mkDiv('font-size:18px;color:var(--text3);margin-left:6px;',rt(note.date));h.appendChild(b);h.appendChild(ts);d.appendChild(h);d.appendChild(mkDiv('note-text',note.text));rEl.appendChild(d);});
+  var rec=A.slice(0,8);
+  if(!rec.length){rEl.innerHTML='<div class="empty">No activity yet</div>';}
+  else rec.forEach(function(act){var c=gc(act.contactId);var row=document.createElement('div');row.style.cssText='display:flex;align-items:center;justify-content:space-between;padding:9px 18px;border-bottom:1px solid var(--border);';var nameEl=document.createElement('span');nameEl.style.cssText='font-size:16px;font-weight:600;color:var(--text);';nameEl.textContent=c?fn(c):'Unknown';var typeEl=document.createElement('span');typeEl.style.cssText='font-size:16px;color:var(--text2);';typeEl.textContent=act.type;row.appendChild(nameEl);row.appendChild(typeEl);rEl.appendChild(row);});
   var dlEl=ge('dDeadlines');dlEl.innerHTML='';
   var dl=D.slice().sort(function(a,b){return new Date(a.date)-new Date(b.date);}).slice(0,5);
   if(!dl.length){dlEl.innerHTML='<div class="empty">No deadlines</div>';}
@@ -2306,7 +2308,7 @@ function vc(id){
 function mksec(title){var s=mkRow('det-sec');var t=mkDiv('det-sec-title',title);t.className='det-sec-title';s.appendChild(t);return s;}
 function mkfld(lbl,val,href,style){var r=mkRow('det-field');var l=mkDiv('det-flbl',lbl);l.className='det-flbl';var v=mkDiv('det-fval','');v.className='det-fval';if(style)v.style.cssText=style;if(href){var a=document.createElement('a');a.href=href;a.textContent=val;v.appendChild(a);}else v.textContent=val;r.appendChild(l);r.appendChild(v);return r;}
 function cd(){ge('detOv').classList.remove('open');curDet=null;}
-function ss(id,stage){var c=gc(id);if(!c)return;c.stage=stage;updateContact(c);autoEnrollOnStage(c,stage);rd();if(curPage==='pipeline')rp();if(curPage==='contacts')rc();}
+function ss(id,stage){var c=gc(id);if(!c)return;c.stage=stage;updateContact(c);logActivity(id,'Pipeline update');autoEnrollOnStage(c,stage);rd();if(curPage==='pipeline')rp();if(curPage==='contacts')rc();}
 function delc(id, silent){if(!silent&&!confirm('Delete this contact?'))return;C=C.filter(function(c){return c.id!==id;});N=N.filter(function(n){return n.contactId!==id;});F=F.filter(function(f){return f.contactId!==id;});D=D.filter(function(d){return d.contactId!==id;});sv();deleteCfromDB(id);if(!silent){cd();rd();if(curPage==='contacts')rc();}}
 
 function rfu(){
@@ -2642,7 +2644,7 @@ function svc(){
     c.property=ge('fProp').value; c.stage=ge('fStage').value;
     c.price=ge('fPrice').value; c.notes=ge('fNotes').value;
     c.closeDate=ge('fCloseDate').value||'';
-    updateContact(c);
+    updateContact(c);logActivity(c.id,'Updated contact');
     ge('btnSaveContact') && ge('btnSaveContact').setAttribute('data-edit-id','');
     ge('addModalTitle') && (ge('addModalTitle').textContent = 'Add Contact');
     cm('addModal');
@@ -2658,10 +2660,10 @@ function svc(){
       price:ge('fPrice').value,notes:ge('fNotes').value,
       closeDate:ge('fCloseDate').value||'',
       added:new Date().toISOString()};
-    C.push(nc); saveContact(nc);
+    C.push(nc); saveContact(nc); logActivity(nc.id,'Added contact');
   }
   cm('addModal');
-  ['fFirst','fLast','fPhone','fEmail','fProp','fPrice','fNotes','fCloseDate'].forEach(function(x){ge(x).value='';});
+  ['fFirst','fLast','fPhone','fEmail','fProp','fPrice','fNotes','fCloseDate'].forEach(function(x){ge(x).value='';})
   clearFTypeValues(); ge('fStage').value='';
   rd(); if(curPage==='contacts')rc(); if(curPage==='pipeline')rp();
 }
@@ -2703,11 +2705,11 @@ function svdl(){
     ge('btnSaveDL') && ge('btnSaveDL').setAttribute('data-edit-id','');
   } else {
     var nd={id:Date.now(),contactId:parseInt(ge('dlContact').value),type:ge('dlType').value,date:ge('dlDate').value,assignedTo:parseInt(ge('dlAssign')&&ge('dlAssign').value)||null};
-    D.push(nd); saveDL(nd);
+    D.push(nd); saveDL(nd); logActivity(nd.contactId,'Updated deadlines');
   }
   cm('dlModal'); rdl(); rd(); if(curDet)vc(curDet);
 }
-function adn(){var text=ge('detNoteTA').value.trim();if(!text||!curDet)return;var nn={id:Date.now(),contactId:curDet,text:text,date:new Date().toISOString()};N.push(nn);saveNote(nn);ge('detNoteTA').value='';vc(curDet);rd();}
+function adn(){var text=ge('detNoteTA').value.trim();if(!text||!curDet)return;var nn={id:Date.now(),contactId:curDet,text:text,date:new Date().toISOString()};N.push(nn);saveNote(nn);logActivity(curDet,'Added notes');ge('detNoteTA').value='';vc(curDet);rd();}
 
 function tsb(){ge('sidebar').classList.toggle('open');ge('sbOv').classList.toggle('open');}
 function csb(){ge('sidebar').classList.remove('open');ge('sbOv').classList.remove('open');}
@@ -3719,7 +3721,7 @@ function saveTransaction(){
     }
   });
 
-  saveTX(tx);
+  saveTX(tx); if(tx.contactId) logActivity(tx.contactId,'Updated transaction');
   cm('tcModal');
   renderTC();
   updateNbTC();
@@ -4772,7 +4774,7 @@ function importScanToTC(r){
   // Add note to contact
   if(contactId){
     var scanNote = {id:Date.now()+1, contactId:contactId, text:'Document scanned: ' + (r.docType||'Document') + '. ' + (r.summary||''), date:new Date().toISOString()};
-    N.push(scanNote); saveNote(scanNote);
+    N.push(scanNote); saveNote(scanNote); logActivity(contactId,'Document scanned');
   }
 
   r.imported = true;
@@ -7325,7 +7327,7 @@ async function startup(){
       // No Supabase config - load from localStorage
       try{
         var lc=localStorage.getItem('crm_c');
-        if(lc){ C=JSON.parse(lc); N=JSON.parse(localStorage.getItem('crm_n')||'[]'); F=JSON.parse(localStorage.getItem('crm_f')||'[]'); D=JSON.parse(localStorage.getItem('crm_d')||'[]'); TX=JSON.parse(localStorage.getItem('crm_tx')||'[]'); }
+        if(lc){ C=JSON.parse(lc); N=JSON.parse(localStorage.getItem('crm_n')||'[]'); F=JSON.parse(localStorage.getItem('crm_f')||'[]'); D=JSON.parse(localStorage.getItem('crm_d')||'[]'); TX=JSON.parse(localStorage.getItem('crm_tx')||'[]'); A=JSON.parse(localStorage.getItem('crm_a')||'[]'); }
         else demo();
       }catch(e2){ demo(); }
       ge('mainApp').style.display = 'flex';
