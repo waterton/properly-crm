@@ -112,8 +112,29 @@ module.exports = async function (req, res) {
     for (const token of tokens) {
       try {
         const freshToken = await refreshAccessToken(token.refresh_token);
-        await sendEmail(freshToken, token.email, subject, emailHtml);
-        results.push({ member: token.member_id, status: 'sent', to: token.email });
+
+        // Resolve email — use stored value or fetch from Gmail profile
+        let toEmail = token.email;
+        if (!toEmail) {
+          const profileResp = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/profile', {
+            headers: { Authorization: `Bearer ${freshToken}` }
+          });
+          const profile = await profileResp.json();
+          toEmail = profile.emailAddress;
+
+          // Cache it back to gmail_tokens for future runs
+          if (toEmail) {
+            await supa(`gmail_tokens?member_id=eq.${token.member_id}`, {
+              method: 'PATCH',
+              body: JSON.stringify({ email: toEmail }),
+            });
+          }
+        }
+
+        if (!toEmail) throw new Error('Could not resolve email address for member ' + token.member_id);
+
+        await sendEmail(freshToken, toEmail, subject, emailHtml);
+        results.push({ member: token.member_id, status: 'sent', to: toEmail });
       } catch (e) {
         results.push({ member: token.member_id, status: 'error', error: e.message });
       }
