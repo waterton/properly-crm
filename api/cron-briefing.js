@@ -26,36 +26,37 @@ module.exports = async function (req, res) {
       return res.json({ skipped: true, reason: 'No schedule configured' });
     }
     const sched = schedRow[0].value;
-    const { days = [], time = '07:00', timezone = 'America/Denver', lastSent } = sched;
+    const { entries = [], timezone = 'America/Denver', lastSentByTime = {} } = sched;
 
-    // ── Check day + time window ─────────────────────────────────────────────
+    if (!entries.length) {
+      return res.json({ skipped: true, reason: 'No schedule entries configured' });
+    }
+
+    // ── Find a matching entry for right now ─────────────────────────────────
     const nowLocal = new Date(new Date().toLocaleString('en-US', { timeZone: timezone }));
     const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     const todayName = DAY_NAMES[nowLocal.getDay()];
-    const todayStr  = nowLocal.toISOString().split('T')[0]; // YYYY-MM-DD local
+    const todayStr  = nowLocal.toISOString().split('T')[0];
+    const currentMins = nowLocal.getHours() * 60 + nowLocal.getMinutes();
 
-    if (!days.includes(todayName)) {
-      return res.json({ skipped: true, reason: `Not a scheduled day (${todayName})` });
-    }
+    const matchingEntry = entries.find(function(e) {
+      if (!e.days.includes(todayName)) return false;
+      const [h, m] = e.time.split(':').map(Number);
+      const slotMins = h * 60 + m;
+      if (Math.abs(currentMins - slotMins) > 14) return false;
+      // Not already sent for this time slot today
+      if (lastSentByTime[e.time] === todayStr) return false;
+      return true;
+    });
 
-    const [schedH, schedM] = time.split(':').map(Number);
-    const scheduledMins = schedH * 60 + schedM;
-    const currentMins   = nowLocal.getHours() * 60 + nowLocal.getMinutes();
-
-    // Allow a 14-minute window so a 15-min ping always catches the right slot
-    if (Math.abs(currentMins - scheduledMins) > 14) {
-      return res.json({ skipped: true, reason: 'Not the scheduled time window' });
-    }
-
-    // ── Deduplicate: don't send twice on the same day ───────────────────────
-    if (lastSent === todayStr) {
-      return res.json({ skipped: true, reason: 'Already sent today' });
+    if (!matchingEntry) {
+      return res.json({ skipped: true, reason: 'No matching schedule for current time' });
     }
 
     // ── Load all data ───────────────────────────────────────────────────────
     const [contacts, followups, deadlines, tokens] = await Promise.all([
       supa('contacts?select=*'),
-      supa('followups?select=*&done=eq.false'),
+      supa('followups?select=*&done=is.false'),
       supa('deadlines?select=*'),
       supa('gmail_tokens?select=*'),
     ]);
@@ -118,12 +119,14 @@ module.exports = async function (req, res) {
       }
     }
 
-    // ── Update lastSent ─────────────────────────────────────────────────────
+    // ── Update lastSentByTime for this slot ────────────────────────────────
+    const updatedLastSent = { ...lastSentByTime };
+    updatedLastSent[matchingEntry.time] = todayStr;
     await supa('settings', {
       method: 'POST',
       body: JSON.stringify({
         key: 'briefing_schedule',
-        value: { ...sched, lastSent: todayStr },
+        value: { ...sched, lastSentByTime: updatedLastSent },
       }),
       headers: { 'Prefer': 'resolution=merge-duplicates' },
     });
@@ -150,8 +153,10 @@ async function supa(path, opts = {}) {
     },
     body: opts.body || undefined,
   });
-  if (!r.ok) throw new Error(`Supabase ${path}: ${r.status}`);
-  return r.json();
+  const text = await r.text();
+  if (!r.ok) throw new Error(`Supabase ${path}: ${r.status} ${text}`);
+  if (!text || text === 'null') return [];
+  try { return JSON.parse(text); } catch(e) { throw new Error(`JSON parse failed for ${path}: ${text.slice(0,100)}`); }
 }
 
 async function refreshAccessToken(refreshToken) {
