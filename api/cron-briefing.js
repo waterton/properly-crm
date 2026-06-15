@@ -49,8 +49,15 @@ module.exports = async function (req, res) {
       return true;
     });
 
-    if (!matchingEntry) {
+    const forceMode = req.query.force === '1';
+
+    if (!matchingEntry && !forceMode) {
       return res.json({ skipped: true, reason: 'No matching schedule for current time' });
+    }
+
+    // In force mode, use the first entry's timezone; otherwise use the matched entry
+    if (!matchingEntry && forceMode) {
+      // just continue — timezone already set, no lastSent check needed
     }
 
     // ── Load all data ───────────────────────────────────────────────────────
@@ -140,17 +147,19 @@ module.exports = async function (req, res) {
       }
     }
 
-    // ── Update lastSentByTime for this slot ────────────────────────────────
-    const updatedLastSent = { ...lastSentByTime };
-    updatedLastSent[matchingEntry.time] = todayStr;
-    await supa('settings', {
-      method: 'POST',
-      body: JSON.stringify({
-        key: 'briefing_schedule',
-        value: { ...sched, lastSentByTime: updatedLastSent },
-      }),
-      headers: { 'Prefer': 'resolution=merge-duplicates' },
-    });
+    // ── Update lastSentByTime for this slot (skip in force/test mode) ────────
+    if (!forceMode && matchingEntry) {
+      const updatedLastSent = { ...lastSentByTime };
+      updatedLastSent[matchingEntry.time] = todayStr;
+      await supa('settings', {
+        method: 'POST',
+        body: JSON.stringify({
+          key: 'briefing_schedule',
+          value: { ...sched, lastSentByTime: updatedLastSent },
+        }),
+        headers: { 'Prefer': 'resolution=merge-duplicates' },
+      });
+    }
 
     return res.json({ sent: true, results });
 
