@@ -19,7 +19,7 @@
     }
   ],
   "crons": [
-    { "path": "/api/run-drips", "schedule": "0 14 * * *" }
-    { "path": "/api/cron-briefing?secret=pb-cron-2025-xk9q", "schedule": "*/15 * * * *" }
+    { "path": "/api/run-drips", "schedule": "0 14 * * *" },
+    { "path": "/api/cron-briefing", "schedule": "*/15 * * * *" }
   ]
 }

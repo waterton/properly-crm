@@ -1,5 +1,5 @@
 // /api/cron-briefing.js
-// Called by cron-job.org every 15 minutes.
+// Called by Vercel Cron (every 15 min) or manually via ?secret= query param.
 // Checks if it's time to send the daily briefing, then sends to all
 // Google-connected team members via their own Gmail accounts.
 
@@ -11,7 +11,11 @@ const CRON_SECRET = process.env.CRON_SECRET;
 
 module.exports = async function (req, res) {
   // ── Security ──────────────────────────────────────────────────────────────
-  if (req.query.secret !== CRON_SECRET) {
+  // Vercel cron sends Authorization: Bearer <CRON_SECRET>
+  // Manual testing uses ?secret=<CRON_SECRET>
+  const authHeader = (req.headers['authorization'] || '').replace('Bearer ', '');
+  const querySecret = req.query.secret;
+  if (querySecret !== CRON_SECRET && authHeader !== CRON_SECRET) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
