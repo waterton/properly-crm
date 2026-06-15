@@ -206,9 +206,11 @@ async function refreshAccessToken(refreshToken) {
 }
 
 async function sendEmail(accessToken, to, subject, htmlBody) {
+  // RFC 2047 encode subject to handle non-ASCII characters (em dash, accents, etc.)
+  const encodedSubject = '=?UTF-8?B?' + Buffer.from(subject, 'utf-8').toString('base64') + '?=';
   const message = [
     `To: ${to}`,
-    `Subject: ${subject}`,
+    `Subject: ${encodedSubject}`,
     'MIME-Version: 1.0',
     'Content-Type: text/html; charset=utf-8',
     '',
