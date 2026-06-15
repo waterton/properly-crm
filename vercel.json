@@ -19,7 +19,6 @@
     }
   ],
   "crons": [
-    { "path": "/api/run-drips", "schedule": "0 14 * * *" },
-    { "path": "/api/cron-briefing", "schedule": "*/15 * * * *" }
+    { "path": "/api/run-drips", "schedule": "0 14 * * *" }
   ]
 }
