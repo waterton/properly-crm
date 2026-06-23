@@ -5,6 +5,7 @@
 
 const SUPA_URL = process.env.SUPA_URL;
 const SUPA_KEY = process.env.SUPA_KEY;
+const SUPA_SERVICE_KEY = process.env.SUPA_SERVICE_KEY;
 const CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
 const CRON_SECRET = process.env.CRON_SECRET;
@@ -176,8 +177,8 @@ async function supa(path, opts = {}) {
   const r = await fetch(url, {
     method: opts.method || 'GET',
     headers: {
-      apikey: SUPA_KEY,
-      Authorization: `Bearer ${SUPA_KEY}`,
+      apikey: SUPA_SERVICE_KEY,
+      Authorization: `Bearer ${SUPA_SERVICE_KEY}`,
       'Content-Type': 'application/json',
       ...(opts.headers || {}),
     },
