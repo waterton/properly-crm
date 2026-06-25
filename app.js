@@ -213,9 +213,7 @@ async function loadFromDB(){
       fetch(base + 'enrollments?order=created_at.asc', {headers:headers}).then(function(r){return r.json();}).catch(function(){return [];}),
       fetch(base + 'send_log?order=created_at.asc', {headers:headers}).then(function(r){return r.json();}).catch(function(){return []; }),
       fetch(base + 'documents?order=created_at.asc', {headers:headers}).then(function(r){return r.json();}).catch(function(){return []; })
-    ]); })
     ]);
-
     var rc = results[0], rn = results[1], rf = results[2], rd = results[3], rtx = results[4];
 
     // Check for errors (Supabase returns {code, message} on error)
