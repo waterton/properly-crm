@@ -6318,7 +6318,6 @@ ge('btnGmailCompose').addEventListener('click', function(){ openCompose(); });
 ge('btnGmailRefresh').addEventListener('click', loadGmailInbox);
 
 ge('btnSendEmail').addEventListener('click', sendComposedEmail);
-ge('btnSaveDraft').addEventListener('click', function(){ alert('Draft saving coming soon!'); });
 document.querySelectorAll('.gmail-template-btn').forEach(function(btn){
   btn.addEventListener('click', function(){ applyTemplate(this.getAttribute('data-tpl')); });
 });
