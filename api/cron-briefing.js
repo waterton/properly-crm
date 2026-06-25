@@ -20,54 +20,6 @@ module.exports = async function (req, res) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
-  // ---- TEMP DEBUG: remove after diagnosing ----
-  if (req.query.debug === '1') {
-    const out = {
-      client_id_start: (CLIENT_ID || 'MISSING').slice(0, 20),
-      client_secret_present: !!CLIENT_SECRET
-    };
-    try {
-      const rows = await supa('gmail_tokens?select=*');
-      out.token_row_count = rows.length;
-      out.rows = rows.map(function (r) {
-        return {
-          id: r.id,
-          member_id: r.member_id,
-          email: r.email,
-          refresh_start: (r.refresh_token || '').slice(0, 4),
-          refresh_len: (r.refresh_token || '').length,
-          expires_at: r.expires_at
-        };
-      });
-      out.refresh_attempts = [];
-      for (const r of rows) {
-        try {
-          const rr = await fetch('https://oauth2.googleapis.com/token', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: new URLSearchParams({
-              client_id: CLIENT_ID,
-              client_secret: CLIENT_SECRET,
-              refresh_token: r.refresh_token,
-              grant_type: 'refresh_token'
-            })
-          });
-          const jj = await rr.json();
-          out.refresh_attempts.push({
-            member_id: r.member_id,
-            http_status: rr.status,
-            got_access_token: !!jj.access_token,
-            error: jj.error || null,
-            error_description: jj.error_description || null
-          });
-        } catch (e) {
-          out.refresh_attempts.push({ member_id: r.member_id, fetch_error: e.message });
-        }
-      }
-    } catch (e) { out.error = e.message; }
-    return res.json(out);
-  }
-
    try {
     // ── Load schedule from Supabase ─────────────────────────────────────────
     const schedRow = await supa('settings?key=eq.briefing_schedule&select=value');
