@@ -87,7 +87,6 @@ var DB_COLS = {
   gmail_tokens: null,
   documents: ['id','contact_id','transaction_id','file_path','file_name','doc_type','summary','mime_type','size','created_at']
 };
-};
 function stripForDB(table, row){
   var cols = DB_COLS[table];
   if(!cols) return row;
