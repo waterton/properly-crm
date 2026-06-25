@@ -5036,13 +5036,11 @@ function renderThread(messages, threadId){
   var gActions = document.createElement('div');
   gActions.style.cssText = 'display:flex;gap:8px;padding:10px 20px;border-bottom:1px solid var(--border);flex-wrap:wrap;';
   var gArchiveBtn = document.createElement('button');
-  gArchiveBtn.className = 'btn btn-g';
-  gArchiveBtn.style.cssText = 'font-size:18px;padding:5px 12px;';
+  gArchiveBtn.style.cssText = 'font-size:18px;padding:6px 14px;border:none;border-radius:7px;cursor:pointer;font-family:DM Sans,sans-serif;font-weight:600;background:var(--accent);color:#1a1612;';
   gArchiveBtn.textContent = 'Archive';
   (function(tid){ gArchiveBtn.addEventListener('click', function(){ gmailThreadAction('archive', tid); }); })(threadId);
   var gDelBtn = document.createElement('button');
-  gDelBtn.className = 'btn btn-g';
-  gDelBtn.style.cssText = 'font-size:18px;padding:5px 12px;';
+  gDelBtn.style.cssText = 'font-size:18px;padding:6px 14px;border:none;border-radius:7px;cursor:pointer;font-family:DM Sans,sans-serif;font-weight:600;background:var(--danger);color:#fff;';
   gDelBtn.textContent = 'Delete';
   (function(tid){ gDelBtn.addEventListener('click', function(){ if(confirm('Move this email to Trash?')) gmailThreadAction('trash', tid); }); })(threadId);
   gActions.appendChild(gArchiveBtn);
