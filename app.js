@@ -309,6 +309,7 @@ function ck(){var s=document.createElementNS('http://www.w3.org/2000/svg','svg')
 var pn={briefing:'Daily Briefing',dashboard:'Dashboard',pipeline:'Pipeline',contacts:'Contacts',followups:'Follow-ups',notes:'Notes',deadlines:'Deadlines',tc:'Transactions',scanner:'Doc Scanner',cardscanner:'Card Scanner',calendar:'Calendar',team:'Team',gmail:'Gmail',mls:'MLS Search',drips:'Drip Campaigns'};
 function sp(id){
   curPage=id;
+  var addBtn=ge('btnAdd'); if(addBtn) addBtn.style.display=(id==='contacts')?'':'none';
   document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');});
   document.querySelectorAll('.ni').forEach(function(n){n.classList.remove('active');});
   var pg=ge('page-'+id);if(pg)pg.classList.add('active');
@@ -6213,7 +6214,6 @@ ge('nav-notes').addEventListener('click',function(){sp('notes');});
 ge('nav-deadlines').addEventListener('click',function(){sp('deadlines');});
 ge('hamburger').addEventListener('click',tsb);
 ge('sbOv').addEventListener('click',csb);
-ge('fab').addEventListener('click',function(){om('addModal');});
 ge('btnAdd').addEventListener('click',function(){om('addModal');});
 ge('btnPipelineAdd').addEventListener('click',function(){om('addModal');});
 ge('btnContactAdd').addEventListener('click',function(){om('addModal');});
