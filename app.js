@@ -2974,6 +2974,7 @@ function startScan(file){
   if(!file) return;
   var maxSize = 20 * 1024 * 1024; // 20MB
   if(file.size > maxSize){ alert('File too large. Please use a file under 20MB.'); return; }
+  lastScanFile = file;
 
   ge('scannerUploadArea').style.display = 'none';
   ge('scannerResults').style.display = 'none';
@@ -3592,6 +3593,50 @@ function showScannerRawResult(text){
   sum.style.marginTop = '12px';
   sum.textContent = text;
   card.appendChild(sum);
+
+  // Store original document (works even when extraction did not parse)
+  var saveDocDiv2 = document.createElement('div');
+  saveDocDiv2.style.cssText = 'margin-top:14px;padding-top:12px;border-top:1px solid var(--border);';
+  var saveDocLabel2 = document.createElement('div');
+  saveDocLabel2.style.cssText = 'font-size:18px;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px;';
+  saveDocLabel2.textContent = 'Store Original Document';
+  saveDocDiv2.appendChild(saveDocLabel2);
+
+  var docContactSel2 = document.createElement('select');
+  docContactSel2.id = 'sc_doc_contact';
+  docContactSel2.className = 'fsel';
+  docContactSel2.style.marginBottom = '8px';
+  var dcBlank2 = document.createElement('option');
+  dcBlank2.value = ''; dcBlank2.textContent = '-- Link to contact (optional) --';
+  docContactSel2.appendChild(dcBlank2);
+  C.forEach(function(c){
+    var o = document.createElement('option');
+    o.value = c.id; o.textContent = fn(c) + (c.email ? ' (' + c.email + ')' : '');
+    docContactSel2.appendChild(o);
+  });
+  saveDocDiv2.appendChild(docContactSel2);
+
+  var docTxSel2 = document.createElement('select');
+  docTxSel2.id = 'sc_doc_tx';
+  docTxSel2.className = 'fsel';
+  docTxSel2.style.marginBottom = '8px';
+  var dtBlank2 = document.createElement('option');
+  dtBlank2.value = ''; dtBlank2.textContent = '-- Link to transaction (optional) --';
+  docTxSel2.appendChild(dtBlank2);
+  TX.forEach(function(tx){
+    var c4 = gc(tx.contactId);
+    var o = document.createElement('option');
+    o.value = tx.id; o.textContent = (tx.address||'Unknown') + (c4 ? ' - ' + fn(c4) : '');
+    docTxSel2.appendChild(o);
+  });
+  saveDocDiv2.appendChild(docTxSel2);
+
+  var saveDocBtn2 = document.createElement('button');
+  saveDocBtn2.className = 'btn btn-p';
+  saveDocBtn2.textContent = 'Save Document';
+  saveDocBtn2.addEventListener('click', function(){ saveScanDocument({docType:'Document', summary:text}, saveDocBtn2); });
+  saveDocDiv2.appendChild(saveDocBtn2);
+  card.appendChild(saveDocDiv2);
   var copyBtn = document.createElement('button');
   copyBtn.className = 'btn btn-g';
   copyBtn.style.marginTop = '12px';
