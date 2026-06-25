@@ -3418,7 +3418,8 @@ async function saveScanDocument(r, btn){
   var contact_id = cidRaw ? parseInt(cidRaw) : null;
   var transaction_id = tidRaw ? parseInt(tidRaw) : null;
   if(!contact_id && !transaction_id){
-    if(!confirm('No contact or transaction selected. Save this document unfiled?')) return;
+    alert('Please link this document to a contact or transaction before saving.');
+    return;
   }
   if(transaction_id && !contact_id){
     var tx = TX.find(function(t){ return String(t.id) === String(transaction_id); });
