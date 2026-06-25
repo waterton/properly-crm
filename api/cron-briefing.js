@@ -20,6 +20,23 @@ module.exports = async function (req, res) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
+  // ---- TEMP DEBUG: remove after diagnosing ----
+  if (req.query.debug === '1') {
+    const dbg = {
+      has_service_key: !!SUPA_SERVICE_KEY,
+      service_key_len: SUPA_SERVICE_KEY ? SUPA_SERVICE_KEY.length : 0,
+      supa_url: SUPA_URL || 'MISSING'
+    };
+    try {
+      const r = await fetch(`${SUPA_URL}/rest/v1/settings?key=eq.briefing_schedule&select=value`, {
+        headers: { apikey: SUPA_SERVICE_KEY, Authorization: `Bearer ${SUPA_SERVICE_KEY}`, 'Content-Type': 'application/json' }
+      });
+      dbg.settings_status = r.status;
+      dbg.settings_body = (await r.text()).slice(0, 300);
+    } catch (e) { dbg.fetch_error = e.message; }
+    return res.json(dbg);
+  }
+
   try {
     // ── Load schedule from Supabase ─────────────────────────────────────────
     const schedRow = await supa('settings?key=eq.briefing_schedule&select=value');
