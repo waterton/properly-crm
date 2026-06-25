@@ -2938,6 +2938,7 @@ async function analyzeQRText(text){
 var scannerDocType = 'auto';
 var scannerHistory = [];
 var lastScanResult = null;
+var lastScanFile = null;
 
 function initScanner(){
   renderScannerHistory();
@@ -3059,6 +3060,7 @@ function startScan(file){
         console.log('Clean JSON (first 200):', clean.substring(0,200));
         var result = JSON.parse(clean);
         lastScanResult = result;
+        lastScanFile = file;
         result.scannedAt = new Date().toISOString();
         result.fileName = file.name;
         scannerHistory.push(result);
@@ -3306,8 +3308,52 @@ function showScannerResults(r){
     opt.textContent = (tx.address||'Unknown') + (c2?' - '+fn(c2):'');
     txSel.appendChild(opt);
   });
-  linkDiv.appendChild(linkLabel); linkDiv.appendChild(txSel);
+  importBtn.addEventListener('click', function(){ importScanToTC(r); });
+
+  var saveDocBtn = document.createElement('button');
+  saveDocBtn.className = 'btn btn-p';
+  saveDocBtn.style.fontSize = '14px';
+  saveDocBtn.textContent = 'Save Document';
+  saveDocBtn.addEventListener('click', function(){ saveScanDocument(r, saveDocBtn); });
   card.appendChild(linkDiv);
+
+  // Store original document section
+  var saveDocDiv = document.createElement('div');
+  saveDocDiv.style.cssText = 'margin-top:14px;padding-top:12px;border-top:1px solid var(--border);';
+  var saveDocLabel = document.createElement('div');
+  saveDocLabel.style.cssText = 'font-size:18px;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px;';
+  saveDocLabel.textContent = 'Store Original Document';
+  saveDocDiv.appendChild(saveDocLabel);
+
+  var docContactSel = document.createElement('select');
+  docContactSel.id = 'sc_doc_contact';
+  docContactSel.className = 'fsel';
+  docContactSel.style.marginBottom = '8px';
+  var dcBlank = document.createElement('option');
+  dcBlank.value = ''; dcBlank.textContent = '-- Link to contact (optional) --';
+  docContactSel.appendChild(dcBlank);
+  C.forEach(function(c){
+    var o = document.createElement('option');
+    o.value = c.id; o.textContent = fn(c) + (c.email ? ' (' + c.email + ')' : '');
+    docContactSel.appendChild(o);
+  });
+  saveDocDiv.appendChild(docContactSel);
+
+  var docTxSel = document.createElement('select');
+  docTxSel.id = 'sc_doc_tx';
+  docTxSel.className = 'fsel';
+  docTxSel.style.marginBottom = '0';
+  var dtBlank = document.createElement('option');
+  dtBlank.value = ''; dtBlank.textContent = '-- Link to transaction (optional) --';
+  docTxSel.appendChild(dtBlank);
+  TX.forEach(function(tx){
+    var c3 = gc(tx.contactId);
+    var o = document.createElement('option');
+    o.value = tx.id; o.textContent = (tx.address||'Unknown') + (c3 ? ' - ' + fn(c3) : '');
+    docTxSel.appendChild(o);
+  });
+  saveDocDiv.appendChild(docTxSel);
+  card.appendChild(saveDocDiv);
 
   // Action buttons
   var actions = document.createElement('div');
@@ -3357,10 +3403,40 @@ function showScannerResults(r){
     setTimeout(function(){ copyBtn.textContent = 'Copy Summary'; }, 2000);
   });
 
-  actions.appendChild(importBtn); actions.appendChild(newScanBtn); actions.appendChild(copyBtn);
+  actions.appendChild(saveDocBtn); actions.appendChild(importBtn); actions.appendChild(newScanBtn); actions.appendChild(copyBtn);
   card.appendChild(actions);
   res.appendChild(card);
   renderScannerHistory();
+}
+
+async function saveScanDocument(r, btn){
+  if(!lastScanFile){ alert('The original file is no longer in memory. Please re-scan the document, then Save.'); return; }
+  var cidRaw = ge('sc_doc_contact') ? ge('sc_doc_contact').value : '';
+  var tidRaw = ge('sc_doc_tx') ? ge('sc_doc_tx').value : '';
+  var contact_id = cidRaw ? parseInt(cidRaw) : null;
+  var transaction_id = tidRaw ? parseInt(tidRaw) : null;
+  if(!contact_id && !transaction_id){
+    if(!confirm('No contact or transaction selected. Save this document unfiled?')) return;
+  }
+  if(transaction_id && !contact_id){
+    var tx = TX.find(function(t){ return String(t.id) === String(transaction_id); });
+    if(tx && tx.contactId) contact_id = tx.contactId;
+  }
+  var origText = btn ? btn.textContent : '';
+  if(btn){ btn.textContent = 'Saving...'; btn.disabled = true; }
+  try{
+    await saveDocument(lastScanFile, {
+      contact_id: contact_id,
+      transaction_id: transaction_id,
+      doc_type: r.docType || 'Document',
+      summary: r.summary || ''
+    });
+    if(btn){ btn.textContent = 'Saved!'; }
+    alert('Document saved to CRM.');
+  }catch(e){
+    if(btn){ btn.textContent = origText; btn.disabled = false; }
+    alert('Save failed: ' + e.message);
+  }
 }
 
 function importScanToTC(r){
