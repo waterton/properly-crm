@@ -3598,7 +3598,7 @@ async function fetchGCalEvents(){
     if(!supaReady) return;
     try{
       var resp = await fetch(SUPA_URL + '/rest/v1/gmail_tokens?select=member_id,email', {
-        headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}
+        headers: await getAuthHeaders()
       });
       var tokens = await resp.json();
       if(Array.isArray(tokens)) tokens.forEach(function(t){
@@ -4666,7 +4666,7 @@ async function checkConnectedAccounts(){
   if(!supaU) return;
   try{
     var resp = await fetch(supaU + '/rest/v1/gmail_tokens?select=member_id,email,name', {
-      headers:{'apikey':supaK,'Authorization':'Bearer '+supaK}
+      headers: await getAuthHeaders()
     });
     var tokens = await resp.json();
     if(Array.isArray(tokens)){
