@@ -5960,8 +5960,9 @@ function bsRender(){
 async function loadBriefingSchedule(){
   if(!supaReady) return;
   try{
+    var headers = await getAuthHeaders();
     var r = await fetch(SUPA_URL+'/rest/v1/settings?key=eq.briefing_schedule&select=value',{
-      headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}
+      headers: headers
     });
     var text = await r.text();
     if(!text) return;
@@ -6001,9 +6002,10 @@ async function saveBriefingSchedule(){
     value: { timezone: ge('bsTZ').value, entries: bsEntries, lastSentByTime: {} }
   };
   try{
+    var headers = await getAuthHeaders({'Prefer':'resolution=merge-duplicates'});
     var r = await fetch(SUPA_URL+'/rest/v1/settings',{
       method: 'POST',
-      headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates'},
+      headers: headers,
       body: JSON.stringify(payload)
     });
     if(r.ok){
