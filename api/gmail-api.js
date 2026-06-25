@@ -182,7 +182,7 @@ export default async function handler(req, res) {
         };
         if (m.payload) getAttachments(m.payload);
 
-        return { id: m.id, from: hdrs['From']||hdrs['from']||'', to: hdrs['To']||hdrs['to']||'', subject: hdrs['Subject']||hdrs['subject']||'(No subject)', date: hdrs['Date']||hdrs['date']||'', bodyText, bodyHtml, attachments, unread: m.labelIds && m.labelIds.includes('UNREAD') };
+        return { id: m.id, from: hdrs['From']||hdrs['from']||'', to: hdrs['To']||hdrs['to']||'', subject: hdrs['Subject']||hdrs['subject']||'(No subject)', date: hdrs['Date']||hdrs['date']||'', bodyText, bodyHtml, attachments, unread: m.labelIds && m.labelIds.includes('UNREAD'), labelIds: m.labelIds || [] };
       });
 
       // Mark thread as read
@@ -294,6 +294,29 @@ export default async function handler(req, res) {
       });
       const arData = await arResp.json();
       if (arData.error) return res.status(400).json({ error: arData.error.message });
+      return res.status(200).json({ success: true });
+    }
+
+    if (action === 'labels') {
+      const lResp = await fetch(`${gmailBase}/labels`, { headers });
+      const lData = await lResp.json();
+      if (lData.error) return res.status(400).json({ error: lData.error.message });
+      const labels = (lData.labels || [])
+        .filter(l => l.type === 'user')
+        .map(l => ({ id: l.id, name: l.name }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+      return res.status(200).json({ labels });
+    }
+
+    if (action === 'modifyLabels') {
+      const addIds = req.body.addLabelIds || [];
+      const removeIds = req.body.removeLabelIds || [];
+      const mlResp = await fetch(`${gmailBase}/threads/${threadId}/modify`, {
+        method: 'POST', headers,
+        body: JSON.stringify({ addLabelIds: addIds, removeLabelIds: removeIds })
+      });
+      const mlData = await mlResp.json();
+      if (mlData.error) return res.status(400).json({ error: mlData.error.message });
       return res.status(200).json({ success: true });
     }
 

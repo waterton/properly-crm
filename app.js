@@ -4967,6 +4967,85 @@ async function gmailThreadAction(action, threadId){
   }catch(e){ alert('Error: ' + e.message); }
 }
 
+async function gmailLoadLabels(){
+  if(gmailState.labelCache) return gmailState.labelCache;
+  try{
+    var resp = await fetch('/api/gmail-api', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({action:'labels', memberId:gmailState.activeMemberId})
+    });
+    var data = await resp.json();
+    gmailState.labelCache = (data && data.labels) ? data.labels : [];
+  }catch(e){ gmailState.labelCache = []; }
+  return gmailState.labelCache;
+}
+
+async function gmailToggleLabel(threadId, labelId, add){
+  try{
+    var resp = await fetch('/api/gmail-api', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        action:'modifyLabels', memberId:gmailState.activeMemberId, threadId:threadId,
+        addLabelIds: add ? [labelId] : [],
+        removeLabelIds: add ? [] : [labelId]
+      })
+    });
+    var data = await resp.json();
+    if(data && data.error){ alert('Label update failed: ' + data.error); return false; }
+    if(add){ if(gmailState.activeThreadLabels.indexOf(labelId) === -1) gmailState.activeThreadLabels.push(labelId); }
+    else { gmailState.activeThreadLabels = gmailState.activeThreadLabels.filter(function(l){ return l !== labelId; }); }
+    return true;
+  }catch(e){ alert('Error: ' + e.message); return false; }
+}
+
+async function openLabelPicker(threadId, anchorBtn){
+  var existing = ge('gmailLabelPicker');
+  if(existing){ existing.remove(); return; }
+  var labels = await gmailLoadLabels();
+  var pop = document.createElement('div');
+  pop.id = 'gmailLabelPicker';
+  pop.style.cssText = 'position:absolute;z-index:50;background:var(--surface);border:1px solid var(--border);border-radius:8px;box-shadow:0 6px 24px rgba(0,0,0,0.3);padding:8px;max-height:260px;overflow-y:auto;min-width:200px;';
+  if(!labels.length){
+    var none = document.createElement('div');
+    none.style.cssText = 'padding:8px 10px;color:var(--text3);font-size:16px;';
+    none.textContent = 'No labels yet. Create them in Gmail first.';
+    pop.appendChild(none);
+  } else {
+    labels.forEach(function(lab){
+      var row = document.createElement('label');
+      row.style.cssText = 'display:flex;align-items:center;gap:8px;padding:6px 10px;cursor:pointer;font-size:16px;color:var(--text);border-radius:6px;';
+      var cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = gmailState.activeThreadLabels.indexOf(lab.id) !== -1;
+      (function(labelId, checkbox){
+        checkbox.addEventListener('change', function(){
+          checkbox.disabled = true;
+          gmailToggleLabel(threadId, labelId, checkbox.checked).then(function(ok){
+            checkbox.disabled = false;
+            if(!ok) checkbox.checked = !checkbox.checked;
+          });
+        });
+      })(lab.id, cb);
+      var nm = document.createElement('span');
+      nm.textContent = lab.name;
+      row.appendChild(cb); row.appendChild(nm);
+      pop.appendChild(row);
+    });
+  }
+  document.body.appendChild(pop);
+  var r = anchorBtn.getBoundingClientRect();
+  pop.style.top = (r.bottom + window.scrollY + 4) + 'px';
+  pop.style.left = (r.left + window.scrollX) + 'px';
+  setTimeout(function(){
+    document.addEventListener('click', function closePicker(e){
+      if(!pop.contains(e.target) && e.target !== anchorBtn){
+        pop.remove();
+        document.removeEventListener('click', closePicker);
+      }
+    });
+  }, 0);
+}
+
 function renderThread(messages, threadId){
   var thread = ge('gmailThread');
   thread.innerHTML = '';
@@ -4989,6 +5068,8 @@ function renderThread(messages, threadId){
   if(!messages.length){ thread.innerHTML='<div class="gmail-empty">Empty thread.</div>'; return; }
 
   var firstMsg = messages[0];
+  gmailState.activeThreadLabels = [];
+  (messages || []).forEach(function(m){ (m.labelIds || []).forEach(function(lid){ if(gmailState.activeThreadLabels.indexOf(lid) === -1) gmailState.activeThreadLabels.push(lid); }); });
   var hdr = document.createElement('div');
   hdr.className = 'gmail-thread-hdr';
   var subj = document.createElement('div');
@@ -5043,6 +5124,11 @@ function renderThread(messages, threadId){
   gDelBtn.style.cssText = 'font-size:18px;padding:6px 14px;border:none;border-radius:7px;cursor:pointer;font-family:DM Sans,sans-serif;font-weight:600;background:var(--danger);color:#fff;';
   gDelBtn.textContent = 'Delete';
   (function(tid){ gDelBtn.addEventListener('click', function(){ if(confirm('Move this email to Trash?')) gmailThreadAction('trash', tid); }); })(threadId);
+  var gLabelBtn = document.createElement('button');
+  gLabelBtn.style.cssText = 'font-size:18px;padding:6px 14px;border-radius:7px;cursor:pointer;font-family:DM Sans,sans-serif;font-weight:600;background:var(--surface2);color:var(--text);border:1px solid var(--border);';
+  gLabelBtn.textContent = 'Labels';
+  (function(tid){ gLabelBtn.addEventListener('click', function(e){ e.stopPropagation(); openLabelPicker(tid, gLabelBtn); }); })(threadId);
+  gActions.appendChild(gLabelBtn);
   gActions.appendChild(gArchiveBtn);
   gActions.appendChild(gDelBtn);
   thread.appendChild(gActions);
