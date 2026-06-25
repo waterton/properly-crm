@@ -4898,6 +4898,12 @@ function renderGmailList(){
     var subj = document.createElement('div');
     subj.className = 'gmail-msg-subject';
     subj.textContent = msg.subject;
+    if(msg.msgCount && msg.msgCount > 1){
+      var cnt = document.createElement('span');
+      cnt.style.cssText = 'color:var(--accent);font-weight:600;margin-left:6px;';
+      cnt.textContent = '(' + msg.msgCount + ')';
+      subj.appendChild(cnt);
+    }
     var snip = document.createElement('div');
     snip.className = 'gmail-msg-snippet';
     snip.textContent = msg.snippet;

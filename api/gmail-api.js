@@ -99,48 +99,47 @@ export default async function handler(req, res) {
 
     if (action === 'inbox') {
       const q = query || 'in:inbox';
-      const listResp = await fetch(`${gmailBase}/messages?maxResults=20&q=${encodeURIComponent(q)}`, { headers });
+      // List CONVERSATIONS (threads), not individual messages, so replies group together
+      const listResp = await fetch(`${gmailBase}/threads?maxResults=20&q=${encodeURIComponent(q)}`, { headers });
       const listRawText = await listResp.text();
       let listData;
       try { listData = JSON.parse(listRawText); } catch(e) {
         return res.status(500).json({ error: 'Gmail list parse error: ' + listRawText.substring(0, 200) });
       }
       if (listData.error) return res.status(400).json({ error: listData.error.message });
-      if (!listData.messages) return res.status(200).json({ messages: [] });
+      if (!listData.threads) return res.status(200).json({ messages: [] });
 
-      // Fetch first message to test structure, then rest in parallel
-      const firstMsgResp = await fetch(`${gmailBase}/messages/${listData.messages[0].id}?format=metadata`, { headers });
-      const firstMsgRaw = await firstMsgResp.text();
-      let firstMsg;
-      try { firstMsg = JSON.parse(firstMsgRaw); } catch(e) {
-        return res.status(500).json({ error: 'First message parse error: ' + firstMsgRaw.substring(0, 200) });
-      }
-
-      const msgs = await Promise.all(
-        listData.messages.slice(0, 15).map(async (m) => {
-          const msgResp = await fetch(`${gmailBase}/messages/${m.id}?format=metadata`, { headers });
-          const msgRaw = await msgResp.text();
-          try { return JSON.parse(msgRaw); } catch(e) { return null; }
+      // For each thread, pull its messages' metadata and build one row from the latest message
+      const mh = 'metadataHeaders=From&metadataHeaders=To&metadataHeaders=Subject&metadataHeaders=Date';
+      const threads = await Promise.all(
+        listData.threads.slice(0, 20).map(async (th) => {
+          const thResp = await fetch(`${gmailBase}/threads/${th.id}?format=metadata&${mh}`, { headers });
+          const thRaw = await thResp.text();
+          try { return JSON.parse(thRaw); } catch(e) { return null; }
         })
       );
 
-      const parsed = msgs.filter(m => m && m.id).map(m => {
+      const parsed = threads.filter(t => t && t.messages && t.messages.length).map(t => {
+        const msgs = t.messages;
+        const last = msgs[msgs.length - 1];
         const hdrs = {};
-        ((m.payload && m.payload.headers) || []).forEach(h => {
+        ((last.payload && last.payload.headers) || []).forEach(h => {
           hdrs[h.name] = h.value;
-          hdrs[h.name.toLowerCase()] = h.value; // case-insensitive fallback
+          hdrs[h.name.toLowerCase()] = h.value;
         });
-        const hasParts = m.payload && m.payload.parts;
+        const anyUnread = msgs.some(m => m.labelIds && m.labelIds.includes('UNREAD'));
+        const anyAttach = msgs.some(m => m.payload && m.payload.parts && m.payload.parts.some(p => p.filename && p.filename.length > 0));
         return {
-          id: m.id,
-          threadId: m.threadId,
+          id: last.id,
+          threadId: t.id,
           from: hdrs['From'] || hdrs['from'] || '',
           to: hdrs['To'] || hdrs['to'] || '',
           subject: hdrs['Subject'] || hdrs['subject'] || '(No subject)',
           date: hdrs['Date'] || hdrs['date'] || '',
-          snippet: m.snippet || '',
-          unread: m.labelIds && m.labelIds.includes('UNREAD'),
-          hasAttachment: hasParts && m.payload.parts.some(p => p.filename && p.filename.length > 0)
+          snippet: last.snippet || t.snippet || '',
+          unread: anyUnread,
+          hasAttachment: anyAttach,
+          msgCount: msgs.length
         };
       });
       return res.status(200).json({ messages: parsed });
