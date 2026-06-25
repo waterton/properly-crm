@@ -4945,6 +4945,28 @@ async function loadThread(threadId, messageId){
   }catch(e){ thread.innerHTML='<div class="gmail-empty" style="color:var(--danger);">Error: '+e.message+'</div>'; }
 }
 
+async function gmailThreadAction(action, threadId){
+  if(!threadId || !gmailState.activeMemberId) return;
+  var thread = ge('gmailThread');
+  try{
+    var resp = await fetch('/api/gmail-api', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({action:action, memberId:gmailState.activeMemberId, threadId:threadId})
+    });
+    var data = await resp.json();
+    if(data && data.error){ alert(action + ' failed: ' + data.error); return; }
+    // Optimistically remove from the list
+    gmailState.messages = gmailState.messages.filter(function(m){ return m.threadId !== threadId; });
+    if(ge('gmailMsgCount')) ge('gmailMsgCount').textContent = gmailState.messages.length + ' messages';
+    gmailState.activeThreadId = null;
+    renderGmailList();
+    // Close the reading pane (returns to the list on mobile)
+    var layout = ge('gmailLayout');
+    if(layout) layout.classList.remove('thread-open');
+    thread.innerHTML = '<div class="gmail-empty" id="gmailEmptyState"><svg width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg><div>Select an email to read</div></div>';
+  }catch(e){ alert('Error: ' + e.message); }
+}
+
 function renderThread(messages, threadId){
   var thread = ge('gmailThread');
   thread.innerHTML = '';
@@ -5009,6 +5031,23 @@ function renderThread(messages, threadId){
     hdr.appendChild(subj); hdr.appendChild(newCBtn);
   }
   thread.appendChild(hdr);
+
+  // Action toolbar: archive / delete
+  var gActions = document.createElement('div');
+  gActions.style.cssText = 'display:flex;gap:8px;padding:10px 20px;border-bottom:1px solid var(--border);flex-wrap:wrap;';
+  var gArchiveBtn = document.createElement('button');
+  gArchiveBtn.className = 'btn btn-g';
+  gArchiveBtn.style.cssText = 'font-size:18px;padding:5px 12px;';
+  gArchiveBtn.textContent = 'Archive';
+  (function(tid){ gArchiveBtn.addEventListener('click', function(){ gmailThreadAction('archive', tid); }); })(threadId);
+  var gDelBtn = document.createElement('button');
+  gDelBtn.className = 'btn btn-g';
+  gDelBtn.style.cssText = 'font-size:18px;padding:5px 12px;';
+  gDelBtn.textContent = 'Delete';
+  (function(tid){ gDelBtn.addEventListener('click', function(){ if(confirm('Move this email to Trash?')) gmailThreadAction('trash', tid); }); })(threadId);
+  gActions.appendChild(gArchiveBtn);
+  gActions.appendChild(gDelBtn);
+  thread.appendChild(gActions);
 
   // Messages
   var msgContainer = document.createElement('div');

@@ -286,6 +286,17 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true });
     }
 
+    if (action === 'archive') {
+      // Archive = remove the INBOX label (keeps the email, removes it from the inbox)
+      const arResp = await fetch(`${gmailBase}/threads/${threadId}/modify`, {
+        method: 'POST', headers,
+        body: JSON.stringify({ removeLabelIds: ['INBOX'] })
+      });
+      const arData = await arResp.json();
+      if (arData.error) return res.status(400).json({ error: arData.error.message });
+      return res.status(200).json({ success: true });
+    }
+
     return res.status(400).json({ error: 'Unknown action: ' + action });
 
   } catch (err) {
