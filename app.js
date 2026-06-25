@@ -52,7 +52,7 @@ async function getAuthHeaders(extra) {
 // Auth disabled for testing
 
 var C=[],N=[],F=[],D=[],TX=[],TM=[],A=[],curDet=null,curFilter='all',curPage='dashboard';
-var CAMP=[],ENR=[],SENDLOG=[];
+var CAMP=[],ENR=[],SENDLOG=[],DOCS=[];
 var curSort='last'; // 'last' or 'first'
 var selectedContacts = new Set();
 // TM = Team Members: [{id, first, last, role, email, phone, color, calLink}]
@@ -84,7 +84,9 @@ var DB_COLS = {
   campaigns: null,
   enrollments: null,
   send_log: null,
-  gmail_tokens: null
+  gmail_tokens: null,
+  documents: ['id','contact_id','transaction_id','file_path','file_name','doc_type','summary','mime_type','size','created_at']
+};
 };
 function stripForDB(table, row){
   var cols = DB_COLS[table];
@@ -93,7 +95,80 @@ function stripForDB(table, row){
   cols.forEach(function(k){ if(row[k] !== undefined) out[k] = row[k]; });
   return out;
 }
-function dbSave(table, rows){
+
+// ---- DOCUMENTS: storage + metadata helpers ----
+var DOC_BUCKET = 'documents';
+
+function docStoragePath(file, meta){
+  var base = (file && file.name) ? file.name : 'document';
+  var safeName = base.replace(/[^A-Za-z0-9._-]/g, '_');
+  var anchor = (meta && meta.contact_id) ? ('c' + meta.contact_id)
+             : (meta && meta.transaction_id) ? ('t' + meta.transaction_id)
+             : 'unfiled';
+  return anchor + '/' + Date.now() + '_' + safeName;
+}
+
+async function uploadDocFile(file, path){
+  var headers = await getAuthHeaders({'Content-Type': (file.type || 'application/octet-stream'), 'x-upsert': 'true'});
+  var resp = await fetch(SUPA_URL + '/storage/v1/object/' + DOC_BUCKET + '/' + path, {
+    method: 'POST', headers: headers, body: file
+  });
+  if(!resp.ok){ var t = await resp.text(); throw new Error('Upload failed: ' + t.substring(0, 200)); }
+  return true;
+}
+
+async function getDocUrl(path){
+  var headers = await getAuthHeaders();
+  var resp = await fetch(SUPA_URL + '/storage/v1/object/sign/' + DOC_BUCKET + '/' + path, {
+    method: 'POST', headers: headers, body: JSON.stringify({expiresIn: 3600})
+  });
+  var data = await resp.json();
+  if(data.error || !data.signedURL){ throw new Error('Could not create link'); }
+  return SUPA_URL + '/storage/v1' + data.signedURL;
+}
+
+async function deleteDocFile(path){
+  var headers = await getAuthHeaders();
+  await fetch(SUPA_URL + '/storage/v1/object/' + DOC_BUCKET + '/' + path, {
+    method: 'DELETE', headers: headers
+  });
+}
+
+async function saveDocument(file, meta){
+  meta = meta || {};
+  var path = docStoragePath(file, meta);
+  await uploadDocFile(file, path);
+  var doc = {
+    id: Date.now() + Math.floor(Math.random() * 1000),
+    contact_id: meta.contact_id || null,
+    transaction_id: meta.transaction_id || null,
+    file_path: path,
+    file_name: (file.name || 'document'),
+    doc_type: meta.doc_type || null,
+    summary: meta.summary || null,
+    mime_type: file.type || null,
+    size: file.size || null
+  };
+  DOCS.push(doc);
+  if(supaReady) dbSave('documents', [doc]);
+  return doc;
+}
+
+async function deleteDocument(doc){
+  try{ await deleteDocFile(doc.file_path); }catch(e){ /* still remove the row */ }
+  DOCS = DOCS.filter(function(d){ return d.id !== doc.id; });
+  if(supaReady) dbDelete('documents', doc.id);
+}
+
+async function openDocument(doc){
+  try{
+    var url = await getDocUrl(doc.file_path);
+    window.open(url, '_blank');
+  }catch(e){ alert('Could not open document: ' + e.message); }
+}
+
+function docsForContact(cid){ return DOCS.filter(function(d){ return d.contact_id === cid; }); }
+function docsForTransaction(tid){ return DOCS.filter(function(d){ return d.transaction_id === tid; }); }function dbSave(table, rows){
   if(!supaReady) return;
   var cleanRows = JSON.parse(JSON.stringify(rows)).map(function(r){ return stripForDB(table, r); });
   getAuthHeaders({'Prefer': 'resolution=merge-duplicates'}).then(function(headers){
@@ -137,7 +212,9 @@ async function loadFromDB(){
       fetch(base + 'transactions?order=created_at.asc', {headers:headers}).then(function(r){return r.json();}),
       fetch(base + 'campaigns?order=created_at.asc', {headers:headers}).then(function(r){return r.json();}).catch(function(){return [];}),
       fetch(base + 'enrollments?order=created_at.asc', {headers:headers}).then(function(r){return r.json();}).catch(function(){return [];}),
-      fetch(base + 'send_log?order=created_at.asc', {headers:headers}).then(function(r){return r.json();}).catch(function(){return []; })
+      fetch(base + 'send_log?order=created_at.asc', {headers:headers}).then(function(r){return r.json();}).catch(function(){return []; }),
+      fetch(base + 'documents?order=created_at.asc', {headers:headers}).then(function(r){return r.json();}).catch(function(){return []; })
+    ]); })
     ]);
 
     var rc = results[0], rn = results[1], rf = results[2], rd = results[3], rtx = results[4];
@@ -154,10 +231,16 @@ async function loadFromDB(){
     if(Array.isArray(rf)) F = rf;
     if(Array.isArray(rd)) D = rd;
     if(Array.isArray(rtx)) TX = rtx;
-    var rcamp = results[5], renr = results[6], rsl = results[7];
+    var rcamp = results[5], renr = results[6], rsl = results[7], rdoc = results[8];
     if(Array.isArray(rcamp)) CAMP = rcamp;
     if(Array.isArray(renr)) ENR = renr;
     if(Array.isArray(rsl)) SENDLOG = rsl;
+    if(Array.isArray(rdoc)) DOCS = rdoc;
+    DOCS.forEach(function(d){
+      d.id = typeof d.id === 'string' ? parseInt(d.id)||d.id : d.id;
+      if(d.contact_id != null) d.contact_id = typeof d.contact_id === 'string' ? parseInt(d.contact_id) : d.contact_id;
+      if(d.transaction_id != null) d.transaction_id = typeof d.transaction_id === 'string' ? parseInt(d.transaction_id) : d.transaction_id;
+    });
     CAMP.forEach(function(x){ if(typeof x.steps === 'string'){ try{ x.steps = JSON.parse(x.steps); }catch(e){ x.steps = []; } } if(!Array.isArray(x.steps)) x.steps = []; });
     // Convert id strings to numbers if needed
     C.forEach(function(c){ c.id = typeof c.id === 'string' ? parseInt(c.id)||c.id : c.id; });
