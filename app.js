@@ -2568,7 +2568,8 @@ async function analyzeBusinessCard(base64, mediaType){
     var data = await resp.json();
     if(!data.content || !data.content[0]){ showCardError('No response from AI.'); return; }
     var text = data.content[0].text;
-    try{
+      var renderOk = false;
+      try{
       var clean = text.replace(/```json/g,'').replace(/```/g,'').trim();
       var fb = clean.indexOf('{'); var lb = clean.lastIndexOf('}');
       if(fb !== -1 && lb > fb) clean = clean.substring(fb, lb+1);
@@ -3066,12 +3067,13 @@ function startScan(file){
         result.fileName = file.name;
         scannerHistory.push(result);
         try{ localStorage.setItem('scanner_history', JSON.stringify(scannerHistory.slice(-20))); }catch(e){}
-        showScannerResults(result);
+        renderOk = true;
       }catch(parseErr){
         console.log('Parse error:', parseErr, 'Raw:', text);
         // AI responded but not as JSON - show raw response
         showScannerRawResult(text);
       }
+      if(renderOk) showScannerResults(result);
     })
     .catch(function(err){
       clearInterval(msgTimer);
