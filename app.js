@@ -167,7 +167,47 @@ async function openDocument(doc){
 }
 
 function docsForContact(cid){ return DOCS.filter(function(d){ return d.contact_id === cid; }); }
-function docsForTransaction(tid){ return DOCS.filter(function(d){ return d.transaction_id === tid; }); }function dbSave(table, rows){
+function docsForTransaction(tid){ return DOCS.filter(function(d){ return d.transaction_id === tid; }); }
+
+function openDocUpload(meta, onDone){
+  var input = document.createElement('input');
+  input.type = 'file';
+  input.style.display = 'none';
+  document.body.appendChild(input);
+  input.addEventListener('change', function(){
+    var file = input.files && input.files[0];
+    if(input.parentNode) input.parentNode.removeChild(input);
+    if(!file) return;
+    if(file.size > 20 * 1024 * 1024){ alert('File too large. Please use a file under 20MB.'); return; }
+    saveDocument(file, meta).then(function(){
+      if(onDone) onDone();
+    }).catch(function(e){ alert('Upload failed: ' + e.message); });
+  });
+  input.click();
+}
+
+function buildDocRow(doc, onChange){
+  var row = document.createElement('div');
+  row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border);';
+  var name = document.createElement('div');
+  name.style.cssText = 'flex:1;font-size:18px;color:var(--accent);cursor:pointer;word-break:break-word;';
+  name.textContent = doc.file_name || 'Document';
+  name.title = 'Open document';
+  (function(d){ name.addEventListener('click', function(){ openDocument(d); }); })(doc);
+  var meta = document.createElement('div');
+  meta.style.cssText = 'font-size:16px;color:var(--text3);white-space:nowrap;';
+  meta.textContent = doc.doc_type || '';
+  var del = document.createElement('button');
+  del.style.cssText = 'background:none;border:none;color:var(--text3);cursor:pointer;font-size:18px;line-height:1;flex-shrink:0;padding:0 4px;';
+  del.textContent = 'x';
+  del.title = 'Delete document';
+  (function(d){ del.addEventListener('click', function(){
+    if(!confirm('Delete this document? The file will be permanently removed.')) return;
+    deleteDocument(d).then(function(){ if(onChange) onChange(); });
+  }); })(doc);
+  row.appendChild(name); row.appendChild(meta); row.appendChild(del);
+  return row;
+}function dbSave(table, rows){
   if(!supaReady) return;
   var cleanRows = JSON.parse(JSON.stringify(rows)).map(function(r){ return stripForDB(table, r); });
   getAuthHeaders({'Prefer': 'resolution=merge-duplicates'}).then(function(headers){
@@ -926,6 +966,14 @@ function vc(id){
   if(!cFU.length)fusec.appendChild(mkDiv('font-size:18px;color:var(--text3);padding:4px 0;','None yet.'));
   else cFU.forEach(function(f){var row=mkRow('det-fu');var chk=mkRow('det-fu-chk'+(f.done?' done':''));if(f.done)chk.appendChild(ck());(function(fid,cid){chk.addEventListener('click',function(){tfu(fid);vc(cid);});})(f.id,id);var lbl=mkDiv('flex:1;font-size:18px;'+(f.done?'text-decoration:line-through;color:var(--text3);':''),f.label);var dt=mkDiv('font-size:18px;color:var(--text3);',fd(f.date));row.appendChild(chk);row.appendChild(lbl);row.appendChild(dt);fusec.appendChild(row);});
   body.appendChild(fusec);
+  var docsec=mksec('Documents');
+  var docab=mkBtn('','+ Upload','background:none;border:none;color:var(--accent);cursor:pointer;font-size:18px;margin-left:8px;');
+  (function(cid){docab.addEventListener('click',function(){ openDocUpload({contact_id:cid}, function(){ vc(cid); }); });})(id);
+  docsec.querySelector('.det-sec-title').appendChild(docab);
+  var cDocs=docsForContact(id);
+  if(!cDocs.length)docsec.appendChild(mkDiv('font-size:18px;color:var(--text3);padding:4px 0;','None yet.'));
+  else cDocs.forEach(function(doc){ docsec.appendChild(buildDocRow(doc, function(){ vc(id); })); });
+  body.appendChild(docsec);
   var nsec=mksec('Notes');
   var cN=N.filter(function(n){return n.contactId===id;}).sort(function(a,b){return new Date(b.date)-new Date(a.date);});
   if(!cN.length)nsec.appendChild(mkDiv('font-size:18px;color:var(--text3);','No notes yet. Add one below.'));
@@ -2094,6 +2142,25 @@ function openTCDetail(id){
   }); })(id);
   cRow.appendChild(cLbl); cRow.appendChild(cSel);
   body.appendChild(cRow);
+
+  // Documents section
+  var tDocSec = document.createElement('div');
+  tDocSec.style.cssText = 'padding:14px 20px;border-bottom:1px solid var(--border);';
+  var tDocHdr = document.createElement('div');
+  tDocHdr.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;';
+  var tDocTitle = document.createElement('div');
+  tDocTitle.style.cssText = 'font-size:18px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);';
+  tDocTitle.textContent = 'Documents';
+  var tDocUp = document.createElement('button');
+  tDocUp.style.cssText = 'background:none;border:none;color:var(--accent);cursor:pointer;font-size:18px;';
+  tDocUp.textContent = '+ Upload';
+  (function(txId, cId){ tDocUp.addEventListener('click', function(){ openDocUpload({transaction_id:txId, contact_id:cId||null}, function(){ openTCDetail(txId); }); }); })(id, tx.contactId);
+  tDocHdr.appendChild(tDocTitle); tDocHdr.appendChild(tDocUp);
+  tDocSec.appendChild(tDocHdr);
+  var tDocs = docsForTransaction(id);
+  if(!tDocs.length) tDocSec.appendChild(mkDiv('font-size:18px;color:var(--text3);padding:4px 0;','None yet.'));
+  else tDocs.forEach(function(doc){ tDocSec.appendChild(buildDocRow(doc, function(){ openTCDetail(id); })); });
+  body.appendChild(tDocSec);
 
   // Info section
   var infoSec = document.createElement('div');
