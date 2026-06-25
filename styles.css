@@ -230,13 +230,13 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 @media (max-width: 768px) {
   /* Gmail - stack vertically on mobile */
   .gmail-layout{grid-template-columns:1fr;height:auto;}
-  .gmail-sidebar{height:auto;max-height:40vh;border-right:none;border-bottom:1px solid var(--border);}
-  .gmail-thread{min-height:50vh;}
-  .gmail-msg-list{max-height:calc(40vh - 50px);}
+  .gmail-sidebar{height:auto;max-height:none;border-right:none;border-bottom:none;}
+  .gmail-thread{display:none;}
+  .gmail-msg-list{max-height:none;}
 
   /* Hide sidebar when thread is open on mobile */
   .gmail-layout.thread-open .gmail-sidebar{display:none;}
-  .gmail-layout.thread-open .gmail-thread{min-height:80vh;}
+  .gmail-layout.thread-open .gmail-thread{display:flex;min-height:calc(100vh - 160px);}
 
   /* Calendar - make toolbar wrap */
   .cal-toolbar{flex-wrap:wrap;gap:6px;padding:8px;}
