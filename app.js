@@ -3309,13 +3309,6 @@ function showScannerResults(r){
     opt.textContent = (tx.address||'Unknown') + (c2?' - '+fn(c2):'');
     txSel.appendChild(opt);
   });
-  importBtn.addEventListener('click', function(){ importScanToTC(r); });
-
-  var saveDocBtn = document.createElement('button');
-  saveDocBtn.className = 'btn btn-p';
-  saveDocBtn.style.fontSize = '14px';
-  saveDocBtn.textContent = 'Save Document';
-  saveDocBtn.addEventListener('click', function(){ saveScanDocument(r, saveDocBtn); });
   card.appendChild(linkDiv);
 
   // Store original document section
@@ -3365,6 +3358,12 @@ function showScannerResults(r){
   importBtn.style.fontSize = '14px';
   importBtn.textContent = 'Import to CRM';
   importBtn.addEventListener('click', function(){ importScanToTC(r); });
+
+  var saveDocBtn = document.createElement('button');
+  saveDocBtn.className = 'btn btn-p';
+  saveDocBtn.style.fontSize = '14px';
+  saveDocBtn.textContent = 'Save Document';
+  saveDocBtn.addEventListener('click', function(){ saveScanDocument(r, saveDocBtn); });
 
   var newScanBtn = document.createElement('button');
   newScanBtn.className = 'btn btn-g';
