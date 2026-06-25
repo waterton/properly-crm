@@ -701,25 +701,13 @@
               </div>
               <div class="fg"><label class="fl">To</label><input class="fi" id="composeTo" placeholder="recipient@email.com"></div>
               <div class="fg"><label class="fl">Subject</label><input class="fi" id="composeSubject" placeholder="Subject..."></div>
-              <!-- Template bar -->
-              <div style="margin-bottom:8px;">
-                <div style="font-size:16px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);margin-bottom:6px;">Templates</div>
-                <div class="gmail-template-bar">
-                  <button class="gmail-template-btn" data-tpl="new_buyer">New Buyer</button>
-                  <button class="gmail-template-btn" data-tpl="new_seller">New Seller</button>
-                  <button class="gmail-template-btn" data-tpl="showing_confirm">Showing Confirm</button>
-                  <button class="gmail-template-btn" data-tpl="under_contract">Under Contract</button>
-                  <button class="gmail-template-btn" data-tpl="closing_reminder">Closing Reminder</button>
-                  <button class="gmail-template-btn" data-tpl="post_close">Post-Close</button>
-                  <button class="gmail-template-btn" data-tpl="market_update">Market Update</button>
-                </div>
-              </div>
+              
               <div class="fg"><label class="fl">Message</label>
                 <textarea class="fi" id="composeBody" rows="10" style="resize:vertical;" placeholder="Write your message here..."></textarea>
               </div>
-              <div style="font-size:16px;color:var(--text3);">Use {{firstName}}, {{lastName}}, {{propertyAddress}}, {{closingDate}}, {{agentName}} as merge fields.</div>
+               {{agentName}} as merge fields.</div>
               <!-- Link to contact for merge fields -->
-              <div class="fg" style="margin-top:8px;"><label class="fl">Link to Contact (for merge fields)</label>
+              <div class="fg" style="margin-top:8px;"><label class="fl">Link to Contact (logs this email to their record)</label>
                 <select class="fsel" id="composeLinkContact">
                   <option value="">None</option>
                 </select>
