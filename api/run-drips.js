@@ -249,8 +249,7 @@ export default async function handler(req, res) {
 
   const nowIso = new Date().toISOString();
   const result = {
-    drips: { checked: 0, sent: 0, failed: 0, completed: 0, skipped: 0, errors: [] },
-    briefing: { sent: [], errors: [] }
+    drips: { checked: 0, sent: 0, failed: 0, completed: 0, skipped: 0, errors: [] }
   };
 
   // 1. Process drip enrollments
@@ -357,38 +356,7 @@ export default async function handler(req, res) {
     result.drips.errors.push('Drip error: ' + err.message);
   }
 
-  // 2. Send morning briefing
-  try {
-    const briefingHtml = await buildBriefing();
-    const dateStr = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/Denver' });
-    const subject = 'Good Morning — Your Day at Palacios Baker (' + dateStr + ')';
 
-    let recipients = [];
-    if (process.env.BRIEFING_EMAILS) {
-      recipients = process.env.BRIEFING_EMAILS.split(',').map(e => e.trim()).filter(Boolean);
-    } else {
-      const tokens = await supaGet('gmail_tokens?limit=20');
-      if (Array.isArray(tokens)) tokens.forEach(t => { if (t.email) recipients.push(t.email); });
-    }
-
-    const allTokens = await supaGet('gmail_tokens?limit=1');
-    if (!Array.isArray(allTokens) || !allTokens[0]) {
-      result.briefing.errors.push('No Gmail account to send from');
-    } else {
-      const tok = await getAccessToken(allTokens[0].member_id);
-      if (tok.error) {
-        result.briefing.errors.push('Token error: ' + tok.error);
-      } else {
-        for (const recipient of recipients) {
-          const sent = await gmailSend(tok.accessToken, recipient, subject, briefingHtml);
-          if (sent.error) result.briefing.errors.push(recipient + ': ' + sent.error);
-          else result.briefing.sent.push(recipient);
-        }
-      }
-    }
-  } catch (err) {
-    result.briefing.errors.push('Briefing error: ' + err.message);
-  }
 
   return res.status(200).json({ ok: true, result });
 }
