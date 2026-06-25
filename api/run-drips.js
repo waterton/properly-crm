@@ -14,6 +14,7 @@ export const config = { api: { bodyParser: false } };
 
 const SUPA_URL = process.env.SUPA_URL || 'https://fgkilooomlozhwfnvjze.supabase.co';
 const SUPA_KEY = process.env.SUPA_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZna2lsb29vbWxvemh3Zm52anplIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA3NTc0NTIsImV4cCI6MjA5NjMzMzQ1Mn0.owQk8Vy3Vcs8n8c0sI0fXQYmjpAy14hev8lDt4g5iZE';
+const SUPA_SERVICE_KEY = process.env.SUPA_SERVICE_KEY || SUPA_KEY;
 const CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
 const AGENT_NAME = process.env.DRIP_AGENT_NAME || 'Randy Baker';
@@ -21,8 +22,8 @@ const DAY_MS = 86400000;
 
 function supaHeaders(extra) {
   return Object.assign({
-    'apikey': SUPA_KEY,
-    'Authorization': 'Bearer ' + SUPA_KEY,
+    'apikey': SUPA_SERVICE_KEY,
+    'Authorization': 'Bearer ' + SUPA_SERVICE_KEY,
     'Content-Type': 'application/json',
     'Accept': 'application/json'
   }, extra || {});
