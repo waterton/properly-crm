@@ -357,6 +357,24 @@ function deleteFUfromDB(id){
     fetch(SUPA_URL+'/rest/v1/followups?id=eq.'+id,{method:'DELETE',headers:h});
   });
 }
+function deleteNotefromDB(id){
+  if(!supaReady) return;
+  getAuthHeaders().then(function(h){
+    fetch(SUPA_URL+'/rest/v1/notes?id=eq.'+id,{method:'DELETE',headers:h});
+  });
+}
+function deleteDLfromDB(id){
+  if(!supaReady) return;
+  getAuthHeaders().then(function(h){
+    fetch(SUPA_URL+'/rest/v1/deadlines?id=eq.'+id,{method:'DELETE',headers:h});
+  });
+}
+function deleteTXfromDB(id){
+  if(!supaReady) return;
+  getAuthHeaders().then(function(h){
+    fetch(SUPA_URL+'/rest/v1/transactions?id=eq.'+id,{method:'DELETE',headers:h});
+  });
+}
 function updateContact(c){ sv(); if(supaReady) dbSave('contacts', [c]); }
 
 // Real-time subscription for live sync
@@ -1027,7 +1045,7 @@ function vc(id){
       if(!confirm('Delete this note?')) return;
       N=N.filter(function(x){return x.id!==nid;});
       sv();
-      if(supaReady) fetch(SUPA_URL+'/rest/v1/notes?id=eq.'+nid,{method:'DELETE',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}});
+      pausePoll(8000); deleteNotefromDB(nid);
       vc(cid);
     });})(n.id, id);
     d.appendChild(delbtn);
@@ -1158,7 +1176,7 @@ function rn(){
       if(!confirm('Delete this note?')) return;
       N=N.filter(function(x){return x.id!==nid;});
       sv();
-      if(supaReady) fetch(SUPA_URL+'/rest/v1/notes?id=eq.'+nid,{method:'DELETE',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}});
+      pausePoll(8000); deleteNotefromDB(nid);
       rn(); rd();
     }); })(note.id);
     acts.appendChild(editBtn); acts.appendChild(delBtn);
@@ -1363,7 +1381,7 @@ function rdl(){
       var delBtn2=document.createElement('button');
       delBtn2.style.cssText='background:rgba(201,76,76,0.1);border:1px solid rgba(201,76,76,0.2);border-radius:5px;padding:4px 8px;cursor:pointer;font-size:18px;color:var(--danger);font-family:DM Sans,sans-serif;';
       delBtn2.textContent='Del';
-      (function(did){ delBtn2.addEventListener('click',function(e){ e.stopPropagation(); if(confirm('Delete this deadline?')){ D=D.filter(function(x){return x.id!==did;}); sv(); if(supaReady) fetch(SUPA_URL+'/rest/v1/deadlines?id=eq.'+did,{method:'DELETE',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}}); rdl(); rd(); }}); })(d.id);
+      (function(did){ delBtn2.addEventListener('click',function(e){ e.stopPropagation(); if(confirm('Delete this deadline?')){ D=D.filter(function(x){return x.id!==did;}); sv(); pausePoll(8000); deleteDLfromDB(did); rdl(); rd(); }}); })(d.id);
 
       right2.appendChild(editBtn2); right2.appendChild(delBtn2);
       row2.appendChild(right2);
@@ -1992,7 +2010,7 @@ function deleteTX(id){
   if(!confirm('Delete this transaction and all its data?')) return;
   TX=TX.filter(function(t){return t.id!==id;});
   sv();
-  if(supaReady) fetch(SUPA_URL+'/rest/v1/transactions?id=eq.'+id,{method:'DELETE',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}});
+  pausePoll(8000); deleteTXfromDB(id);
   ge('tcDetOv').classList.remove('open');
   curTx=null;
   renderTC(); rd();
