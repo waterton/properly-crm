@@ -135,6 +135,16 @@ async function deleteDocFile(path){
 
 async function saveDocument(file, meta){
   meta = meta || {};
+  var fname = file.name || 'document';
+  var fsize = file.size || 0;
+  var dupe = DOCS.find(function(d){
+    if(d.file_name !== fname) return false;
+    if((d.size||0) !== fsize) return false;
+    var sameContact = meta.contact_id && d.contact_id === meta.contact_id;
+    var sameTx = meta.transaction_id && d.transaction_id === meta.transaction_id;
+    return sameContact || sameTx;
+  });
+  if(dupe){ throw new Error('That document is already attached to this record (' + fname + ').'); }
   var path = docStoragePath(file, meta);
   await uploadDocFile(file, path);
   var doc = {
@@ -142,11 +152,11 @@ async function saveDocument(file, meta){
     contact_id: meta.contact_id || null,
     transaction_id: meta.transaction_id || null,
     file_path: path,
-    file_name: (file.name || 'document'),
+    file_name: fname,
     doc_type: meta.doc_type || null,
     summary: meta.summary || null,
     mime_type: file.type || null,
-    size: file.size || null
+    size: fsize
   };
   DOCS.push(doc);
   if(supaReady) dbSave('documents', [doc]);
@@ -160,12 +170,15 @@ async function deleteDocument(doc){
 }
 
 async function openDocument(doc){
+  var w = window.open('', '_blank');
   try{
     var url = await getDocUrl(doc.file_path);
-    window.open(url, '_blank');
-  }catch(e){ alert('Could not open document: ' + e.message); }
+    if(w){ w.location = url; } else { window.location = url; }
+  }catch(e){
+    if(w){ try{ w.close(); }catch(_){} }
+    alert('Could not open document: ' + e.message);
+  }
 }
-
 function docsForContact(cid){ return DOCS.filter(function(d){ return d.contact_id === cid; }); }
 function docsForTransaction(tid){ return DOCS.filter(function(d){ return d.transaction_id === tid; }); }
 
@@ -188,21 +201,22 @@ function openDocUpload(meta, onDone){
 
 function buildDocRow(doc, onChange){
   var row = document.createElement('div');
-  row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border);';
+  row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);';
   var name = document.createElement('div');
-  name.style.cssText = 'flex:1;font-size:18px;color:var(--accent);cursor:pointer;word-break:break-word;';
+  name.style.cssText = 'flex:1;font-size:18px;color:var(--accent);cursor:pointer;text-decoration:underline;word-break:break-word;';
   name.textContent = doc.file_name || 'Document';
   name.title = 'Open document';
   (function(d){ name.addEventListener('click', function(){ openDocument(d); }); })(doc);
   var meta = document.createElement('div');
-  meta.style.cssText = 'font-size:16px;color:var(--text3);white-space:nowrap;';
-  meta.textContent = doc.doc_type || '';
+  meta.style.cssText = 'font-size:15px;color:var(--text3);white-space:nowrap;';
+  var sizeKb = doc.size ? Math.round(doc.size/1024) + ' KB' : '';
+  meta.textContent = [doc.doc_type, sizeKb].filter(Boolean).join(' - ');
   var del = document.createElement('button');
-  del.style.cssText = 'background:none;border:none;color:var(--text3);cursor:pointer;font-size:18px;line-height:1;flex-shrink:0;padding:0 4px;';
-  del.textContent = 'x';
-  del.title = 'Delete document';
+  del.className = 'btn btn-d';
+  del.style.cssText = 'font-size:14px;padding:4px 10px;flex-shrink:0;';
+  del.textContent = 'Delete';
   (function(d){ del.addEventListener('click', function(){
-    if(!confirm('Delete this document? The file will be permanently removed.')) return;
+    if(!confirm('Delete "' + (d.file_name||'this document') + '"? The file will be permanently removed.')) return;
     deleteDocument(d).then(function(){ if(onChange) onChange(); });
   }); })(doc);
   row.appendChild(name); row.appendChild(meta); row.appendChild(del);
