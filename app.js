@@ -1121,7 +1121,7 @@ function rfu(){
       }, fu.assignedTo);
     }); })(f);
     right.appendChild(gcalFuBtn);
-    (function(id){del.addEventListener('click',function(){F=F.filter(function(f){return f.id!==id;});sv();if(supaReady) fetch(SUPA_URL+'/rest/v1/followups?id=eq.'+id,{method:'DELETE',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}});rfu();rd();});})(f.id);right.appendChild(del);row.appendChild(chk);row.appendChild(info);row.appendChild(right);el.appendChild(row);});
+    (function(id){del.addEventListener('click',function(){pausePoll(8000);F=F.filter(function(f){return f.id!==id;});sv();deleteFUfromDB(id);rfu();rd();});})(f.id);right.appendChild(del);row.appendChild(chk);row.appendChild(info);row.appendChild(right);el.appendChild(row);});
   ge('nbFollowups').textContent=F.filter(function(f){return !f.done;}).length;
 }
 function tfu(id){var f=F.find(function(x){return x.id===id;});if(f){f.done=!f.done;sv();if(supaReady) dbSave('followups',[f]);}}
