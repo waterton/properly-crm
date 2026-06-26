@@ -163,27 +163,19 @@ async function saveDocument(file, meta){
   return doc;
 }
 
-async function deleteDocument(doc){
-  var headers = await getAuthHeaders();
-  delete headers['Content-Type'];
-  // 1. Delete the file from storage (404 = already gone, that is fine)
-  var fileResp = await fetch(SUPA_URL + '/storage/v1/object/' + DOC_BUCKET + '/' + doc.file_path, {
-    method: 'DELETE', headers: headers
-  });
-  if(!fileResp.ok && fileResp.status !== 404){
-    var ft = await fileResp.text();
-    throw new Error('Storage delete failed: ' + ft.substring(0, 200));
+async function openDocument(doc){
+  var w = window.open('about:blank', '_blank');
+  if(!w){
+    alert('Your browser blocked the new tab. Please allow popups for this site, then try again.');
+    return;
   }
-  // 2. Delete the database row
-  var rowResp = await fetch(SUPA_URL + '/rest/v1/documents?id=eq.' + doc.id, {
-    method: 'DELETE', headers: headers
-  });
-  if(!rowResp.ok){
-    var rt = await rowResp.text();
-    throw new Error('Record delete failed: ' + rt.substring(0, 200));
+  try{
+    var url = await getDocUrl(doc.file_path);
+    w.location.href = url;
+  }catch(e){
+    try{ w.close(); }catch(_){}
+    alert('Could not open document: ' + e.message);
   }
-  // 3. Only now remove it locally
-  DOCS = DOCS.filter(function(d){ return d.id !== doc.id; });
 }
 
 async function openDocument(doc){
