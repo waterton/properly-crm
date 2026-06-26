@@ -2240,10 +2240,10 @@ function openTCDetail(id){
   });
   cSel.value = tx.contactId || '';
   (function(txId){ cSel.addEventListener('change', function(){
-    var t = TX.find(function(x){ return x.id===txId; });
+    var t = TX.find(function(x){ return String(x.id)===String(txId); });
     if(!t) return;
-    t.contactId = parseInt(cSel.value)||cSel.value||null;
-    sv(); if(supaReady) dbSave('transactions',[t]);
+    t.contactId = parseInt(cSel.value)||null;
+    sv(); if(supaReady) dbSave('transactions',[t]);;
     // update subtitle
     var nc = gc(t.contactId);
     ge('tcDetSub').textContent = (t.price?t.price+' | ':'')+t.type.toUpperCase()+(t.closingDate?' | Close: '+fd(t.closingDate):'');
