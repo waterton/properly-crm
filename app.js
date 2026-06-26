@@ -1344,13 +1344,20 @@ function rdl(){
       var dot2=mkDot(dc(n)); row2.appendChild(dot2);
 
       var info2=mkDiv('flex:1;');
+      var dlTx=(d.transactionId!=null)?TX.find(function(t){return String(t.id)===String(d.transactionId);}):null;
+      if(!dlTx && d.contactId!=null){ dlTx=TX.find(function(t){return String(t.contactId)===String(d.contactId);}); }
+      var dlType=d.type;
+      if(!dlType && dlTx){
+        var dlKeys=[['earnestDate','Earnest Money Due'],['dueDiligDate','Due Diligence Deadline'],['financingDate','Financing Deadline'],['appraisalDate','Appraisal Deadline'],['closingDate','Closing Date']];
+        for(var ti=0;ti<dlKeys.length;ti++){ if(dlTx[dlKeys[ti][0]]===d.date){ dlType=dlKeys[ti][1]; break; } }
+      }
       var typeLbl=document.createElement('div');
       typeLbl.style.cssText='font-size:18px;font-weight:600;color:'+(isOverdue?'var(--danger)':isToday?'var(--accent)':'var(--text)')+';';
-      typeLbl.textContent=(isOverdue?'OVERDUE: ':isToday?'TODAY: ':'')+d.type;
+      typeLbl.textContent=(isOverdue?'OVERDUE: ':isToday?'TODAY: ':'')+(dlType||'Deadline');
       info2.appendChild(typeLbl);
-      var dlTx=(d.transactionId!=null)?TX.find(function(t){return String(t.id)===String(d.transactionId);}):null;
-      var dlWho=c?(fn(c)+(c.property?' - '+c.property:'')):(dlTx&&dlTx.address?dlTx.address:'Unknown');
-      var subLbl=mkDiv('font-size:18px;color:var(--text3);',dlWho);
+      var dlAddr=(dlTx&&dlTx.address)?dlTx.address:(c&&c.property?c.property:'');
+      var dlWho=c?fn(c):'Unknown';
+      var subLbl=mkDiv('font-size:18px;color:var(--text3);',(dlAddr?dlAddr+' - ':'')+dlWho);
       info2.appendChild(subLbl);
       row2.appendChild(info2);
 
