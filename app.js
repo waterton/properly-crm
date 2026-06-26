@@ -568,7 +568,7 @@ function rd(){
   var fuEl=ge('dFollowups');fuEl.innerHTML='';
   var pend=F.filter(function(f){return !f.done;}).slice(0,4);
   if(!pend.length){fuEl.innerHTML='<div class="empty">All caught up!</div>';}
-  else pend.forEach(function(f){var c=gc(f.contactId);var row=mkRow('fu-row');var chk=mkRow('chk'+(f.done?' done':''));if(f.done)chk.appendChild(ck());(function(id){chk.addEventListener('click',function(){tfu(id);rd();});})(f.id);var info=mkDiv('flex:1;');info.appendChild(mkDiv('font-size:18px;',f.label));info.appendChild(mkDiv('font-size:18px;color:var(--text3);',(c?fn(c):'')+' - '+fd(f.date)));row.appendChild(chk);row.appendChild(info);row.appendChild(mkBadge(f.pri));fuEl.appendChild(row);});
+  else pend.forEach(function(f){var c=gc(f.contactId);var row=mkRow('fu-row');var info=mkDiv('flex:1;');info.appendChild(mkDiv('font-size:18px;',f.label));info.appendChild(mkDiv('font-size:18px;color:var(--text3);',(c?fn(c):'')+' - '+fd(f.date)));row.appendChild(chk);row.appendChild(info);row.appendChild(mkBadge(f.pri));fuEl.appendChild(row);});
   var pipEl=ge('dPipeline');pipEl.innerHTML='';
   ['New Lead','Contacted','Showing','Under Contract'].forEach(function(s){var cnt=C.filter(function(c){return c.stage===s;}).length;var row=mkRow('li');row.appendChild(mkDiv('flex:1;font-size:18px;font-weight:600;',s));row.appendChild(mkDiv('font-family:monospace;font-size:22px;font-weight:700;color:var(--accent);',cnt));pipEl.appendChild(row);});
   ge('nbFollowups').textContent=F.filter(function(f){return !f.done;}).length;
@@ -1124,7 +1124,7 @@ function rfu(){
   var el=ge('fuList');el.innerHTML='';
   var sorted=F.slice().sort(function(a,b){return new Date(a.date)-new Date(b.date);});
   if(!sorted.length){el.innerHTML='<div class="empty">No follow-ups yet.</div>';return;}
-  sorted.forEach(function(f){var c=gc(f.contactId);var row=mkRow('fu-row');var chk=mkRow('chk'+(f.done?' done':''));if(f.done)chk.appendChild(ck());(function(id){chk.addEventListener('click',function(){tfu(id);rfu();});})(f.id);var info=mkDiv('flex:1;');info.appendChild(mkDiv('font-size:18px;'+(f.done?'text-decoration:line-through;color:var(--text3);':''),f.label));info.appendChild(mkDiv('font-size:18px;color:var(--text3);',(c?fn(c):'Unknown')+' - '+fd(f.date)));var right=mkDiv('display:flex;align-items:center;gap:7px;');right.appendChild(mkBadge(f.pri));var del=mkBtn('','\u00d7','background:none;border:none;color:var(--text3);cursor:pointer;font-size:18px;line-height:1;');// GCal sync for follow-up
+  sorted.forEach(function(f){var c=gc(f.contactId);var row=mkRow('fu-row');var chk=mkRow('chk'+(f.done?' done':''));if(f.done)chk.appendChild(ck());(function(id){chk.addEventListener('click',function(){tfu(id);rfu();});})(f.id);var info=mkDiv('flex:1;');info.appendChild(mkDiv('font-size:18px;',f.label));info.appendChild(mkDiv('font-size:18px;color:var(--text3);',(c?fn(c):'Unknown')+' - '+fd(f.date)));var right=mkDiv('display:flex;align-items:center;gap:7px;');right.appendChild(mkBadge(f.pri));var del=mkBtn('','\u00d7','background:none;border:none;color:var(--text3);cursor:pointer;font-size:18px;line-height:1;');// GCal sync for follow-up
     var gcalFuBtn=document.createElement('button');
     gcalFuBtn.style.cssText='background:rgba(76,142,201,0.1);border:1px solid rgba(76,142,201,0.2);border-radius:5px;padding:3px 8px;cursor:pointer;font-size:14px;color:var(--buyer);font-family:DM Sans,sans-serif;';
     gcalFuBtn.textContent='+ GCal';
@@ -1145,7 +1145,7 @@ function rfu(){
     editFuBtn.textContent='Edit';
     (function(fu){ editFuBtn.addEventListener('click',function(e){ e.stopPropagation(); openEditFU(fu); }); })(f);
     right.appendChild(editFuBtn);
-    (function(id){del.addEventListener('click',function(){pausePoll(8000);F=F.filter(function(f){return f.id!==id;});sv();deleteFUfromDB(id);rfu();rd();});})(f.id);right.appendChild(del);row.appendChild(chk);row.appendChild(info);row.appendChild(right);el.appendChild(row);});
+    (function(id){del.addEventListener('click',function(){pausePoll(8000);F=F.filter(function(f){return f.id!==id;});sv();deleteFUfromDB(id);rfu();rd();});})(f.id);right.appendChild(del);row.appendChild(info);row.appendChild(right);el.appendChild(row);});
   ge('nbFollowups').textContent=F.filter(function(f){return !f.done;}).length;
 }
 function tfu(id){var f=F.find(function(x){return x.id===id;});if(f){f.done=!f.done;sv();if(supaReady) dbSave('followups',[f]);}}
