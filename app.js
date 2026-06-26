@@ -456,7 +456,7 @@ function pl(p){return p==='hot'?'HOT':p==='warn'?'SOON':'OK';}
 function pb(p){return p==='hot'?'b-hot':p==='warn'?'b-warn':'b-ok';}
 function ge(id){return document.getElementById(id);}
 function ck(){var s=document.createElementNS('http://www.w3.org/2000/svg','svg');s.setAttribute('width','9');s.setAttribute('height','9');s.setAttribute('fill','none');s.setAttribute('stroke','#0d0f14');s.setAttribute('stroke-width','3');s.setAttribute('viewBox','0 0 24 24');var p=document.createElementNS('http://www.w3.org/2000/svg','polyline');p.setAttribute('points','20,6 9,17 4,12');s.appendChild(p);return s;}
-var pn={briefing:'Daily Briefing',dashboard:'Dashboard',pipeline:'Pipeline',contacts:'Contacts',followups:'Follow-ups',notes:'Notes',deadlines:'Deadlines',tc:'Transactions',scanner:'Doc Scanner',cardscanner:'Card Scanner',calendar:'Calendar',team:'Team',gmail:'Gmail',mls:'MLS Search',drips:'Drip Campaigns'};
+var pn={briefing:'Daily Briefing',dashboard:'Dashboard',pipeline:'Pipeline',contacts:'Contacts',followups:'Follow-ups',notes:'Notes',deadlines:'Deadlines',documents:'Documents',tc:'Transactions',scanner:'Doc Scanner',cardscanner:'Card Scanner',calendar:'Calendar',team:'Team',gmail:'Gmail',mls:'MLS Search',drips:'Drip Campaigns'};
 function sp(id){
   curPage=id;
   var addBtn=ge('btnAdd'); if(addBtn) addBtn.style.display=(id==='contacts')?'':'none';
@@ -472,6 +472,7 @@ function sp(id){
   else if(id==='contacts'){ selectedContacts.clear(); updateBulkBar(); rc(); }
   else if(id==='followups')rfu();
   else if(id==='notes')rn();
+  else if(id==='documents')renderDocsPage();
 
   else if(id==='deadlines'){
     // Populate contact filter
@@ -6141,6 +6142,79 @@ ge('nav-team').addEventListener('click',function(){sp('team');});
 ge('nav-gmail').addEventListener('click',function(){sp('gmail');});
 ge('nav-mls').addEventListener('click',function(){sp('mls');});
 ge('nav-drips').addEventListener('click',function(){sp('drips');});
+
+ge('nav-documents').addEventListener('click',function(){sp('documents');});
+if(ge('docSearch')) ge('docSearch').addEventListener('input', renderDocsPage);
+if(ge('docTypeFilter')) ge('docTypeFilter').addEventListener('change', renderDocsPage);
+if(ge('docClear')) ge('docClear').addEventListener('click', function(){ ge('docSearch').value=''; ge('docTypeFilter').value=''; renderDocsPage(); });
+
+function renderDocsPage(){
+  var listEl = ge('docsList');
+  if(!listEl) return;
+  var typeSel = ge('docTypeFilter');
+  if(typeSel){
+    var curType = typeSel.value;
+    var types = [];
+    DOCS.forEach(function(d){ if(d.doc_type && types.indexOf(d.doc_type)===-1) types.push(d.doc_type); });
+    types.sort();
+    typeSel.innerHTML = '';
+    var allOpt = document.createElement('option'); allOpt.value=''; allOpt.textContent='All Types'; typeSel.appendChild(allOpt);
+    types.forEach(function(t){ var o=document.createElement('option'); o.value=t; o.textContent=t; typeSel.appendChild(o); });
+    typeSel.value = curType;
+  }
+  var q = ((ge('docSearch') && ge('docSearch').value) || '').trim().toLowerCase();
+  var typeF = (ge('docTypeFilter') && ge('docTypeFilter').value) || '';
+  var rows = DOCS.slice().sort(function(a,b){ return (b.id||0) - (a.id||0); });
+  var filtered = rows.filter(function(d){
+    if(typeF && d.doc_type !== typeF) return false;
+    if(!q) return true;
+    var contact = d.contact_id ? gc(d.contact_id) : null;
+    var tx = d.transaction_id ? TX.find(function(t){ return t.id===d.transaction_id; }) : null;
+    var hay = [ d.file_name||'', d.doc_type||'', contact?fn(contact):'', tx?(tx.address||''):'' ].join(' ').toLowerCase();
+    return hay.indexOf(q) !== -1;
+  });
+  listEl.innerHTML = '';
+  if(!filtered.length){
+    listEl.appendChild(mkDiv('font-size:18px;color:var(--text3);padding:20px;text-align:center;', DOCS.length ? 'No documents match your search.' : 'No documents stored yet.'));
+    return;
+  }
+  filtered.forEach(function(d){
+    var row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);flex-wrap:wrap;';
+    var nameWrap = mkDiv('flex:1;min-width:180px;');
+    var name = mkDiv('font-size:18px;color:var(--accent);cursor:pointer;text-decoration:underline;word-break:break-word;', d.file_name||'Document');
+    (function(doc){ name.addEventListener('click', function(){ openDocument(doc); }); })(d);
+    nameWrap.appendChild(name);
+    var subBits = [];
+    if(d.doc_type) subBits.push(d.doc_type);
+    if(d.size) subBits.push(Math.round(d.size/1024)+' KB');
+    if(d.created_at) subBits.push(fd(d.created_at));
+    nameWrap.appendChild(mkDiv('font-size:15px;color:var(--text3);margin-top:2px;', subBits.join(' - ')));
+    row.appendChild(nameWrap);
+    var linkWrap = mkDiv('display:flex;gap:6px;flex-wrap:wrap;');
+    var contact = d.contact_id ? gc(d.contact_id) : null;
+    var tx = d.transaction_id ? TX.find(function(t){ return t.id===d.transaction_id; }) : null;
+    if(contact){
+      var cBtn = mkBtn('btn btn-g','Contact: '+fn(contact),'font-size:14px;padding:4px 10px;');
+      (function(cid){ cBtn.addEventListener('click', function(){ sp('contacts'); vc(cid); }); })(contact.id);
+      linkWrap.appendChild(cBtn);
+    }
+    if(tx){
+      var tBtn = mkBtn('btn btn-g','Deal: '+(tx.address||'Transaction'),'font-size:14px;padding:4px 10px;');
+      (function(txId){ tBtn.addEventListener('click', function(){ openTCDetail(txId); }); })(tx.id);
+      linkWrap.appendChild(tBtn);
+    }
+    if(!contact && !tx){ linkWrap.appendChild(mkDiv('font-size:15px;color:var(--text3);','Unfiled')); }
+    row.appendChild(linkWrap);
+    var del = mkBtn('btn btn-d','Delete','font-size:14px;padding:4px 10px;');
+    (function(doc){ del.addEventListener('click', function(){
+      if(!confirm('Delete "'+(doc.file_name||'this document')+'"? The file will be permanently removed.')) return;
+      deleteDocument(doc).then(function(){ renderDocsPage(); }).catch(function(e){ alert('Delete failed: '+e.message); });
+    }); })(d);
+    row.appendChild(del);
+    listEl.appendChild(row);
+  });
+}
 ge('sortByLast').addEventListener('click',function(){
   curSort='last';
   ge('sortByLast').classList.add('active'); ge('sortByFirst').classList.remove('active');
