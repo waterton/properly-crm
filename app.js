@@ -165,6 +165,7 @@ async function saveDocument(file, meta){
 
 async function deleteDocument(doc){
   var headers = await getAuthHeaders();
+  delete headers['Content-Type'];
   // 1. Delete the file from storage (404 = already gone, that is fine)
   var fileResp = await fetch(SUPA_URL + '/storage/v1/object/' + DOC_BUCKET + '/' + doc.file_path, {
     method: 'DELETE', headers: headers
