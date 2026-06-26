@@ -1317,9 +1317,9 @@ function rdl(){
           var val = inpEl.value;
           if(!val){ alert('Please pick a date.'); return; }
           // Add to deadlines and update transaction
-          var nd={id:Date.now(),contactId:it.contactId,type:it.label,date:val};
+          var nd={id:Date.now(),contactId:it.contactId,transactionId:it.txId,type:it.label,date:val};
           D.push(nd); saveDL(nd);
-          var tx2=TX.find(function(t){return t.id===it.txId;});
+          var tx2=TX.find(function(t){return String(t.id)===String(it.txId);});
           if(tx2){ tx2[it.key]=val; saveTX(tx2); }
           rdl(); rd();
         });
@@ -1348,7 +1348,9 @@ function rdl(){
       typeLbl.style.cssText='font-size:18px;font-weight:600;color:'+(isOverdue?'var(--danger)':isToday?'var(--accent)':'var(--text)')+';';
       typeLbl.textContent=(isOverdue?'OVERDUE: ':isToday?'TODAY: ':'')+d.type;
       info2.appendChild(typeLbl);
-      var subLbl=mkDiv('font-size:18px;color:var(--text3);',(c?fn(c):'Unknown')+(c&&c.property?' - '+c.property:''));
+      var dlTx=(d.transactionId!=null)?TX.find(function(t){return String(t.id)===String(d.transactionId);}):null;
+      var dlWho=c?(fn(c)+(c.property?' - '+c.property:'')):(dlTx&&dlTx.address?dlTx.address:'Unknown');
+      var subLbl=mkDiv('font-size:18px;color:var(--text3);',dlWho);
       info2.appendChild(subLbl);
       row2.appendChild(info2);
 
