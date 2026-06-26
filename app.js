@@ -6610,6 +6610,24 @@ ge('nav-contacts').addEventListener('click',function(){sp('contacts');});
 ge('nav-followups').addEventListener('click',function(){sp('followups');});
 ge('nav-notes').addEventListener('click',function(){sp('notes');});
 ge('nav-deadlines').addEventListener('click',function(){sp('deadlines');});
+// --- Dashboard stat tiles: clickable drill-downs ---
+function dashToContacts(f){
+  curFilter=f;
+  document.querySelectorAll('.filter-btn[data-filter]').forEach(function(b){
+    b.classList.toggle('active', b.getAttribute('data-filter')===f);
+  });
+  sp('contacts');
+}
+[['sBuyers','buyer'],['sSellers','seller'],['sLeads','prospect']].forEach(function(pair){
+  var el=ge(pair[0]); if(!el||!el.parentNode) return;
+  var tile=el.parentNode; tile.style.cursor='pointer';
+  (function(f){ tile.addEventListener('click',function(){dashToContacts(f);}); })(pair[1]);
+});
+(function(){
+  var cl=ge('sClosing'); if(!cl||!cl.parentNode) return;
+  cl.parentNode.style.cursor='pointer';
+  cl.parentNode.addEventListener('click',function(){sp('tc');});
+})();
 ge('hamburger').addEventListener('click',tsb);
 ge('sbOv').addEventListener('click',csb);
 ge('btnAdd').addEventListener('click',function(){om('addModal');});
