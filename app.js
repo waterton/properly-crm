@@ -880,7 +880,7 @@ function rc(){
           if(selectedContacts.has(cid)){ selectedContacts.delete(cid); cb.checked=false; r.style.background=''; }
           else { selectedContacts.add(cid); cb.checked=true; r.style.background='rgba(201,76,76,0.07)'; }
           updateBulkBar();
-        } else { openEditContact(cid); }
+        } else { vc(cid); }
       });
     })(c.id, row, chk);
     chkWrap.appendChild(chk); row.appendChild(chkWrap);
@@ -966,6 +966,19 @@ function vc(id){
   if(!cFU.length)fusec.appendChild(mkDiv('font-size:18px;color:var(--text3);padding:4px 0;','None yet.'));
   else cFU.forEach(function(f){var row=mkRow('det-fu');var chk=mkRow('det-fu-chk'+(f.done?' done':''));if(f.done)chk.appendChild(ck());(function(fid,cid){chk.addEventListener('click',function(){tfu(fid);vc(cid);});})(f.id,id);var lbl=mkDiv('flex:1;font-size:18px;'+(f.done?'text-decoration:line-through;color:var(--text3);':''),f.label);var dt=mkDiv('font-size:18px;color:var(--text3);',fd(f.date));row.appendChild(chk);row.appendChild(lbl);row.appendChild(dt);fusec.appendChild(row);});
   body.appendChild(fusec);
+  var txsec=mksec('Transactions');
+  var cTX=TX.filter(function(t){return t.contactId===id;});
+  if(!cTX.length)txsec.appendChild(mkDiv('font-size:18px;color:var(--text3);padding:4px 0;','None yet.'));
+  else cTX.forEach(function(t){
+    var trow=document.createElement('div');
+    trow.style.cssText='display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border);cursor:pointer;';
+    var tnm=mkDiv('flex:1;font-size:18px;color:var(--accent);',(t.address||'Transaction')+(t.type?' ('+t.type+')':''));
+    var tst=mkDiv('font-size:16px;color:var(--text3);white-space:nowrap;',t.closingDate?('Close '+fd(t.closingDate)):'');
+    trow.appendChild(tnm);trow.appendChild(tst);
+    (function(txId){trow.addEventListener('click',function(){ cd(); openTCDetail(txId); });})(t.id);
+    txsec.appendChild(trow);
+  });
+  body.appendChild(txsec);
   var docsec=mksec('Documents');
   var docab=mkBtn('','+ Upload','background:none;border:none;color:var(--accent);cursor:pointer;font-size:18px;margin-left:8px;');
   (function(cid){docab.addEventListener('click',function(){ openDocUpload({contact_id:cid}, function(){ vc(cid); }); });})(id);
