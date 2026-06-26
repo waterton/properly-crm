@@ -1139,6 +1139,11 @@ function rfu(){
       }, fu.assignedTo);
     }); })(f);
     right.appendChild(gcalFuBtn);
+    var editFuBtn=document.createElement('button');
+    editFuBtn.style.cssText='background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:3px 8px;cursor:pointer;font-size:14px;color:var(--text2);font-family:DM Sans,sans-serif;';
+    editFuBtn.textContent='Edit';
+    (function(fu){ editFuBtn.addEventListener('click',function(e){ e.stopPropagation(); openEditFU(fu); }); })(f);
+    right.appendChild(editFuBtn);
     (function(id){del.addEventListener('click',function(){pausePoll(8000);F=F.filter(function(f){return f.id!==id;});sv();deleteFUfromDB(id);rfu();rd();});})(f.id);right.appendChild(del);row.appendChild(chk);row.appendChild(info);row.appendChild(right);el.appendChild(row);});
   ge('nbFollowups').textContent=F.filter(function(f){return !f.done;}).length;
 }
@@ -1492,7 +1497,35 @@ function svn(){
   }
   cm('noteModal'); ge('nText').value=''; rn(); rd();
 }
-function svfu(){var lbl=ge('fuLabel').value.trim();if(!lbl)return;var nf={id:Date.now(),contactId:parseInt(ge('fuContact').value),label:lbl,date:ge('fuDate').value,pri:ge('fuPri').value,done:false,assignedTo:parseInt(ge('fuAssign')&&ge('fuAssign').value)||null};F.push(nf);saveFU(nf);cm('fuModal');ge('fuLabel').value='';rfu();rd();if(curDet)vc(curDet);}
+function openEditFU(f){
+  fs('fuContact'); ge('fuContact').value=f.contactId;
+  ge('fuLabel').value=f.label||'';
+  ge('fuDate').value=f.date||'';
+  if(f.pri) ge('fuPri').value=f.pri;
+  if(ge('fuAssign')) ge('fuAssign').value=(f.assignedTo!=null?f.assignedTo:'');
+  ge('btnSaveFU') && ge('btnSaveFU').setAttribute('data-edit-id', f.id);
+  om('fuModal');
+}
+function svfu(){
+  var lbl=ge('fuLabel').value.trim(); if(!lbl) return;
+  var editId = ge('btnSaveFU') ? ge('btnSaveFU').getAttribute('data-edit-id') : '';
+  if(editId){
+    var existing=F.find(function(x){return String(x.id)===String(editId);});
+    if(existing){
+      existing.contactId=parseInt(ge('fuContact').value);
+      existing.label=lbl;
+      existing.date=ge('fuDate').value;
+      existing.pri=ge('fuPri').value;
+      existing.assignedTo=parseInt(ge('fuAssign')&&ge('fuAssign').value)||null;
+      sv(); if(supaReady) dbSave('followups',[existing]);
+    }
+    ge('btnSaveFU') && ge('btnSaveFU').setAttribute('data-edit-id','');
+  } else {
+    var nf={id:Date.now(),contactId:parseInt(ge('fuContact').value),label:lbl,date:ge('fuDate').value,pri:ge('fuPri').value,done:false,assignedTo:parseInt(ge('fuAssign')&&ge('fuAssign').value)||null};
+    F.push(nf); saveFU(nf);
+  }
+  cm('fuModal'); ge('fuLabel').value=''; rfu(); rd(); if(curDet)vc(curDet);
+}
 function openEditDL(d){
   fs('dlContact'); ge('dlContact').value=d.contactId;
   ge('dlType').value=d.type||'';
@@ -6633,7 +6666,7 @@ ge('sbOv').addEventListener('click',csb);
 ge('btnAdd').addEventListener('click',function(){om('addModal');});
 ge('btnPipelineAdd').addEventListener('click',function(){om('addModal');});
 ge('btnContactAdd').addEventListener('click',function(){om('addModal');});
-ge('btnAddFU').addEventListener('click',function(){fs('fuContact');ge('fuDate').value=tod();om('fuModal');});
+ge('btnAddFU').addEventListener('click',function(){ge('btnSaveFU')&&ge('btnSaveFU').setAttribute('data-edit-id','');ge('fuLabel').value='';fs('fuContact');ge('fuDate').value=tod();om('fuModal');});
 ge('btnAddNote').addEventListener('click',function(){fs('nContact');om('noteModal');});
 ge('btnAddDL').addEventListener('click',function(){fs('dlContact');ge('dlDate').value=tod();om('dlModal');});
 ge('btnViewNotes').addEventListener('click',function(){sp('notes');});
