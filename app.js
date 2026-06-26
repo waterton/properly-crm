@@ -1211,20 +1211,10 @@ function rdl(){
   var el=ge('dlList');
   el.innerHTML='';
 
-  // Get filter values
   var filterFrom = ge('dlFilterFrom') ? ge('dlFilterFrom').value : '';
   var filterTo = ge('dlFilterTo') ? ge('dlFilterTo').value : '';
   var filterContact = ge('dlFilterContact') ? ge('dlFilterContact').value : '';
 
-  // Build combined list: real deadlines + missing deadline flags from transactions
-  var allItems = [];
-
-  // Real deadlines
-  D.forEach(function(d){
-    allItems.push({type:'real', data:d});
-  });
-
-  // Check transactions for missing deadlines and flag them
   var REPC_DEADLINES = [
     {key:'earnestDate', label:'Earnest Money Due'},
     {key:'dueDiligDate', label:'Due Diligence Deadline'},
@@ -1232,91 +1222,126 @@ function rdl(){
     {key:'appraisalDate', label:'Appraisal Deadline'},
     {key:'closingDate', label:'Closing / Settlement Date'}
   ];
+
+  function dlTypeLabel(d, tx){
+    if(d.type) return d.type;
+    if(tx){ for(var i=0;i<REPC_DEADLINES.length;i++){ if(tx[REPC_DEADLINES[i].key]===d.date) return REPC_DEADLINES[i].label; } }
+    return 'Deadline';
+  }
+  function dlDeal(d){
+    var tx=null;
+    if(d.transactionId!=null) tx=TX.find(function(t){return String(t.id)===String(d.transactionId);});
+    if(!tx && d.contactId!=null) tx=TX.find(function(t){return String(t.contactId)===String(d.contactId);});
+    return tx||null;
+  }
+
+  var groups={}, order=[];
+  function ensureGroup(key, tx, contactId){
+    if(!groups[key]){
+      var c = contactId!=null ? gc(contactId) : (tx ? gc(tx.contactId) : null);
+      var addr = (tx&&tx.address) ? tx.address : (c&&c.property?c.property:'');
+      groups[key] = { tx:tx, contactId:(contactId!=null?contactId:(tx?tx.contactId:null)), addr:addr, who:(c?fn(c):'Unassigned'), dated:[], missing:[] };
+      order.push(key);
+    }
+    return groups[key];
+  }
+
+  D.forEach(function(d){
+    if(filterContact && String(d.contactId)!==String(filterContact)) return;
+    if(filterFrom && d.date < filterFrom) return;
+    if(filterTo && d.date > filterTo) return;
+    var tx=dlDeal(d);
+    var key = tx ? ('tx_'+tx.id) : (d.contactId!=null ? ('c_'+d.contactId) : 'none');
+    ensureGroup(key, tx, tx?null:d.contactId).dated.push(d);
+  });
+
   TX.filter(function(t){return t.status!=='closed';}).forEach(function(tx){
+    if(filterContact && String(tx.contactId)!==String(filterContact)) return;
     REPC_DEADLINES.forEach(function(dl){
       if(!tx[dl.key]){
-        // Check if this missing deadline is already in D
-        var exists = D.find(function(d){
-          return d.contactId===tx.contactId && d.type===dl.label;
-        });
-        if(!exists){
-          allItems.push({
-            type:'missing',
-            txId: tx.id,
-            txAddress: tx.address,
-            contactId: tx.contactId,
-            label: dl.label,
-            key: dl.key
-          });
-        }
+        var exists = D.find(function(d){ return String(d.contactId)===String(tx.contactId) && d.type===dl.label; });
+        if(!exists){ ensureGroup('tx_'+tx.id, tx, null).missing.push({ txId:tx.id, contactId:tx.contactId, label:dl.label, key:dl.key }); }
       }
     });
   });
 
-  // Sort: missing first, then by date
-  allItems.sort(function(a,b){
-    if(a.type==='missing' && b.type!=='missing') return -1;
-    if(a.type!=='missing' && b.type==='missing') return 1;
-    if(a.type==='real' && b.type==='real') return new Date(a.data.date)-new Date(b.data.date);
-    return 0;
+  order = order.filter(function(k){ return groups[k].dated.length || groups[k].missing.length; });
+  order.sort(function(a,b){
+    var ga=groups[a], gb=groups[b];
+    if(ga.missing.length && !gb.missing.length) return -1;
+    if(!ga.missing.length && gb.missing.length) return 1;
+    var ea = ga.dated.length ? Math.min.apply(null, ga.dated.map(function(d){return pld(d.date).getTime();})) : Infinity;
+    var eb = gb.dated.length ? Math.min.apply(null, gb.dated.map(function(d){return pld(d.date).getTime();})) : Infinity;
+    return ea-eb;
   });
 
-  // Apply filters
-  var filtered = allItems.filter(function(item){
-    if(item.type==='missing') return true; // always show missing
-    var d = item.data;
-    if(filterContact && String(d.contactId) !== String(filterContact)) return false;
-    if(filterFrom && d.date < filterFrom) return false;
-    if(filterTo && d.date > filterTo) return false;
-    return true;
-  });
+  if(!order.length){ el.innerHTML='<div class="empty">No deadlines match the current filter.</div>'; return; }
 
-  if(!filtered.length){
-    el.innerHTML='<div class="empty">No deadlines match the current filter.</div>';
-    return;
-  }
-
-  // Show count
-  var real = filtered.filter(function(i){return i.type==='real';}).length;
-  var missing = filtered.filter(function(i){return i.type==='missing';}).length;
-  var summary = document.createElement('div');
+  var totalDated=0, totalMissing=0;
+  order.forEach(function(k){ totalDated+=groups[k].dated.length; totalMissing+=groups[k].missing.length; });
+  var summary=document.createElement('div');
   summary.style.cssText='font-size:18px;color:var(--text3);margin-bottom:10px;display:flex;gap:12px;flex-wrap:wrap;';
-  summary.innerHTML = '<span>' + real + ' deadline' + (real!==1?'s':'') + '</span>'
-    + (missing ? '<span style="color:var(--danger);font-weight:600;">&#9888; ' + missing + ' missing date' + (missing!==1?'s':'') + ' need attention</span>' : '');
+  var s1=document.createElement('span'); s1.textContent=totalDated+' deadline'+(totalDated!==1?'s':''); summary.appendChild(s1);
+  if(totalMissing){ var s2=document.createElement('span'); s2.style.cssText='color:var(--danger);font-weight:600;'; s2.textContent='\u26A0 '+totalMissing+' missing date'+(totalMissing!==1?'s':'')+' need attention'; summary.appendChild(s2); }
   el.appendChild(summary);
 
-  filtered.forEach(function(item){
-    if(item.type==='missing'){
-      // Missing deadline flag
-      var row = document.createElement('div');
+  order.forEach(function(k){
+    var g=groups[k];
+    var hdr=document.createElement('div');
+    hdr.style.cssText='display:flex;align-items:baseline;gap:10px;margin:14px 0 8px;padding-bottom:6px;border-bottom:2px solid var(--border);';
+    var hAddr=document.createElement('div'); hAddr.style.cssText='font-size:19px;font-weight:700;color:var(--text);'; hAddr.textContent=g.addr||g.who||'Unassigned'; hdr.appendChild(hAddr);
+    if(g.addr && g.who && g.who!=='Unassigned'){ var hWho=document.createElement('div'); hWho.style.cssText='font-size:16px;color:var(--text3);'; hWho.textContent=g.who; hdr.appendChild(hWho); }
+    el.appendChild(hdr);
+
+    g.dated.slice().sort(function(a,b){return pld(a.date)-pld(b.date);}).forEach(function(d){
+      var c=gc(d.contactId); var n=du(d.date);
+      var isOverdue=n<0, isToday=n===0, isUrgent=n<=3&&n>=0;
+      var row2=document.createElement('div');
+      row2.style.cssText='background:var(--surface);border:1px solid '+(isOverdue?'rgba(201,76,76,0.4)':isToday?'var(--accent)':isUrgent?'rgba(201,168,76,0.3)':'var(--border)')+';border-radius:8px;padding:11px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px;';
+      row2.appendChild(mkDot(dc(n)));
+      var info2=mkDiv('flex:1;');
+      var typeLbl=document.createElement('div');
+      typeLbl.style.cssText='font-size:18px;font-weight:600;color:'+(isOverdue?'var(--danger)':isToday?'var(--accent)':'var(--text)')+';';
+      typeLbl.textContent=(isOverdue?'OVERDUE: ':isToday?'TODAY: ':'')+dlTypeLabel(d, g.tx);
+      info2.appendChild(typeLbl);
+      row2.appendChild(info2);
+      var right2=mkDiv('display:flex;align-items:center;gap:8px;');
+      var dates2=mkDiv('text-align:right;');
+      var dateTxt=document.createElement('div'); dateTxt.style.cssText='font-family:monospace;font-size:18px;color:'+(isOverdue?'var(--danger)':isToday?'var(--accent)':'var(--text2)')+';font-weight:'+(isOverdue||isToday?'700':'400')+';'; dateTxt.textContent=fd(d.date);
+      var lbl2=mkDiv('font-size:18px;color:'+(isOverdue?'var(--danger)':isUrgent?'var(--warn)':'var(--text3)')+';', isOverdue?Math.abs(n)+'d overdue':isToday?'TODAY':n+' days');
+      dates2.appendChild(dateTxt); dates2.appendChild(lbl2); right2.appendChild(dates2);
+      var gcalDlBtn=document.createElement('button');
+      gcalDlBtn.style.cssText='background:rgba(76,142,201,0.1);border:1px solid rgba(76,142,201,0.2);border-radius:5px;padding:4px 8px;cursor:pointer;font-size:14px;color:var(--buyer);font-family:DM Sans,sans-serif;white-space:nowrap;';
+      gcalDlBtn.textContent='+ GCal'; gcalDlBtn.title='Add to Google Calendar';
+      (function(dl2,tx2){ gcalDlBtn.addEventListener('click',function(e){ e.stopPropagation(); var c5=gc(dl2.contactId); syncToGCal({ title:dlTypeLabel(dl2,tx2)+(c5?' - '+fn(c5):''), date:dl2.date,time:'',type:'deadline', clientName:c5?fn(c5):'', notes:'Deadline from Properly CRM' }, dl2.assignedTo); }); })(d,g.tx);
+      right2.appendChild(gcalDlBtn);
+      var editBtn2=document.createElement('button');
+      editBtn2.style.cssText='background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:4px 8px;cursor:pointer;font-size:18px;color:var(--text2);font-family:DM Sans,sans-serif;';
+      editBtn2.textContent='Edit';
+      (function(dl){ editBtn2.addEventListener('click',function(e){ e.stopPropagation(); openEditDL(dl); }); })(d);
+      right2.appendChild(editBtn2);
+      var delBtn2=document.createElement('button');
+      delBtn2.style.cssText='background:rgba(201,76,76,0.1);border:1px solid rgba(201,76,76,0.2);border-radius:5px;padding:4px 8px;cursor:pointer;font-size:18px;color:var(--danger);font-family:DM Sans,sans-serif;';
+      delBtn2.textContent='Del';
+      (function(did){ delBtn2.addEventListener('click',function(e){ e.stopPropagation(); if(confirm('Delete this deadline?')){ D=D.filter(function(x){return x.id!==did;}); sv(); pausePoll(8000); deleteDLfromDB(did); rdl(); rd(); }}); })(d.id);
+      right2.appendChild(delBtn2);
+      row2.appendChild(right2);
+      el.appendChild(row2);
+    });
+
+    g.missing.forEach(function(item){
+      var row=document.createElement('div');
       row.style.cssText='background:rgba(201,76,76,0.08);border:1px solid rgba(201,76,76,0.25);border-radius:8px;padding:11px 14px;margin-bottom:8px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;';
-      var warn = document.createElement('div');
-      warn.style.cssText='color:var(--danger);font-size:18px;flex-shrink:0;';
-      warn.textContent='!';
-      var info = document.createElement('div');
-      info.style.flex='1';
-      var lbl = document.createElement('div');
-      lbl.style.cssText='font-size:18px;font-weight:600;color:var(--danger);';
-      lbl.textContent='MISSING: ' + item.label;
-      var sub = document.createElement('div');
-      sub.style.cssText='font-size:18px;color:var(--text3);margin-top:2px;';
-      var c2=gc(item.contactId);
-      sub.textContent=(item.txAddress||'Unknown property') + (c2?' - '+fn(c2):'') + ' | Date not found in scanned document';
+      var warn=document.createElement('div'); warn.style.cssText='color:var(--danger);font-size:18px;flex-shrink:0;'; warn.textContent='!';
+      var info=document.createElement('div'); info.style.flex='1';
+      var lbl=document.createElement('div'); lbl.style.cssText='font-size:18px;font-weight:600;color:var(--danger);'; lbl.textContent=item.label+' needs a date';
+      var sub=document.createElement('div'); sub.style.cssText='font-size:16px;color:var(--text3);margin-top:2px;'; sub.textContent='Not found in scanned document';
       info.appendChild(lbl); info.appendChild(sub);
-      // Add date input to resolve
-      var inp = document.createElement('input');
-      inp.type='date';
-      inp.style.cssText='background:var(--surface);border:1px solid rgba(201,76,76,0.4);border-radius:5px;padding:5px 8px;font-size:18px;color:var(--text);font-family:DM Sans,sans-serif;outline:none;';
-      inp.placeholder='Set date to resolve';
-      var saveBtn2 = document.createElement('button');
-      saveBtn2.className='btn btn-p';
-      saveBtn2.style.cssText='font-size:18px;padding:5px 12px;';
-      saveBtn2.textContent='Add Date';
+      var inp=document.createElement('input'); inp.type='date'; inp.style.cssText='background:var(--surface);border:1px solid rgba(201,76,76,0.4);border-radius:5px;padding:5px 8px;font-size:18px;color:var(--text);font-family:DM Sans,sans-serif;outline:none;';
+      var saveBtn2=document.createElement('button'); saveBtn2.className='btn btn-p'; saveBtn2.style.cssText='font-size:18px;padding:5px 12px;'; saveBtn2.textContent='Add Date';
       (function(it, inpEl){
         saveBtn2.addEventListener('click', function(){
-          var val = inpEl.value;
-          if(!val){ alert('Please pick a date.'); return; }
-          // Add to deadlines and update transaction
+          var val=inpEl.value; if(!val){ alert('Please pick a date.'); return; }
           var nd={id:Date.now(),contactId:it.contactId,transactionId:it.txId,type:it.label,date:val};
           D.push(nd); saveDL(nd);
           var tx2=TX.find(function(t){return String(t.id)===String(it.txId);});
@@ -1326,82 +1351,7 @@ function rdl(){
       })(item, inp);
       row.appendChild(warn); row.appendChild(info); row.appendChild(inp); row.appendChild(saveBtn2);
       el.appendChild(row);
-
-    } else {
-      // Real deadline row
-      var d=item.data;
-      var c=gc(d.contactId);
-      var n=du(d.date);
-      var isOverdue = n < 0;
-      var isToday = n === 0;
-      var isUrgent = n <= 3 && n >= 0;
-
-      var row2=document.createElement('div');
-      row2.style.cssText='background:var(--surface);border:1px solid '
-        +(isOverdue?'rgba(201,76,76,0.4)':isToday?'var(--accent)':isUrgent?'rgba(201,168,76,0.3)':'var(--border)')
-        +';border-radius:8px;padding:11px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px;';
-
-      var dot2=mkDot(dc(n)); row2.appendChild(dot2);
-
-      var info2=mkDiv('flex:1;');
-      var dlTx=(d.transactionId!=null)?TX.find(function(t){return String(t.id)===String(d.transactionId);}):null;
-      if(!dlTx && d.contactId!=null){ dlTx=TX.find(function(t){return String(t.contactId)===String(d.contactId);}); }
-      var dlType=d.type;
-      if(!dlType && dlTx){
-        var dlKeys=[['earnestDate','Earnest Money Due'],['dueDiligDate','Due Diligence Deadline'],['financingDate','Financing Deadline'],['appraisalDate','Appraisal Deadline'],['closingDate','Closing Date']];
-        for(var ti=0;ti<dlKeys.length;ti++){ if(dlTx[dlKeys[ti][0]]===d.date){ dlType=dlKeys[ti][1]; break; } }
-      }
-      var typeLbl=document.createElement('div');
-      typeLbl.style.cssText='font-size:18px;font-weight:600;color:'+(isOverdue?'var(--danger)':isToday?'var(--accent)':'var(--text)')+';';
-      typeLbl.textContent=(isOverdue?'OVERDUE: ':isToday?'TODAY: ':'')+(dlType||'Deadline');
-      info2.appendChild(typeLbl);
-      var dlAddr=(dlTx&&dlTx.address)?dlTx.address:(c&&c.property?c.property:'');
-      var dlWho=c?fn(c):'Unknown';
-      var subLbl=mkDiv('font-size:18px;color:var(--text3);',(dlAddr?dlAddr+' - ':'')+dlWho);
-      info2.appendChild(subLbl);
-      row2.appendChild(info2);
-
-      var right2=mkDiv('display:flex;align-items:center;gap:8px;');
-      var dates2=mkDiv('text-align:right;');
-      var dateTxt=document.createElement('div');
-      dateTxt.style.cssText='font-family:monospace;font-size:18px;color:'+(isOverdue?'var(--danger)':isToday?'var(--accent)':'var(--text2)')+';font-weight:'+(isOverdue||isToday?'700':'400')+';';
-      dateTxt.textContent=fd(d.date);
-      var lbl2Text=isOverdue?Math.abs(n)+'d overdue':isToday?'TODAY':n+' days';
-      var lbl2=mkDiv('font-size:18px;color:'+(isOverdue?'var(--danger)':isUrgent?'var(--warn)':'var(--text3)')+';',lbl2Text);
-      dates2.appendChild(dateTxt); dates2.appendChild(lbl2);
-      right2.appendChild(dates2);
-
-      var editBtn2=document.createElement('button');
-      // GCal sync button
-      var gcalDlBtn=document.createElement('button');
-      gcalDlBtn.style.cssText='background:rgba(76,142,201,0.1);border:1px solid rgba(76,142,201,0.2);border-radius:5px;padding:4px 8px;cursor:pointer;font-size:14px;color:var(--buyer);font-family:DM Sans,sans-serif;white-space:nowrap;';
-      gcalDlBtn.textContent='+ GCal';
-      gcalDlBtn.title='Add to Google Calendar';
-      (function(dl2){ gcalDlBtn.addEventListener('click',function(e){
-        e.stopPropagation();
-        var c5=gc(dl2.contactId);
-        syncToGCal({
-          title:dl2.type+(c5?' - '+fn(c5):''),
-          date:dl2.date,time:'',type:'deadline',
-          clientName:c5?fn(c5):'',
-          notes:'Deadline from Properly CRM'
-        }, dl2.assignedTo);
-      }); })(d);
-      right2.appendChild(gcalDlBtn);
-
-      editBtn2.style.cssText='background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:4px 8px;cursor:pointer;font-size:18px;color:var(--text2);font-family:DM Sans,sans-serif;';
-      editBtn2.textContent='Edit';
-      (function(dl){ editBtn2.addEventListener('click',function(e){ e.stopPropagation(); openEditDL(dl); }); })(d);
-
-      var delBtn2=document.createElement('button');
-      delBtn2.style.cssText='background:rgba(201,76,76,0.1);border:1px solid rgba(201,76,76,0.2);border-radius:5px;padding:4px 8px;cursor:pointer;font-size:18px;color:var(--danger);font-family:DM Sans,sans-serif;';
-      delBtn2.textContent='Del';
-      (function(did){ delBtn2.addEventListener('click',function(e){ e.stopPropagation(); if(confirm('Delete this deadline?')){ D=D.filter(function(x){return x.id!==did;}); sv(); pausePoll(8000); deleteDLfromDB(did); rdl(); rd(); }}); })(d.id);
-
-      right2.appendChild(editBtn2); right2.appendChild(delBtn2);
-      row2.appendChild(right2);
-      el.appendChild(row2);
-    }
+    });
   });
 }
 
