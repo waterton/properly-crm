@@ -1297,15 +1297,15 @@ function rdl(){
       var c=gc(d.contactId); var n=du(d.date);
       var isOverdue=n<0, isToday=n===0, isUrgent=n<=3&&n>=0;
       var row2=document.createElement('div');
-      row2.style.cssText='background:var(--surface);border:1px solid '+(isOverdue?'rgba(201,76,76,0.4)':isToday?'var(--accent)':isUrgent?'rgba(201,168,76,0.3)':'var(--border)')+';border-radius:8px;padding:5px 14px;margin-bottom:6px;display:flex;align-items:center;gap:10px;';
+      row2.style.cssText='background:var(--surface);border:1px solid '+(isOverdue?'rgba(201,76,76,0.4)':isToday?'var(--accent)':isUrgent?'rgba(201,168,76,0.3)':'var(--border)')+';border-radius:8px;padding:5px 14px;margin-bottom:6px;display:flex;align-items:center;flex-wrap:wrap;gap:6px 10px;';;
       row2.appendChild(mkDot(dc(n)));
-      var info2=mkDiv('flex:1;');
+      var info2=mkDiv('flex:1;min-width:130px;');
       var typeLbl=document.createElement('div');
       typeLbl.style.cssText='font-size:18px;font-weight:600;color:'+(isOverdue?'var(--danger)':isToday?'var(--accent)':'var(--text)')+';';
       typeLbl.textContent=(isOverdue?'OVERDUE: ':isToday?'TODAY: ':'')+dlTypeLabel(d, g.tx);
       info2.appendChild(typeLbl);
       row2.appendChild(info2);
-      var right2=mkDiv('display:flex;align-items:center;gap:8px;');
+      var right2=mkDiv('display:flex;align-items:center;gap:6px;margin-left:auto;');
       var dates2=mkDiv('display:flex;align-items:center;gap:8px;white-space:nowrap;');
       var dateTxt=document.createElement('div'); dateTxt.style.cssText='font-family:monospace;font-size:16px;color:'+(isOverdue?'var(--danger)':isToday?'var(--accent)':'var(--text2)')+';font-weight:'+(isOverdue||isToday?'700':'400')+';'; dateTxt.textContent=fd(d.date);
       var lbl2=mkDiv('font-size:14px;color:'+(isOverdue?'var(--danger)':isUrgent?'var(--warn)':'var(--text3)')+';', isOverdue?Math.abs(n)+'d overdue':isToday?'TODAY':n+' days');
