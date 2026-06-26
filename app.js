@@ -1200,12 +1200,12 @@ function rn(){
 
 function openEditNote(note){
   // Pre-fill the note modal
-  ge('nContact').value=note.contactId;
+  fs('nContact'); ge('nContact').value=note.contactId;
+  fsDeals('nDeal', note.contactId, note.transactionId);
   ge('nText').value=note.text;
   ge('btnSaveNote') && ge('btnSaveNote').setAttribute('data-edit-id', note.id);
   om('noteModal');
 }
-
 function rdl(){
   var el=ge('dlList');
   el.innerHTML='';
@@ -1500,11 +1500,12 @@ function svn(){
     if(existing){
       existing.text=text;
       existing.contactId=parseInt(ge('nContact').value);
+      existing.transactionId=parseInt(ge('nDeal').value)||null;
       sv(); if(supaReady) dbSave('notes',[existing]);
     }
     ge('btnSaveNote') && ge('btnSaveNote').setAttribute('data-edit-id','');
   } else {
-    var nn={id:Date.now(),contactId:parseInt(ge('nContact').value),text:text,date:new Date().toISOString()};
+    var nn={id:Date.now(),contactId:parseInt(ge('nContact').value),transactionId:parseInt(ge('nDeal').value)||null,text:text,date:new Date().toISOString()};
     N.push(nn); saveNote(nn);
   }
   cm('noteModal'); ge('nText').value=''; rn(); rd();
@@ -1542,6 +1543,7 @@ function svfu(){
 }
 function openEditDL(d){
   fs('dlContact'); ge('dlContact').value=d.contactId;
+  fsDeals('dlDeal', d.contactId, d.transactionId);
   ge('dlType').value=d.type||'';
   ge('dlDate').value=d.date||'';
   ge('btnSaveDL') && ge('btnSaveDL').setAttribute('data-edit-id', d.id);
@@ -1553,13 +1555,14 @@ function svdl(){
     var existing = D.find(function(x){ return String(x.id)===String(editId); });
     if(existing){
       existing.contactId=parseInt(ge('dlContact').value);
+      existing.transactionId=parseInt(ge('dlDeal').value)||null;
       existing.type=ge('dlType').value;
       existing.date=ge('dlDate').value;
       sv(); if(supaReady) dbSave('deadlines',[existing]);
     }
     ge('btnSaveDL') && ge('btnSaveDL').setAttribute('data-edit-id','');
   } else {
-    var nd={id:Date.now(),contactId:parseInt(ge('dlContact').value),type:ge('dlType').value,date:ge('dlDate').value,assignedTo:parseInt(ge('dlAssign')&&ge('dlAssign').value)||null};
+    var nd={id:Date.now(),contactId:parseInt(ge('dlContact').value),transactionId:parseInt(ge('dlDeal').value)||null,type:ge('dlType').value,date:ge('dlDate').value,assignedTo:parseInt(ge('dlAssign')&&ge('dlAssign').value)||null};
     D.push(nd); saveDL(nd); logActivity(nd.contactId,'Updated deadlines');
   }
   cm('dlModal'); rdl(); rd(); if(curDet)vc(curDet);
@@ -6681,15 +6684,17 @@ ge('btnAdd').addEventListener('click',function(){om('addModal');});
 ge('btnPipelineAdd').addEventListener('click',function(){om('addModal');});
 ge('btnContactAdd').addEventListener('click',function(){om('addModal');});
 ge('btnAddFU').addEventListener('click',function(){ge('btnSaveFU')&&ge('btnSaveFU').setAttribute('data-edit-id','');ge('fuLabel').value='';fs('fuContact');fsDeals('fuDeal',ge('fuContact').value,'');ge('fuDate').value=tod();om('fuModal');});
-ge('btnAddNote').addEventListener('click',function(){fs('nContact');om('noteModal');});
-ge('btnAddDL').addEventListener('click',function(){fs('dlContact');ge('dlDate').value=tod();om('dlModal');});
+ge('btnAddNote').addEventListener('click',function(){ge('btnSaveNote')&&ge('btnSaveNote').setAttribute('data-edit-id','');ge('nText').value='';fs('nContact');fsDeals('nDeal',ge('nContact').value,'');om('noteModal');});
+ge('btnAddDL').addEventListener('click',function(){ge('btnSaveDL')&&ge('btnSaveDL').setAttribute('data-edit-id','');fs('dlContact');fsDeals('dlDeal',ge('dlContact').value,'');ge('dlDate').value=tod();om('dlModal');});
 ge('btnViewNotes').addEventListener('click',function(){sp('notes');});
 ge('btnViewFU').addEventListener('click',function(){sp('followups');});
 ge('btnSaveContact').addEventListener('click',svc);
 ge('btnSaveNote').addEventListener('click',svn);
+(function(){ var c=ge('nContact'); if(c) c.addEventListener('change',function(){ fsDeals('nDeal', c.value, ''); }); })();
 ge('btnSaveFU').addEventListener('click',svfu);
 (function(){ var c=ge('fuContact'); if(c) c.addEventListener('change',function(){ fsDeals('fuDeal', c.value, ''); }); })();
 ge('btnSaveDL').addEventListener('click',svdl);
+(function(){ var c=ge('dlContact'); if(c) c.addEventListener('change',function(){ fsDeals('dlDeal', c.value, ''); }); })();
 ge('btnSaveDetNote').addEventListener('click',adn);
 ge('detOv').addEventListener('click',function(e){if(e.target===ge('detOv'))cd();});
 ge('searchBox').addEventListener('input',function(){if(curPage==='contacts')rc();});
