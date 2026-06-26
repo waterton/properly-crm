@@ -164,9 +164,25 @@ async function saveDocument(file, meta){
 }
 
 async function deleteDocument(doc){
-  try{ await deleteDocFile(doc.file_path); }catch(e){ /* still remove the row */ }
+  var headers = await getAuthHeaders();
+  // 1. Delete the file from storage (404 = already gone, that is fine)
+  var fileResp = await fetch(SUPA_URL + '/storage/v1/object/' + DOC_BUCKET + '/' + doc.file_path, {
+    method: 'DELETE', headers: headers
+  });
+  if(!fileResp.ok && fileResp.status !== 404){
+    var ft = await fileResp.text();
+    throw new Error('Storage delete failed: ' + ft.substring(0, 200));
+  }
+  // 2. Delete the database row
+  var rowResp = await fetch(SUPA_URL + '/rest/v1/documents?id=eq.' + doc.id, {
+    method: 'DELETE', headers: headers
+  });
+  if(!rowResp.ok){
+    var rt = await rowResp.text();
+    throw new Error('Record delete failed: ' + rt.substring(0, 200));
+  }
+  // 3. Only now remove it locally
   DOCS = DOCS.filter(function(d){ return d.id !== doc.id; });
-  if(supaReady) dbDelete('documents', doc.id);
 }
 
 async function openDocument(doc){
@@ -217,7 +233,7 @@ function buildDocRow(doc, onChange){
   del.textContent = 'Delete';
   (function(d){ del.addEventListener('click', function(){
     if(!confirm('Delete "' + (d.file_name||'this document') + '"? The file will be permanently removed.')) return;
-    deleteDocument(d).then(function(){ if(onChange) onChange(); });
+    deleteDocument(d).then(function(){ if(onChange) onChange(); }).catch(function(e){ alert('Delete failed: ' + e.message); });
   }); })(doc);
   row.appendChild(name); row.appendChild(meta); row.appendChild(del);
   return row;
