@@ -458,9 +458,10 @@ function ctypes(c){
 }
 function ctype1(c){ var t=ctypes(c); return t[0]||''; } // primary type for CSS classes etc
 function gc(id){for(var i=0;i<C.length;i++){if(String(C[i].id)===String(id))return C[i];}return null;}
-function du(s){var d=new Date(s);d.setHours(0,0,0,0);var n=new Date();n.setHours(0,0,0,0);return Math.round((d-n)/864e5);}
+function du(s){var d=pld(s);d.setHours(0,0,0,0);var n=new Date();n.setHours(0,0,0,0);return Math.round((d-n)/864e5);}
 function rt(iso){var m=Math.round((Date.now()-new Date(iso))/60000);if(m<1)return 'just now';if(m<60)return m+'m ago';if(m<1440)return Math.round(m/60)+'h ago';return Math.round(m/1440)+'d ago';}
-function fd(s){return new Date(s).toLocaleDateString('en-US',{month:'short',day:'numeric'});}
+function pld(s){if(typeof s==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(s)){var p=s.split('-');return new Date(+p[0],+p[1]-1,+p[2]);}return new Date(s);}
+function fd(s){return pld(s).toLocaleDateString('en-US',{month:'short',day:'numeric'});}
 function tod(){return new Date().toISOString().split('T')[0];}
 function dc(n){return n<=3?'dot-r':n<=7?'dot-y':'dot-g';}
 function pl(p){return p==='hot'?'HOT':p==='warn'?'SOON':'OK';}
