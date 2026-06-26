@@ -77,9 +77,9 @@ function sv(){
 // Known columns per table — strips unknown fields before sending to Supabase
 var DB_COLS = {
   contacts: ['id','first','last','type','phone','email','property','stage','price','notes','added','closeDate','assignedTo'],
-  notes: ['id','contactId','text','date'],
-  followups: ['id','contactId','label','date','pri','done','assignedTo'],
-  deadlines: ['id','contactId','type','date','assignedTo'],
+  notes: ['id','contactId','transactionId','text','date'],
+  followups: ['id','contactId','transactionId','label','date','pri','done','assignedTo'],
+  deadlines: ['id','contactId','transactionId','type','date','assignedTo'],
   transactions: null, // allow all
   campaigns: null,
   enrollments: null,
@@ -1398,6 +1398,18 @@ function rdl(){
 function om(id){ge(id).classList.add('open');}
 function cm(id){ge(id).classList.remove('open');}
 function fs(sid){var sel=ge(sid);sel.innerHTML='';C.forEach(function(c){var o=document.createElement('option');o.value=c.id;o.textContent=fn(c)+(ctypes(c).length?' ('+ctypes(c).join(', ')+ ')':'');sel.appendChild(o);});}
+function fsDeals(selId, contactId, selectedId){
+  var sel=ge(selId); if(!sel) return;
+  sel.innerHTML='';
+  var o0=document.createElement('option'); o0.value=''; o0.textContent='No deal (whole client)'; sel.appendChild(o0);
+  var cid=parseInt(contactId);
+  TX.filter(function(t){return parseInt(t.contactId)===cid;}).forEach(function(t){
+    var o=document.createElement('option'); o.value=t.id;
+    o.textContent=(t.address||'Transaction')+(t.type?' ('+t.type+')':'')+(t.status==='closed'?' - closed':'');
+    sel.appendChild(o);
+  });
+  if(selectedId!=null && String(selectedId)!=='') sel.value=String(selectedId);
+}
 function ofc(id){fs('fuContact');ge('fuContact').value=id;ge('fuDate').value=tod();populateAssignDropdowns();om('fuModal');}
 function odc(id){fs('dlContact');ge('dlContact').value=id;ge('dlDate').value=tod();populateAssignDropdowns();om('dlModal');}
 
@@ -1499,6 +1511,7 @@ function svn(){
 }
 function openEditFU(f){
   fs('fuContact'); ge('fuContact').value=f.contactId;
+  fsDeals('fuDeal', f.contactId, f.transactionId);
   ge('fuLabel').value=f.label||'';
   ge('fuDate').value=f.date||'';
   if(f.pri) ge('fuPri').value=f.pri;
@@ -1513,6 +1526,7 @@ function svfu(){
     var existing=F.find(function(x){return String(x.id)===String(editId);});
     if(existing){
       existing.contactId=parseInt(ge('fuContact').value);
+      existing.transactionId=parseInt(ge('fuDeal').value)||null;
       existing.label=lbl;
       existing.date=ge('fuDate').value;
       existing.pri=ge('fuPri').value;
@@ -1521,7 +1535,7 @@ function svfu(){
     }
     ge('btnSaveFU') && ge('btnSaveFU').setAttribute('data-edit-id','');
   } else {
-    var nf={id:Date.now(),contactId:parseInt(ge('fuContact').value),label:lbl,date:ge('fuDate').value,pri:ge('fuPri').value,done:false,assignedTo:parseInt(ge('fuAssign')&&ge('fuAssign').value)||null};
+    var nf={id:Date.now(),contactId:parseInt(ge('fuContact').value),transactionId:parseInt(ge('fuDeal').value)||null,label:lbl,date:ge('fuDate').value,pri:ge('fuPri').value,done:false,assignedTo:parseInt(ge('fuAssign')&&ge('fuAssign').value)||null};
     F.push(nf); saveFU(nf);
   }
   cm('fuModal'); ge('fuLabel').value=''; rfu(); rd(); if(curDet)vc(curDet);
@@ -6666,7 +6680,7 @@ ge('sbOv').addEventListener('click',csb);
 ge('btnAdd').addEventListener('click',function(){om('addModal');});
 ge('btnPipelineAdd').addEventListener('click',function(){om('addModal');});
 ge('btnContactAdd').addEventListener('click',function(){om('addModal');});
-ge('btnAddFU').addEventListener('click',function(){ge('btnSaveFU')&&ge('btnSaveFU').setAttribute('data-edit-id','');ge('fuLabel').value='';fs('fuContact');ge('fuDate').value=tod();om('fuModal');});
+ge('btnAddFU').addEventListener('click',function(){ge('btnSaveFU')&&ge('btnSaveFU').setAttribute('data-edit-id','');ge('fuLabel').value='';fs('fuContact');fsDeals('fuDeal',ge('fuContact').value,'');ge('fuDate').value=tod();om('fuModal');});
 ge('btnAddNote').addEventListener('click',function(){fs('nContact');om('noteModal');});
 ge('btnAddDL').addEventListener('click',function(){fs('dlContact');ge('dlDate').value=tod();om('dlModal');});
 ge('btnViewNotes').addEventListener('click',function(){sp('notes');});
@@ -6674,6 +6688,7 @@ ge('btnViewFU').addEventListener('click',function(){sp('followups');});
 ge('btnSaveContact').addEventListener('click',svc);
 ge('btnSaveNote').addEventListener('click',svn);
 ge('btnSaveFU').addEventListener('click',svfu);
+(function(){ var c=ge('fuContact'); if(c) c.addEventListener('change',function(){ fsDeals('fuDeal', c.value, ''); }); })();
 ge('btnSaveDL').addEventListener('click',svdl);
 ge('btnSaveDetNote').addEventListener('click',adn);
 ge('detOv').addEventListener('click',function(e){if(e.target===ge('detOv'))cd();});
