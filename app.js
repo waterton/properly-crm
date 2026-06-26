@@ -1288,16 +1288,16 @@ function rdl(){
   order.forEach(function(k){
     var g=groups[k];
     var hdr=document.createElement('div');
-    hdr.style.cssText='display:flex;align-items:baseline;gap:10px;margin:14px 0 8px;padding-bottom:6px;border-bottom:2px solid var(--border);';
-    var hAddr=document.createElement('div'); hAddr.style.cssText='font-size:19px;font-weight:700;color:var(--text);'; hAddr.textContent=g.addr||g.who||'Unassigned'; hdr.appendChild(hAddr);
-    if(g.addr && g.who && g.who!=='Unassigned'){ var hWho=document.createElement('div'); hWho.style.cssText='font-size:16px;color:var(--text3);'; hWho.textContent=g.who; hdr.appendChild(hWho); }
+    hdr.style.cssText='display:flex;align-items:baseline;gap:10px;margin:22px 0 10px;padding:8px 12px;background:var(--surface2);border-left:4px solid var(--accent);border-radius:6px;';
+    var hAddr=document.createElement('div'); hAddr.style.cssText='font-size:18px;font-weight:700;color:var(--accent);letter-spacing:0.3px;'; hAddr.textContent=g.addr||g.who||'Unassigned'; hdr.appendChild(hAddr);
+    if(g.addr && g.who && g.who!=='Unassigned'){ var hWho=document.createElement('div'); hWho.style.cssText='font-size:15px;color:var(--text3);'; hWho.textContent=g.who; hdr.appendChild(hWho); }
     el.appendChild(hdr);
 
     g.dated.slice().sort(function(a,b){return pld(a.date)-pld(b.date);}).forEach(function(d){
       var c=gc(d.contactId); var n=du(d.date);
       var isOverdue=n<0, isToday=n===0, isUrgent=n<=3&&n>=0;
       var row2=document.createElement('div');
-      row2.style.cssText='background:var(--surface);border:1px solid '+(isOverdue?'rgba(201,76,76,0.4)':isToday?'var(--accent)':isUrgent?'rgba(201,168,76,0.3)':'var(--border)')+';border-radius:8px;padding:11px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px;';
+      row2.style.cssText='background:var(--surface);border:1px solid '+(isOverdue?'rgba(201,76,76,0.4)':isToday?'var(--accent)':isUrgent?'rgba(201,168,76,0.3)':'var(--border)')+';border-radius:8px;padding:5px 14px;margin-bottom:6px;display:flex;align-items:center;gap:10px;';
       row2.appendChild(mkDot(dc(n)));
       var info2=mkDiv('flex:1;');
       var typeLbl=document.createElement('div');
@@ -1306,9 +1306,9 @@ function rdl(){
       info2.appendChild(typeLbl);
       row2.appendChild(info2);
       var right2=mkDiv('display:flex;align-items:center;gap:8px;');
-      var dates2=mkDiv('text-align:right;');
-      var dateTxt=document.createElement('div'); dateTxt.style.cssText='font-family:monospace;font-size:18px;color:'+(isOverdue?'var(--danger)':isToday?'var(--accent)':'var(--text2)')+';font-weight:'+(isOverdue||isToday?'700':'400')+';'; dateTxt.textContent=fd(d.date);
-      var lbl2=mkDiv('font-size:18px;color:'+(isOverdue?'var(--danger)':isUrgent?'var(--warn)':'var(--text3)')+';', isOverdue?Math.abs(n)+'d overdue':isToday?'TODAY':n+' days');
+      var dates2=mkDiv('display:flex;align-items:center;gap:8px;white-space:nowrap;');
+      var dateTxt=document.createElement('div'); dateTxt.style.cssText='font-family:monospace;font-size:16px;color:'+(isOverdue?'var(--danger)':isToday?'var(--accent)':'var(--text2)')+';font-weight:'+(isOverdue||isToday?'700':'400')+';'; dateTxt.textContent=fd(d.date);
+      var lbl2=mkDiv('font-size:14px;color:'+(isOverdue?'var(--danger)':isUrgent?'var(--warn)':'var(--text3)')+';', isOverdue?Math.abs(n)+'d overdue':isToday?'TODAY':n+' days');
       dates2.appendChild(dateTxt); dates2.appendChild(lbl2); right2.appendChild(dates2);
       var gcalDlBtn=document.createElement('button');
       gcalDlBtn.style.cssText='background:rgba(76,142,201,0.1);border:1px solid rgba(76,142,201,0.2);border-radius:5px;padding:4px 8px;cursor:pointer;font-size:14px;color:var(--buyer);font-family:DM Sans,sans-serif;white-space:nowrap;';
