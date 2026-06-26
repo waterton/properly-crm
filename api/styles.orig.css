@@ -1,4 +1,4 @@
-:root{--bg:#1A1612;--surface:#241E18;--surface2:#2E2620;--surface3:#3A2F26;--border:#3A322B;--accent:#C8432A;--accent2:#E0694C;--text:#E8DDD4;--text2:#A89A8B;--text3:#736658;--buyer:#4c8ec9;--seller:#c96b4c;--lead:#6bc97a;--danger:#D84444;--warn:#C9A84C;--radius:10px;}
+:root{--bg:#0d0f14;--surface:#151820;--surface2:#1c2030;--surface3:#232840;--border:#2a2f45;--accent:#c9a84c;--accent2:#e8c97a;--text:#e8eaf0;--text2:#8b90a8;--text3:#5a5f78;--buyer:#4c8ec9;--seller:#c96b4c;--lead:#6bc97a;--danger:#c94c4c;--warn:#c9a84c;--radius:10px;}
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden;font-size:16px !important;}
 
@@ -113,7 +113,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .sb-ov.open{display:block;}
 .empty{text-align:center;padding:36px 20px;color:var(--text3);font-size:16px;}
 .filter-btn{padding:5px 13px;border-radius:20px;font-size:16px;font-weight:500;cursor:pointer;border:1px solid var(--border);background:var(--surface2);color:var(--text2);transition:all 0.15s;font-family:'DM Sans',sans-serif;}
-.filter-btn.active,.filter-btn:hover{border-color:var(--accent);color:var(--accent);background:rgba(200,67,42,0.08);}
+.filter-btn.active,.filter-btn:hover{border-color:var(--accent);color:var(--accent);background:rgba(201,168,76,0.08);}
 .topbar-user{width:30px;height:30px;border-radius:50%;background:var(--accent);color:var(--bg);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;}
 /* TRANSACTION COORDINATOR */
 .tc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px;}
@@ -151,7 +151,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .tc-ai-response{font-size:16px;color:var(--text2);line-height:1.6;white-space:pre-wrap;}
 /* DOCUMENT SCANNER */
 .scanner-drop{border:2px dashed var(--border);border-radius:12px;padding:36px 20px;text-align:center;cursor:pointer;transition:all 0.2s;background:var(--surface2);}
-.scanner-drop:hover,.scanner-drop.dragover{border-color:var(--accent);background:rgba(200,67,42,0.05);}
+.scanner-drop:hover,.scanner-drop.dragover{border-color:var(--accent);background:rgba(201,168,76,0.05);}
 .scanner-drop-icon{font-size:48px;margin-bottom:12px;color:var(--text3);}
 .scanner-drop-title{font-size:16px;font-weight:600;color:var(--text);margin-bottom:6px;}
 .scanner-drop-sub{font-size:16px;color:var(--text3);}
@@ -201,7 +201,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .gmail-msg-list{overflow-y:auto;flex:1;}
 .gmail-msg-item{padding:11px 14px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.1s;}
 .gmail-msg-item:hover{background:var(--surface2);}
-.gmail-msg-item.active{background:rgba(200,67,42,0.08);border-left:3px solid var(--accent);}
+.gmail-msg-item.active{background:rgba(201,168,76,0.08);border-left:3px solid var(--accent);}
 .gmail-msg-item.unread .gmail-msg-subject{font-weight:700;color:var(--text);}
 .gmail-msg-from{font-size:16px;font-weight:600;color:var(--text);margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .gmail-msg-subject{font-size:16px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
@@ -283,17 +283,17 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);border-left:1px solid var(--border);border-top:1px solid var(--border);}
 .cal-dow{padding:8px;text-align:center;font-size:13px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1px;background:var(--surface2);border-right:1px solid var(--border);border-bottom:1px solid var(--border);}
 .cal-cell{border-right:1px solid var(--border);border-bottom:1px solid var(--border);min-height:100px;padding:4px;cursor:pointer;transition:background 0.1s;vertical-align:top;}
-.cal-cell:hover{background:rgba(200,67,42,0.05);}
-.cal-cell.today{background:rgba(200,67,42,76,0.08);}
+.cal-cell:hover{background:rgba(201,168,76,0.05);}
+.cal-cell.today{background:rgba(201,168,76,0.08);}
 .cal-cell.other-month{opacity:0.4;}
-.cal-cell.selected{background:rgba(200,67,42,0.12);outline:2px solid var(--accent);}
+.cal-cell.selected{background:rgba(201,168,76,0.12);outline:2px solid var(--accent);}
 .cal-day-num{font-size:14px;font-weight:600;color:var(--text2);margin-bottom:3px;width:24px;height:24px;display:flex;align-items:center;justify-content:center;border-radius:50%;}
 .cal-cell.today .cal-day-num{background:var(--accent);color:var(--bg);}
 .cal-event{font-size:12px;padding:2px 5px;border-radius:3px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;font-weight:500;}
 .cal-event:hover{opacity:0.85;}
 .cal-event.ev-deadline{background:rgba(201,76,76,0.25);color:#ff9999;}
 .cal-event.ev-followup{background:rgba(107,201,122,0.25);color:#6bc97a;}
-.cal-event.ev-transaction{background:rgba(200,67,42,0.25);color:var(--accent);}
+.cal-event.ev-transaction{background:rgba(201,168,76,0.25);color:var(--accent);}
 .cal-event.ev-custom{background:rgba(76,142,201,0.25);color:#7ab8f5;}
 .cal-event.ev-gcal{background:rgba(167,139,250,0.25);color:#a78bfa;}
 .cal-event.ev-overdue{background:rgba(201,76,76,0.5);color:#ff6666;font-weight:700;}
@@ -301,7 +301,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .cal-week-grid{display:grid;grid-template-columns:60px repeat(7,1fr);border-left:1px solid var(--border);border-top:1px solid var(--border);}
 .cal-week-hour{font-size:12px;color:var(--text3);padding:4px 6px;border-right:1px solid var(--border);border-bottom:1px solid var(--border);text-align:right;background:var(--surface2);}
 .cal-week-cell{border-right:1px solid var(--border);border-bottom:1px solid var(--border);min-height:40px;padding:2px;position:relative;cursor:pointer;}
-.cal-week-cell:hover{background:rgba(200,67,42,0.04);}
+.cal-week-cell:hover{background:rgba(201,168,76,0.04);}
 /* Agenda view */
 .cal-agenda-day{margin-bottom:2px;}
 .cal-agenda-date{font-size:14px;font-weight:700;color:var(--text);padding:10px 16px 6px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface);z-index:2;}
@@ -356,7 +356,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .google-btn:hover{background:#f8f8f8;box-shadow:0 1px 6px rgba(0,0,0,0.2);}
 .google-btn svg{width:20px;height:20px;}
 .login-footer{margin-top:24px;padding-top:18px;border-top:1px solid var(--border);font-size:12px;color:var(--text3);text-align:center;}
-.fab{position:fixed;bottom:24px;right:24px;width:52px;height:52px;border-radius:50%;background:var(--accent);border:none;cursor:pointer;font-size:26px;color:var(--bg);font-weight:700;box-shadow:0 4px 20px rgba(200,67,42,0.5);z-index:200;}
+.fab{position:fixed;bottom:24px;right:24px;width:52px;height:52px;border-radius:50%;background:var(--accent);border:none;cursor:pointer;font-size:26px;color:var(--bg);font-weight:700;box-shadow:0 4px 20px rgba(201,168,76,0.5);z-index:200;}
 /* Login CSS removed - auth disabled for testing */
 .mls-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;}
 .mls-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;cursor:pointer;transition:all 0.15s;}
@@ -396,7 +396,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .mls-det-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
 .mls-det-field{font-size:16px;color:var(--text2);}
 .mls-det-field b{color:var(--text);}
-.bhero{background:linear-gradient(135deg,#2E2620,#1A1612);border:1px solid var(--border);border-radius:12px;padding:26px;margin-bottom:18px;}
+.bhero{background:linear-gradient(135deg,#1a1f35,#0d0f14);border:1px solid var(--border);border-radius:12px;padding:26px;margin-bottom:18px;}
 .bdate{font-size:16px;color:var(--text3);letter-spacing:2px;text-transform:uppercase;margin-bottom:5px;}
 .bgreet{font-family:'Bebas Neue',sans-serif;font-size:30px;letter-spacing:1px;margin-bottom:4px;}
 .bsub{font-size:16px;color:var(--text2);line-height:1.5;}
