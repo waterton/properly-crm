@@ -555,7 +555,7 @@ function rd(){
   ge('sBuyers').textContent=C.filter(function(c){return ctypes(c).indexOf('buyer')>=0;}).length;
   ge('sSellers').textContent=C.filter(function(c){return ctypes(c).indexOf('seller')>=0;}).length;
   ge('sLeads').textContent=C.filter(function(c){var t=ctypes(c);return t.indexOf('prospect')>=0||t.indexOf('lead')>=0;}).length;
-  ge('sClosing').textContent=D.filter(function(d){var n=du(d.date);return n>=0&&n<=30;}).length;
+  ge('sClosing').textContent=TX.filter(function(t){return t.status!=='closed';}).length;
   var rEl=ge('dRecent');rEl.innerHTML='';
   var rec=A.slice(0,8);
   if(!rec.length){rEl.innerHTML='<div class="empty">No activity yet</div>';}
