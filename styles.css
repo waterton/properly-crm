@@ -15,7 +15,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .logo-text{font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:2px;color:#C9A84C;}
 .logo-sub{font-size:16px;color:#A8915E;letter-spacing:3px;text-transform:uppercase;}
 .nav{padding:14px 8px;flex:1;}
-.nav-sec{font-size:16px;color:var(--text3);letter-spacing:2px;text-transform:uppercase;padding:8px 10px 5px;margin-top:6px;}
+.nav-sec{font-size:16px;font-weight:700;color:var(--accent);letter-spacing:2px;text-transform:uppercase;padding:8px 10px 5px;margin-top:6px;}
 .ni{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:7px;cursor:pointer;font-size:16px;color:var(--text2);border:none;background:none;width:100%;text-align:left;margin-bottom:2px;transition:all 0.15s;}
 .ni:hover{background:var(--surface2);color:var(--text);}
 .ni.active{background:var(--surface3);color:var(--accent);}

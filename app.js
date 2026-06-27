@@ -6161,7 +6161,6 @@ ge('nav-cardscanner').addEventListener('click',function(){sp('cardscanner');});
 ge('nav-calendar').addEventListener('click',function(){sp('calendar');});
 ge('nav-team').addEventListener('click',function(){sp('team');});
 ge('nav-gmail').addEventListener('click',function(){sp('gmail');});
-ge('nav-mls').addEventListener('click',function(){sp('mls');});
 ge('nav-drips').addEventListener('click',function(){sp('drips');});
 
 ge('nav-documents').addEventListener('click',function(){sp('documents');});
