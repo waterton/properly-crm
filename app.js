@@ -76,7 +76,7 @@ function sv(){
 // Supabase sync functions
 // Known columns per table — strips unknown fields before sending to Supabase
 var DB_COLS = {
-  contacts: ['id','first','last','type','phone','email','property','stage','price','notes','added','closeDate','assignedTo'],
+  contacts: ['id','first','last','type','phone','email','property','stage','price','notes','added','closeDate','assignedTo','emails','phones','addresses'],
   notes: ['id','contactId','transactionId','text','date'],
   followups: ['id','contactId','transactionId','label','date','pri','done','assignedTo'],
   deadlines: ['id','contactId','transactionId','type','date','assignedTo'],
