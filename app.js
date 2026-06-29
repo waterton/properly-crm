@@ -1387,6 +1387,46 @@ function clearFTypeValues(){
   document.querySelectorAll('.ftype-chk').forEach(function(cb){ cb.checked=false; });
 }
 
+function mvAddRow(containerId, value, label){
+  var box = ge(containerId); if(!box) return;
+  var row = document.createElement('div');
+  row.className = 'mv-row';
+  row.style.cssText = 'display:flex;gap:6px;margin-bottom:6px;align-items:center;';
+  var vi = document.createElement('input');
+  vi.className = 'fi mv-val'; vi.style.flex = '1';
+  vi.value = value || '';
+  vi.setAttribute('placeholder', box.getAttribute('data-ph') || '');
+  var li = document.createElement('input');
+  li.className = 'fi mv-lbl'; li.style.width = '90px';
+  li.value = label || ''; li.setAttribute('placeholder', 'label');
+  var rm = document.createElement('button');
+  rm.type = 'button'; rm.className = 'btn btn-g';
+  rm.style.cssText = 'padding:4px 10px;font-size:18px;'; rm.textContent = 'X';
+  rm.addEventListener('click', function(){ box.removeChild(row); });
+  row.appendChild(vi); row.appendChild(li); row.appendChild(rm);
+  box.appendChild(row);
+}
+function mvRender(containerId, arr, fallback){
+  var box = ge(containerId); if(!box) return;
+  box.innerHTML = '';
+  var list = Array.isArray(arr) ? arr.slice() : [];
+  if(!list.length && fallback){ list = [{value: fallback, label: ''}]; }
+  if(!list.length){ mvAddRow(containerId, '', ''); return; }
+  list.forEach(function(item){
+    if(typeof item === 'string'){ mvAddRow(containerId, item, ''); }
+    else { mvAddRow(containerId, (item && item.value) || '', (item && item.label) || ''); }
+  });
+}
+function mvCollect(containerId){
+  var box = ge(containerId); if(!box) return [];
+  var out = [], rows = box.querySelectorAll('.mv-row');
+  for(var i=0;i<rows.length;i++){
+    var v = rows[i].querySelector('.mv-val'), l = rows[i].querySelector('.mv-lbl');
+    var val = v ? v.value.trim() : '';
+    if(val) out.push({value: val, label: l ? l.value.trim() : ''});
+  }
+  return out;
+}
 function openEditContact(id){
   var c = gc(id);
   if(!c) return;
@@ -1395,9 +1435,9 @@ function openEditContact(id){
   ge('fFirst').value = c.first||'';
   ge('fLast').value = c.last||'';
   setFTypeValues(ctypes(c));
-  ge('fPhone').value = c.phone||'';
-  ge('fEmail').value = c.email||'';
-  ge('fProp').value = c.property||'';
+  mvRender('fPhones', c.phones, c.phone);
+  mvRender('fEmails', c.emails, c.email);
+  mvRender('fAddresses', c.addresses, c.property);
   ge('fStage').value = c.stage||'';
   ge('fPrice').value = c.price||'';
   ge('fNotes').value = c.notes||'';
@@ -1425,30 +1465,35 @@ function svc(){
     }
     c.first=first; c.last=last;
     c.types=getFTypeValues(); c.type=c.types.join('|');
-    c.phone=ge('fPhone').value; c.email=ge('fEmail').value;
-    c.property=ge('fProp').value; c.stage=ge('fStage').value;
+    c.phones=mvCollect('fPhones'); c.emails=mvCollect('fEmails'); c.addresses=mvCollect('fAddresses');
+    c.phone=(c.phones[0]&&c.phones[0].value)||''; c.email=(c.emails[0]&&c.emails[0].value)||''; c.property=(c.addresses[0]&&c.addresses[0].value)||'';
+    c.stage=ge('fStage').value;
     c.price=ge('fPrice').value; c.notes=ge('fNotes').value;
     c.closeDate=ge('fCloseDate').value||'';
     updateContact(c);logActivity(c.id,'Updated contact');
     ge('btnSaveContact') && ge('btnSaveContact').setAttribute('data-edit-id','');
     ge('addModalTitle') && (ge('addModalTitle').textContent = 'Add Contact');
     cm('addModal');
-    ['fFirst','fLast','fPhone','fEmail','fProp','fPrice','fNotes','fCloseDate'].forEach(function(x){ge(x).value='';});
+    ['fFirst','fLast','fPrice','fNotes','fCloseDate'].forEach(function(x){ge(x).value='';});
+    mvRender('fPhones',[]); mvRender('fEmails',[]); mvRender('fAddresses',[]);
     clearFTypeValues(); ge('fStage').value='';
     rd(); if(curPage==='contacts')rc(); if(curPage==='pipeline')rp();
     return;
   } else {
     var _ftypes=getFTypeValues();
+    var _ph=mvCollect('fPhones'), _em=mvCollect('fEmails'), _ad=mvCollect('fAddresses');
     var nc={id:Date.now(),first:first,last:last,types:_ftypes,type:_ftypes.join('|'),
-      phone:ge('fPhone').value,email:ge('fEmail').value,
-      property:ge('fProp').value,stage:ge('fStage').value,
+      phones:_ph,emails:_em,addresses:_ad,
+      phone:(_ph[0]&&_ph[0].value)||'',email:(_em[0]&&_em[0].value)||'',
+      property:(_ad[0]&&_ad[0].value)||'',stage:ge('fStage').value,
       price:ge('fPrice').value,notes:ge('fNotes').value,
       closeDate:ge('fCloseDate').value||'',
       added:new Date().toISOString()};
     C.push(nc); saveContact(nc); logActivity(nc.id,'Added contact');
   }
   cm('addModal');
-  ['fFirst','fLast','fPhone','fEmail','fProp','fPrice','fNotes','fCloseDate'].forEach(function(x){ge(x).value='';})
+  ['fFirst','fLast','fPrice','fNotes','fCloseDate'].forEach(function(x){ge(x).value='';});
+  mvRender('fPhones',[]); mvRender('fEmails',[]); mvRender('fAddresses',[]);
   clearFTypeValues(); ge('fStage').value='';
   rd(); if(curPage==='contacts')rc(); if(curPage==='pipeline')rp();
 }
@@ -5445,7 +5490,7 @@ function renderThread(messages, threadId){
       var parts = name.replace(/<.*>/,'').trim().split(' ');
       ge('fFirst').value = parts[0]||'';
       ge('fLast').value = parts.slice(1).join(' ')||'';
-      ge('fEmail').value = email;
+      mvRender('fEmails', [{value:email,label:''}]); mvRender('fPhones',[]); mvRender('fAddresses',[]);
       clearFTypeValues();
       ge('btnSaveContact') && ge('btnSaveContact').setAttribute('data-edit-id','');
       ge('addModalTitle') && (ge('addModalTitle').textContent='Add Contact');
@@ -6641,7 +6686,17 @@ ge('hamburger').addEventListener('click',tsb);
 ge('sbOv').addEventListener('click',csb);
 ge('btnAdd').addEventListener('click',function(){om('addModal');});
 ge('btnPipelineAdd').addEventListener('click',function(){om('addModal');});
-ge('btnContactAdd').addEventListener('click',function(){om('addModal');});
+ge('btnContactAdd').addEventListener('click',function(){
+  ge('btnSaveContact') && ge('btnSaveContact').setAttribute('data-edit-id','');
+  ge('addModalTitle') && (ge('addModalTitle').textContent='Add Contact');
+  ['fFirst','fLast','fPrice','fNotes','fCloseDate'].forEach(function(x){ge(x).value='';});
+  clearFTypeValues(); ge('fStage').value='';
+  mvRender('fPhones',[]); mvRender('fEmails',[]); mvRender('fAddresses',[]);
+  om('addModal');
+});
+ge('fPhonesAdd') && ge('fPhonesAdd').addEventListener('click',function(){mvAddRow('fPhones','','');});
+ge('fEmailsAdd') && ge('fEmailsAdd').addEventListener('click',function(){mvAddRow('fEmails','','');});
+ge('fAddressesAdd') && ge('fAddressesAdd').addEventListener('click',function(){mvAddRow('fAddresses','','');});
 ge('btnAddFU').addEventListener('click',function(){ge('btnSaveFU')&&ge('btnSaveFU').setAttribute('data-edit-id','');ge('fuLabel').value='';fs('fuContact');fsDeals('fuDeal',ge('fuContact').value,'');ge('fuDate').value=tod();om('fuModal');});
 ge('btnAddNote').addEventListener('click',function(){ge('btnSaveNote')&&ge('btnSaveNote').setAttribute('data-edit-id','');ge('nText').value='';fs('nContact');fsDeals('nDeal',ge('nContact').value,'');om('noteModal');});
 ge('btnAddDL').addEventListener('click',function(){ge('btnSaveDL')&&ge('btnSaveDL').setAttribute('data-edit-id','');fs('dlContact');fsDeals('dlDeal',ge('dlContact').value,'');ge('dlDate').value=tod();om('dlModal');});
