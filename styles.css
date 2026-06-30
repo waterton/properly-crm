@@ -450,8 +450,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
   .sidebar{position:fixed;left:0;top:0;bottom:0;transform:translateX(-100%);}
   .sidebar.open{transform:translateX(0);box-shadow:4px 0 30px rgba(0,0,0,0.5);}
   .hbtn{display:flex;padding:6px;}
-  .hbtn svg{width:24px;height:24px;}
-  .topbar-title{font-size:22px;}
+  .hbtn svg{width:26px;height:26px;}
+  .topbar-title{font-size:24px;}
   .sbox{width:110px;}
   .grid4{grid-template-columns:1fr 1fr;}
   .col2,.col3{grid-template-columns:1fr;}
