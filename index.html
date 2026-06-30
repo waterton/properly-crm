@@ -860,7 +860,7 @@
   <div class="modal">
     <div class="mhdr"><div class="mtitle">Add Contact</div><button class="mx" data-close="addModal">&#x2715;</button></div>
     <div class="mbody">
-      <div class="frow"><div class="fg"><label class="fl">First Name</label><input class="fi" id="fFirst" placeholder="Sarah"></div><div class="fg"><label class="fl">Last Name</label><input class="fi" id="fLast" placeholder="Johnson"></div></div>
+      <div class="frow"><div class="fg"><label class="fl">First Name</label><input class="fi" id="fFirst"></div><div class="fg"><label class="fl">Last Name</label><input class="fi" id="fLast"></div></div>
       <div class="fg"><label class="fl">Type <span style="color:var(--text3);font-weight:400;">(optional, select all that apply)</span></label>
         <div id="fTypeWrap" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;">
           <label style="display:flex;align-items:center;gap:5px;font-size:14px;cursor:pointer;"><input type="checkbox" class="ftype-chk" value="prospect" style="accent-color:var(--accent);"> Prospect</label>
@@ -873,13 +873,13 @@
           <label style="display:flex;align-items:center;gap:5px;font-size:14px;cursor:pointer;"><input type="checkbox" class="ftype-chk" value="other" style="accent-color:var(--accent);"> Other</label>
         </div>
       </div>
-      <div class="fg"><label class="fl">Phone(s)</label><div id="fPhones" data-ph="(555) 000-0000"></div><button type="button" class="btn btn-g" id="fPhonesAdd" style="font-size:16px;padding:3px 10px;margin-top:2px;">+ Add phone</button></div>
-      <div class="fg"><label class="fl">Email(s)</label><div id="fEmails" data-ph="sarah@email.com"></div><button type="button" class="btn btn-g" id="fEmailsAdd" style="font-size:16px;padding:3px 10px;margin-top:2px;">+ Add email</button></div>
-      <div class="fg"><label class="fl">Address / Interest</label><div id="fAddresses" data-ph="123 Oak St or Budget $400k-$500k"></div><button type="button" class="btn btn-g" id="fAddressesAdd" style="font-size:16px;padding:3px 10px;margin-top:2px;">+ Add address</button></div>
-      <div class="fg"><label class="fl">WhatsApp</label><input class="fi" id="fWhatsapp" placeholder="+1 555 000 0000 or @username"></div>
-      <div class="frow"><div class="fg"><label class="fl">Stage <span style="color:var(--text3);font-weight:400;">(optional)</span></label><select class="fsel" id="fStage"><option value="">-- No stage --</option><option>New Lead</option><option>Contacted</option><option>Showing</option><option>Under Contract</option><option>Closed</option></select></div><div class="fg"><label class="fl">Price/Budget</label><input class="fi" id="fPrice" placeholder="$450,000"></div></div>
+      <div class="fg"><label class="fl">Phone(s)</label><div id="fPhones"></div><button type="button" class="btn btn-g" id="fPhonesAdd" style="font-size:16px;padding:3px 10px;margin-top:2px;">+ Add phone</button></div>
+      <div class="fg"><label class="fl">Email(s)</label><div id="fEmails"></div><button type="button" class="btn btn-g" id="fEmailsAdd" style="font-size:16px;padding:3px 10px;margin-top:2px;">+ Add email</button></div>
+      <div class="fg"><label class="fl">Address / Interest</label><div id="fAddresses"></div><button type="button" class="btn btn-g" id="fAddressesAdd" style="font-size:16px;padding:3px 10px;margin-top:2px;">+ Add address</button></div>
+      <div class="fg"><label class="fl">WhatsApp</label><input class="fi" id="fWhatsapp"></div>
+      <div class="frow"><div class="fg"><label class="fl">Stage <span style="color:var(--text3);font-weight:400;">(optional)</span></label><select class="fsel" id="fStage"><option value="">-- No stage --</option><option>New Lead</option><option>Contacted</option><option>Showing</option><option>Under Contract</option><option>Closed</option></select></div><div class="fg"><label class="fl">Price/Budget</label><input class="fi" id="fPrice"></div></div>
       <div class="fg"><label class="fl">Closing Date <span style="color:var(--text3);font-weight:400;">(optional)</span></label><input class="fi" id="fCloseDate" type="date"></div>
-      <div class="fg"><label class="fl">Notes</label><textarea class="fi" id="fNotes" rows="3" placeholder="Source, preferences..."></textarea></div>
+      <div class="fg"><label class="fl">Notes</label><textarea class="fi" id="fNotes" rows="3"></textarea></div>
     </div>
     <div class="mftr"><button class="btn btn-g" data-close="addModal">Cancel</button><button class="btn btn-p" id="btnSaveContact">Save Contact</button></div>
   </div>
