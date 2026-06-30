@@ -564,7 +564,7 @@ function rd(){
   var dlEl=ge('dDeadlines');dlEl.innerHTML='';
   var dl=D.slice().sort(function(a,b){return new Date(a.date)-new Date(b.date);}).slice(0,5);
   if(!dl.length){dlEl.innerHTML='<div class="empty">No deadlines</div>';}
-  else dl.forEach(function(d){var c=gc(d.contactId);var n=du(d.date);var lbl=n<0?'Overdue':n===0?'Today':n+'d';var row=mkRow('dl-row');row.appendChild(mkDot(dc(n)));var info=mkDiv('flex:1;');info.appendChild(mkDiv('font-size:18px;',d.type));info.appendChild(mkDiv('font-size:18px;color:var(--text3);',c?fn(c):''));row.appendChild(info);row.appendChild(mkDiv('font-family:monospace;font-size:18px;color:var(--text2);',lbl));dlEl.appendChild(row);});
+  else dl.forEach(function(d){var c=gc(d.contactId);var n=du(d.date);var lbl=n<0?'Overdue':n===0?'Today':n+'d';var row=mkRow('dl-row');row.style.cursor='pointer';row.addEventListener('click',function(){sp('deadlines');});row.appendChild(mkDot(dc(n)));var info=mkDiv('flex:1;');info.appendChild(mkDiv('font-size:18px;',d.type));info.appendChild(mkDiv('font-size:18px;color:var(--text3);',c?fn(c):''));row.appendChild(info);row.appendChild(mkDiv('font-family:monospace;font-size:18px;color:var(--text2);',lbl));dlEl.appendChild(row);});
   var fuEl=ge('dFollowups');fuEl.innerHTML='';
   var pend=F.filter(function(f){return !f.done;}).slice(0,4);
   if(!pend.length){fuEl.innerHTML='<div class="empty">All caught up!</div>';}
