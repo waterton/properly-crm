@@ -76,7 +76,7 @@ function sv(){
 // Supabase sync functions
 // Known columns per table — strips unknown fields before sending to Supabase
 var DB_COLS = {
-  contacts: ['id','first','last','type','phone','email','property','stage','price','notes','added','closeDate','assignedTo','emails','phones','addresses'],
+  contacts: ['id','first','last','type','phone','email','property','stage','price','notes','added','closeDate','assignedTo','emails','phones','addresses','whatsapp'],
   notes: ['id','contactId','transactionId','text','date'],
   followups: ['id','contactId','transactionId','label','date','pri','done','assignedTo'],
   deadlines: ['id','contactId','transactionId','type','date','assignedTo'],
@@ -936,6 +936,15 @@ function rc(){
   });
 }
 
+function waLink(v){
+  v = String(v).trim();
+  var digits = v.replace(/[^\d]/g,'');
+  if(/^[+]?[\d\s().\-]+$/.test(v) && digits.length >= 7){
+    if(digits.length === 10) digits = '1' + digits;
+    return 'https://wa.me/' + digits;
+  }
+  return 'https://wa.me/' + v.replace(/^@/,'');
+}
 function getCMethods(arr, fallback, split){
   var list = Array.isArray(arr) ? arr.slice() : [];
   list = list.map(function(it){ return (typeof it==='string')?{value:it,label:''}:{value:(it&&it.value)||'',label:(it&&it.label)||''}; }).filter(function(it){ return it.value; });
@@ -985,7 +994,8 @@ function vc(id){
   var isec=mksec('Contact Info');
   getCMethods(c.phones, c.phone, true).forEach(function(p){ isec.appendChild(mkContactRow('Phone', p.value, p.label, [{txt:'Call',href:'tel:'+p.value},{txt:'Text',href:'sms:'+p.value}])); });
   getCMethods(c.emails, c.email, true).forEach(function(e){ isec.appendChild(mkContactRow('Email', e.value, e.label, [{txt:'Email',href:'mailto:'+e.value}])); });
-  getCMethods(c.addresses, c.property, false).forEach(function(a){ isec.appendChild(mkContactRow('Address', a.value, a.label, [])); });
+  ggetCMethods(c.addresses, c.property, false).forEach(function(a){ isec.appendChild(mkContactRow('Address', a.value, a.label, [])); });
+  if(c.whatsapp){ isec.appendChild(mkContactRow('WhatsApp', c.whatsapp, '', [{txt:'WhatsApp',href:waLink(c.whatsapp)}])); }
   if(c.price)isec.appendChild(mkfld('Price',c.price,null,'color:var(--accent);font-family:monospace;'));
   if(c.notes)isec.appendChild(mkfld('Notes',c.notes,null,''));
   if(c.closeDate)isec.appendChild(mkfld('Closing Date',fd(c.closeDate),null,'color:var(--accent);'));
@@ -1465,6 +1475,7 @@ function openEditContact(id){
   mvRender('fPhones', c.phones, c.phone);
   mvRender('fEmails', c.emails, c.email);
   mvRender('fAddresses', c.addresses, c.property);
+  ge('fWhatsapp').value = c.whatsapp||'';
   ge('fStage').value = c.stage||'';
   ge('fPrice').value = c.price||'';
   ge('fNotes').value = c.notes||'';
@@ -1494,6 +1505,7 @@ function svc(){
     c.types=getFTypeValues(); c.type=c.types.join('|');
     c.phones=mvCollect('fPhones'); c.emails=mvCollect('fEmails'); c.addresses=mvCollect('fAddresses');
     c.phone=(c.phones[0]&&c.phones[0].value)||''; c.email=(c.emails[0]&&c.emails[0].value)||''; c.property=(c.addresses[0]&&c.addresses[0].value)||'';
+    c.whatsapp=ge('fWhatsapp').value;
     c.stage=ge('fStage').value;
     c.price=ge('fPrice').value; c.notes=ge('fNotes').value;
     c.closeDate=ge('fCloseDate').value||'';
@@ -1501,7 +1513,7 @@ function svc(){
     ge('btnSaveContact') && ge('btnSaveContact').setAttribute('data-edit-id','');
     ge('addModalTitle') && (ge('addModalTitle').textContent = 'Add Contact');
     cm('addModal');
-    ['fFirst','fLast','fPrice','fNotes','fCloseDate'].forEach(function(x){ge(x).value='';});
+    ['fFirst','fLast','fWhatsapp','fPrice','fNotes','fCloseDate'].forEach(function(x){ge(x).value='';});
     mvRender('fPhones',[]); mvRender('fEmails',[]); mvRender('fAddresses',[]);
     clearFTypeValues(); ge('fStage').value='';
     rd(); if(curPage==='contacts')rc(); if(curPage==='pipeline')rp();
@@ -1510,7 +1522,7 @@ function svc(){
     var _ftypes=getFTypeValues();
     var _ph=mvCollect('fPhones'), _em=mvCollect('fEmails'), _ad=mvCollect('fAddresses');
     var nc={id:Date.now(),first:first,last:last,types:_ftypes,type:_ftypes.join('|'),
-      phones:_ph,emails:_em,addresses:_ad,
+      phones:_ph,emails:_em,addresses:_ad,whatsapp:ge('fWhatsapp').value,
       phone:(_ph[0]&&_ph[0].value)||'',email:(_em[0]&&_em[0].value)||'',
       property:(_ad[0]&&_ad[0].value)||'',stage:ge('fStage').value,
       price:ge('fPrice').value,notes:ge('fNotes').value,
@@ -1519,7 +1531,7 @@ function svc(){
     C.push(nc); saveContact(nc); logActivity(nc.id,'Added contact');
   }
   cm('addModal');
-  ['fFirst','fLast','fPrice','fNotes','fCloseDate'].forEach(function(x){ge(x).value='';});
+  ['fFirst','fLast','fWhatsapp','fPrice','fNotes','fCloseDate'].forEach(function(x){ge(x).value='';});
   mvRender('fPhones',[]); mvRender('fEmails',[]); mvRender('fAddresses',[]);
   clearFTypeValues(); ge('fStage').value='';
   rd(); if(curPage==='contacts')rc(); if(curPage==='pipeline')rp();
@@ -5517,7 +5529,7 @@ function renderThread(messages, threadId){
       var parts = name.replace(/<.*>/,'').trim().split(' ');
       ge('fFirst').value = parts[0]||'';
       ge('fLast').value = parts.slice(1).join(' ')||'';
-      mvRender('fEmails', [{value:email,label:''}]); mvRender('fPhones',[]); mvRender('fAddresses',[]);
+      mvRender('fEmails', [{value:email,label:''}]); mvRender('fPhones',[]); mvRender('fAddresses',[]); ge('fWhatsapp').value='';
       clearFTypeValues();
       ge('btnSaveContact') && ge('btnSaveContact').setAttribute('data-edit-id','');
       ge('addModalTitle') && (ge('addModalTitle').textContent='Add Contact');
@@ -6716,7 +6728,7 @@ ge('btnPipelineAdd').addEventListener('click',function(){om('addModal');});
 ge('btnContactAdd').addEventListener('click',function(){
   ge('btnSaveContact') && ge('btnSaveContact').setAttribute('data-edit-id','');
   ge('addModalTitle') && (ge('addModalTitle').textContent='Add Contact');
-  ['fFirst','fLast','fPrice','fNotes','fCloseDate'].forEach(function(x){ge(x).value='';});
+  ['fFirst','fLast','fWhatsapp','fPrice','fNotes','fCloseDate'].forEach(function(x){ge(x).value='';});
   clearFTypeValues(); ge('fStage').value='';
   mvRender('fPhones',[]); mvRender('fEmails',[]); mvRender('fAddresses',[]);
   om('addModal');
