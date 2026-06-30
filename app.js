@@ -936,6 +936,35 @@ function rc(){
   });
 }
 
+function getCMethods(arr, fallback, split){
+  var list = Array.isArray(arr) ? arr.slice() : [];
+  list = list.map(function(it){ return (typeof it==='string')?{value:it,label:''}:{value:(it&&it.value)||'',label:(it&&it.label)||''}; }).filter(function(it){ return it.value; });
+  if(!list.length && fallback){
+    if(split){ String(fallback).split(/\s*[;,\/|]\s*/).forEach(function(v){ v=v.trim(); if(v) list.push({value:v,label:''}); }); }
+    else { list = [{value:String(fallback),label:''}]; }
+  }
+  return list;
+}
+function mkContactRow(typeLabel, value, label, actions){
+  var row = document.createElement('div');
+  row.style.cssText = 'display:flex;align-items:center;gap:8px;padding:6px 0;flex-wrap:wrap;border-bottom:1px solid var(--border);';
+  var info = document.createElement('div');
+  info.style.cssText = 'flex:1;min-width:140px;';
+  var top = document.createElement('div');
+  top.style.cssText = 'font-size:18px;color:var(--text);'; top.textContent = value;
+  var sub = document.createElement('div');
+  sub.style.cssText = 'font-size:14px;color:var(--text3);'; sub.textContent = typeLabel + (label ? ' - ' + label : '');
+  info.appendChild(top); info.appendChild(sub); row.appendChild(info);
+  var btns = document.createElement('div');
+  btns.style.cssText = 'display:flex;gap:6px;';
+  actions.forEach(function(a){
+    var el = document.createElement('a');
+    el.href = a.href; el.className = 'btn btn-g';
+    el.style.cssText = 'font-size:16px;padding:4px 10px;'; el.textContent = a.txt;
+    btns.appendChild(el);
+  });
+  row.appendChild(btns); return row;
+}
 function vc(id){
   curDet=id;var c=gc(id);if(!c)return;
   var stgs=['New Lead','Contacted','Showing','Under Contract','Closed'];
@@ -948,17 +977,15 @@ function vc(id){
   var xb=mkBtn('det-x','\u2715','');xb.addEventListener('click',cd);
   hdr.appendChild(av);hdr.appendChild(nd);hdr.appendChild(xb);
   var acts=ge('detActs');acts.innerHTML='';
-  if(c.phone){var a1=document.createElement('a');a1.href='tel:'+c.phone;a1.className='btn btn-g';a1.style.cssText='font-size:18px;padding:5px 11px;';a1.textContent='Call';acts.appendChild(a1);}
-  if(c.phone){var a2=document.createElement('a');a2.href='sms:'+c.phone;a2.className='btn btn-g';a2.style.cssText='font-size:18px;padding:5px 11px;';a2.textContent='Text';acts.appendChild(a2);}
-  if(c.email){var a3=document.createElement('a');a3.href='mailto:'+c.email;a3.className='btn btn-g';a3.style.cssText='font-size:18px;padding:5px 11px;';a3.textContent='Email';acts.appendChild(a3);}
+  
   var fb=mkBtn('btn btn-g','+ FU','font-size:18px;padding:5px 11px;');(function(cid){fb.addEventListener('click',function(){ofc(cid);});})(id);acts.appendChild(fb);
   var db=mkBtn('btn btn-g','+ DL','font-size:18px;padding:5px 11px;');(function(cid){db.addEventListener('click',function(){odc(cid);});})(id);acts.appendChild(db);
   var delb=mkBtn('btn btn-d','Delete','font-size:18px;padding:5px 11px;margin-left:auto;');(function(cid){delb.addEventListener('click',function(){delc(cid);});})(id);acts.appendChild(delb);
   var body=ge('detBody');body.innerHTML='';
   var isec=mksec('Contact Info');
-  if(c.phone)isec.appendChild(mkfld('Phone',c.phone,'tel:'+c.phone,''));
-  if(c.email)isec.appendChild(mkfld('Email',c.email,'mailto:'+c.email,''));
-  if(c.property)isec.appendChild(mkfld('Property',c.property,null,''));
+  getCMethods(c.phones, c.phone, true).forEach(function(p){ isec.appendChild(mkContactRow('Phone', p.value, p.label, [{txt:'Call',href:'tel:'+p.value},{txt:'Text',href:'sms:'+p.value}])); });
+  getCMethods(c.emails, c.email, true).forEach(function(e){ isec.appendChild(mkContactRow('Email', e.value, e.label, [{txt:'Email',href:'mailto:'+e.value}])); });
+  getCMethods(c.addresses, c.property, false).forEach(function(a){ isec.appendChild(mkContactRow('Address', a.value, a.label, [])); });
   if(c.price)isec.appendChild(mkfld('Price',c.price,null,'color:var(--accent);font-family:monospace;'));
   if(c.notes)isec.appendChild(mkfld('Notes',c.notes,null,''));
   if(c.closeDate)isec.appendChild(mkfld('Closing Date',fd(c.closeDate),null,'color:var(--accent);'));
