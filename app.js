@@ -6750,7 +6750,8 @@ ge('btnSaveDL').addEventListener('click',svdl);
 (function(){ var c=ge('dlContact'); if(c) c.addEventListener('change',function(){ fsDeals('dlDeal', c.value, ''); }); })();
 ge('btnSaveDetNote').addEventListener('click',adn);
 ge('detOv').addEventListener('click',function(e){if(e.target===ge('detOv'))cd();});
-ge('searchBox').addEventListener('input',function(){if(curPage==='contacts')rc();});
+ge('searchBox').addEventListener('input',function(){if(curPage!=='contacts'){if(this.value.trim())sp('contacts');}else rc();});
+ge('searchBox').addEventListener('keydown',function(e){if(e.key==='Enter'){if(curPage!=='contacts')sp('contacts');else rc();}});
 
 // Auth event listeners
 ge('btnGoogleLogin').addEventListener('click', signInWithGoogle);
