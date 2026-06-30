@@ -5261,9 +5261,10 @@ function switchGmailAccount(memberId){
   loadGmailInbox();
 }
 
-async function loadGmailInbox(){
+async function loadGmailInbox(searchTerm){
   if(!gmailState.activeMemberId) return;
   var filter = ge('gmailInboxFilter') ? ge('gmailInboxFilter').value : 'in:inbox';
+  if(typeof searchTerm === 'string' && searchTerm.trim()){ filter = filter + ' ' + searchTerm.trim(); }
   ge('gmailMsgList').innerHTML = '<div style="padding:20px;text-align:center;color:var(--text3);font-size:18px;">Loading...</div>';
   try{
     var resp = await fetch('/api/gmail-api', {
@@ -6750,8 +6751,16 @@ ge('btnSaveDL').addEventListener('click',svdl);
 (function(){ var c=ge('dlContact'); if(c) c.addEventListener('change',function(){ fsDeals('dlDeal', c.value, ''); }); })();
 ge('btnSaveDetNote').addEventListener('click',adn);
 ge('detOv').addEventListener('click',function(e){if(e.target===ge('detOv'))cd();});
-ge('searchBox').addEventListener('input',function(){if(curPage!=='contacts'){if(this.value.trim())sp('contacts');}else rc();});
-ge('searchBox').addEventListener('keydown',function(e){if(e.key==='Enter'){if(curPage!=='contacts')sp('contacts');else rc();}});
+ge('searchBox').addEventListener('input',function(){
+  if(curPage==='gmail') return;
+  if(curPage!=='contacts'){ if(this.value.trim()) sp('contacts'); } else rc();
+});
+ge('searchBox').addEventListener('keydown',function(e){
+  if(e.key!=='Enter') return;
+  if(curPage==='gmail'){ loadGmailInbox(ge('searchBox').value); }
+  else if(curPage!=='contacts'){ sp('contacts'); }
+  else { rc(); }
+});
 
 // Auth event listeners
 ge('btnGoogleLogin').addEventListener('click', signInWithGoogle);
