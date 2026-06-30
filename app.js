@@ -568,7 +568,7 @@ function rd(){
   var fuEl=ge('dFollowups');fuEl.innerHTML='';
   var pend=F.filter(function(f){return !f.done;}).slice(0,4);
   if(!pend.length){fuEl.innerHTML='<div class="empty">All caught up!</div>';}
-  else pend.forEach(function(f){var c=gc(f.contactId);var row=mkRow('fu-row');var info=mkDiv('flex:1;');info.appendChild(mkDiv('font-size:18px;',f.label));info.appendChild(mkDiv('font-size:18px;color:var(--text3);',(c?fn(c):'')+' - '+fd(f.date)));row.appendChild(chk);row.appendChild(info);row.appendChild(mkBadge(f.pri));fuEl.appendChild(row);});
+  else pend.forEach(function(f){var c=gc(f.contactId);var row=mkRow('fu-row');row.style.cursor='pointer';row.addEventListener('click',function(){sp('followups');});var chk=mkRow('chk'+(f.done?' done':''));if(f.done)chk.appendChild(ck());(function(id){chk.addEventListener('click',function(e){e.stopPropagation();tfu(id);rd();});})(f.id);var info=mkDiv('flex:1;');info.appendChild(mkDiv('font-size:18px;',f.label));info.appendChild(mkDiv('font-size:18px;color:var(--text3);',(c?fn(c):'')+' - '+fd(f.date)));row.appendChild(chk);row.appendChild(info);row.appendChild(mkBadge(f.pri));fuEl.appendChild(row);});
   var pipEl=ge('dPipeline');pipEl.innerHTML='';
   ['New Lead','Contacted','Showing','Under Contract'].forEach(function(s){var cnt=C.filter(function(c){return c.stage===s;}).length;var row=mkRow('li');row.appendChild(mkDiv('flex:1;font-size:18px;font-weight:600;',s));row.appendChild(mkDiv('font-family:monospace;font-size:22px;font-weight:700;color:var(--accent);',cnt));pipEl.appendChild(row);});
   ge('nbFollowups').textContent=F.filter(function(f){return !f.done;}).length;
