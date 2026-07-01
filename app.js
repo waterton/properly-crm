@@ -5320,7 +5320,7 @@ async function loadGmailInbox(searchTerm){
   if(!gmailState.activeMemberId) return;
   var filter = ge('gmailInboxFilter') ? ge('gmailInboxFilter').value : 'in:inbox';
   if(typeof searchTerm === 'string' && searchTerm.trim()){ filter = filter + ' ' + searchTerm.trim(); }
-  ge('gmailMsgList').innerHTML = '<div style="padding:20px;text-align:center;color:var(--text3);font-size:18px;">Loading...</div>';
+  if(!gmailState.silentRefresh) ge('gmailMsgList').innerHTML = '<div style="padding:20px;text-align:center;color:var(--text3);font-size:18px;">Loading...</div>';
   try{
     var resp = await fetch('/api/gmail-api', {
       method:'POST', headers:{'Content-Type':'application/json'},
@@ -6301,6 +6301,16 @@ ge('nav-cardscanner').addEventListener('click',function(){sp('cardscanner');});
 ge('nav-calendar').addEventListener('click',function(){sp('calendar');});
 ge('nav-team').addEventListener('click',function(){sp('team');});
 ge('nav-gmail').addEventListener('click',function(){sp('gmail');});
+// Auto-refresh the Gmail inbox while viewing it (silent, every 2 min) + on window focus
+function gmailAutoRefresh(){
+  if(curPage!=='gmail' || !gmailState.activeMemberId) return;
+  var sb=ge('searchBox'); if(sb && sb.value.trim()) return; // don't disrupt an active search
+  gmailState.silentRefresh = true;
+  loadGmailInbox();
+  gmailState.silentRefresh = false;
+}
+setInterval(gmailAutoRefresh, 120000);
+window.addEventListener('focus', gmailAutoRefresh);
 ge('nav-drips').addEventListener('click',function(){sp('drips');});
 
 ge('nav-documents').addEventListener('click',function(){sp('documents');});
