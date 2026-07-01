@@ -6547,6 +6547,7 @@ function onAuthSuccess(user){
     rd();
     subscribeRealtime();
     updateNbTC();
+    try{ var _h=(location.hash||'').replace(/^#/,''); if(_h && {dashboard:1,contacts:1,followups:1,deadlines:1,gmail:1,tc:1}[_h]) sp(_h); }catch(e){}
   });
 }
 
