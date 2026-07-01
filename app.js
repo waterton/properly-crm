@@ -328,26 +328,18 @@ async function loadFromDB(){
 }
 
 function showSyncStatus(status){
+  // Old full-width bar retired in favor of the compact top-bar dot.
   var bar = document.getElementById('syncBar');
-  if(!bar) return;
-  if(status === 'live'){
-    bar.style.display = 'flex';
-    bar.style.background = 'rgba(107,201,122,0.12)';
-    bar.style.borderColor = 'var(--lead)';
-    bar.innerHTML = '<span style="color:var(--lead);">&#9679;</span>&nbsp;<span style="font-size:18px;color:var(--text2);">Synced to cloud  -  changes shared with all devices in real time</span>';
-  } else if(status === 'loading'){
-    bar.style.display = 'flex';
-    bar.style.background = 'rgba(201,168,76,0.1)';
-    bar.style.borderColor = 'var(--accent)';
-    bar.innerHTML = '<span style="color:var(--accent);">&#8635;</span>&nbsp;<span style="font-size:18px;color:var(--text2);">Connecting to cloud...</span>';
-  } else if(status === 'error'){
-    bar.style.display = 'flex';
-    bar.style.background = 'rgba(201,76,76,0.1)';
-    bar.style.borderColor = 'var(--danger)';
-    bar.innerHTML = '<span style="color:var(--danger);">&#9888;</span>&nbsp;<span style="font-size:18px;color:var(--text2);">Cloud sync error  -  using local data. Check your Supabase keys.</span>';
-  } else {
-    bar.style.display = 'none';
-  }
+  if(bar) bar.style.display = 'none';
+  var dot = document.getElementById('syncDotIcon');
+  if(!dot) return;
+  var color, tip;
+  if(status === 'live'){ color = 'var(--lead)'; tip = 'Cloud sync active - click to disconnect'; }
+  else if(status === 'loading'){ color = 'var(--accent)'; tip = 'Connecting to cloud...'; }
+  else if(status === 'error'){ color = 'var(--danger)'; tip = 'Cloud sync error - using local data'; }
+  else { color = 'var(--danger)'; tip = 'Cloud sync off - click to reconnect'; }
+  dot.style.background = color;
+  if(dot.parentNode) dot.parentNode.title = tip;
 }
 
 // Wrapped save functions that sync to Supabase
@@ -6506,6 +6498,11 @@ function updateSupaBanner(connected){
 ge('btnConnectSupa').addEventListener('click', connectSupa);
 ge('btnDisconnectSupa').addEventListener('click', disconnectSupa);
 ge('supaKeyInput').addEventListener('keydown', function(e){ if(e.key==='Enter') connectSupa(); });
+ge('syncDot') && ge('syncDot').addEventListener('click', function(){
+  if(supaReady){ if(confirm('Disconnect cloud sync? Your data stays on this device until you reconnect.')) disconnectSupa(); }
+  else { connectSupa(); }
+});
+showSyncStatus(supaReady ? 'live' : 'off');
 
 // -- STARTUP ----------------------------------------------------------
 // -- AUTH SYSTEM --

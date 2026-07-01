@@ -94,6 +94,7 @@
         <div class="topbar-title" id="pageTitle">Dashboard</div>
       </div>
       <div class="topbar-right">
+        <div id="syncDot" title="Cloud sync" style="cursor:pointer;display:flex;align-items:center;margin-right:2px;"><span id="syncDotIcon" style="width:11px;height:11px;border-radius:50%;background:var(--lead);display:inline-block;"></span></div>
         <input class="sbox" type="text" placeholder="Search..." id="searchBox">
         <button class="btn btn-p" id="btnAdd" style="display:none;">+ Add</button>
         <div style="font-size:11px;color:var(--text3);margin-right:4px;">v4.5</div>
@@ -161,7 +162,7 @@
       </div>
       <div class="page active" id="page-dashboard">
         <!-- Cloud Setup Banner (shown only when not connected) -->
-        <div id="setupBanner" style="background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:16px 18px;margin-bottom:20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+        <div id="setupBanner" style="background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:16px 18px;margin-bottom:20px;display:none;align-items:center;gap:14px;flex-wrap:wrap;">
           <svg width="20" height="20" fill="none" stroke="var(--accent)" stroke-width="2" viewBox="0 0 24 24"><polyline points="16,17 21,12 16,7"/><path d="M21 12H9"/><path d="M9 18H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4"/></svg>
           <div style="flex:1;">
             <div style="font-size:16px;font-weight:600;color:var(--text);margin-bottom:2px;">Connect Cloud Sync</div>
