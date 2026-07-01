@@ -99,47 +99,44 @@ export default async function handler(req, res) {
 
     if (action === 'inbox') {
       const q = query || 'in:inbox';
-      // List CONVERSATIONS (threads), not individual messages, so replies group together
-      const listResp = await fetch(`${gmailBase}/threads?maxResults=50&q=${encodeURIComponent(q)}`, { headers });
+      // List individual MESSAGES (newest first) so every email is its own row.
+      // Replies no longer hide inside a conversation.
+      const listResp = await fetch(`${gmailBase}/messages?maxResults=50&q=${encodeURIComponent(q)}`, { headers });
       const listRawText = await listResp.text();
       let listData;
       try { listData = JSON.parse(listRawText); } catch(e) {
         return res.status(500).json({ error: 'Gmail list parse error: ' + listRawText.substring(0, 200) });
       }
       if (listData.error) return res.status(400).json({ error: listData.error.message });
-      if (!listData.threads) return res.status(200).json({ messages: [] });
+      if (!listData.messages) return res.status(200).json({ messages: [] });
 
-      // For each thread, pull its messages' metadata and build one row from the latest message
       const mh = 'metadataHeaders=From&metadataHeaders=To&metadataHeaders=Subject&metadataHeaders=Date';
-      const threads = await Promise.all(
-        listData.threads.slice(0, 50).map(async (th) => {
-          const thResp = await fetch(`${gmailBase}/threads/${th.id}?format=metadata&${mh}`, { headers });
-          const thRaw = await thResp.text();
-          try { return JSON.parse(thRaw); } catch(e) { return null; }
+      const rows = await Promise.all(
+        listData.messages.slice(0, 50).map(async (mref) => {
+          const mResp = await fetch(`${gmailBase}/messages/${mref.id}?format=metadata&${mh}`, { headers });
+          const mRaw = await mResp.text();
+          try { return JSON.parse(mRaw); } catch(e) { return null; }
         })
       );
 
-      const parsed = threads.filter(t => t && t.messages && t.messages.length).map(t => {
-        const msgs = t.messages;
-        const last = msgs[msgs.length - 1];
+      const parsed = rows.filter(m => m && m.payload).map(m => {
         const hdrs = {};
-        ((last.payload && last.payload.headers) || []).forEach(h => {
+        ((m.payload && m.payload.headers) || []).forEach(h => {
           hdrs[h.name] = h.value;
           hdrs[h.name.toLowerCase()] = h.value;
         });
-        const anyUnread = msgs.some(m => m.labelIds && m.labelIds.includes('UNREAD'));
-        const anyAttach = msgs.some(m => m.payload && m.payload.parts && m.payload.parts.some(p => p.filename && p.filename.length > 0));
+        const hasAttach = !!(m.payload && m.payload.parts && m.payload.parts.some(p => p.filename && p.filename.length > 0));
         return {
-          id: last.id,
-          threadId: t.id,
+          id: m.id,
+          threadId: m.threadId,
           from: hdrs['From'] || hdrs['from'] || '',
           to: hdrs['To'] || hdrs['to'] || '',
           subject: hdrs['Subject'] || hdrs['subject'] || '(No subject)',
           date: hdrs['Date'] || hdrs['date'] || '',
-          snippet: last.snippet || t.snippet || '',
-          unread: anyUnread,
-          hasAttachment: anyAttach,
-          msgCount: msgs.length
+          snippet: m.snippet || '',
+          unread: !!(m.labelIds && m.labelIds.includes('UNREAD')),
+          hasAttachment: hasAttach,
+          msgCount: 1
         };
       });
       return res.status(200).json({ messages: parsed });
