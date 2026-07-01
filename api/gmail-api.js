@@ -100,7 +100,7 @@ export default async function handler(req, res) {
     if (action === 'inbox') {
       const q = query || 'in:inbox';
       // List CONVERSATIONS (threads), not individual messages, so replies group together
-      const listResp = await fetch(`${gmailBase}/threads?maxResults=20&q=${encodeURIComponent(q)}`, { headers });
+      const listResp = await fetch(`${gmailBase}/threads?maxResults=50&q=${encodeURIComponent(q)}`, { headers });
       const listRawText = await listResp.text();
       let listData;
       try { listData = JSON.parse(listRawText); } catch(e) {
@@ -112,7 +112,7 @@ export default async function handler(req, res) {
       // For each thread, pull its messages' metadata and build one row from the latest message
       const mh = 'metadataHeaders=From&metadataHeaders=To&metadataHeaders=Subject&metadataHeaders=Date';
       const threads = await Promise.all(
-        listData.threads.slice(0, 20).map(async (th) => {
+        listData.threads.slice(0, 50).map(async (th) => {
           const thResp = await fetch(`${gmailBase}/threads/${th.id}?format=metadata&${mh}`, { headers });
           const thRaw = await thResp.text();
           try { return JSON.parse(thRaw); } catch(e) { return null; }
