@@ -1931,7 +1931,7 @@ var TC_TEMPLATES = {
   buyer: [
     {phase:'Form 1 - Buyer Intake', steps:[
       {label:'Collect contact information (name, phone, email)',key:'bi_contact'},
-      {label:'Add to CRM / Follow Up Boss',key:'bi_crm'},
+      
       {label:'Discuss timeline and budget',key:'bi_budget'},
       {label:'Review buying process with buyer',key:'bi_process'},
       {label:'Send Buyer Guide',key:'bi_guide'},
@@ -1989,7 +1989,7 @@ var TC_TEMPLATES = {
       {label:'Review requested (Google / Social)',key:'pc_review'},
       {label:'Testimonial requested',key:'pc_testimonial'},
       {label:'Referral requested',key:'pc_referral'},
-      {label:'Moved to Past Client in Follow Up Boss',key:'pc_fub'},
+      
       {label:'Home anniversary added',key:'pc_anniversary'},
       {label:'Birthday added (if known)',key:'pc_birthday'},
       {label:'Tags updated (Past Client)',key:'pc_tags'},
@@ -2004,7 +2004,7 @@ var TC_TEMPLATES = {
   seller: [
     {phase:'Form 2 - Seller Intake', steps:[
       {label:'Collect contact info (name, phone, email)',key:'si_contact'},
-      {label:'Add to CRM / Follow Up Boss',key:'si_crm'},
+      
       {label:'Confirm preferred contact method',key:'si_contact_method'},
       {label:'Mortgage statement received',key:'si_mortgage'},
       {label:'HELOC statement received (if applicable)',key:'si_heloc'},
@@ -2084,7 +2084,7 @@ var TC_TEMPLATES = {
       {label:'Review requested (Google / Social)',key:'spc_review'},
       {label:'Testimonial requested',key:'spc_testimonial'},
       {label:'Referral requested',key:'spc_referral'},
-      {label:'Moved to Past Client in Follow Up Boss',key:'spc_fub'},
+      
       {label:'Notes updated with closing info',key:'spc_notes'},
       {label:'Home anniversary added',key:'spc_anniversary'},
       {label:'Birthday added (if known)',key:'spc_birthday'},
