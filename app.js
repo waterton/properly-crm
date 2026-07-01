@@ -5348,7 +5348,7 @@ function renderGmailList(){
   if(!gmailState.messages.length){ el.innerHTML='<div style="padding:20px;text-align:center;color:var(--text3);">No messages found.</div>'; return; }
   gmailState.messages.forEach(function(msg){
     var item = document.createElement('div');
-    item.className = 'gmail-msg-item' + (msg.unread?' unread':'') + (gmailState.activeThreadId===msg.threadId?' active':'');
+    item.className = 'gmail-msg-item' + (msg.unread?' unread':'') + (gmailState.activeMsgId===msg.id?' active':'');
     var top = document.createElement('div');
     top.style.cssText = 'display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:2px;';
     var from = document.createElement('div');
@@ -5408,6 +5408,7 @@ function formatGmailDate(dateStr){
 
 async function loadThread(threadId, messageId){
   gmailState.activeThreadId = threadId;
+  gmailState.activeMsgId = messageId;
   renderGmailList(); // Update active state
 
   var thread = ge('gmailThread');
@@ -6301,6 +6302,21 @@ ge('nav-cardscanner').addEventListener('click',function(){sp('cardscanner');});
 ge('nav-calendar').addEventListener('click',function(){sp('calendar');});
 ge('nav-team').addEventListener('click',function(){sp('team');});
 ge('nav-gmail').addEventListener('click',function(){sp('gmail');});
+(function(){
+  var rez = ge('gmailResizer'), lay = ge('gmailLayout');
+  if(!rez || !lay) return;
+  var dragging = false;
+  rez.addEventListener('mousedown', function(e){ dragging = true; document.body.style.userSelect='none'; e.preventDefault(); });
+  document.addEventListener('mousemove', function(e){
+    if(!dragging) return;
+    var rect = lay.getBoundingClientRect();
+    var w = e.clientX - rect.left;
+    if(w < 220) w = 220;
+    if(w > rect.width - 300) w = rect.width - 300;
+    lay.style.setProperty('--gmail-list-w', w + 'px');
+  });
+  document.addEventListener('mouseup', function(){ if(dragging){ dragging=false; document.body.style.userSelect=''; } });
+})();
 // Auto-refresh the Gmail inbox while viewing it (silent, every 2 min) + on window focus
 function gmailAutoRefresh(){
   if(curPage!=='gmail' || !gmailState.activeMemberId) return;

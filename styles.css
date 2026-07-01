@@ -195,7 +195,9 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .team-cal-btn:hover{background:rgba(76,142,201,0.2);}
 .assign-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:4px;font-size:16px;font-weight:700;background:var(--surface2);color:var(--text2);}
 /* GMAIL */
-.gmail-layout{display:grid;grid-template-columns:300px 1fr;gap:0;height:calc(100vh - 120px);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
+.gmail-layout{display:grid;grid-template-columns:var(--gmail-list-w,320px) 6px 1fr;gap:0;height:calc(100vh - 120px);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
+.gmail-resizer{background:var(--border);cursor:col-resize;transition:background 0.15s;}
+.gmail-resizer:hover{background:var(--accent);}
 .gmail-sidebar{border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;}
 .gmail-sidebar-hdr{padding:12px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-shrink:0;}
 .gmail-msg-list{overflow-y:auto;flex:1;}
@@ -230,6 +232,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 @media (max-width: 768px) {
   /* Gmail - stack vertically on mobile */
   .gmail-layout{grid-template-columns:1fr;height:auto;}
+  .gmail-resizer{display:none;}
   .gmail-sidebar{height:auto;max-height:none;border-right:none;border-bottom:none;}
   .gmail-thread{display:none;}
   .gmail-msg-list{max-height:none;}
