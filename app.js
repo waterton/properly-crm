@@ -133,6 +133,20 @@ async function deleteDocFile(path){
   });
 }
 
+async function deleteDocument(doc){
+  // Remove the stored file first (best-effort; ignore if already gone)
+  if(doc.file_path){ try{ await deleteDocFile(doc.file_path); }catch(e){} }
+  // Remove the database row (authenticated so RLS permits it)
+  if(supaReady){
+    var headers = await getAuthHeaders();
+    var resp = await fetch(SUPA_URL + '/rest/v1/documents?id=eq.' + doc.id, { method: 'DELETE', headers: headers });
+    if(!resp.ok){ var t = await resp.text(); throw new Error(t.substring(0,200)); }
+  }
+  // Remove from the in-memory list
+  var i = DOCS.findIndex(function(d){ return d.id === doc.id; });
+  if(i >= 0) DOCS.splice(i, 1);
+}
+
 async function saveDocument(file, meta){
   meta = meta || {};
   var fname = file.name || 'document';
