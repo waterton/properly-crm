@@ -2261,6 +2261,28 @@ function openTCDetail(id){
   var body = ge('tcDetBody');
   body.innerHTML = '';
 
+  // Status row - mark closed / reopen
+  var stRow = document.createElement('div');
+  stRow.style.cssText = 'padding:10px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:10px;';
+  var stLbl = document.createElement('div');
+  stLbl.style.cssText = 'font-size:15px;';
+  var isClosed = tx.status === 'closed';
+  stLbl.innerHTML = '<span style="color:var(--text3);">Status:</span> <b style="color:'+(isClosed?'var(--text3)':'var(--lead)')+';">'+(isClosed?'Closed':'Active')+'</b>';
+  var stBtn = document.createElement('button');
+  stBtn.className = 'btn ' + (isClosed ? 'btn-g' : 'btn-p');
+  stBtn.style.cssText = 'font-size:15px;padding:6px 14px;';
+  stBtn.textContent = isClosed ? 'Reopen' : 'Mark Closed';
+  (function(txId){ stBtn.addEventListener('click', function(){
+    var t = TX.find(function(x){ return x.id===txId; });
+    if(!t) return;
+    t.status = (t.status==='closed') ? 'active' : 'closed';
+    saveTX(t);
+    renderTC(); updateNbTC(); rd();
+    openTCDetail(txId);
+  }); })(id);
+  stRow.appendChild(stLbl); stRow.appendChild(stBtn);
+  body.appendChild(stRow);
+
   // Contact reassign row at top of detail body
   var cRow = document.createElement('div');
   cRow.style.cssText = 'padding:10px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;background:var(--surface2);';
@@ -3688,6 +3710,25 @@ function importScanToTC(r){
       if(titleCo) existing.titleCo = titleCo;
       if(price) existing.price = price;
       saveTX(existing);
+
+      // Create/update main deadlines so they show on the Deadlines tab
+      if(existing.contactId){
+        var exMap = [
+          {type:'Earnest Money Due', val:earnestDate},
+          {type:'Due Diligence Deadline', val:dueDiligDate},
+          {type:'Financing Deadline', val:financingDate},
+          {type:'Appraisal Deadline', val:appraisalDate},
+          {type:'Closing Date', val:closingDate}
+        ];
+        exMap.forEach(function(dm){
+          if(!dm.val) return;
+          var ex = D.find(function(d){ return d.contactId===existing.contactId && d.type===dm.type; });
+          if(ex){ ex.date = dm.val; saveDL(ex); }
+          else { var nd={id:Date.now()+Math.random(), contactId:existing.contactId, type:dm.type, date:dm.val}; D.push(nd); saveDL(nd); }
+        });
+      }
+
+      // Add scan summary as a note on the linked contact
 
       // Add scan summary as a note on the linked contact
       if(existing.contactId){
