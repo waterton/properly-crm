@@ -9,6 +9,7 @@ const SUPA_SERVICE_KEY = process.env.SUPA_SERVICE_KEY;
 const CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
 const CRON_SECRET = process.env.CRON_SECRET;
+const APP_URL = process.env.APP_URL || 'https://properly-crm.vercel.app';
 
 module.exports = async function (req, res) {
   // ── Security ──────────────────────────────────────────────────────────────
@@ -247,9 +248,9 @@ function buildEmailHtml(dateLabel, overdueFU, todayFU, weekDL, pipeline, contact
   const danger     = '#c94c4c';
   const warn       = '#c9a84c';
 
-  const section = (title, color, rows) => rows.length === 0 ? '' : `
+  const section = (title, color, rows, href) => rows.length === 0 ? '' : `
     <div style="margin-bottom:28px;">
-      <div style="font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:${color};border-bottom:1px solid ${border};padding-bottom:8px;margin-bottom:12px;">${title}</div>
+      <div style="font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:${color};border-bottom:1px solid ${border};padding-bottom:8px;margin-bottom:12px;">${href ? `<a href="${href}" style="color:${color};text-decoration:none;">${title} &rarr;</a>` : title}</div>
       <table width="100%" cellpadding="0" cellspacing="0">${rows.join('')}</table>
     </div>`;
 
@@ -304,15 +305,16 @@ function buildEmailHtml(dateLabel, overdueFU, todayFU, weekDL, pipeline, contact
           <div style="font-size:11px;letter-spacing:3px;color:${textMuted};text-transform:uppercase;margin-bottom:4px;">Real Estate</div>
           <div style="font-size:22px;font-weight:700;color:${textLight};margin-top:16px;">Daily Briefing</div>
           <div style="font-size:14px;color:${textMuted};margin-top:4px;">${dateLabel}</div>
+          <a href="${APP_URL}" style="display:inline-block;margin-top:18px;background:${accentGold};color:${bg};text-decoration:none;font-weight:700;font-size:14px;padding:11px 24px;border-radius:8px;">Open CRM &rarr;</a>
         </td></tr>
 
         <!-- Body -->
         <tr><td style="background:${surface};border-left:1px solid ${border};border-right:1px solid ${border};padding:28px 32px;">
           ${urgentNote}
-          ${section('🚨 Overdue', danger, urgentRows)}
-          ${section('📋 Due Today', warn, todayRows)}
-          ${section('📅 Deadlines This Week', accentGold, dlRows)}
-          ${section('📊 Pipeline Snapshot', '#4c8ec9', pipeRows)}
+          ${section('🚨 Overdue', danger, urgentRows, `${APP_URL}#followups`)}
+          ${section('📋 Due Today', warn, todayRows, `${APP_URL}#followups`)}
+          ${section('📅 Deadlines This Week', accentGold, dlRows, `${APP_URL}#deadlines`)}
+          ${section('📊 Pipeline Snapshot', '#4c8ec9', pipeRows, `${APP_URL}#dashboard`)}
           ${urgentRows.length === 0 && todayRows.length === 0 && dlRows.length === 0
             ? `<div style="text-align:center;padding:32px;color:${textMuted};font-size:14px;">All clear — no urgent items today. ✓</div>`
             : ''}
@@ -320,7 +322,7 @@ function buildEmailHtml(dateLabel, overdueFU, todayFU, weekDL, pipeline, contact
 
         <!-- Footer -->
         <tr><td style="background:${bg};border:1px solid ${border};border-top:none;border-radius:0 0 12px 12px;padding:16px 32px;text-align:center;">
-          <div style="font-size:12px;color:${textMuted};">Palacios Baker Real Estate CRM · Auto-generated briefing</div>
+          <div style="font-size:12px;color:${textMuted};"><a href="${APP_URL}" style="color:${accentGold};text-decoration:none;">Open the CRM</a> · Palacios Baker Real Estate · Auto-generated briefing</div>
         </td></tr>
 
       </table>
