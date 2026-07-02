@@ -3333,7 +3333,7 @@ function startScan(file){
     .catch(function(err){
       clearInterval(msgTimer);
       cleanupScan();
-      showScannerError('Connection error: ' + err.message);
+      showScannerError(err.message);
     });
 }
 
@@ -5988,7 +5988,18 @@ function fetchMLSLive(){
   ge('mlsResults').innerHTML = '<div class="empty">Searching MLS...</div>';
 
   fetch(url, {headers:{Authorization:'Bearer '+mlsToken, Accept:'application/json'}})
-    .then(function(r){ return r.json(); })
+    .then(function(r){
+      return r.text().then(function(txt){
+        if(!r.ok){
+          if(r.status === 413 || /too large|request entity/i.test(txt)){
+            throw new Error('That file is too large to scan. Try a single page or a photo of the page.');
+          }
+          throw new Error('Scan server error ' + r.status + ': ' + txt.substring(0,120));
+        }
+        try{ return JSON.parse(txt); }
+        catch(e){ throw new Error('The scan server did not return a valid response. ' + txt.substring(0,120)); }
+      });
+    })
     .then(function(data){
       if(!data.value){ ge('mlsResults').innerHTML = '<div class="empty">No results. Check your token or search criteria.</div>'; return; }
       mlsAllResults = data.value.map(function(p){
