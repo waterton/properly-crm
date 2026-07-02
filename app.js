@@ -76,7 +76,7 @@ function sv(){
 // Supabase sync functions
 // Known columns per table — strips unknown fields before sending to Supabase
 var DB_COLS = {
-  contacts: ['id','first','last','type','phone','email','property','stage','price','notes','added','closeDate','assignedTo','emails','phones','addresses','whatsapp'],
+  contacts: ['id','first','last','type','phone','email','property','stage','price','notes','added','closeDate','assignedTo','emails','phones','addresses','whatsapp','closedAt'],
   notes: ['id','contactId','transactionId','text','date'],
   followups: ['id','contactId','transactionId','label','date','pri','done','assignedTo'],
   deadlines: ['id','contactId','transactionId','type','date','assignedTo'],
@@ -592,12 +592,20 @@ function rd(){
   ge('nbPipeline').textContent=C.filter(function(c){return c.stage && c.stage!=='Closed';}).length;
 }
 
+function closedRecently(c){
+  var CLOSED_DAYS = 5;
+  var d = c.closedAt || c.closeDate;
+  if(!d) return false;
+  var t = new Date(d).getTime();
+  if(isNaN(t)) return false;
+  return (Date.now() - t) <= CLOSED_DAYS * 86400000;
+}
 function rp(){
   var board=ge('pBoard');board.innerHTML='';
   var stages=['New Lead','Contacted','Showing','Under Contract','Closed'];
   var stageColors={'New Lead':'var(--lead)','Contacted':'var(--buyer)','Showing':'var(--accent)','Under Contract':'var(--seller)','Closed':'var(--text3)'};
   stages.forEach(function(s){
-    var sc=C.filter(function(c){return c.stage && c.stage===s;});
+    var sc=C.filter(function(c){return c.stage===s && (s!=='Closed' || closedRecently(c));});
     var col=document.createElement('div');
     col.style.cssText='min-width:220px;flex-shrink:0;display:flex;flex-direction:column;';
 
@@ -653,6 +661,12 @@ function rp(){
         (function(cid,stage){ bR.addEventListener('click',function(e){ e.stopPropagation(); ss(cid,stage); }); })(c.id, stages[si+1]);
         arrows.appendChild(bR);
       }
+      var bX=document.createElement('button');
+      bX.style.cssText='background:var(--surface3);border:1px solid var(--danger);border-radius:5px;padding:3px 9px;cursor:pointer;color:var(--danger);font-size:15px;font-weight:700;line-height:1;';
+      bX.textContent='\u00d7';
+      bX.title='Remove from pipeline';
+      (function(cid){ bX.addEventListener('click',function(e){ e.stopPropagation(); if(confirm('Remove this deal from the pipeline? The contact stays in your contacts.')) ss(cid,''); }); })(c.id);
+      arrows.appendChild(bX);
       foot.appendChild(arrows);
       card.appendChild(foot);
       zone.appendChild(card);
@@ -1171,7 +1185,7 @@ function vc(id){
 function mksec(title){var s=mkRow('det-sec');var t=mkDiv('det-sec-title',title);t.className='det-sec-title';s.appendChild(t);return s;}
 function mkfld(lbl,val,href,style){var r=mkRow('det-field');var l=mkDiv('det-flbl',lbl);l.className='det-flbl';var v=mkDiv('det-fval','');v.className='det-fval';if(style)v.style.cssText=style;if(href){var a=document.createElement('a');a.href=href;a.textContent=val;v.appendChild(a);}else v.textContent=val;r.appendChild(l);r.appendChild(v);return r;}
 function cd(){ge('detOv').classList.remove('open');curDet=null;}
-function ss(id,stage){var c=gc(id);if(!c)return;c.stage=stage;updateContact(c);logActivity(id,'Pipeline update');autoEnrollOnStage(c,stage);rd();if(curPage==='pipeline')rp();if(curPage==='contacts')rc();}
+function ss(id,stage){var c=gc(id);if(!c)return;c.stage=stage;if(stage==='Closed')c.closedAt=new Date().toISOString();updateContact(c);logActivity(id,'Pipeline update');autoEnrollOnStage(c,stage);rd();if(curPage==='pipeline')rp();if(curPage==='contacts')rc();}
 function delc(id, silent){if(!silent&&!confirm('Delete this contact?'))return;C=C.filter(function(c){return c.id!==id;});N=N.filter(function(n){return n.contactId!==id;});F=F.filter(function(f){return f.contactId!==id;});D=D.filter(function(d){return d.contactId!==id;});sv();deleteCfromDB(id);if(!silent){cd();rd();if(curPage==='contacts')rc();}}
 
 function rfu(){
