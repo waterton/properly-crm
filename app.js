@@ -475,8 +475,9 @@ function pb(p){return p==='hot'?'b-hot':p==='warn'?'b-warn':'b-ok';}
 function ge(id){return document.getElementById(id);}
 function ck(){var s=document.createElementNS('http://www.w3.org/2000/svg','svg');s.setAttribute('width','9');s.setAttribute('height','9');s.setAttribute('fill','none');s.setAttribute('stroke','#0d0f14');s.setAttribute('stroke-width','3');s.setAttribute('viewBox','0 0 24 24');var p=document.createElementNS('http://www.w3.org/2000/svg','polyline');p.setAttribute('points','20,6 9,17 4,12');s.appendChild(p);return s;}
 var pn={briefing:'Daily Briefing',dashboard:'Dashboard',pipeline:'Pipeline',contacts:'Contacts',followups:'Follow-ups',notes:'Notes',deadlines:'Deadlines',documents:'Documents',tc:'Transactions',scanner:'Doc Scanner',cardscanner:'Card Scanner',calendar:'Calendar',team:'Team',gmail:'Gmail',mls:'MLS Search',drips:'Drip Campaigns'};
-function sp(id){
+function sp(id, fromHistory){
   curPage=id;
+  if(!fromHistory){ try{ history.pushState({page:id}, '', '#'+id); }catch(e){} }
   var addBtn=ge('btnAdd'); if(addBtn) addBtn.style.display=(id==='contacts')?'':'none';
   document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');});
   document.querySelectorAll('.ni').forEach(function(n){n.classList.remove('active');});
@@ -513,6 +514,16 @@ function sp(id){
   else if(id==='team')initTeam();
   else if(id==='gmail')initGmail();
   else if(id==='mls')initMLS();
+}
+// Keep the current tab in the URL so Back navigates between tabs and refresh restores the tab.
+window.addEventListener('popstate', function(e){
+  var id = (e.state && e.state.page) || (location.hash||'').replace(/^#/,'') || 'dashboard';
+  sp(ge('page-'+id) ? id : 'dashboard', true);
+});
+function restoreTabFromHash(){
+  var h = (location.hash||'').replace(/^#/,'');
+  if(h && ge('page-'+h)){ history.replaceState({page:h}, '', '#'+h); sp(h, true); }
+  else { history.replaceState({page:(curPage||'dashboard')}, '', '#'+(curPage||'dashboard')); }
 }
 function mkRow(cls){var d=document.createElement('div');d.className=cls;return d;}
 function mkDiv(style,text){var d=document.createElement('div');if(style)d.style.cssText=style;if(text!==undefined)d.textContent=text;return d;}
@@ -6625,9 +6636,8 @@ function onAuthSuccess(user){
     rd();
     subscribeRealtime();
     updateNbTC();
-    try{ var _h=(location.hash||'').replace(/^#/,''); if(_h && {dashboard:1,contacts:1,followups:1,deadlines:1,gmail:1,tc:1}[_h]) sp(_h); }catch(e){}
+    restoreTabFromHash();
   });
-}
 
 // ---- Briefing Schedule ----
 var bsEntries = []; // in-memory list of schedule entries
