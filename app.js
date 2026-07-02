@@ -3263,25 +3263,23 @@ function startScan(file){
     if(el) el.textContent = processingMsgs[msgIdx];
   }, 3000);
 
-  var reader = new FileReader();
-  reader.onload = function(e){
-    var base64 = e.target.result.split(',')[1];
-    var mediaType = file.type || 'image/jpeg';
-
+  var mediaType = file.type || (isPDF ? 'application/pdf' : 'image/jpeg');
+  var scanPath = 'scans/' + Date.now() + '_' + String(file.name||'scan').replace(/[^a-zA-Z0-9._-]/g,'_');
+  var cleanupScan = function(){ deleteDocFile(scanPath).catch(function(){}); };
+  uploadDocFile(file, scanPath).then(function(){
     var msgContent;
     if(isPDF){
       msgContent = [
-        {type:'document', source:{type:'base64', media_type:'application/pdf', data:base64}},
+        {type:'document', source:{type:'storage', media_type:'application/pdf', path:scanPath}},
         {type:'text', text: buildScannerPrompt(hint)}
       ];
     } else {
       msgContent = [
-        {type:'image', source:{type:'base64', media_type:mediaType, data:base64}},
+        {type:'image', source:{type:'storage', media_type:mediaType, path:scanPath}},
         {type:'text', text: buildScannerPrompt(hint)}
       ];
     }
-
-    fetch('/api/claude', {
+    return fetch('/api/claude', {
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body: JSON.stringify({
@@ -3289,10 +3287,12 @@ function startScan(file){
         max_tokens:8192,
         messages:[{role:'user', content:msgContent}]
       })
-    })
+    });
+  })
     .then(function(r){ return r.json(); })
     .then(function(data){
       clearInterval(msgTimer);
+      cleanupScan();
       console.log('Gemini raw response:', JSON.stringify(data).substring(0,500));
       if(data.error){
         showScannerError('Gemini API error: ' + (data.error.message || JSON.stringify(data.error)));
@@ -3332,10 +3332,9 @@ function startScan(file){
     })
     .catch(function(err){
       clearInterval(msgTimer);
+      cleanupScan();
       showScannerError('Connection error: ' + err.message);
     });
-  };
-  reader.readAsDataURL(file);
 }
 
 function buildScannerPrompt(hint){

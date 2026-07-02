@@ -6,6 +6,20 @@ export const config = {
   }
 };
 
+async function fetchStorageBase64(path) {
+  var supaUrl = process.env.SUPA_URL || 'https://fgkilooomlozhwfnvjze.supabase.co';
+  var supaKey = process.env.SUPA_SERVICE_KEY || process.env.SUPA_KEY;
+  var resp = await fetch(supaUrl + '/storage/v1/object/documents/' + path, {
+    headers: { 'apikey': supaKey, 'Authorization': 'Bearer ' + supaKey }
+  });
+  if (!resp.ok) {
+    var t = await resp.text();
+    throw new Error('Storage fetch failed (' + resp.status + '): ' + t.substring(0, 150));
+  }
+  var buf = await resp.arrayBuffer();
+  return Buffer.from(buf).toString('base64');
+}
+
 export default async function handler(req, res) {
   // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -33,15 +47,22 @@ export default async function handler(req, res) {
 
     var parts = [];
     if (Array.isArray(body.messages[0].content)) {
-      body.messages[0].content.forEach(function(item) {
-        if (item.type === 'image') {
-          parts.push({ inlineData: { mimeType: item.source.media_type, data: item.source.data } });
-        } else if (item.type === 'document') {
-          parts.push({ inlineData: { mimeType: 'application/pdf', data: item.source.data } });
-        } else if (item.type === 'text') {
+      var content = body.messages[0].content;
+      for (var i = 0; i < content.length; i++) {
+        var item = content[i];
+        if (item.type === 'text') {
           parts.push({ text: item.text });
+        } else if (item.type === 'image' || item.type === 'document') {
+          var mime = (item.type === 'document') ? 'application/pdf' : (item.source.media_type || 'image/jpeg');
+          var b64;
+          if (item.source && item.source.path) {
+            b64 = await fetchStorageBase64(item.source.path);
+          } else {
+            b64 = item.source.data;
+          }
+          parts.push({ inlineData: { mimeType: mime, data: b64 } });
         }
-      });
+      }
     } else {
       parts.push({ text: body.messages[0].content });
     }
