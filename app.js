@@ -6638,6 +6638,7 @@ function onAuthSuccess(user){
     updateNbTC();
     restoreTabFromHash();
   });
+}
 
 // ---- Briefing Schedule ----
 var bsEntries = []; // in-memory list of schedule entries
