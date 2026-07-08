@@ -1705,14 +1705,13 @@ function parseCSV(text){
       first = parts[0]||''; last = parts.slice(1).join(' ')||'';
     }
 
-    // ---- Email: Google uses "e-mail 1 - value", FUB uses "email" ----
-    var email = obj['e-mail 1 - value'] || obj['email 1 - value'] || obj['email address'] || obj['email'] || obj['e-mail'] || '';
-    // fallback: any key containing 'email' and 'value'
-    if(!email){ Object.keys(obj).forEach(function(k){ if(!email && k.indexOf('email')>=0 && k.indexOf('value')>=0) email=obj[k]; }); }
+    // ---- Email: "Email 1/2/3", Google "e-mail 1 - value", FUB "email address" ----
+    var emails = csvCollectMV(obj, headers, /e-?mail/, /relationship|type|label/);
+    var email  = (emails[0] && emails[0].value) || '';
 
-    // ---- Phone: Google uses "phone 1 - value", FUB uses "phone" ----
-    var phone = obj['phone 1 - value'] || obj['phone 1 value'] || obj['mobile phone'] || obj['cell phone'] || obj['phone'] || obj['phone number'] || obj['mobile'] || obj['cell'] || '';
-    if(!phone){ Object.keys(obj).forEach(function(k){ if(!phone && k.indexOf('phone')>=0 && k.indexOf('value')>=0) phone=obj[k]; }); }
+    // ---- Phone: "Phone 1/2/3", Google "phone 1 - value", FUB "home phone" ----
+    var phones = csvCollectMV(obj, headers, /phone|mobile|cell/, /relationship|type|label/);
+    var phone  = (phones[0] && phones[0].value) || '';
 
     // Skip junk rows
     if(!first && !last && !email && !phone) continue;
@@ -1746,6 +1745,9 @@ function parseCSV(text){
       notes = notes ? notes + ' | Source stage: ' + stageRaw.trim() : 'Source stage: ' + stageRaw.trim();
     }
 
+    var addresses = address ? [{value: address, label: ''}] : [];
+    var propertyVal = obj['property'] || obj['interest'] || address;
+
     var c = {
       id: Date.now() + i + Math.floor(Math.random()*1000),
       first: first,
@@ -1754,7 +1756,10 @@ function parseCSV(text){
       type:  types.join('|'),
       phone: phone,
       email: email,
-      property: obj['property'] || obj['interest'] || address,
+      phones: phones,
+      emails: emails,
+      addresses: addresses,
+      property: propertyVal,
       stage: stage,
       price: obj['price'] || obj['budget'] || '',
       notes: notes,
@@ -1763,6 +1768,28 @@ function parseCSV(text){
     results.push(c);
   }
   return results;
+}
+
+function csvCollectMV(obj, headers, rx, skipRx){
+  var out = [], seen = {};
+  for(var hi = 0; hi < headers.length; hi++){
+    var h = headers[hi];
+    if(!rx.test(h)) continue;
+    if(skipRx && skipRx.test(h)) continue;
+    var raw = (obj[h] || '').trim();
+    if(!raw) continue;
+    var label = h.replace(/e-?mail|phone|mobile|cell|address|value|[0-9]+|[-:]/g, '').trim();
+    var parts = raw.split(/\s*[;,|]\s*/);
+    for(var pi = 0; pi < parts.length; pi++){
+      var v = parts[pi].trim();
+      if(!v) continue;
+      var k = v.toLowerCase();
+      if(seen[k]) continue;
+      seen[k] = 1;
+      out.push({value: v, label: label});
+    }
+  }
+  return out;
 }
 
 function csvSplit(line){
