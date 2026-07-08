@@ -1738,9 +1738,13 @@ function parseCSV(text){
     var rawType = obj['type'] || obj['contact type'] || '';
     var types = rawType ? rawType.split('|').map(function(t){ return normalizeType(t.trim()); }).filter(Boolean) : [];
 
-    // ---- Stage ----
+    // ---- Stage: only accept an explicit, recognized stage. ----
+    // Unrecognized values never become a pipeline stage; preserve them in notes.
     var stageRaw = obj['stage'] || obj['status'] || obj['lead stage'] || '';
-    var stage = stageRaw.trim() ? normalizeStage(stageRaw) : '';
+    var stage = normalizeStage(stageRaw);
+    if(stageRaw.trim() && !stage){
+      notes = notes ? notes + ' | Source stage: ' + stageRaw.trim() : 'Source stage: ' + stageRaw.trim();
+    }
 
     var c = {
       id: Date.now() + i + Math.floor(Math.random()*1000),
@@ -1775,6 +1779,7 @@ function csvSplit(line){
 
 function normalizeType(t){
   t = (t||'').toLowerCase().trim();
+  if(!t) return '';
   if(t === 'buyer') return 'buyer';
   if(t === 'seller') return 'seller';
   if(t === 'agent' || t === 'broker' || t === 'agent/broker') return 'agent';
@@ -1783,16 +1788,17 @@ function normalizeType(t){
   if(t === 'vendor') return 'vendor';
   if(t === 'other') return 'other';
   if(t === 'lead' || t === 'prospect') return 'prospect';
-  return 'prospect';
+  return 'other';
 }
 
 function normalizeStage(s){
   s = (s||'').trim();
+  if(!s) return '';
   var stages = ['New Lead','Contacted','Showing','Under Contract','Closed'];
   for(var i = 0; i < stages.length; i++){
     if(stages[i].toLowerCase() === s.toLowerCase()) return stages[i];
   }
-  return 'New Lead';
+  return '';
 }
 
 function findDupe(nc){
