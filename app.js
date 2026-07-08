@@ -914,6 +914,12 @@ function rc(){
       : (b.last||'').toLowerCase() + (b.first||'').toLowerCase();
     return ka<kb?-1:ka>kb?1:0;
   });
+  var cntEl=ge('contactCount');
+  if(cntEl){
+    cntEl.textContent = (list.length === C.length)
+      ? (C.length + ' contact' + (C.length===1 ? '' : 's'))
+      : (list.length + ' of ' + C.length);
+  }
   var grid=ge('cGrid');grid.innerHTML='';
   if(!list.length){
     grid.appendChild(mkDiv('padding:24px;text-align:center;color:var(--text3);font-size:16px;','No contacts found.'));
