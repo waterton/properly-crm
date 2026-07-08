@@ -1025,7 +1025,7 @@ function vc(id){
   var isec=mksec('Contact Info');
   getCMethods(c.phones, c.phone, true).forEach(function(p){ isec.appendChild(mkContactRow('Phone', p.value, p.label, [{txt:'Call',href:'tel:'+p.value},{txt:'Text',href:'sms:'+p.value}])); });
   getCMethods(c.emails, c.email, true).forEach(function(e){ isec.appendChild(mkContactRow('Email', e.value, e.label, [{txt:'Email',href:'mailto:'+e.value}])); });
-  ggetCMethods(c.addresses, c.property, false).forEach(function(a){ isec.appendChild(mkContactRow('Address', a.value, a.label, [])); });
+  getCMethods(c.addresses, c.property, false).forEach(function(a){ isec.appendChild(mkContactRow('Address', a.value, a.label, [])); });
   if(c.whatsapp){ isec.appendChild(mkContactRow('WhatsApp', c.whatsapp, '', [{txt:'WhatsApp',href:waLink(c.whatsapp)}])); }
   if(c.price)isec.appendChild(mkfld('Price',c.price,null,'color:var(--accent);font-family:monospace;'));
   if(c.notes)isec.appendChild(mkfld('Notes',c.notes,null,''));
