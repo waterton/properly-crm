@@ -297,15 +297,15 @@ async function loadFromDB(){
     var base = SUPA_URL + '/rest/v1/';
 
     var results = await Promise.all([
-      fetchAllRows(base, 'contacts?order=added.asc', headers),
-      fetchAllRows(base, 'notes?order=date.asc', headers),
-      fetchAllRows(base, 'followups?order=date.asc', headers),
-      fetchAllRows(base, 'deadlines?order=date.asc', headers),
-      fetchAllRows(base, 'transactions?order=created_at.asc', headers),
-      fetchAllRows(base, 'campaigns?order=created_at.asc', headers).catch(function(){return [];}),
-      fetchAllRows(base, 'enrollments?order=created_at.asc', headers).catch(function(){return [];}),
-      fetchAllRows(base, 'send_log?order=created_at.asc', headers).catch(function(){return []; }),
-      fetchAllRows(base, 'documents?order=created_at.asc', headers).catch(function(){return []; })
+      fetchAllRows(base, 'contacts?order=added.asc,id.asc', headers),
+      fetchAllRows(base, 'notes?order=date.asc,id.asc', headers),
+      fetchAllRows(base, 'followups?order=date.asc,id.asc', headers),
+      fetchAllRows(base, 'deadlines?order=date.asc,id.asc', headers),
+      fetchAllRows(base, 'transactions?order=created_at.asc,id.asc', headers),
+      fetchAllRows(base, 'campaigns?order=created_at.asc,id.asc', headers).catch(function(){return [];}),
+      fetchAllRows(base, 'enrollments?order=created_at.asc,id.asc', headers).catch(function(){return [];}),
+      fetchAllRows(base, 'send_log?order=created_at.asc,id.asc', headers).catch(function(){return []; }),
+      fetchAllRows(base, 'documents?order=created_at.asc,id.asc', headers).catch(function(){return []; })
     ]);
     var rc = results[0], rn = results[1], rf = results[2], rd = results[3], rtx = results[4];
 
