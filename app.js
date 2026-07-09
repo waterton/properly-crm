@@ -2578,7 +2578,7 @@ function openTCDetail(id){
       // Show relevant date if this step has one
       if(step.hasDate && step.dateField && tx[step.dateField]){
         var dateVal = tx[step.dateField];
-        if(dateVal){{
+        if(dateVal){
           var n = du(dateVal);
           var due = document.createElement('div');
           due.className = 'tc-step-due' + (n < 0 ? ' overdue' : n <= 3 ? ' soon' : '');
