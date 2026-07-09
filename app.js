@@ -271,6 +271,22 @@ function dbDelete(table, id){
   });
 }
 
+function fetchAllRows(base, path, headers){
+  var pageSize = 1000;
+  var all = [];
+  function nextPage(offset){
+    var sep = path.indexOf('?') >= 0 ? '&' : '?';
+    var url = base + path + sep + 'limit=' + pageSize + '&offset=' + offset;
+    return fetch(url, {headers: headers}).then(function(r){ return r.json(); }).then(function(j){
+      if(!Array.isArray(j)) return j;
+      all = all.concat(j);
+      if(j.length < pageSize) return all;
+      return nextPage(offset + pageSize);
+    });
+  }
+  return nextPage(0);
+}
+
 async function loadFromDB(){
   if(!supaReady) return false;
   try{
@@ -281,15 +297,15 @@ async function loadFromDB(){
     var base = SUPA_URL + '/rest/v1/';
 
     var results = await Promise.all([
-      fetch(base + 'contacts?order=added.asc', {headers:headers}).then(function(r){return r.json();}),
-      fetch(base + 'notes?order=date.asc', {headers:headers}).then(function(r){return r.json();}),
-      fetch(base + 'followups?order=date.asc', {headers:headers}).then(function(r){return r.json();}),
-      fetch(base + 'deadlines?order=date.asc', {headers:headers}).then(function(r){return r.json();}),
-      fetch(base + 'transactions?order=created_at.asc', {headers:headers}).then(function(r){return r.json();}),
-      fetch(base + 'campaigns?order=created_at.asc', {headers:headers}).then(function(r){return r.json();}).catch(function(){return [];}),
-      fetch(base + 'enrollments?order=created_at.asc', {headers:headers}).then(function(r){return r.json();}).catch(function(){return [];}),
-      fetch(base + 'send_log?order=created_at.asc', {headers:headers}).then(function(r){return r.json();}).catch(function(){return []; }),
-      fetch(base + 'documents?order=created_at.asc', {headers:headers}).then(function(r){return r.json();}).catch(function(){return []; })
+      fetchAllRows(base, 'contacts?order=added.asc', headers),
+      fetchAllRows(base, 'notes?order=date.asc', headers),
+      fetchAllRows(base, 'followups?order=date.asc', headers),
+      fetchAllRows(base, 'deadlines?order=date.asc', headers),
+      fetchAllRows(base, 'transactions?order=created_at.asc', headers),
+      fetchAllRows(base, 'campaigns?order=created_at.asc', headers).catch(function(){return [];}),
+      fetchAllRows(base, 'enrollments?order=created_at.asc', headers).catch(function(){return [];}),
+      fetchAllRows(base, 'send_log?order=created_at.asc', headers).catch(function(){return []; }),
+      fetchAllRows(base, 'documents?order=created_at.asc', headers).catch(function(){return []; })
     ]);
     var rc = results[0], rn = results[1], rf = results[2], rd = results[3], rtx = results[4];
 
