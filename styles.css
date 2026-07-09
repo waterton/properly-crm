@@ -133,6 +133,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .tc-step-info{flex:1;}
 .tc-step-label{font-size:16px;color:var(--text);}
 .tc-step-label.done{text-decoration:line-through;color:var(--text3);}
+.tc-step-desc{font-size:13px;color:var(--text3);margin-top:3px;line-height:1.4;}
+.tc-step-label.done + .tc-step-desc{opacity:0.5;}
 .tc-step-due{font-size:16px;color:var(--text3);margin-top:2px;}
 .tc-step-due.overdue{color:var(--danger);}
 .tc-step-due.soon{color:var(--warn);}
