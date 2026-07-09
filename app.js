@@ -1711,6 +1711,7 @@ function parseCSV(text){
   if(lines.length < 2) return [];
   var headers = csvSplit(lines[0]).map(function(h){ return h.trim().toLowerCase().replace(/"/g,''); });
   var results = [];
+  var idSeed = Date.now();
   for(var i = 1; i < lines.length; i++){
     var line = lines[i].trim();
     if(!line) continue;
@@ -1771,7 +1772,7 @@ function parseCSV(text){
     var propertyVal = obj['property'] || obj['interest'] || address;
 
     var c = {
-      id: Date.now() + i + Math.floor(Math.random()*1000),
+      id: idSeed + i,
       first: first,
       last:  last,
       types: types,
