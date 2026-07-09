@@ -560,7 +560,7 @@ function rb(){
   var oFU=F.filter(function(f){return !f.done&&f.date<td;});
   var uDL=D.filter(function(d){return du(d.date)<=0;});
   var wDL=D.filter(function(d){var n=du(d.date);return n>0&&n<=7;});
-  var act=C.filter(function(c){return c.stage!=='Closed';});
+  var act=C.filter(function(c){return c.stage && c.stage!=='Closed';});
   var urg=uDL.length+oFU.length;
   ge('bUrgNum').textContent=urg;
   ge('bTodayNum').textContent=tFU.length;
@@ -1950,9 +1950,15 @@ function showCSVPreview(contacts){
 
 function confirmImport(){
   var toSave=[], skipped=0;
+  var usedIds = {};
+  C.forEach(function(ec){ usedIds[ec.id] = 1; });
+  var idSeed = Date.now();
   csvParsed.forEach(function(nc, i){
     if(csvDecisions[i]==='skip'){ skipped++; return; }
-    nc.id = Date.now() + Math.floor(Math.random()*100000) + i;
+    var newId = idSeed + i;
+    while(usedIds[newId]){ newId++; }
+    usedIds[newId] = 1;
+    nc.id = newId;
     nc.added = nc.added || new Date().toISOString();
     C.push(nc); toSave.push(nc);
   });
