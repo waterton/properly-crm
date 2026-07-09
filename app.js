@@ -2167,196 +2167,74 @@ var tcFilter = 'all';
 // Checklist templates based on your actual Palacios Baker forms
 var TC_TEMPLATES = {
   buyer: [
-    {phase:'Form 1 - Buyer Intake', steps:[
-      {label:'Collect contact information (name, phone, email)',key:'bi_contact'},
-      
-      {label:'Discuss timeline and budget',key:'bi_budget'},
-      {label:'Review buying process with buyer',key:'bi_process'},
-      {label:'Send Buyer Guide',key:'bi_guide'},
-      {label:'Assign lender / connect with lender',key:'bi_lender'},
-      {label:'Pre-approval received',key:'bi_preapproval'},
-      {label:'Down payment funds verified',key:'bi_downpayment'},
-      {label:'Create MLS search and set alerts',key:'bi_mls'},
-      {label:'Schedule buyer consultation',key:'bi_consult'},
-      {label:'Buyer agreement signed',key:'bi_agreement'},
-      {label:'Next follow-up date set',key:'bi_followup'}
+    {phase:'Phase 1 - Intake & Pre-Approval', steps:[
+      {label:'Pre-approval & funds verified',key:'b1_preapproval',desc:'Connection established, pre-approval letter secured, and down payment funds verified.'},
+      {label:'Buyer agreement signed & uploaded',key:'b1_agreement',desc:'Fully executed agency agreement uploaded into Dotloop.'},
+      {label:'MLS search & alerts active',key:'b1_mls',desc:'Search parameters configured and automated notifications active.'}
     ]},
-    {phase:'Home Search', steps:[
-      {label:'Showings scheduled',key:'hs_showings'},
-      {label:'Disclosures reviewed with buyer',key:'hs_disclosures'},
-      {label:'Favorites narrowed down',key:'hs_favorites'},
-      {label:'CMA reviewed for target property',key:'hs_cma'}
+    {phase:'Phase 2 - Home Search', steps:[
+      {label:'Target property CMA & disclosures reviewed',key:'b2_cma',desc:'Comprehensive market evaluation, history, and property disclosures reviewed prior to offer preparation.'}
     ]},
-    {phase:'Form 4 - Under Contract', steps:[
-      {label:'Offer submitted and docs uploaded in Dotloop',key:'uc_offer'},
-      {label:'Earnest money delivered',key:'uc_earnest',hasDate:true,dateKey:'tcEarnestDate'},
-      {label:'Due diligence deadline tracked',key:'uc_duedilig',hasDate:true,dateKey:'tcDueDiligDate'},
-      {label:'Financing deadline tracked',key:'uc_financing',hasDate:true,dateKey:'tcFinancingDate'},
-      {label:'Appraisal deadline tracked',key:'uc_appraisal',hasDate:true,dateKey:'tcAppraisalDate'},
-      {label:'Inspection ordered',key:'uc_insp_ordered'},
-      {label:'Inspection completed',key:'uc_insp_done'},
-      {label:'Inspection report received',key:'uc_insp_report'},
-      {label:'Repairs negotiated',key:'uc_repairs'},
-      {label:'Addendum signed',key:'uc_addendum'},
-      {label:'Appraisal ordered',key:'uc_appr_ordered'},
-      {label:'Appraisal received',key:'uc_appr_received'},
-      {label:'Loan application submitted',key:'uc_loan_app'},
-      {label:'Appraisal completed',key:'uc_appr_done'},
-      {label:'Clear to close received',key:'uc_ctc'},
-      {label:'Final loan approval',key:'uc_loan_final'},
-      {label:'Title company confirmed',key:'uc_title'},
-      {label:'Title commitment received',key:'uc_title_commit'},
-      {label:'Utilities / accounts reviewed',key:'uc_utilities'},
-      {label:'Signing date and time set',key:'uc_signing'},
-      {label:'Final walkthrough scheduled',key:'uc_walkthrough'},
-      {label:'Funds to close confirmed',key:'uc_funds'},
-      {label:'Recording confirmed',key:'uc_recording'},
-      {label:'Keys / access confirmed',key:'uc_keys'}
+    {phase:'Phase 3 - Under Contract', steps:[
+      {label:'Offer submitted & docs uploaded in Dotloop',key:'b3_offer',desc:'Executed purchase contract submitted and files organized in compliance repository.'},
+      {label:'Earnest money delivered',key:'b3_earnest',hasDate:true,dateField:'earnestDate',desc:'Earnest money confirmation received and logged.'},
+      {label:'Due diligence deadline tracked',key:'b3_duedilig',hasDate:true,dateField:'dueDiligDate',desc:'Contractual tracking window active.'},
+      {label:'Financing deadline tracked',key:'b3_financing',hasDate:true,dateField:'financingDate',desc:'Contractual tracking window active.'},
+      {label:'Appraisal deadline tracked',key:'b3_appraisal',hasDate:true,dateField:'appraisalDate',desc:'Contractual tracking window active.'},
+      {label:'Home inspection completed & repairs negotiated',key:'b3_inspection',desc:'Physical inspection performed, report evaluated, and repair addenda executed.'},
+      {label:'Appraisal completed & loan approved',key:'b3_apprloan',desc:'Appraisal report received above contract value and formal loan commitment issued.'},
+      {label:'Title commitment reviewed & confirmed',key:'b3_title',desc:'Preliminary title insurance commitment reviewed for encumbrances.'},
+      {label:'Final walkthrough scheduled & completed',key:'b3_walkthrough',desc:'Final property condition verification completed with buyer.'},
+      {label:'Closing time, utilities, & funds confirmed',key:'b3_closingprep',desc:'Signing window locked, utility transfer reminders sent, and final wire figures verified.'},
+      {label:'Recording & keys confirmed',key:'b3_recording',desc:'Public recordation confirmed and possession transfers completed.'}
     ]},
-    {phase:'Closing & Post-Close', steps:[
-      {label:'Settlement statement reviewed',key:'cl_settlement'},
-      {label:'Closing appointment arranged',key:'cl_appt'},
-      {label:'Closing gift arranged',key:'cl_gift'},
-      {label:'Keys delivered',key:'cl_keys'},
-      {label:'Home warranty reviewed (if applicable)',key:'cl_warranty'},
-      {label:'Possession arranged',key:'cl_possession'}
-    ]},
-    {phase:'Form 5 - Post-Closing Follow-Up', steps:[
-      {label:'Closing gift delivered',key:'pc_gift'},
-      {label:'Thank you / appreciation sent',key:'pc_thankyou'},
-      {label:'Review requested (Google / Social)',key:'pc_review'},
-      {label:'Testimonial requested',key:'pc_testimonial'},
-      {label:'Referral requested',key:'pc_referral'},
-      
-      {label:'Home anniversary added',key:'pc_anniversary'},
-      {label:'Birthday added (if known)',key:'pc_birthday'},
-      {label:'Tags updated (Past Client)',key:'pc_tags'},
-      {label:'Nurture / long-term campaign started',key:'pc_nurture'},
-      {label:'7-Day follow-up completed',key:'pc_7day'},
-      {label:'30-Day follow-up completed',key:'pc_30day'},
-      {label:'90-Day homeowner check-in completed',key:'pc_90day'},
-      {label:'6-Month follow-up completed',key:'pc_6mo'},
-      {label:'1-Year / Anniversary check-in completed',key:'pc_1year'}
+    {phase:'Phase 4 - Post-Close Nurture', steps:[
+      {label:'Settlement statement reviewed & uploaded',key:'b4_settlement',desc:'Final ALTA / settlement statement uploaded to long-term storage.'},
+      {label:'Closing gift delivered',key:'b4_gift',desc:'Closing appreciation item prepared and delivered.'},
+      {label:'Review & testimonial requested',key:'b4_review',desc:'Digital feedback and testimonial requests sent to client.'},
+      {label:'CRM updated',key:'b4_crm',desc:'Contact records updated with past client tags, property anniversary date, and birthdays.'},
+      {label:'Long-term nurture campaign started',key:'b4_nurture',desc:'Long-term client relationship and marketing sequence initiated.'},
+      {label:'Milestone follow-ups',key:'b4_milestones',desc:'Follow-up schedule systematically initiated across standard milestones (7-day, 30-day, 90-day, 1-year).'}
     ]}
   ],
   seller: [
-    {phase:'Form 2 - Seller Intake', steps:[
-      {label:'Collect contact info (name, phone, email)',key:'si_contact'},
-      
-      {label:'Confirm preferred contact method',key:'si_contact_method'},
-      {label:'Mortgage statement received',key:'si_mortgage'},
-      {label:'HELOC statement received (if applicable)',key:'si_heloc'},
-      {label:'HOA documents and contact info received',key:'si_hoa'},
-      {label:'Property tax information collected',key:'si_tax'},
-      {label:'Utility averages collected',key:'si_utilities'},
-      {label:'List of upgrades and improvements received',key:'si_upgrades'},
-      {label:'Trust / probate documents (if applicable)',key:'si_trust'},
-      {label:'Existing survey (if available)',key:'si_survey'},
-      {label:'Solar information collected (if applicable)',key:'si_solar'},
-      {label:'Existing leases collected (if applicable)',key:'si_leases'},
-      {label:'Home warranty information collected',key:'si_warranty'},
-      {label:'Open title / request preliminary title report',key:'si_title'},
-      {label:'Request ownership verification and lien search',key:'si_liens'},
-      {label:'Request estimated seller net sheet',key:'si_netsheet'},
-      {label:'Review payoff balances and closing costs',key:'si_payoff'},
-      {label:'Discuss timeline and moving plans',key:'si_timeline'},
-      {label:'Seller disclosures sent',key:'si_disclosures'},
-      {label:'Next follow-up date set',key:'si_followup'}
+    {phase:'Phase 1 - Listing Intake & Property Docs', steps:[
+      {label:'Property documentation gathered',key:'s1_docs',desc:'Consolidated gathering of HOA docs, payoff balances, tax records, utility averages, and solar/lease details.'},
+      {label:'Listing agreement & seller disclosures completed',key:'s1_agreement',desc:'Exclusive listing agreement and statutory disclosures fully completed and signed.'},
+      {label:'Preliminary title opened & lien search requested',key:'s1_title',desc:'Escrow opened with title company and early lien verification requested.'}
     ]},
-    {phase:'Form 3 - Listing Go-Live Checklist', steps:[
-      {label:'Listing agreement signed',key:'lg_agreement'},
-      {label:'Seller disclosures completed',key:'lg_disclosures'},
-      {label:'Title opened',key:'lg_title'},
-      {label:'Payoff requested',key:'lg_payoff'},
-      {label:'CMA prepared and pricing strategy set',key:'lg_cma'},
-      {label:'Staging consultation completed',key:'lg_staging'},
-      {label:'Photography scheduled',key:'lg_photo_sched'},
-      {label:'Photos received and approved',key:'lg_photos'},
-      {label:'Drone photos completed',key:'lg_drone'},
-      {label:'Floor plan completed',key:'lg_floorplan'},
-      {label:'TikTok / Reels video created',key:'lg_video'},
-      {label:'MLS data input and verified',key:'lg_mls'},
-      {label:'Lockbox installed',key:'lg_lockbox'},
-      {label:'Sign installed',key:'lg_sign'},
-      {label:'Property brochures created',key:'lg_brochures'},
-      {label:'Showing instructions confirmed',key:'lg_showing_instr'},
-      {label:'MLS activated',key:'lg_mls_live'},
-      {label:'Just Listed announcement sent',key:'lg_announcement'},
-      {label:'Facebook post published',key:'lg_facebook'},
-      {label:'Instagram post published',key:'lg_instagram'},
-      {label:'Email blast to database sent',key:'lg_email'},
-      {label:'Agent to agent notification sent',key:'lg_agent_notify'},
-      {label:'Open house scheduled',key:'lg_openhouse'},
-      {label:'Listing ads launched',key:'lg_ads'},
-      {label:'Property flyers delivered',key:'lg_flyers'}
+    {phase:'Phase 2 - Listing Go-Live', steps:[
+      {label:'CMA prepared & pricing finalized',key:'s2_cma',desc:'Market data updated and final base list price established.'},
+      {label:'Media completed',key:'s2_media',desc:'High-definition interior/exterior photos, drone captures, floor plans, and social media walkthrough videos finalized.'},
+      {label:'Sign, lockbox, & showing instructions active',key:'s2_signage',desc:'Physical lockbox placed, yard sign installed, and showing instructions configured in system.'},
+      {label:'MLS active & verified',key:'s2_mls',desc:'Listing made active on the MLS and data integrity checked.'},
+      {label:'Marketing blast launched',key:'s2_marketing',desc:'Omnichannel marketing campaign deployed across social networks, local databases, and printed flyers.'},
+      {label:'Open house scheduled & executed',key:'s2_openhouse',desc:'Public or broker open house events coordinated and executed.'}
     ]},
-    {phase:'Under Contract - Seller Side', steps:[
-      {label:'Offer received and reviewed',key:'suc_offer'},
-      {label:'Offer summary / net sheet prepared',key:'suc_netsheet'},
-      {label:'Offer accepted / countered',key:'suc_accepted'},
-      {label:'Earnest money received',key:'suc_earnest'},
-      {label:'Due diligence deadline tracked',key:'suc_duedilig',hasDate:true,dateKey:'tcDueDiligDate'},
-      {label:'Financing deadline tracked',key:'suc_financing',hasDate:true,dateKey:'tcFinancingDate'},
-      {label:'Appraisal deadline tracked',key:'suc_appraisal',hasDate:true,dateKey:'tcAppraisalDate'},
-      {label:'Inspection ordered by buyer',key:'suc_insp'},
-      {label:'Inspection report received',key:'suc_insp_report'},
-      {label:'Repair negotiations completed',key:'suc_repairs'},
-      {label:'Addendum signed',key:'suc_addendum'},
-      {label:'Appraisal completed',key:'suc_appr'},
-      {label:'Title commitment received',key:'suc_title'},
-      {label:'Utilities / accounts reviewed',key:'suc_utilities'},
-      {label:'Signing date and time set',key:'suc_signing'},
-      {label:'Final walkthrough scheduled',key:'suc_walkthrough'},
-      {label:'Funds to close confirmed',key:'suc_funds'},
-      {label:'Recording confirmed',key:'suc_recording'},
-      {label:'Keys / access confirmed',key:'suc_keys'}
+    {phase:'Phase 3 - Under Contract', steps:[
+      {label:'Offer accepted/countered & uploaded',key:'s3_offer',desc:'Ratified purchase contract uploaded to internal CRM compliance track.'},
+      {label:'Earnest money received',key:'s3_earnest',hasDate:true,dateField:'earnestDate',desc:'Verification of earnest money deposit holding received.'},
+      {label:'Due diligence deadline tracked',key:'s3_duedilig',hasDate:true,dateField:'dueDiligDate',desc:'Contractual tracking window active.'},
+      {label:'Financing deadline tracked',key:'s3_financing',hasDate:true,dateField:'financingDate',desc:'Contractual tracking window active.'},
+      {label:'Appraisal deadline tracked',key:'s3_appraisal',hasDate:true,dateField:'appraisalDate',desc:'Contractual tracking window active.'},
+      {label:'Buyer inspection & repair negotiations completed',key:'s3_inspection',desc:"Buyer's home inspection finalized and resolution addendum successfully executed."},
+      {label:'Buyer appraisal completed',key:'s3_appraisaldone',desc:"Buyer's valuation contingency satisfied."},
+      {label:'Title commitment reviewed',key:'s3_title',desc:'Seller title obligations verified clear for transfer.'},
+      {label:'Signing date set & utilities reminded',key:'s3_signing',desc:'Settlement appointment locked and client reminded to terminate active utility accounts.'},
+      {label:'Final walkthrough & funds verification completed',key:'s3_walkthrough',desc:'Buyer final walkthrough completed and funds availability confirmed.'},
+      {label:'Recording confirmed & proceeds wired',key:'s3_recording',desc:"Title recording confirmed by county and net proceeds wired to seller's account."},
+      {label:'Keys handed over / possession complete',key:'s3_keys',desc:'Property keys relinquished and possession transferred per contract.'}
     ]},
-    {phase:'Closing & Post-Close', steps:[
-      {label:'Settlement statement reviewed',key:'scl_settlement'},
-      {label:'Closing appointment confirmed',key:'scl_appt'},
-      {label:'Proceeds / wire confirmed',key:'scl_proceeds'},
-      {label:'Closing gift delivered',key:'scl_gift'}
-    ]},
-    {phase:'Form 5 - Post-Closing Follow-Up', steps:[
-      {label:'Thank you / appreciation sent',key:'spc_thankyou'},
-      {label:'Review requested (Google / Social)',key:'spc_review'},
-      {label:'Testimonial requested',key:'spc_testimonial'},
-      {label:'Referral requested',key:'spc_referral'},
-      
-      {label:'Notes updated with closing info',key:'spc_notes'},
-      {label:'Home anniversary added',key:'spc_anniversary'},
-      {label:'Birthday added (if known)',key:'spc_birthday'},
-      {label:'Tags updated (Past Client)',key:'spc_tags'},
-      {label:'Nurture / long-term campaign started',key:'spc_nurture'},
-      {label:'7-Day follow-up completed',key:'spc_7day'},
-      {label:'30-Day follow-up completed',key:'spc_30day'},
-      {label:'90-Day check-in completed',key:'spc_90day'},
-      {label:'6-Month follow-up completed',key:'spc_6mo'},
-      {label:'1-Year / Anniversary check-in',key:'spc_1year'}
+    {phase:'Phase 4 - Post-Close Nurture', steps:[
+      {label:'Settlement statement reviewed & uploaded',key:'s4_settlement',desc:'Final closing statement archived internally.'},
+      {label:'Closing gift delivered',key:'s4_gift',desc:'Appreciation gesture delivered to client.'},
+      {label:'Review & testimonial requested',key:'s4_review',desc:'Requests for online performance reviews and testimonials transmitted.'},
+      {label:'CRM updated',key:'s4_crm',desc:'Client dataset updated with past seller tags, transaction data notes, and dates.'},
+      {label:'Long-term nurture campaign started',key:'s4_nurture',desc:'Post-sale value-add communication sequence activated.'},
+      {label:'Milestone follow-ups',key:'s4_milestones',desc:'Follow-up schedule systematically initiated across standard milestones.'}
     ]}
   ]
 };
-
-function saveTX(tx){ sv(); if(supaReady && tx) dbSave('transactions', [tx]); }
-function deleteTX(id){
-  if(!confirm('Delete this transaction and all its data?')) return;
-  TX=TX.filter(function(t){return t.id!==id;});
-  sv();
-  pausePoll(8000); deleteTXfromDB(id);
-  ge('tcDetOv').classList.remove('open');
-  curTx=null;
-  renderTC(); rd();
-}
-
-function initTC(){
-  renderTC();
-  updateNbTC();
-}
-
-function updateNbTC(){
-  var active = TX.filter(function(t){ return t.status !== 'closed'; }).length;
-  ge('nbTC').textContent = active;
-}
 
 function tcProgress(tx){
   var template = TC_TEMPLATES[tx.type] || TC_TEMPLATES['buyer'];
@@ -2689,11 +2567,18 @@ function openTCDetail(id){
       lbl.className = 'tc-step-label' + (isDone ? ' done' : '');
       lbl.textContent = step.label;
       info.appendChild(lbl);
-
+ 
+      if(step.desc){
+        var dsc = document.createElement('div');
+        dsc.className = 'tc-step-desc';
+        dsc.textContent = step.desc;
+        info.appendChild(dsc);
+      }
+ 
       // Show relevant date if this step has one
-      if(step.hasDate && tx[step.dateKey.replace('tc','').toLowerCase()+'Date']){
-        var dateVal = tx[step.dateKey.replace('tc','').toLowerCase()+'Date'];
-        if(dateVal){
+      if(step.hasDate && step.dateField && tx[step.dateField]){
+        var dateVal = tx[step.dateField];
+        if(dateVal){{
           var n = du(dateVal);
           var due = document.createElement('div');
           due.className = 'tc-step-due' + (n < 0 ? ' overdue' : n <= 3 ? ' soon' : '');
@@ -2793,10 +2678,9 @@ async function askTCQuestion(){
         doneItems.push(phase.phase + ': ' + step.label);
       } else {
         pendingItems.push(phase.phase + ': ' + step.label);
-        if(step.hasDate){
-          var dateKey = step.dateKey.replace('tc','').replace('Date','').toLowerCase() + 'Date';
-          if(tx[dateKey]){
-            var n = du(tx[dateKey]);
+        if(step.hasDate && step.dateField){
+          if(tx[step.dateField]){
+            var n = du(tx[step.dateField]);
             if(n <= 3) urgentItems.push(step.label + ' (due in ' + n + ' days)');
           }
         }
