@@ -708,6 +708,33 @@ function updateBulkBar(){
 }
 
 var mergeStep = 1;
+var mergePreview = null;
+ 
+function mergeMV(a, b, arrKey, scalarKey, split){
+  var out = [];
+  getCMethods(a[arrKey], a[scalarKey], split).forEach(function(x){
+    out.push({value: x.value, label: x.label, from: 'A'});
+  });
+  getCMethods(b[arrKey], b[scalarKey], split).forEach(function(x){
+    var dup = false;
+    for(var i = 0; i < out.length; i++){
+      if(out[i].value.toLowerCase() === x.value.toLowerCase()){ dup = true; break; }
+    }
+    if(!dup) out.push({value: x.value, label: x.label, from: 'B'});
+  });
+  return out;
+}
+ 
+function mergeNotesText(na, nb){
+  var segs = [];
+  [na, nb].forEach(function(t){
+    String(t || '').split('|').forEach(function(seg){
+      seg = seg.trim();
+      if(seg && segs.indexOf(seg) < 0) segs.push(seg);
+    });
+  });
+  return segs.join(' | ');
+}
 
 function openMergeModal(){
   var ids=Array.from(selectedContacts);
@@ -726,22 +753,22 @@ function openMergeModal(){
 
 function showMergeStep1(a, b){
   var body=ge('mergeModalBody'); body.innerHTML='';
-  var fields=[
+  var nameA=(a.first+' '+a.last).trim()||'Contact A';
+  var nameB=(b.first+' '+b.last).trim()||'Contact B';
+ 
+  var wrap=document.createElement('div');
+  wrap.style.cssText='padding:4px 0;';
+ 
+  // ---- Scalar fields: pick one side ----
+  var scalars=[
     {key:'first',label:'First Name'},
     {key:'last',label:'Last Name'},
-    {key:'type',label:'Type'},
-    {key:'phone',label:'Phone'},
-    {key:'email',label:'Email'},
-    {key:'property',label:'Property'},
     {key:'stage',label:'Stage'},
     {key:'price',label:'Price'},
     {key:'closeDate',label:'Closing Date'},
-    {key:'notes',label:'Notes'}
+    {key:'whatsapp',label:'WhatsApp'}
   ];
-
-  var nameA=(a.first+' '+a.last).trim()||'Contact A';
-  var nameB=(b.first+' '+b.last).trim()||'Contact B';
-
+ 
   var tbl=document.createElement('table');
   tbl.id='mergePickTable';
   tbl.style.cssText='width:100%;border-collapse:collapse;font-size:14px;';
@@ -757,9 +784,9 @@ function showMergeStep1(a, b){
     hr.appendChild(th);
   });
   thead.appendChild(hr); tbl.appendChild(thead);
-
+ 
   var tbody=document.createElement('tbody');
-  fields.forEach(function(f){
+  scalars.forEach(function(f){
     var va=a[f.key]||'', vb=b[f.key]||'';
     if(!va&&!vb) return;
     var tr=document.createElement('tr');
@@ -784,35 +811,87 @@ function showMergeStep1(a, b){
     });
     tbody.appendChild(tr);
   });
-  tbl.appendChild(tbody); body.appendChild(tbl);
+  tbl.appendChild(tbody); wrap.appendChild(tbl);
+ 
+  // ---- Multi-value fields: keep any/all ----
+  function mvSection(title, field, items){
+    if(!items.length) return;
+    var sec=document.createElement('div');
+    sec.style.cssText='padding:12px 12px 4px;';
+    var h=document.createElement('div');
+    h.style.cssText='font-size:13px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;';
+    h.textContent=title+' (keep any)';
+    sec.appendChild(h);
+    items.forEach(function(it,idx){
+      var lbl=document.createElement('label');
+      lbl.style.cssText='display:flex;align-items:center;gap:8px;cursor:pointer;padding:5px 0;border-bottom:1px solid var(--border);';
+      var cb=document.createElement('input');
+      cb.type='checkbox'; cb.checked=true;
+      cb.className='mv-pick';
+      cb.setAttribute('data-field',field);
+      cb.setAttribute('data-idx',String(idx));
+      cb.style.cssText='flex-shrink:0;accent-color:var(--accent);';
+      var span=document.createElement('span');
+      span.style.cssText='font-size:13px;color:var(--text);word-break:break-word;flex:1;';
+      span.textContent=it.value+(it.label?' ('+it.label+')':'');
+      var tag=document.createElement('span');
+      tag.style.cssText='font-size:11px;font-weight:700;color:var(--text3);flex-shrink:0;';
+      tag.textContent=it.from==='A'?nameA:nameB;
+      lbl.appendChild(cb); lbl.appendChild(span); lbl.appendChild(tag);
+      sec.appendChild(lbl);
+    });
+    wrap.appendChild(sec);
+  }
+ 
+  mergePreview={a:a,b:b,mv:{}};
+  mergePreview.mv.emails    = mergeMV(a,b,'emails','email',true);
+  mergePreview.mv.phones    = mergeMV(a,b,'phones','phone',true);
+  mergePreview.mv.addresses = mergeMV(a,b,'addresses','property',false);
+ 
+  var tset=[];
+  ctypes(a).forEach(function(t){ if(tset.indexOf(t)<0) tset.push(t); });
+  ctypes(b).forEach(function(t){ if(tset.indexOf(t)<0) tset.push(t); });
+  mergePreview.mv.types = tset.map(function(t){
+    return {value:t, label:'', from: ctypes(a).indexOf(t)>=0 ? 'A' : 'B'};
+  });
+ 
+  mvSection('Emails','emails',mergePreview.mv.emails);
+  mvSection('Phones','phones',mergePreview.mv.phones);
+  mvSection('Addresses','addresses',mergePreview.mv.addresses);
+  mvSection('Types','types',mergePreview.mv.types);
+ 
+  // ---- Notes: always combined ----
+  var nsec=document.createElement('div');
+  nsec.style.cssText='padding:12px;';
+  var nh=document.createElement('div');
+  nh.style.cssText='font-size:13px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;';
+  nh.textContent='Notes (combined, editable next step)';
+  nsec.appendChild(nh);
+  var np=document.createElement('div');
+  np.style.cssText='font-size:13px;color:var(--text2);background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:9px 11px;white-space:pre-wrap;word-break:break-word;';
+  np.textContent=mergeNotesText(a.notes,b.notes)||'(none)';
+  nsec.appendChild(np);
+  wrap.appendChild(nsec);
+ 
+  body.appendChild(wrap);
 }
-
+ 
 function showMergeStep2(merged){
   var body=ge('mergeModalBody'); body.innerHTML='';
-  ge('mergeStepLabel').textContent='Step 2 of 2 — Review and edit before saving';
+  ge('mergeStepLabel').textContent='Step 2 of 2 - Review and edit before saving';
   ge('btnConfirmMerge').textContent='Save Merged Contact';
   ge('btnMergeBack').style.display='inline-flex';
-
+ 
   var wrap=document.createElement('div'); wrap.style.padding='16px 20px';
-
+ 
   function mfld(labelTxt, inputEl){
     var fg=document.createElement('div'); fg.style.cssText='margin-bottom:12px;';
     var lbl=document.createElement('label'); lbl.className='fl'; lbl.textContent=labelTxt;
     fg.appendChild(lbl); fg.appendChild(inputEl); wrap.appendChild(fg);
   }
-
+ 
   var iFirst=document.createElement('input'); iFirst.className='fi'; iFirst.id='mrg_first'; iFirst.value=merged.first||'';
   var iLast=document.createElement('input'); iLast.className='fi'; iLast.id='mrg_last'; iLast.value=merged.last||'';
-  var iType=document.createElement('select'); iType.className='fsel'; iType.id='mrg_type';
-  [['','-- No type --'],['prospect','Prospect'],['buyer','Buyer'],['seller','Seller'],
-   ['agent','Agent/Broker'],['lender','Loan Officer/Lender'],['title','Title Company'],
-   ['vendor','Vendor'],['other','Other']].forEach(function(o){
-    var opt=document.createElement('option'); opt.value=o[0]; opt.textContent=o[1]; iType.appendChild(opt);
-  });
-  iType.value=merged.type||'';
-  var iPhone=document.createElement('input'); iPhone.className='fi'; iPhone.id='mrg_phone'; iPhone.value=merged.phone||'';
-  var iEmail=document.createElement('input'); iEmail.className='fi'; iEmail.id='mrg_email'; iEmail.value=merged.email||'';
-  var iProp=document.createElement('input'); iProp.className='fi'; iProp.id='mrg_prop'; iProp.value=merged.property||'';
   var iStage=document.createElement('select'); iStage.className='fsel'; iStage.id='mrg_stage';
   [['','-- No stage --'],['New Lead','New Lead'],['Contacted','Contacted'],['Showing','Showing'],
    ['Under Contract','Under Contract'],['Closed','Closed']].forEach(function(o){
@@ -821,8 +900,9 @@ function showMergeStep2(merged){
   iStage.value=merged.stage||'';
   var iPrice=document.createElement('input'); iPrice.className='fi'; iPrice.id='mrg_price'; iPrice.value=merged.price||'';
   var iClose=document.createElement('input'); iClose.className='fi'; iClose.id='mrg_closedate'; iClose.type='date'; iClose.value=merged.closeDate||'';
-  var iNotes=document.createElement('textarea'); iNotes.className='fi'; iNotes.id='mrg_notes'; iNotes.rows=4; iNotes.value=merged.notes||'';
-
+  var iWa=document.createElement('input'); iWa.className='fi'; iWa.id='mrg_whatsapp'; iWa.value=merged.whatsapp||'';
+  var iNotes=document.createElement('textarea'); iNotes.className='fi'; iNotes.id='mrg_notes'; iNotes.rows=5; iNotes.value=merged.notes||'';
+ 
   var nameRow=document.createElement('div'); nameRow.style.cssText='display:flex;gap:10px;margin-bottom:12px;';
   var fg1=document.createElement('div'); fg1.style.flex='1';
   var l1=document.createElement('label'); l1.className='fl'; l1.textContent='First Name';
@@ -832,58 +912,124 @@ function showMergeStep2(merged){
   fg2.appendChild(l2); fg2.appendChild(iLast);
   nameRow.appendChild(fg1); nameRow.appendChild(fg2);
   wrap.appendChild(nameRow);
-
-  mfld('Type', iType); mfld('Phone', iPhone); mfld('Email', iEmail);
-  mfld('Property / Interest', iProp); mfld('Stage', iStage); mfld('Price', iPrice);
-  mfld('Closing Date', iClose); mfld('Notes', iNotes);
+ 
+  function mvList(title, field, items){
+    var fg=document.createElement('div'); fg.style.cssText='margin-bottom:12px;';
+    var lbl=document.createElement('label'); lbl.className='fl';
+    lbl.textContent=title+' ('+items.length+')';
+    fg.appendChild(lbl);
+    if(!items.length){
+      var none=document.createElement('div');
+      none.style.cssText='font-size:13px;color:var(--text3);padding:4px 0;';
+      none.textContent='(none)';
+      fg.appendChild(none);
+    }
+    items.forEach(function(it,idx){
+      var inp=document.createElement('input');
+      inp.className='fi'; inp.value=it.value;
+      inp.setAttribute('data-mvfield',field);
+      inp.setAttribute('data-mvidx',String(idx));
+      inp.style.marginBottom='5px';
+      fg.appendChild(inp);
+    });
+    wrap.appendChild(fg);
+  }
+ 
+  mvList('Emails','emails',merged.emails||[]);
+  mvList('Phones','phones',merged.phones||[]);
+  mvList('Addresses','addresses',merged.addresses||[]);
+ 
+  var tRow=document.createElement('div'); tRow.style.cssText='margin-bottom:12px;';
+  var tl=document.createElement('label'); tl.className='fl'; tl.textContent='Types';
+  tRow.appendChild(tl);
+  var tv=document.createElement('div');
+  tv.style.cssText='font-size:13px;color:var(--text);padding:4px 0;';
+  tv.textContent=(merged.types&&merged.types.length)?merged.types.join(', '):'(none)';
+  tRow.appendChild(tv); wrap.appendChild(tRow);
+ 
+  mfld('Stage', iStage); mfld('Price', iPrice);
+  mfld('Closing Date', iClose); mfld('WhatsApp', iWa); mfld('Notes', iNotes);
   body.appendChild(wrap);
 }
-
+ 
 function buildMergedFromStep1(a, b){
   var merged=JSON.parse(JSON.stringify(a));
-  var radios=ge('mergeModalBody').querySelectorAll('input[type="radio"]:checked');
+  var bodyEl=ge('mergeModalBody');
+ 
+  var radios=bodyEl.querySelectorAll('input[type="radio"]:checked');
   radios.forEach(function(r){
     var key=r.getAttribute('data-key');
     var src=r.value==='a'?a:b;
     merged[key]=src[key]||'';
   });
+ 
+  var picked={emails:[],phones:[],addresses:[],types:[]};
+  bodyEl.querySelectorAll('input.mv-pick:checked').forEach(function(cb){
+    var field=cb.getAttribute('data-field');
+    var idx=parseInt(cb.getAttribute('data-idx'),10);
+    var item=mergePreview&&mergePreview.mv[field]?mergePreview.mv[field][idx]:null;
+    if(item) picked[field].push({value:item.value,label:item.label||''});
+  });
+ 
+  merged.emails=picked.emails;
+  merged.phones=picked.phones;
+  merged.addresses=picked.addresses;
+  merged.email=(picked.emails[0]&&picked.emails[0].value)||'';
+  merged.phone=(picked.phones[0]&&picked.phones[0].value)||'';
+  merged.property=(picked.addresses[0]&&picked.addresses[0].value)||'';
+  merged.types=picked.types.map(function(t){ return t.value; });
+  merged.type=merged.types.join('|');
+  merged.notes=mergeNotesText(a.notes,b.notes);
   return merged;
 }
-
+ 
 function confirmMerge(){
   var btn=ge('btnConfirmMerge');
   var idA=parseInt(btn.getAttribute('data-a'))||btn.getAttribute('data-a');
   var idB=parseInt(btn.getAttribute('data-b'))||btn.getAttribute('data-b');
   var a=gc(idA), b=gc(idB); if(!a||!b) return;
-
+ 
   if(mergeStep===1){
-    // build preview from selections and show editable form
-    var merged=buildMergedFromStep1(a,b);
+    var built=buildMergedFromStep1(a,b);
+    mergePreview.merged=built;
     mergeStep=2;
-    showMergeStep2(merged);
+    showMergeStep2(built);
     return;
   }
-
-  // Step 2 — read editable form and save
-  var merged=JSON.parse(JSON.stringify(a));
+ 
+  if(!mergePreview||!mergePreview.merged) return;
+  var merged=mergePreview.merged;
+ 
   merged.first=ge('mrg_first').value.trim();
   merged.last=ge('mrg_last').value.trim();
-  merged.type=ge('mrg_type').value; merged.types=merged.type?[merged.type]:[];
-  merged.phone=ge('mrg_phone').value.trim();
-  merged.email=ge('mrg_email').value.trim();
-  merged.property=ge('mrg_prop').value.trim();
   merged.stage=ge('mrg_stage').value;
   merged.price=ge('mrg_price').value.trim();
   merged.closeDate=ge('mrg_closedate').value;
+  merged.whatsapp=ge('mrg_whatsapp').value.trim();
   merged.notes=ge('mrg_notes').value.trim();
-
+ 
+  ['emails','phones','addresses'].forEach(function(field){
+    var inputs=ge('mergeModalBody').querySelectorAll('input[data-mvfield="'+field+'"]');
+    var out=[];
+    inputs.forEach(function(inp){
+      var idx=parseInt(inp.getAttribute('data-mvidx'),10);
+      var v=inp.value.trim();
+      if(!v) return;
+      var lab=(merged[field]&&merged[field][idx]&&merged[field][idx].label)||'';
+      out.push({value:v,label:lab});
+    });
+    merged[field]=out;
+  });
+  merged.email=(merged.emails[0]&&merged.emails[0].value)||'';
+  merged.phone=(merged.phones[0]&&merged.phones[0].value)||'';
+  merged.property=(merged.addresses[0]&&merged.addresses[0].value)||'';
+ 
   if(!merged.first&&!merged.last){ alert('Please enter at least a first or last name.'); return; }
-
-  // re-attach all notes/followups/deadlines from B to A
+ 
   N.forEach(function(n){ if(String(n.contactId)===String(idB)) n.contactId=idA; });
   F.forEach(function(f){ if(String(f.contactId)===String(idB)) f.contactId=idA; });
   D.forEach(function(d){ if(String(d.contactId)===String(idB)) d.contactId=idA; });
-
+ 
   var idx=C.findIndex(function(c){ return c.id===idA; });
   if(idx>=0) C[idx]=merged;
   updateContact(merged);
@@ -894,13 +1040,12 @@ function confirmMerge(){
   }
   delc(idB, true);
   selectedContacts.clear(); updateBulkBar();
+  mergePreview=null;
   cm('mergeModal');
-  // Wait for Supabase writes to settle then reload from DB to confirm
   setTimeout(function(){
     loadFromDB().then(function(){ rc(); rd(); });
   }, 1500);
 }
-
 function deleteSelectedContacts(){
   if(!selectedContacts.size) return;
   if(!confirm('Delete '+selectedContacts.size+' contact(s) and all their notes, follow-ups, and deadlines?')) return;
