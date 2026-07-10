@@ -3873,7 +3873,7 @@ function showScannerResults(r){
   var commitBtn = document.createElement('button');
   commitBtn.className = 'btn btn-p'; commitBtn.style.fontSize='14px';
   commitBtn.id = 'sc_commit_btn';
-  commitBtn.textContent = 'Import to CRM';
+  commitBtn.textContent = 'Confirm & Import';
   commitBtn.addEventListener('click', function(){ commitScanImport(r, commitBtn); });
   var newScanBtn = document.createElement('button');
   newScanBtn.className='btn btn-g'; newScanBtn.textContent='Scan Another Document';
