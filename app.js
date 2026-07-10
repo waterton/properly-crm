@@ -2734,8 +2734,8 @@ function openNewTxModal(){
   ge('tcModalTitle').textContent = 'New Transaction';
   ge('btnSaveTransaction').setAttribute('data-edit-id','');
   ge('tcType').value = 'buyer';
-  ge('tcContact').innerHTML = '';
-  C.forEach(function(c){ var o=document.createElement('option'); o.value=c.id; o.textContent=fn(c)+' ('+c.type+')'; ge('tcContact').appendChild(o); });
+  var txCP = ge('tcContactPick'); txCP.innerHTML = '';
+  buildContactPicker(txCP, 'tcContact', 'Search contact by name, email, phone...');
   ['tcAddress','tcPrice','tcMLS','tcLender','tcTitle','tcNotes'].forEach(function(x){ ge(x).value=''; });
   ['tcContractDate','tcClosingDate','tcEarnestDate','tcDueDiligDate','tcFinancingDate','tcAppraisalDate'].forEach(function(x){ ge(x).value=''; });
   cm('tcModal');
@@ -2743,6 +2743,8 @@ function openNewTxModal(){
 }
 
 function saveTransaction(){
+  var pickedContactId = parseInt(ge('tcContact').value);
+  if(!pickedContactId){ alert('Please select a contact for this transaction.'); return; }
   var editId = ge('btnSaveTransaction').getAttribute('data-edit-id');
   var tx;
   if(editId){
@@ -2753,7 +2755,7 @@ function saveTransaction(){
     TX.push(tx);
   }
   tx.type = ge('tcType').value;
-  tx.contactId = parseInt(ge('tcContact').value);
+  tx.contactId = pickedContactId;
   tx.address = ge('tcAddress').value.trim();
   tx.price = ge('tcPrice').value.trim();
   tx.mlsNum = ge('tcMLS').value.trim();
@@ -7205,10 +7207,10 @@ ge('tcDetEdit').addEventListener('click', function(){
   ge('tcModalTitle').textContent = 'Edit Transaction';
   ge('btnSaveTransaction').setAttribute('data-edit-id', tx.id);
   ge('tcType').value = tx.type||'buyer';
-  ge('tcContact').innerHTML = '';
-  C.forEach(function(c){ var o=document.createElement('option'); o.value=c.id; o.textContent=fn(c)+' ('+c.type+')'; ge('tcContact').appendChild(o); });
-  ge('tcContact').value = tx.contactId||'';
-  ge('tcAddress').value = tx.address||'';
+  var txCPe = ge('tcContactPick'); txCPe.innerHTML = '';
+  var txPick = buildContactPicker(txCPe, 'tcContact', 'Search contact by name, email, phone...');
+  if(tx.contactId){ var txC = gc(tx.contactId); if(txC) txPick.setContact(txC); }
+  ['tcAddress','tcPrice','tcMLS','tcLender','tcTitle','tcNotes'].forEach(function(x){ ge(x).value=''; });
   ge('tcPrice').value = tx.price||'';
   ge('tcMLS').value = tx.mlsNum||'';
   ge('tcLender').value = tx.lender||'';
@@ -7650,8 +7652,8 @@ function openEnrollModal(presetCampaignId){
   });
   if(presetCampaignId) cs.value = presetCampaignId;
 
-  var cc = ge('enrollContact'); cc.textContent='';
-  C.forEach(function(c){ var o=document.createElement('option'); o.value=c.id; o.textContent=fn(c)+(c.email?'':' (no email)'); cc.appendChild(o); });
+  var enCP = ge('enrollContactPick'); enCP.innerHTML='';
+  buildContactPicker(enCP, 'enrollContact', 'Search contact by name, email, phone...');
 
   var fs = ge('enrollFrom'); fs.textContent='';
   var accts = (typeof gmailState!=='undefined' && gmailState.connectedAccounts) ? gmailState.connectedAccounts : {};
