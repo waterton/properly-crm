@@ -2236,7 +2236,7 @@ var TC_TEMPLATES = {
   ]
 };
 
-function saveTX(tx){ sv(); if(supaReady && tx) dbSave('transactions', [tx]); }
+function saveTX(tx){ recomputeCommission(tx); sv(); if(supaReady && tx) dbSave('transactions', [tx]); }
 function deleteTX(id){
   if(!confirm('Delete this transaction and all its data?')) return;
   TX=TX.filter(function(t){return t.id!==id;});
@@ -2345,6 +2345,8 @@ function renderTC(){
       var dates = document.createElement('div');
       dates.style.cssText = 'display:flex;gap:12px;margin:10px 0 8px;flex-wrap:wrap;';
       if(tx.price){ var p=document.createElement('div'); p.style.cssText='font-size:18px;'; p.innerHTML='<span style="color:var(--text3);">Price:</span> <b style="color:var(--accent);">'+tx.price+'</b>'; dates.appendChild(p); }
+      if(tx.listCommissionAmt!=null){ var lc=document.createElement('div'); lc.style.cssText='font-size:18px;'; lc.innerHTML='<span style="color:var(--text3);">List comm:</span> <b>'+fmtUSD(tx.listCommissionAmt)+(tx.listCommissionPct!=null?' ('+tx.listCommissionPct+'%)':'')+'</b>'; dates.appendChild(lc); }
+      if(tx.buyerCommissionAmt!=null){ var bc=document.createElement('div'); bc.style.cssText='font-size:18px;'; bc.innerHTML='<span style="color:var(--text3);">Buyer comm:</span> <b>'+fmtUSD(tx.buyerCommissionAmt)+(tx.buyerCommissionPct!=null?' ('+tx.buyerCommissionPct+'%)':'')+'</b>'; dates.appendChild(bc); }
       if(tx.closingDate){
         var d=document.createElement('div'); d.style.cssText='font-size:18px;';
         var n=daysToClose;
@@ -2751,7 +2753,7 @@ function openNewTxModal(){
   ge('tcType').value = 'buyer';
   var txCP = ge('tcContactPick'); txCP.innerHTML = '';
   buildContactPicker(txCP, 'tcContact', 'Search contact by name, email, phone...');
-  ['tcAddress','tcPrice','tcMLS','tcLender','tcTitle','tcNotes'].forEach(function(x){ ge(x).value=''; });
+  ['tcAddress','tcPrice','tcMLS','tcLender','tcTitle','tcNotes','tcListCommPct','tcBuyerCommPct','tcListCommAmt','tcBuyerCommAmt'].forEach(function(x){ if(ge(x)) ge(x).value=''; });
   ['tcContractDate','tcClosingDate','tcEarnestDate','tcDueDiligDate','tcFinancingDate','tcAppraisalDate'].forEach(function(x){ ge(x).value=''; });
   cm('tcModal');
   ge('tcModal').classList.add('open');
@@ -2783,6 +2785,13 @@ function saveTransaction(){
   tx.dueDiligDate = ge('tcDueDiligDate').value;
   tx.financingDate = ge('tcFinancingDate').value;
   tx.appraisalDate = ge('tcAppraisalDate').value;
+  tx.listCommissionPct  = normPct(ge('tcListCommPct') ? ge('tcListCommPct').value : '');
+  tx.buyerCommissionPct = normPct(ge('tcBuyerCommPct') ? ge('tcBuyerCommPct').value : '');
+  var _lAmt = ge('tcListCommAmt') ? ge('tcListCommAmt').value.trim() : '';
+  var _bAmt = ge('tcBuyerCommAmt') ? ge('tcBuyerCommAmt').value.trim() : '';
+  tx.listCommissionAmt  = _lAmt ? parsePrice(_lAmt) : null;   // manual override (used when % blank)
+  tx.buyerCommissionAmt = _bAmt ? parsePrice(_bAmt) : null;   // manual override (used when % blank)
+  recomputeCommission(tx);  // % present -> amount derived; % blank -> keep manual flat fee
 
   // Auto-create deadlines in the main deadline tracker
   var dateMap = [
@@ -3483,6 +3492,8 @@ function buildScannerPrompt(hint){
     '  "settlementDeadline": "YYYY-MM-DD or empty string",',
     '  "lenderName": "lender name if present",',
     '  "titleCompany": "title company if present",',
+    '  "listingCommissionPct": "listing-side broker commission percent, number only e.g. 3 (empty string if not stated)",',
+    '  "buyerCommissionPct": "buyer-side broker commission percent, number only e.g. 2.5 (empty string if not stated)",',
     '  "mlsNumber": "MLS number if present",',
     '  "contingencies": ["list", "of", "contingencies"],',
     '  "redFlags": ["any items needing attention", "unusual clauses", "tight deadlines"],',
@@ -3665,7 +3676,9 @@ function showScannerResults(r){
     {label:'Lender', key:'lenderName', id:'sc_lender'},
     {label:'Title Company', key:'titleCompany', id:'sc_title'},
     {label:'MLS Number', key:'mlsNumber', id:'sc_mls'},
-    {label:'Loan Amount', key:'loanAmount', id:'sc_loan'}
+    {label:'Loan Amount', key:'loanAmount', id:'sc_loan'},
+    {label:'Listing Commission %', key:'listingCommissionPct', id:'sc_list_comm'},
+    {label:'Buyer Commission %', key:'buyerCommissionPct', id:'sc_buyer_comm'}
   ];
   fieldDefs.forEach(function(f){
     var fDiv = document.createElement('div');
@@ -3999,6 +4012,8 @@ async function commitScanImport(r, btn){
   var dueDiligDate = ge('sc_duedilig') ? ge('sc_duedilig').value : (r.dueDiligenceDeadline||'');
   var financingDate = ge('sc_financing') ? ge('sc_financing').value : (r.financingDeadline||'');
   var appraisalDate = ge('sc_appraisal') ? ge('sc_appraisal').value : (r.appraisalDeadline||'');
+  var listCommPct = ge('sc_list_comm') ? ge('sc_list_comm').value : (r.listingCommissionPct||'');
+  var buyerCommPct = ge('sc_buyer_comm') ? ge('sc_buyer_comm').value : (r.buyerCommissionPct||'');
   var address = r.address||'';
 
   // ---- Resolve transaction choice ----
@@ -4021,6 +4036,8 @@ async function commitScanImport(r, btn){
     if(lender) tx.lender = lender;
     if(titleCo) tx.titleCo = titleCo;
     if(price) tx.price = price;
+    if(String(listCommPct).trim()!=='') tx.listCommissionPct = normPct(listCommPct);
+    if(String(buyerCommPct).trim()!=='') tx.buyerCommissionPct = normPct(buyerCommPct);
   } else {
     var txType = (r.docType && r.docType.toLowerCase().indexOf('list') >= 0) ? 'seller' : 'buyer';
     tx = {
@@ -4040,7 +4057,11 @@ async function commitScanImport(r, btn){
       earnestDate: earnestDate,
       dueDiligDate: dueDiligDate,
       financingDate: financingDate,
-      appraisalDate: appraisalDate
+      appraisalDate: appraisalDate,
+      listCommissionPct: normPct(listCommPct),
+      buyerCommissionPct: normPct(buyerCommPct),
+      listCommissionAmt: null,
+      buyerCommissionAmt: null
     };
     TX.push(tx);
   }
@@ -6221,6 +6242,39 @@ function parsePrice(s){
   return parseInt(s.replace(/[$,]/g,'')) || 0;
 }
 
+// ---- Commission helpers ----
+// Normalize a percent field to a number or null (blank/garbage -> null so numeric DB columns accept it).
+function normPct(v){
+  v = (v==null ? '' : String(v)).trim().replace('%','');
+  if(v==='') return null;
+  var n = parseFloat(v);
+  return isNaN(n) ? null : n;
+}
+// Format a number as USD for display.
+function fmtUSD(n){
+  if(n==null || isNaN(n)) return '';
+  return '$'+Number(n).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:2});
+}
+// Compute a commission dollar amount from purchase price and percent. Base is purchase price, always.
+function commissionAmt(price, pct){
+  var p = parsePrice(price);           // handles "$450,000" strings and plain numbers
+  var pc = parseFloat(pct);
+  if(!p || isNaN(pc)) return null;
+  return Math.round(p * pc / 100 * 100) / 100;  // round to cents
+}
+// Recompute stored amounts from price + percent. When a percent is present the amount is always
+// derived (decision: recompute on price/percent change). When percent is blank we leave the amount
+// alone so a manually-entered flat fee (e.g. "$12,000" with no %) survives.
+function recomputeCommission(tx){
+  if(!tx) return;
+  if(tx.listCommissionPct != null && !isNaN(parseFloat(tx.listCommissionPct))){
+    tx.listCommissionAmt = commissionAmt(tx.price, tx.listCommissionPct);
+  }
+  if(tx.buyerCommissionPct != null && !isNaN(parseFloat(tx.buyerCommissionPct))){
+    tx.buyerCommissionAmt = commissionAmt(tx.price, tx.buyerCommissionPct);
+  }
+}
+
 function sortMLS(results){
   var sort = ge('mlsSort').value;
   results.sort(function(a,b){
@@ -7280,12 +7334,16 @@ ge('tcDetEdit').addEventListener('click', function(){
   var txCPe = ge('tcContactPick'); txCPe.innerHTML = '';
   var txPick = buildContactPicker(txCPe, 'tcContact', 'Search contact by name, email, phone...');
   if(tx.contactId){ var txC = gc(tx.contactId); if(txC) txPick.setContact(txC); }
-  ['tcAddress','tcPrice','tcMLS','tcLender','tcTitle','tcNotes'].forEach(function(x){ ge(x).value=''; });
+  ['tcAddress','tcPrice','tcMLS','tcLender','tcTitle','tcNotes','tcListCommPct','tcBuyerCommPct','tcListCommAmt','tcBuyerCommAmt'].forEach(function(x){ if(ge(x)) ge(x).value=''; });
   ge('tcPrice').value = tx.price||'';
   ge('tcMLS').value = tx.mlsNum||'';
   ge('tcLender').value = tx.lender||'';
   ge('tcTitle').value = tx.titleCo||'';
   ge('tcNotes').value = tx.notes||'';
+  if(ge('tcListCommPct'))  ge('tcListCommPct').value  = tx.listCommissionPct!=null  ? tx.listCommissionPct  : '';
+  if(ge('tcBuyerCommPct')) ge('tcBuyerCommPct').value = tx.buyerCommissionPct!=null ? tx.buyerCommissionPct : '';
+  if(ge('tcListCommAmt'))  ge('tcListCommAmt').value  = tx.listCommissionAmt!=null  ? tx.listCommissionAmt  : '';
+  if(ge('tcBuyerCommAmt')) ge('tcBuyerCommAmt').value = tx.buyerCommissionAmt!=null ? tx.buyerCommissionAmt : '';
   ge('tcContractDate').value = tx.contractDate||'';
   ge('tcClosingDate').value = tx.closingDate||'';
   ge('tcEarnestDate').value = tx.earnestDate||'';
