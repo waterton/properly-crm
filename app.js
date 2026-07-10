@@ -1490,12 +1490,23 @@ function rdl(){
     ensureGroup(key, tx, tx?null:d.contactId).dated.push(d);
   });
 
+  var _closingAliases=['Closing Date','Closing / Settlement Date'];
+  function _dlSameSlot(a,b){ return a===b || (_closingAliases.indexOf(a)>=0 && _closingAliases.indexOf(b)>=0); }
   TX.filter(function(t){return t.status!=='closed';}).forEach(function(tx){
     if(filterContact && String(tx.contactId)!==String(filterContact)) return;
     REPC_DEADLINES.forEach(function(dl){
-      if(!tx[dl.key]){
-        var exists = D.find(function(d){ return String(d.contactId)===String(tx.contactId) && d.type===dl.label; });
-        if(!exists){ ensureGroup('tx_'+tx.id, tx, null).missing.push({ txId:tx.id, contactId:tx.contactId, label:dl.label, key:dl.key }); }
+      var rec = D.find(function(d){
+        var owns = (d.transactionId!=null && String(d.transactionId)===String(tx.id)) || (d.transactionId==null && String(d.contactId)===String(tx.contactId));
+        return owns && _dlSameSlot(d.type, dl.label);
+      });
+      if(tx[dl.key]){
+        if(!rec){
+          var nd={id:Date.now()+Math.floor(Math.random()*100000), contactId:tx.contactId, transactionId:tx.id, type:dl.label, date:tx[dl.key]};
+          D.push(nd); saveDL(nd);
+          ensureGroup('tx_'+tx.id, tx, null).dated.push(nd);
+        }
+      } else if(!rec){
+        ensureGroup('tx_'+tx.id, tx, null).missing.push({ txId:tx.id, contactId:tx.contactId, label:dl.label, key:dl.key });
       }
     });
   });
