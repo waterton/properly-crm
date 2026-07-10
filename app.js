@@ -3764,83 +3764,134 @@ function showScannerResults(r){
     card.appendChild(inspDiv);
   }
 
-  // Link to existing contact / transaction
-  var linkDiv = document.createElement('div');
-  linkDiv.style.cssText = 'margin-top:14px;padding-top:12px;border-top:1px solid var(--border);';
-  var linkLabel = document.createElement('div');
-  linkLabel.style.cssText = 'font-size:18px;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px;';
-  linkLabel.textContent = 'Link to Existing Transaction (optional)';
-  var txSel = document.createElement('select');
-  txSel.id = 'sc_link_tx';
-  txSel.className = 'fsel';
-  txSel.style.marginBottom = '0';
-  var blankOpt = document.createElement('option');
-  blankOpt.value = '';
-  blankOpt.textContent = '-- Create new transaction --';
-  txSel.appendChild(blankOpt);
-  TX.forEach(function(tx){
-    var c2 = gc(tx.contactId);
-    var opt = document.createElement('option');
-    opt.value = tx.id;
-    opt.textContent = (tx.address||'Unknown') + (c2?' - '+fn(c2):'');
-    txSel.appendChild(opt);
+  // ===== Unified Import panel =====
+  var imp = document.createElement('div');
+  imp.style.cssText = 'margin-top:16px;padding-top:14px;border-top:2px solid var(--border);';
+  var impLabel = document.createElement('div');
+  impLabel.style.cssText = 'font-size:18px;color:var(--accent);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px;font-weight:700;';
+  impLabel.textContent = 'Import to CRM';
+  imp.appendChild(impLabel);
+
+  // ---- Contact resolution ----
+  var cLbl = document.createElement('div');
+  cLbl.className = 'fl'; cLbl.textContent = 'Contact';
+  imp.appendChild(cLbl);
+  var cWrap = document.createElement('div'); cWrap.style.marginBottom = '4px';
+  imp.appendChild(cWrap);
+  var scPicker = buildContactPicker(cWrap, 'sc_import_contact', 'Search existing contact by name, email, phone...');
+
+  // Pre-seed: try to match the document name against existing contacts
+  var docName = (r.buyerName || r.sellerName || '').trim();
+  function normName(x){ return String(x||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9 ]/g,'').replace(/\s+/g,' ').trim(); }
+  if(docName){
+    var dn = normName(docName);
+    var strong = C.filter(function(c){ return normName(fn(c)) === dn; });
+    if(strong.length === 1){ scPicker.setContact(strong[0]); }
+    else { scPicker.input.value = docName; }
+  }
+
+  // ---- New-contact toggle ----
+  var newToggle = document.createElement('label');
+  newToggle.style.cssText = 'display:flex;align-items:center;gap:8px;cursor:pointer;margin:8px 0;font-size:14px;color:var(--text2);';
+  var newCb = document.createElement('input'); newCb.type='checkbox'; newCb.id='sc_new_contact_toggle';
+  newCb.style.cssText='accent-color:var(--accent);';
+  newToggle.appendChild(newCb);
+  var newTxt = document.createElement('span'); newTxt.textContent = 'This is a new contact - create it'; newToggle.appendChild(newTxt);
+  imp.appendChild(newToggle);
+
+  var newFields = document.createElement('div');
+  newFields.style.cssText = 'display:none;background:var(--surface2);border-radius:8px;padding:10px 12px;margin-bottom:8px;';
+  var np = docName.split(' ');
+  function mkNF(id, ph, val){ var i2=document.createElement('input'); i2.className='fi'; i2.id=id; i2.placeholder=ph; i2.value=val||''; i2.style.marginBottom='6px'; return i2; }
+  var nfRow = document.createElement('div'); nfRow.style.cssText='display:flex;gap:6px;';
+  var nfFirst = mkNF('sc_nc_first','First name', np[0]||''); nfFirst.style.flex='1';
+  var nfLast = mkNF('sc_nc_last','Last name', np.slice(1).join(' ')); nfLast.style.flex='1';
+  nfRow.appendChild(nfFirst); nfRow.appendChild(nfLast); newFields.appendChild(nfRow);
+  newFields.appendChild(mkNF('sc_nc_phone','Phone (optional)',''));
+  newFields.appendChild(mkNF('sc_nc_email','Email (optional)',''));
+  var nfType = document.createElement('select'); nfType.className='fsel'; nfType.id='sc_nc_type';
+  [['buyer','Buyer'],['seller','Seller']].forEach(function(o){ var op=document.createElement('option'); op.value=o[0]; op.textContent=o[1]; nfType.appendChild(op); });
+  nfType.value = (r.docType && r.docType.toLowerCase().indexOf('list')>=0) ? 'seller' : 'buyer';
+  newFields.appendChild(nfType);
+  imp.appendChild(newFields);
+
+  newCb.addEventListener('change', function(){
+    newFields.style.display = newCb.checked ? 'block' : 'none';
+    scPicker.input.disabled = newCb.checked;
+    if(newCb.checked){ scPicker.hidden.value=''; scPicker.input.style.opacity='0.5'; }
+    else { scPicker.input.style.opacity='1'; }
   });
-  card.appendChild(linkDiv);
 
-  // Store original document section
-  var saveDocDiv = document.createElement('div');
-  saveDocDiv.style.cssText = 'margin-top:14px;padding-top:12px;border-top:1px solid var(--border);';
-  var saveDocLabel = document.createElement('div');
-  saveDocLabel.style.cssText = 'font-size:18px;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px;';
-  saveDocLabel.textContent = 'Store Original Document';
-  saveDocDiv.appendChild(saveDocLabel);
+  // ---- Transaction resolution ----
+  var txLbl = document.createElement('div');
+  txLbl.className = 'fl'; txLbl.textContent = 'Transaction'; txLbl.style.marginTop='6px';
+  imp.appendChild(txLbl);
+  var txChoice = document.createElement('div');
+  txChoice.style.cssText='margin-bottom:8px;';
+  imp.appendChild(txChoice);
 
-  var docContactWrap = document.createElement('div');
-  docContactWrap.style.marginBottom = '8px';
-  saveDocDiv.appendChild(docContactWrap);
-  buildContactPicker(docContactWrap, 'sc_doc_contact', 'Link to contact (search name, email, phone)...');
+  function renderTxChoice(){
+    txChoice.innerHTML = '';
+    var cid = newCb.checked ? null : (scPicker.hidden.value ? parseInt(scPicker.hidden.value) : null);
+    var existing = cid ? TX.filter(function(t){ return String(t.contactId)===String(cid) && t.status!=='closed'; }) : [];
 
-  var docTxSel = document.createElement('select');
-  docTxSel.id = 'sc_doc_tx';
-  docTxSel.className = 'fsel';
-  docTxSel.style.marginBottom = '0';
-  var dtBlank = document.createElement('option');
-  dtBlank.value = ''; dtBlank.textContent = '-- Link to transaction (optional) --';
-  docTxSel.appendChild(dtBlank);
-  TX.forEach(function(tx){
-    var c3 = gc(tx.contactId);
-    var o = document.createElement('option');
-    o.value = tx.id; o.textContent = (tx.address||'Unknown') + (c3 ? ' - ' + fn(c3) : '');
-    docTxSel.appendChild(o);
-  });
-  saveDocDiv.appendChild(docTxSel);
-  card.appendChild(saveDocDiv);
+    function radio(val, labelTxt, checked){
+      var lab=document.createElement('label');
+      lab.style.cssText='display:flex;align-items:center;gap:8px;cursor:pointer;padding:5px 0;font-size:14px;color:var(--text);';
+      var rb=document.createElement('input'); rb.type='radio'; rb.name='sc_tx_choice'; rb.value=val; rb.checked=checked;
+      rb.style.cssText='accent-color:var(--accent);';
+      rb.addEventListener('change', renderTxChoice);
+      lab.appendChild(rb); lab.appendChild(document.createTextNode(labelTxt));
+      return lab;
+    }
+    txChoice.appendChild(radio('new', 'Create new transaction', true));
+    if(existing.length){
+      var exWrap=document.createElement('div');
+      exWrap.style.cssText='margin-top:4px;padding-left:4px;';
+      existing.forEach(function(t){
+        var lab=document.createElement('label');
+        lab.style.cssText='display:flex;align-items:center;gap:8px;cursor:pointer;padding:4px 0;font-size:13px;color:var(--text2);';
+        var rb=document.createElement('input'); rb.type='radio'; rb.name='sc_tx_choice'; rb.value='existing:'+t.id;
+        rb.style.cssText='accent-color:var(--accent);';
+        lab.appendChild(rb);
+        lab.appendChild(document.createTextNode((t.address||'Unknown address')+' ('+(t.type||'')+')'));
+        exWrap.appendChild(lab);
+      });
+      var exHdr=document.createElement('div');
+      exHdr.style.cssText='font-size:12px;color:var(--text3);margin-top:6px;';
+      exHdr.textContent='or add to an existing transaction for this contact:';
+      txChoice.appendChild(exHdr);
+      txChoice.appendChild(exWrap);
+    }
+  }
+  renderTxChoice();
+  scPicker.input.addEventListener('blur', function(){ setTimeout(renderTxChoice, 200); });
 
-  // Action buttons
-  var actions = document.createElement('div');
-  actions.className = 'scanner-actions';
-
-  var importBtn = document.createElement('button');
-  importBtn.className = 'btn btn-p';
-  importBtn.style.fontSize = '14px';
-  importBtn.textContent = 'Import to CRM';
-  importBtn.addEventListener('click', function(){ importScanToTC(r); });
-
-  var saveDocBtn = document.createElement('button');
-  saveDocBtn.className = 'btn btn-p';
-  saveDocBtn.style.fontSize = '14px';
-  saveDocBtn.textContent = 'Save Document';
-  saveDocBtn.addEventListener('click', function(){ saveScanDocument(r, saveDocBtn); });
-
+  // ---- Single action + result state ----
+  var impActions = document.createElement('div');
+  impActions.className = 'scanner-actions';
+  var commitBtn = document.createElement('button');
+  commitBtn.className = 'btn btn-p'; commitBtn.style.fontSize='14px';
+  commitBtn.id = 'sc_commit_btn';
+  commitBtn.textContent = 'Import to CRM';
+  commitBtn.addEventListener('click', function(){ commitScanImport(r, commitBtn); });
   var newScanBtn = document.createElement('button');
-  newScanBtn.className = 'btn btn-g';
-  newScanBtn.textContent = 'Scan Another Document';
+  newScanBtn.className='btn btn-g'; newScanBtn.textContent='Scan Another Document';
   newScanBtn.addEventListener('click', function(){
-    ge('scannerUploadArea').style.display = 'block';
-    ge('scannerResults').style.display = 'none';
-    ge('scannerHistory').style.display = 'block';
-    ge('scannerFileInput').value = '';
+    ge('scannerUploadArea').style.display='block';
+    ge('scannerResults').style.display='none';
+    ge('scannerHistory').style.display='block';
+    ge('scannerFileInput').value='';
   });
+  impActions.appendChild(commitBtn); impActions.appendChild(newScanBtn);
+  imp.appendChild(impActions);
+
+  var resultState = document.createElement('div');
+  resultState.id = 'sc_result_state';
+  resultState.style.cssText='display:none;margin-top:10px;padding:10px 12px;background:rgba(30,76,132,0.08);border:1px solid var(--accent);border-radius:8px;';
+  imp.appendChild(resultState);
+
+  card.appendChild(imp);
 
   // Full notes section showing complete extracted text
   var notesSec = document.createElement('div');
@@ -3869,9 +3920,7 @@ function showScannerResults(r){
     copyBtn.textContent = 'Copied!';
     setTimeout(function(){ copyBtn.textContent = 'Copy Summary'; }, 2000);
   });
-
-  actions.appendChild(saveDocBtn); actions.appendChild(importBtn); actions.appendChild(newScanBtn); actions.appendChild(copyBtn);
-  card.appendChild(actions);
+  card.appendChild(copyBtn);
   res.appendChild(card);
   renderScannerHistory();
 }
@@ -3907,10 +3956,39 @@ async function saveScanDocument(r, btn){
   }
 }
 
-function importScanToTC(r){
-  // Get edited values from the form fields
-  var address = ge('sc_buyer') ? (r.address||'') : (r.address||'');
-  var buyerName = ge('sc_buyer') ? ge('sc_buyer').value : (r.buyerName||'');
+async function commitScanImport(r, btn){
+  // ---- Resolve contact (required) ----
+  var newCb = ge('sc_new_contact_toggle');
+  var contactId = null;
+
+  if(newCb && newCb.checked){
+    var first = (ge('sc_nc_first').value||'').trim();
+    var last = (ge('sc_nc_last').value||'').trim();
+    if(!first && !last){ alert('Enter a name for the new contact, or pick an existing one.'); return; }
+    var newC = {
+      id: Date.now() + Math.floor(Math.random()*100000),
+      first: first, last: last,
+      type: ge('sc_nc_type').value || 'buyer',
+      phone: (ge('sc_nc_phone').value||'').trim(),
+      email: (ge('sc_nc_email').value||'').trim(),
+      emails: [], phones: [], addresses: [],
+      property: r.address||'',
+      stage: '',
+      price: ge('sc_price') ? ge('sc_price').value : (r.purchasePrice||''),
+      notes: 'Created from document scan.',
+      added: new Date().toISOString()
+    };
+    if(newC.email) newC.emails=[{value:newC.email,label:''}];
+    if(newC.phone) newC.phones=[{value:newC.phone,label:''}];
+    C.push(newC); saveContact(newC); logActivity(newC.id,'Contact created from scan');
+    contactId = newC.id;
+  } else {
+    var picked = ge('sc_import_contact') ? ge('sc_import_contact').value : '';
+    if(!picked){ alert('Select an existing contact, or check "This is a new contact" to create one.'); return; }
+    contactId = parseInt(picked);
+  }
+
+  // ---- Gather edited fields ----
   var price = ge('sc_price') ? ge('sc_price').value : (r.purchasePrice||'');
   var lender = ge('sc_lender') ? ge('sc_lender').value : (r.lenderName||'');
   var titleCo = ge('sc_title') ? ge('sc_title').value : (r.titleCompany||'');
@@ -3921,135 +3999,122 @@ function importScanToTC(r){
   var dueDiligDate = ge('sc_duedilig') ? ge('sc_duedilig').value : (r.dueDiligenceDeadline||'');
   var financingDate = ge('sc_financing') ? ge('sc_financing').value : (r.financingDeadline||'');
   var appraisalDate = ge('sc_appraisal') ? ge('sc_appraisal').value : (r.appraisalDeadline||'');
-  var linkTxId = ge('sc_link_tx') ? ge('sc_link_tx').value : '';
+  var address = r.address||'';
 
-  // Check if linking to existing transaction
-  if(linkTxId){
-    var existing = TX.find(function(t){ return t.id == linkTxId; });
-    if(existing){
-      // Update existing transaction with scanned data
-      if(closingDate) existing.closingDate = closingDate;
-      if(earnestDate) existing.earnestDate = earnestDate;
-      if(dueDiligDate) existing.dueDiligDate = dueDiligDate;
-      if(financingDate) existing.financingDate = financingDate;
-      if(appraisalDate) existing.appraisalDate = appraisalDate;
-      if(lender) existing.lender = lender;
-      if(titleCo) existing.titleCo = titleCo;
-      if(price) existing.price = price;
-      saveTX(existing);
+  // ---- Resolve transaction choice ----
+  var choiceEl = document.querySelector('input[name="sc_tx_choice"]:checked');
+  var choice = choiceEl ? choiceEl.value : 'new';
+  var tx = null;
 
-      // Create/update main deadlines so they show on the Deadlines tab
-      if(existing.contactId){
-        var exMap = [
-          {type:'Earnest Money Due', val:earnestDate},
-          {type:'Due Diligence Deadline', val:dueDiligDate},
-          {type:'Financing Deadline', val:financingDate},
-          {type:'Appraisal Deadline', val:appraisalDate},
-          {type:'Closing Date', val:closingDate}
-        ];
-        exMap.forEach(function(dm){
-          if(!dm.val) return;
-          var ex = D.find(function(d){ return d.contactId===existing.contactId && d.type===dm.type; });
-          if(ex){ ex.date = dm.val; saveDL(ex); }
-          else { var nd={id:Date.now()+Math.random(), contactId:existing.contactId, type:dm.type, date:dm.val}; D.push(nd); saveDL(nd); }
-        });
-      }
-
-      // Add scan summary as a note on the linked contact
-
-      // Add scan summary as a note on the linked contact
-      if(existing.contactId){
-        var noteText = 'Document scanned: ' + (r.docType||'Document') + '. ' + (r.summary||'');
-        var newNote = {id:Date.now(), contactId:existing.contactId, text:noteText, date:new Date().toISOString()};
-        N.push(newNote); saveNote(newNote);
-      }
-
-      // Mark scan as imported
-      r.imported = true;
-      renderScannerHistory();
-      alert('Transaction updated with scanned data! Deadlines have been added.');
-      sp('tc');
-      return;
-    }
+  if(choice.indexOf('existing:') === 0){
+    var exId = choice.split(':')[1];
+    tx = TX.find(function(t){ return String(t.id)===String(exId); });
   }
 
-  // Create new transaction
-  // Try to find or create contact from buyer name
-  var contactId = null;
-  if(buyerName){
-    var parts = buyerName.trim().split(' ');
-    var firstName = parts[0] || 'Unknown';
-    var lastName = parts.slice(1).join(' ') || 'Client';
-    // Check if contact exists
-    var found = C.find(function(c){
-      return (c.first.toLowerCase() === firstName.toLowerCase() && c.last.toLowerCase() === lastName.toLowerCase());
+  if(tx){
+    if(closingDate) tx.closingDate = closingDate;
+    if(earnestDate) tx.earnestDate = earnestDate;
+    if(dueDiligDate) tx.dueDiligDate = dueDiligDate;
+    if(financingDate) tx.financingDate = financingDate;
+    if(appraisalDate) tx.appraisalDate = appraisalDate;
+    if(contractDate) tx.contractDate = contractDate;
+    if(lender) tx.lender = lender;
+    if(titleCo) tx.titleCo = titleCo;
+    if(price) tx.price = price;
+  } else {
+    var txType = (r.docType && r.docType.toLowerCase().indexOf('list') >= 0) ? 'seller' : 'buyer';
+    tx = {
+      id: Date.now() + Math.floor(Math.random()*100000),
+      contactId: contactId,
+      type: txType,
+      address: address,
+      price: price,
+      mlsNum: mlsNum,
+      lender: lender,
+      titleCo: titleCo,
+      notes: 'Imported from document scan: ' + (r.docType||'Document') + '. ' + (r.summary||''),
+      status: 'active',
+      steps: {},
+      contractDate: contractDate,
+      closingDate: closingDate,
+      earnestDate: earnestDate,
+      dueDiligDate: dueDiligDate,
+      financingDate: financingDate,
+      appraisalDate: appraisalDate
+    };
+    TX.push(tx);
+  }
+
+  // ---- Gap B: auto-check date-tracked checklist steps ----
+  var template = TC_TEMPLATES[tx.type] || TC_TEMPLATES['buyer'];
+  if(!tx.steps) tx.steps = {};
+  template.forEach(function(phase){
+    phase.steps.forEach(function(step){
+      if(step.hasDate && step.dateField && tx[step.dateField] && !tx.steps[step.key]){
+        tx.steps[step.key] = true;
+      }
     });
-    if(found){
-      contactId = found.id;
-    } else {
-      // Create new contact
-      var newC = {
-        id: Date.now(),
-        first: firstName, last: lastName,
-        type: 'buyer', phone: '', email: '',
-        property: address, stage: 'Under Contract',
-        price: price, notes: 'Created from document scan.',
-        added: new Date().toISOString()
-      };
-      C.push(newC); saveContact(newC);
-      contactId = newC.id;
-    }
-  }
+  });
+  saveTX(tx);
 
-  var txType = (r.docType && r.docType.toLowerCase().indexOf('list') >= 0) ? 'seller' : 'buyer';
-  var newTX = {
-    id: Date.now(),
-    contactId: contactId,
-    type: txType,
-    address: address,
-    price: price,
-    mlsNum: mlsNum,
-    lender: lender,
-    titleCo: titleCo,
-    notes: 'Imported from document scan: ' + (r.docType||'Document') + '. ' + (r.summary||''),
-    status: 'active',
-    steps: {},
-    contractDate: contractDate,
-    closingDate: closingDate,
-    earnestDate: earnestDate,
-    dueDiligDate: dueDiligDate,
-    financingDate: financingDate,
-    appraisalDate: appraisalDate
-  };
-  TX.push(newTX);
-  saveTX(newTX);
-
-  // Also create main deadlines
-  var dateMap = [
+  // ---- Deadlines (tagged with transactionId) ----
+  var dlMap = [
     {type:'Earnest Money Due', val:earnestDate},
     {type:'Due Diligence Deadline', val:dueDiligDate},
     {type:'Financing Deadline', val:financingDate},
     {type:'Appraisal Deadline', val:appraisalDate},
     {type:'Closing Date', val:closingDate}
   ];
-  dateMap.forEach(function(dm){
-    if(dm.val && contactId){
-      var nd = {id:Date.now()+Math.random(), contactId:contactId, type:dm.type, date:dm.val};
-      D.push(nd); saveDL(nd);
-    }
+  dlMap.forEach(function(dm){
+    if(!dm.val) return;
+    var ex = D.find(function(d){ return String(d.transactionId)===String(tx.id) && d.type===dm.type; })
+          || D.find(function(d){ return d.transactionId==null && String(d.contactId)===String(contactId) && d.type===dm.type; });
+    if(ex){ ex.date = dm.val; ex.transactionId = tx.id; saveDL(ex); }
+    else { var nd={id:Date.now()+Math.floor(Math.random()*100000), contactId:contactId, transactionId:tx.id, type:dm.type, date:dm.val}; D.push(nd); saveDL(nd); }
   });
 
-  // Add note to contact
-  if(contactId){
-    var scanNote = {id:Date.now()+1, contactId:contactId, text:'Document scanned: ' + (r.docType||'Document') + '. ' + (r.summary||''), date:new Date().toISOString()};
-    N.push(scanNote); saveNote(scanNote); logActivity(contactId,'Document scanned');
-  }
+  // ---- Note ----
+  var noteText = 'Document scanned: ' + (r.docType||'Document') + '. ' + (r.summary||'');
+  var newNote = {id:Date.now()+Math.floor(Math.random()*100000), contactId:contactId, text:noteText, date:new Date().toISOString()};
+  N.push(newNote); saveNote(newNote); logActivity(contactId,'Document scanned');
 
   r.imported = true;
-  renderScannerHistory();
-  rd(); renderTC();
-  alert('Transaction created successfully! Check the Transactions tab.');
-  sp('tc');
+  renderScannerHistory(); rd(); renderTC();
+
+  // ---- Store the file (warn-and-continue on failure) ----
+  var fileWarn = '';
+  if(lastScanFile){
+    if(btn){ btn.textContent='Storing file...'; btn.disabled=true; }
+    try{
+      await saveDocument(lastScanFile, {
+        contact_id: contactId,
+        transaction_id: tx.id,
+        doc_type: r.docType || 'Document',
+        summary: r.summary || ''
+      });
+    }catch(e){
+      fileWarn = ' (Note: the original file was not stored - ' + e.message + '. You can re-scan to store it.)';
+    }
+  } else {
+    fileWarn = ' (Note: original file no longer in memory, not stored.)';
+  }
+
+  // ---- Result state, stay on scanner (option b) ----
+  var rs = ge('sc_result_state');
+  if(rs){
+    rs.style.display='block';
+    rs.innerHTML='';
+    var msg=document.createElement('div');
+    msg.style.cssText='font-size:14px;color:var(--text);margin-bottom:8px;';
+    var who=gc(contactId);
+    msg.textContent = 'Imported. ' + (choice.indexOf('existing:')===0?'Updated':'Created') + ' transaction for ' + (who?fn(who):'contact') + '.' + fileWarn;
+    rs.appendChild(msg);
+    var viewBtn=document.createElement('button');
+    viewBtn.className='btn btn-p'; viewBtn.style.fontSize='13px'; viewBtn.textContent='View Transaction';
+    viewBtn.addEventListener('click', function(){ sp('tc'); if(typeof openTCDetail==='function') openTCDetail(tx.id); });
+    rs.appendChild(viewBtn);
+  }
+  if(btn){ btn.textContent='Imported'; btn.disabled=true; }
 }
 
 function showScannerRawResult(text){
