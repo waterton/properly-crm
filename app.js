@@ -3398,6 +3398,7 @@ function startScan(file){
     .then(function(data){
       clearInterval(msgTimer);
       cleanupScan();
+      var renderOk = false;
       console.log('Gemini raw response:', JSON.stringify(data).substring(0,500));
       if(data.error){
         showScannerError('Gemini API error: ' + (data.error.message || JSON.stringify(data.error)));
@@ -3477,6 +3478,103 @@ function buildScannerPrompt(hint){
     'Be thorough - this data will be imported into a real estate CRM.'
   ];
   return lines.join('\n');
+}
+
+function buildContactPicker(containerEl, hiddenId, placeholder, onPick){
+  var wrap = document.createElement('div');
+  wrap.style.cssText = 'position:relative;';
+ 
+  var hidden = document.createElement('input');
+  hidden.type = 'hidden';
+  hidden.id = hiddenId;
+  hidden.value = '';
+ 
+  var box = document.createElement('input');
+  box.type = 'text';
+  box.className = 'fi';
+  box.setAttribute('autocomplete', 'off');
+  box.placeholder = placeholder || 'Search contacts by name, email, or phone...';
+ 
+  var menu = document.createElement('div');
+  menu.style.cssText = 'position:absolute;left:0;right:0;top:100%;z-index:50;background:var(--surface);border:1px solid var(--border);border-radius:7px;margin-top:3px;max-height:260px;overflow-y:auto;box-shadow:0 6px 20px rgba(0,0,0,0.12);display:none;';
+ 
+  function norm(s){
+    return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  }
+  function digits(s){ return String(s || '').replace(/\D/g, ''); }
+ 
+  function haystack(c){
+    var parts = [fn(c)];
+    (c.emails || []).forEach(function(e){ parts.push(e && e.value ? e.value : e); });
+    if(c.email) parts.push(c.email);
+    (c.phones || []).forEach(function(p){ parts.push(p && p.value ? p.value : p); });
+    if(c.phone) parts.push(c.phone);
+    return norm(parts.join(' '));
+  }
+ 
+  function pick(c){
+    hidden.value = c ? c.id : '';
+    box.value = c ? fn(c) + (c.email ? ' (' + c.email + ')' : '') : '';
+    menu.style.display = 'none';
+    if(typeof onPick === 'function') onPick(c);
+  }
+ 
+  function render(q){
+    menu.innerHTML = '';
+    var nq = norm(q);
+    var dq = digits(q);
+    var matches = [];
+    for(var i = 0; i < C.length && matches.length < 50; i++){
+      var c = C[i];
+      var hs = haystack(c);
+      var hit = nq && hs.indexOf(nq) >= 0;
+      if(!hit && dq.length >= 3 && digits(hs).indexOf(dq) >= 0) hit = true;
+      if(hit) matches.push(c);
+    }
+    if(!nq && !dq){ menu.style.display = 'none'; return; }
+    if(!matches.length){
+      var none = document.createElement('div');
+      none.style.cssText = 'padding:10px 12px;color:var(--text3);font-size:14px;';
+      none.textContent = 'No matches';
+      menu.appendChild(none);
+      menu.style.display = 'block';
+      return;
+    }
+    matches.forEach(function(c){
+      var row = document.createElement('div');
+      row.style.cssText = 'padding:9px 12px;cursor:pointer;font-size:14px;color:var(--text);border-bottom:1px solid var(--border);';
+      row.addEventListener('mouseenter', function(){ row.style.background = 'var(--surface2)'; });
+      row.addEventListener('mouseleave', function(){ row.style.background = 'transparent'; });
+      var nm = document.createElement('div');
+      nm.textContent = fn(c);
+      var sub = document.createElement('div');
+      sub.style.cssText = 'font-size:12px;color:var(--text3);margin-top:1px;';
+      var subBits = [];
+      if(c.email) subBits.push(c.email);
+      if(c.phone) subBits.push(c.phone);
+      sub.textContent = subBits.join('  |  ');
+      row.appendChild(nm);
+      if(subBits.length) row.appendChild(sub);
+      row.addEventListener('click', function(){ pick(c); });
+      menu.appendChild(row);
+    });
+    menu.style.display = 'block';
+  }
+ 
+  box.addEventListener('input', function(){
+    hidden.value = '';
+    render(box.value);
+  });
+  box.addEventListener('focus', function(){ if(box.value) render(box.value); });
+  document.addEventListener('click', function(e){
+    if(!wrap.contains(e.target)) menu.style.display = 'none';
+  });
+ 
+  wrap.appendChild(hidden);
+  wrap.appendChild(box);
+  wrap.appendChild(menu);
+  containerEl.appendChild(wrap);
+  return { input: box, hidden: hidden, setContact: pick };
 }
 
 function showScannerResults(r){
@@ -3680,19 +3778,10 @@ function showScannerResults(r){
   saveDocLabel.textContent = 'Store Original Document';
   saveDocDiv.appendChild(saveDocLabel);
 
-  var docContactSel = document.createElement('select');
-  docContactSel.id = 'sc_doc_contact';
-  docContactSel.className = 'fsel';
-  docContactSel.style.marginBottom = '8px';
-  var dcBlank = document.createElement('option');
-  dcBlank.value = ''; dcBlank.textContent = '-- Link to contact (optional) --';
-  docContactSel.appendChild(dcBlank);
-  C.forEach(function(c){
-    var o = document.createElement('option');
-    o.value = c.id; o.textContent = fn(c) + (c.email ? ' (' + c.email + ')' : '');
-    docContactSel.appendChild(o);
-  });
-  saveDocDiv.appendChild(docContactSel);
+  var docContactWrap = document.createElement('div');
+  docContactWrap.style.marginBottom = '8px';
+  saveDocDiv.appendChild(docContactWrap);
+  buildContactPicker(docContactWrap, 'sc_doc_contact', 'Link to contact (search name, email, phone)...');
 
   var docTxSel = document.createElement('select');
   docTxSel.id = 'sc_doc_tx';
