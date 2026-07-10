@@ -4073,19 +4073,10 @@ function showScannerRawResult(text){
   saveDocLabel2.textContent = 'Store Original Document';
   saveDocDiv2.appendChild(saveDocLabel2);
 
-  var docContactSel2 = document.createElement('select');
-  docContactSel2.id = 'sc_doc_contact';
-  docContactSel2.className = 'fsel';
-  docContactSel2.style.marginBottom = '8px';
-  var dcBlank2 = document.createElement('option');
-  dcBlank2.value = ''; dcBlank2.textContent = '-- Link to contact (optional) --';
-  docContactSel2.appendChild(dcBlank2);
-  C.forEach(function(c){
-    var o = document.createElement('option');
-    o.value = c.id; o.textContent = fn(c) + (c.email ? ' (' + c.email + ')' : '');
-    docContactSel2.appendChild(o);
-  });
-  saveDocDiv2.appendChild(docContactSel2);
+  var docContactWrap2 = document.createElement('div');
+  docContactWrap2.style.marginBottom = '8px';
+  saveDocDiv2.appendChild(docContactWrap2);
+  buildContactPicker(docContactWrap2, 'sc_doc_contact', 'Link to contact (search name, email, phone)...');
 
   var docTxSel2 = document.createElement('select');
   docTxSel2.id = 'sc_doc_tx';
@@ -4887,10 +4878,10 @@ function openCalEventDetail(ev){
   detOv.classList.add('open');
 }
 
+var calContactPicker = null;
 function populateCalModal(){
-  var cSel = ge('calEvContact');
-  cSel.innerHTML = '<option value="">None</option>';
-  C.forEach(function(c){ var o=document.createElement('option'); o.value=c.id; o.textContent=fn(c); cSel.appendChild(o); });
+  var calCP = ge('calEvContactPick'); calCP.innerHTML = '';
+  calContactPicker = buildContactPicker(calCP, 'calEvContact', 'Search contact (optional)...');
   populateAssignDropdowns();
 }
 
@@ -4920,7 +4911,7 @@ function openEditCalEvent(ev){
   ge('calEvNotes').value = ev.notes||'';
   populateCalModal();
   ge('calEvMember').value = ev.memberId||'';
-  ge('calEvContact').value = ev.contactId||'';
+  if(calContactPicker && ev.contactId){ var calC = gc(ev.contactId); if(calC) calContactPicker.setContact(calC); }
   om('calEventModal');
 }
 
@@ -5976,9 +5967,8 @@ function openCompose(opts){
   });
   if(gmailState.activeMemberId) fromSel.value = gmailState.activeMemberId;
   // Populate contact dropdown for merge fields
-  var cSel = ge('composeLinkContact');
-  cSel.innerHTML = '<option value="">None</option>';
-  C.forEach(function(c){ var o=document.createElement('option'); o.value=c.id; o.textContent=fn(c)+' ('+c.email+')'; cSel.appendChild(o); });
+  var cmpCP = ge('composeLinkContactPick'); cmpCP.innerHTML = '';
+  buildContactPicker(cmpCP, 'composeLinkContact', 'Search contact (optional)...');
   // Store reply info
   ge('composeModal').setAttribute('data-thread-id', opts.threadId||'');
   ge('composeModal').setAttribute('data-reply-to', opts.replyToMessageId||'');
