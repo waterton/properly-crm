@@ -1525,6 +1525,7 @@ function rdl(){
     var hdr=document.createElement('div');
     hdr.style.cssText='display:flex;align-items:baseline;gap:10px;margin:22px 0 10px;padding:8px 12px;background:var(--surface2);border-left:4px solid var(--accent);border-radius:6px;';
     var hAddr=document.createElement('div'); hAddr.style.cssText='font-size:18px;font-weight:700;color:var(--accent);letter-spacing:0.3px;'; hAddr.textContent=g.addr||g.who||'Unassigned'; hdr.appendChild(hAddr);
+    if(g.tx){ hAddr.style.cursor='pointer'; hAddr.title='Open transaction to edit'; hAddr.onmouseenter=function(){hAddr.style.textDecoration='underline';}; hAddr.onmouseleave=function(){hAddr.style.textDecoration='none';}; (function(txId){ hAddr.onclick=function(){ curTx=txId; ge('tcDetEdit').click(); }; })(g.tx.id); } hAddr.textContent=g.addr||g.who||'Unassigned'; hdr.appendChild(hAddr);
     if(g.addr && g.who && g.who!=='Unassigned'){ var hWho=document.createElement('div'); hWho.style.cssText='font-size:15px;color:var(--text3);'; hWho.textContent=g.who; hdr.appendChild(hWho); }
     el.appendChild(hdr);
 
@@ -1532,31 +1533,31 @@ function rdl(){
       var c=gc(d.contactId); var n=du(d.date);
       var isOverdue=n<0, isToday=n===0, isUrgent=n<=3&&n>=0;
       var row2=document.createElement('div');
-      row2.style.cssText='background:var(--surface);border:1px solid '+(isOverdue?'rgba(201,76,76,0.4)':isToday?'var(--accent)':isUrgent?'rgba(201,168,76,0.3)':'var(--border)')+';border-radius:8px;padding:5px 14px;margin-bottom:6px;display:flex;align-items:center;flex-wrap:wrap;gap:6px 10px;';;
+      row2.style.cssText='background:var(--surface);border:1px solid '+(isOverdue?'rgba(201,76,76,0.4)':isToday?'var(--accent)':isUrgent?'rgba(201,168,76,0.3)':'var(--border)')+';border-radius:7px;padding:3px 10px;margin:0 0 4px 26px;display:flex;align-items:center;flex-wrap:wrap;gap:4px 8px;';
       row2.appendChild(mkDot(dc(n)));
       var info2=mkDiv('flex:1;min-width:130px;');
       var typeLbl=document.createElement('div');
-      typeLbl.style.cssText='font-size:18px;font-weight:600;color:'+(isOverdue?'var(--danger)':isToday?'var(--accent)':'var(--text)')+';';
+      typeLbl.style.cssText='font-size:13px;font-weight:600;color:'+(isOverdue?'var(--danger)':isToday?'var(--accent)':'var(--text)')+';';
       typeLbl.textContent=(isOverdue?'OVERDUE: ':isToday?'TODAY: ':'')+dlTypeLabel(d, g.tx);
       info2.appendChild(typeLbl);
       row2.appendChild(info2);
       var right2=mkDiv('display:flex;align-items:center;gap:6px;margin-left:auto;');
       var dates2=mkDiv('display:flex;align-items:center;gap:8px;white-space:nowrap;');
-      var dateTxt=document.createElement('div'); dateTxt.style.cssText='font-family:monospace;font-size:16px;color:'+(isOverdue?'var(--danger)':isToday?'var(--accent)':'var(--text2)')+';font-weight:'+(isOverdue||isToday?'700':'400')+';'; dateTxt.textContent=fd(d.date);
-      var lbl2=mkDiv('font-size:14px;color:'+(isOverdue?'var(--danger)':isUrgent?'var(--warn)':'var(--text3)')+';', isOverdue?Math.abs(n)+'d overdue':isToday?'TODAY':n+' days');
+      var dateTxt=document.createElement('div'); dateTxt.style.cssText='font-family:monospace;font-size:13px;color:'+(isOverdue?'var(--danger)':isToday?'var(--accent)':'var(--text2)')+';font-weight:'+(isOverdue||isToday?'700':'400')+';'; dateTxt.textContent=fd(d.date);
+      var lbl2=mkDiv('font-size:11px;color:'+(isOverdue?'var(--danger)':isUrgent?'var(--warn)':'var(--text3)')+';', isOverdue?Math.abs(n)+'d overdue':isToday?'TODAY':n+' days');
       dates2.appendChild(dateTxt); dates2.appendChild(lbl2); right2.appendChild(dates2);
       var gcalDlBtn=document.createElement('button');
-      gcalDlBtn.style.cssText='background:rgba(76,142,201,0.1);border:1px solid rgba(76,142,201,0.2);border-radius:5px;padding:4px 8px;cursor:pointer;font-size:14px;color:var(--buyer);font-family:DM Sans,sans-serif;white-space:nowrap;';
+      gcalDlBtn.style.cssText='background:rgba(76,142,201,0.1);border:1px solid rgba(76,142,201,0.2);border-radius:5px;padding:2px 6px;cursor:pointer;font-size:11px;color:var(--buyer);font-family:DM Sans,sans-serif;white-space:nowrap;';
       gcalDlBtn.textContent='+ GCal'; gcalDlBtn.title='Add to Google Calendar';
       (function(dl2,tx2){ gcalDlBtn.addEventListener('click',function(e){ e.stopPropagation(); var c5=gc(dl2.contactId); syncToGCal({ title:dlTypeLabel(dl2,tx2)+(c5?' - '+fn(c5):''), date:dl2.date,time:'',type:'deadline', clientName:c5?fn(c5):'', notes:'Deadline from Properly CRM' }, dl2.assignedTo); }); })(d,g.tx);
       right2.appendChild(gcalDlBtn);
       var editBtn2=document.createElement('button');
-      editBtn2.style.cssText='background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:4px 8px;cursor:pointer;font-size:18px;color:var(--text2);font-family:DM Sans,sans-serif;';
+      editBtn2.style.cssText='background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:2px 6px;cursor:pointer;font-size:11px;color:var(--text2);font-family:DM Sans,sans-serif;';
       editBtn2.textContent='Edit';
       (function(dl){ editBtn2.addEventListener('click',function(e){ e.stopPropagation(); openEditDL(dl); }); })(d);
       right2.appendChild(editBtn2);
       var delBtn2=document.createElement('button');
-      delBtn2.style.cssText='background:rgba(201,76,76,0.1);border:1px solid rgba(201,76,76,0.2);border-radius:5px;padding:4px 8px;cursor:pointer;font-size:18px;color:var(--danger);font-family:DM Sans,sans-serif;';
+      delBtn2.style.cssText='background:rgba(201,76,76,0.1);border:1px solid rgba(201,76,76,0.2);border-radius:5px;padding:2px 6px;cursor:pointer;font-size:11px;color:var(--danger);font-family:DM Sans,sans-serif;';
       delBtn2.textContent='Del';
       (function(did){ delBtn2.addEventListener('click',function(e){ e.stopPropagation(); if(confirm('Delete this deadline?')){ D=D.filter(function(x){return x.id!==did;}); sv(); pausePoll(8000); deleteDLfromDB(did); rdl(); rd(); }}); })(d.id);
       right2.appendChild(delBtn2);
