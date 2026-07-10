@@ -2236,6 +2236,21 @@ var TC_TEMPLATES = {
   ]
 };
 
+function saveTX(tx){ sv(); if(supaReady && tx) dbSave('transactions', [tx]); }
+function deleteTX(id){
+  if(!confirm('Delete this transaction and all its data?')) return;
+  TX=TX.filter(function(t){return t.id!==id;});
+  sv();
+  pausePoll(8000); deleteTXfromDB(id);
+  var ov=ge('tcDetOv'); if(ov) ov.classList.remove('open');
+  renderTC(); rd();
+}
+function initTC(){ renderTC(); updateNbTC(); }
+function updateNbTC(){
+  var active = TX.filter(function(t){ return t.status !== 'closed'; }).length;
+  var el = ge('nbTC'); if(el) el.textContent = active;
+}
+
 function tcProgress(tx){
   var template = TC_TEMPLATES[tx.type] || TC_TEMPLATES['buyer'];
   var total = 0, done = 0;
