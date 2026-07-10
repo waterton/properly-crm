@@ -4078,6 +4078,14 @@ async function commitScanImport(r, btn){
   });
   saveTX(tx);
 
+  // ---- Auto-advance contact to "Under Contract" (a scanned transaction means under contract).
+  //      Skip if already Under Contract or Closed: avoids duplicate activity log / drip re-enroll
+  //      and never revives a closed deal. ss() mirrors the manual pipeline-stage change exactly.
+  var _ucC = gc(contactId);
+  if(_ucC && _ucC.stage !== 'Under Contract' && _ucC.stage !== 'Closed'){
+    ss(contactId, 'Under Contract');
+  }
+
   // ---- Deadlines (tagged with transactionId) ----
   var dlMap = [
     {type:'Earnest Money Due', val:earnestDate},
