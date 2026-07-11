@@ -3805,14 +3805,45 @@ function showScannerResults(r){
   imp.appendChild(cWrap);
   var scPicker = buildContactPicker(cWrap, 'sc_import_contact', 'Search existing contact by name, email, phone...');
 
-  // Pre-seed: try to match the document name against existing contacts
-  var docName = (r.buyerName || r.sellerName || '').trim();
+  // Pre-seed + client-side selector (buyer vs seller) with smart default
   function normName(x){ return String(x||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9 ]/g,'').replace(/\s+/g,' ').trim(); }
+  var buyN=(r.buyerName||'').trim(), selN=(r.sellerName||'').trim();
+  function scHasMatch(nm){ if(!nm) return false; var d=normName(nm); return C.some(function(c){ return normName(fn(c))===d; }); }
+  var defaultSide='buyer';
+  if(r.docType && r.docType.toLowerCase().indexOf('list')>=0) defaultSide='seller';
+  if(scHasMatch(selN) && !scHasMatch(buyN)) defaultSide='seller';
+  else if(scHasMatch(buyN) && !scHasMatch(selN)) defaultSide='buyer';
+  var docName = ((defaultSide==='seller' ? selN : buyN) || buyN || selN || '').trim();
+
+  function scReseed(side){
+    if(ge('sc_client_side')) ge('sc_client_side').value = side;
+    var nm=((side==='seller'?selN:buyN)||'').trim();
+    if(nm){
+      var dn=normName(nm);
+      var strong=C.filter(function(c){ return normName(fn(c))===dn; });
+      if(strong.length===1){ scPicker.setContact(strong[0]); }
+      else { scPicker.hidden.value=''; scPicker.input.value=nm; }
+    } else { scPicker.hidden.value=''; scPicker.input.value=''; }
+    var np2=nm.split(' ');
+    if(ge('sc_nc_first')) ge('sc_nc_first').value=np2[0]||'';
+    if(ge('sc_nc_last')) ge('sc_nc_last').value=np2.slice(1).join(' ');
+    if(ge('sc_nc_type')) ge('sc_nc_type').value=side;
+  }
+
+  var sideWrap=document.createElement('div'); sideWrap.style.cssText='margin-bottom:10px;';
+  var sideLbl=document.createElement('div'); sideLbl.className='fl'; sideLbl.textContent='My client is the';
+  var sideSel=document.createElement('select'); sideSel.className='fsel'; sideSel.id='sc_client_side';
+  [['buyer','Buyer'],['seller','Seller']].forEach(function(o){ var op=document.createElement('option'); op.value=o[0]; op.textContent=o[1]; sideSel.appendChild(op); });
+  sideSel.value=defaultSide;
+  sideSel.addEventListener('change', function(){ scReseed(sideSel.value); });
+  sideWrap.appendChild(sideLbl); sideWrap.appendChild(sideSel);
+  imp.insertBefore(sideWrap, cLbl);
+
   if(docName){
-    var dn = normName(docName);
-    var strong = C.filter(function(c){ return normName(fn(c)) === dn; });
-    if(strong.length === 1){ scPicker.setContact(strong[0]); }
-    else { scPicker.input.value = docName; }
+    var dn0=normName(docName);
+    var strong0=C.filter(function(c){ return normName(fn(c))===dn0; });
+    if(strong0.length===1){ scPicker.setContact(strong0[0]); }
+    else { scPicker.input.value=docName; }
   }
 
   // ---- New-contact toggle ----
@@ -3836,7 +3867,7 @@ function showScannerResults(r){
   newFields.appendChild(mkNF('sc_nc_email','Email (optional)',''));
   var nfType = document.createElement('select'); nfType.className='fsel'; nfType.id='sc_nc_type';
   [['buyer','Buyer'],['seller','Seller']].forEach(function(o){ var op=document.createElement('option'); op.value=o[0]; op.textContent=o[1]; nfType.appendChild(op); });
-  nfType.value = (r.docType && r.docType.toLowerCase().indexOf('list')>=0) ? 'seller' : 'buyer';
+  nfType.value = defaultSide;
   newFields.appendChild(nfType);
   imp.appendChild(newFields);
 
@@ -4051,7 +4082,7 @@ async function commitScanImport(r, btn){
     if(String(listCommPct).trim()!=='') tx.listCommissionPct = normPct(listCommPct);
     if(String(buyerCommPct).trim()!=='') tx.buyerCommissionPct = normPct(buyerCommPct);
   } else {
-    var txType = (r.docType && r.docType.toLowerCase().indexOf('list') >= 0) ? 'seller' : 'buyer';
+    var txType = (ge('sc_client_side') && ge('sc_client_side').value) ? ge('sc_client_side').value : ((r.docType && r.docType.toLowerCase().indexOf('list') >= 0) ? 'seller' : 'buyer');
     tx = {
       id: Date.now() + Math.floor(Math.random()*100000),
       contactId: contactId,
