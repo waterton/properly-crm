@@ -3567,7 +3567,8 @@ function buildContactPicker(containerEl, hiddenId, placeholder, onPick){
     for(var i = 0; i < C.length && matches.length < 50; i++){
       var c = C[i];
       var hs = haystack(c);
-      var hit = nq && hs.indexOf(nq) >= 0;
+      var toks = nq ? nq.split(/\s+/).filter(Boolean) : [];
+      var hit = toks.length > 0 && toks.every(function(t){ return hs.indexOf(t) >= 0; });
       if(!hit && dq.length >= 3 && digits(hs).indexOf(dq) >= 0) hit = true;
       if(hit) matches.push(c);
     }
@@ -3808,7 +3809,8 @@ function showScannerResults(r){
   // Pre-seed + client-side selector (buyer vs seller) with smart default
   function normName(x){ return String(x||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9 ]/g,'').replace(/\s+/g,' ').trim(); }
   var buyN=(r.buyerName||'').trim(), selN=(r.sellerName||'').trim();
-  function scHasMatch(nm){ if(!nm) return false; var d=normName(nm); return C.some(function(c){ return normName(fn(c))===d; }); }
+  function scHasMatch(nm){ if(!nm) return false; var d=normName(nm); var toks=d.split(' ').filter(Boolean); return toks.length>0 && C.some(function(c){ var h=normName(fn(c)); return toks.every(function(t){ return h.indexOf(t)>=0; }); }); }
+  function scMatch(nm){ nm=(nm||'').trim(); if(!nm) return null; var d=normName(nm); var exact=C.filter(function(c){ return normName(fn(c))===d; }); if(exact.length===1) return exact[0]; var toks=d.split(' ').filter(Boolean); var tokM=C.filter(function(c){ var h=normName(fn(c)); return toks.length>0 && toks.every(function(t){ return h.indexOf(t)>=0; }); }); return tokM.length===1 ? tokM[0] : null; }
   var defaultSide='buyer';
   if(r.docType && r.docType.toLowerCase().indexOf('list')>=0) defaultSide='seller';
   if(scHasMatch(selN) && !scHasMatch(buyN)) defaultSide='seller';
@@ -3819,9 +3821,8 @@ function showScannerResults(r){
     if(ge('sc_client_side')) ge('sc_client_side').value = side;
     var nm=((side==='seller'?selN:buyN)||'').trim();
     if(nm){
-      var dn=normName(nm);
-      var strong=C.filter(function(c){ return normName(fn(c))===dn; });
-      if(strong.length===1){ scPicker.setContact(strong[0]); }
+      var hit=scMatch(nm);
+      if(hit){ scPicker.setContact(hit); }
       else { scPicker.hidden.value=''; scPicker.input.value=nm; }
     } else { scPicker.hidden.value=''; scPicker.input.value=''; }
     var np2=nm.split(' ');
@@ -3830,9 +3831,9 @@ function showScannerResults(r){
     if(ge('sc_nc_type')) ge('sc_nc_type').value=side;
   }
 
-  var sideWrap=document.createElement('div'); sideWrap.style.cssText='margin-bottom:10px;';
-  var sideLbl=document.createElement('div'); sideLbl.className='fl'; sideLbl.textContent='My client is the';
-  var sideSel=document.createElement('select'); sideSel.className='fsel'; sideSel.id='sc_client_side';
+  var sideWrap=document.createElement('div'); sideWrap.style.cssText='margin-bottom:10px;display:flex;align-items:center;gap:10px;';
+  var sideLbl=document.createElement('div'); sideLbl.className='fl'; sideLbl.style.marginBottom='0'; sideLbl.textContent='My client is the';
+  var sideSel=document.createElement('select'); sideSel.className='fsel'; sideSel.id='sc_client_side'; sideSel.style.width='auto'; sideSel.style.flex='0 0 auto';
   [['buyer','Buyer'],['seller','Seller']].forEach(function(o){ var op=document.createElement('option'); op.value=o[0]; op.textContent=o[1]; sideSel.appendChild(op); });
   sideSel.value=defaultSide;
   sideSel.addEventListener('change', function(){ scReseed(sideSel.value); });
@@ -3840,9 +3841,8 @@ function showScannerResults(r){
   imp.insertBefore(sideWrap, cLbl);
 
   if(docName){
-    var dn0=normName(docName);
-    var strong0=C.filter(function(c){ return normName(fn(c))===dn0; });
-    if(strong0.length===1){ scPicker.setContact(strong0[0]); }
+    var hit0=scMatch(docName);
+    if(hit0){ scPicker.setContact(hit0); }
     else { scPicker.input.value=docName; }
   }
 
