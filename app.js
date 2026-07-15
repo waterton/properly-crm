@@ -380,6 +380,34 @@ function deleteCfromDB(id){
     fetch(SUPA_URL+'/rest/v1/deadlines?contactId=eq.'+id,{method:'DELETE',headers:h});
   });
 }
+
+// Bulk delete: one request per table per chunk using PostgREST "in.(...)", awaited in
+// sequence. Deleting one-by-one fires 4 unawaited fetches per contact, which floods the
+// connection pool and silently drops most of them past a few hundred rows.
+async function bulkDeleteContactsFromDB(ids, onProgress){
+  var out = {ok:0, fail:0};
+  if(!supaReady || !ids || !ids.length) return out;
+  var h = await getAuthHeaders();
+  var CHUNK = 100;                       // keeps the URL well under length limits
+  var targets = [                        // children first, then the contact rows
+    {t:'notes',     col:'contactId'},
+    {t:'followups', col:'contactId'},
+    {t:'deadlines', col:'contactId'},
+    {t:'contacts',  col:'id'}
+  ];
+  for(var i=0; i<ids.length; i+=CHUNK){
+    var list = '(' + ids.slice(i, i+CHUNK).join(',') + ')';
+    for(var k=0; k<targets.length; k++){
+      try{
+        var res = await fetch(SUPA_URL+'/rest/v1/'+targets[k].t+'?'+targets[k].col+'=in.'+list,
+                              {method:'DELETE', headers:h});
+        if(res.ok) out.ok++; else out.fail++;
+      }catch(e){ out.fail++; }
+    }
+    if(onProgress) onProgress(Math.min(i+CHUNK, ids.length), ids.length);
+  }
+  return out;
+}
 function deleteFUfromDB(id){
   if(!supaReady) return;
   getAuthHeaders().then(function(h){
@@ -1053,13 +1081,36 @@ function confirmMerge(){
     loadFromDB().then(function(){ rc(); rd(); });
   }, 1500);
 }
-function deleteSelectedContacts(){
+async function deleteSelectedContacts(){
   if(!selectedContacts.size) return;
-  if(!confirm('Delete '+selectedContacts.size+' contact(s) and all their notes, follow-ups, and deadlines?')) return;
-  selectedContacts.forEach(function(id){ delc(id, true); });
+  var ids = Array.from(selectedContacts);
+  if(!confirm('Delete '+ids.length+' contact(s) and all their notes, follow-ups, and deadlines?\n\nThis cannot be undone.')) return;
+  var btn = ge('btnDeleteSelected');
+  function setBtn(t, dis){ if(btn){ btn.textContent=t; btn.disabled=!!dis; } }
+  setBtn('Deleting 0/'+ids.length+'...', true);
+  pausePoll(180000);   // stop the 30s poll from racing the deletes / resurrecting rows
+
+  // Remove locally first so the UI is responsive.
+  var gone = {};
+  ids.forEach(function(i){ gone[String(i)] = true; });
+  C = C.filter(function(c){ return !gone[String(c.id)]; });
+  N = N.filter(function(n){ return !gone[String(n.contactId)]; });
+  F = F.filter(function(f){ return !gone[String(f.contactId)]; });
+  D = D.filter(function(d){ return !gone[String(d.contactId)]; });
+  sv();
   selectedContacts.clear();
-  updateBulkBar();
-  rc(); rd();
+  updateBulkBar(); rc(); rd();
+
+  var res = await bulkDeleteContactsFromDB(ids, function(done, total){
+    setBtn('Deleting '+done+'/'+total+'...', true);
+  });
+  setBtn('Delete Selected', false);
+
+  // Reload from the DB so the list reflects what actually persisted, not what we assumed.
+  loadFromDB().then(function(){
+    rc(); rd();
+    if(res.fail) alert('Delete finished, but '+res.fail+' request(s) failed. Some records may remain - select and delete again.');
+  });
 }
 
 function rc(){
