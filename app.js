@@ -53,6 +53,7 @@ async function getAuthHeaders(extra) {
 
 var C=[],N=[],F=[],D=[],TX=[],TM=[],A=[],curDet=null,curFilter='all',curPage='dashboard';
 var CAMP=[],ENR=[],SENDLOG=[],DOCS=[];
+var CH=[]; // tx_changes: audit trail of field changes applied from scanned documents
 var curSort='last'; // 'last' or 'first'
 var selectedContacts = new Set();
 // TM = Team Members: [{id, first, last, role, email, phone, color, calLink}]
@@ -70,6 +71,7 @@ function sv(){
     localStorage.setItem('crm_enr',JSON.stringify(ENR));
     localStorage.setItem('crm_sendlog',JSON.stringify(SENDLOG));
     localStorage.setItem('crm_a',JSON.stringify(A));
+    localStorage.setItem('crm_ch',JSON.stringify(CH));
   }catch(e){}
 }
 
@@ -85,7 +87,8 @@ var DB_COLS = {
   enrollments: null,
   send_log: null,
   gmail_tokens: null,
-  documents: ['id','contact_id','transaction_id','file_path','file_name','doc_type','summary','mime_type','size','created_at']
+  documents: ['id','contact_id','transaction_id','file_path','file_name','doc_type','summary','mime_type','size','created_at'],
+  tx_changes: ['id','transactionId','contactId','field','oldValue','newValue','docType','addendumNo','effectiveDate','documentId','appliedAt']
 };
 function stripForDB(table, row){
   var cols = DB_COLS[table];
@@ -305,7 +308,8 @@ async function loadFromDB(){
       fetchAllRows(base, 'campaigns?order=created_at.asc,id.asc', headers).catch(function(){return [];}),
       fetchAllRows(base, 'enrollments?order=created_at.asc,id.asc', headers).catch(function(){return [];}),
       fetchAllRows(base, 'send_log?order=created_at.asc,id.asc', headers).catch(function(){return []; }),
-      fetchAllRows(base, 'documents?order=created_at.asc,id.asc', headers).catch(function(){return []; })
+      fetchAllRows(base, 'documents?order=created_at.asc,id.asc', headers).catch(function(){return []; }),
+      fetchAllRows(base, 'tx_changes?order=id.asc', headers).catch(function(){return []; })
     ]);
     var rc = results[0], rn = results[1], rf = results[2], rd = results[3], rtx = results[4];
 
@@ -326,6 +330,8 @@ async function loadFromDB(){
     if(Array.isArray(renr)) ENR = renr;
     if(Array.isArray(rsl)) SENDLOG = rsl;
     if(Array.isArray(rdoc)) DOCS = rdoc;
+    var rch = results[9];
+    if(Array.isArray(rch)) CH = rch;
     DOCS.forEach(function(d){
       d.id = typeof d.id === 'string' ? parseInt(d.id)||d.id : d.id;
       if(d.contact_id != null) d.contact_id = typeof d.contact_id === 'string' ? parseInt(d.contact_id) : d.contact_id;
@@ -364,6 +370,7 @@ function saveNote(n){ sv(); if(supaReady) dbSave('notes', [n]); }
 function logActivity(contactId,type){A.unshift({contactId:contactId,type:type,date:new Date().toISOString()});if(A.length>30)A=A.slice(0,30);sv();}
 function saveFU(f){ sv(); if(supaReady) dbSave('followups', [f]); }
 function saveDL(d){ sv(); if(supaReady) dbSave('deadlines', [d]); }
+function saveCH(x){ sv(); if(supaReady) dbSave('tx_changes', [x]); }
 function deleteCfromDB(id){
   if(!supaReady) return;
   getAuthHeaders().then(function(h){
@@ -3510,6 +3517,8 @@ function buildScannerPrompt(hint){
     '  "contingencies": ["list", "of", "contingencies"],',
     '  "redFlags": ["any items needing attention", "unusual clauses", "tight deadlines"],',
     '  "keyChanges": "for addenda only - what changed from original contract",',
+    '  "addendumNumber": "for addenda only - the addendum number if stated, digits only e.g. 3 (empty string if not stated)",',
+    '  "effectiveDate": "for addenda only - the effective or signature date of this addendum, YYYY-MM-DD or empty string",',
     '  "inspectionItems": ["for inspection reports - major items found"],',
     '  "spanishSummary": "same summary in Spanish"',
     '}',
@@ -3693,6 +3702,12 @@ function showScannerResults(r){
     {label:'Listing Commission %', key:'listingCommissionPct', id:'sc_list_comm'},
     {label:'Buyer Commission %', key:'buyerCommissionPct', id:'sc_buyer_comm'}
   ];
+  // Addendum-only fields: sequencing info, shown when the doc looks like an addendum
+  var scIsAddendum = !!(r.docType && r.docType.toLowerCase().indexOf('addend')>=0) || !!r.addendumNumber || !!r.keyChanges;
+  if(scIsAddendum){
+    fieldDefs.push({label:'Addendum #', key:'addendumNumber', id:'sc_addendum_no'});
+    fieldDefs.push({label:'Addendum Effective Date', key:'effectiveDate', id:'sc_addendum_date'});
+  }
   fieldDefs.forEach(function(f){
     var fDiv = document.createElement('div');
     fDiv.className = 'scanner-field';
@@ -3886,6 +3901,105 @@ function showScannerResults(r){
   txChoice.style.cssText='margin-bottom:8px;';
   imp.appendChild(txChoice);
 
+  // ---- Addendum reconciliation: diff review ----
+  var diffWrap = document.createElement('div');
+  imp.appendChild(diffWrap);
+
+  var SC_DIFF_FIELDS = [
+    {id:'sc_price',        field:'price',              label:'Purchase Price'},
+    {id:'sc_contract',     field:'contractDate',       label:'Contract Date',          date:true},
+    {id:'sc_closing',      field:'closingDate',        label:'Closing Date',           date:true},
+    {id:'sc_earnest_date', field:'earnestDate',        label:'Earnest Money Due',      date:true},
+    {id:'sc_duedilig',     field:'dueDiligDate',       label:'Due Diligence Deadline', date:true},
+    {id:'sc_financing',    field:'financingDate',      label:'Financing Deadline',     date:true},
+    {id:'sc_appraisal',    field:'appraisalDate',      label:'Appraisal Deadline',     date:true},
+    {id:'sc_lender',       field:'lender',             label:'Lender'},
+    {id:'sc_title',        field:'titleCo',            label:'Title Company'},
+    {id:'sc_mls',          field:'mlsNum',             label:'MLS #'},
+    {id:'sc_list_comm',    field:'listCommissionPct',  label:'Listing Commission %', pct:true},
+    {id:'sc_buyer_comm',   field:'buyerCommissionPct', label:'Buyer Commission %',   pct:true}
+  ];
+  function scSelectedTx(){
+    var el=document.querySelector('input[name="sc_tx_choice"]:checked');
+    if(!el || String(el.value).indexOf('existing:')!==0) return null;
+    var exid=String(el.value).split(':')[1];
+    return TX.find(function(t){ return String(t.id)===String(exid); }) || null;
+  }
+  function scIncomingNo(){
+    var e=ge('sc_addendum_no'); if(!e) return null;
+    var n=parseFloat(String(e.value).replace(/[^0-9.]/g,''));
+    return isNaN(n) ? null : n;
+  }
+  // Highest addendum number that has already changed this field on this transaction
+  function scFieldLatestNo(txId, field){
+    var best=null;
+    CH.forEach(function(h){
+      if(String(h.transactionId)!==String(txId) || h.field!==field) return;
+      var n=(h.addendumNo==null ? null : parseFloat(h.addendumNo));
+      if(n!=null && !isNaN(n) && (best==null || n>best)) best=n;
+    });
+    return best;
+  }
+  function scNormVal(v, f){
+    if(v==null) return '';
+    var s=String(v).trim();
+    if(f && f.pct){ var p=normPct(s); return p==null ? '' : String(p); }
+    return s;
+  }
+  function renderDiff(){
+    diffWrap.innerHTML='';
+    var dtx=scSelectedTx();
+    if(!dtx) return;
+    var inNo=scIncomingNo();
+    var rows=[];
+    SC_DIFF_FIELDS.forEach(function(f){
+      var el=ge(f.id); if(!el) return;
+      var nv=scNormVal(el.value, f);
+      if(nv==='') return;                          // nothing extracted -> not a change
+      var cv=scNormVal(dtx[f.field], f);
+      if(nv===cv) return;                          // identical -> not a change (handles echoed terms)
+      var latest=scFieldLatestNo(dtx.id, f.field);
+      var stale=(inNo!=null && latest!=null && inNo<latest);
+      rows.push({f:f, cur:cv, nw:nv, stale:stale, latest:latest});
+    });
+    if(!rows.length) return;
+    var dh=document.createElement('div');
+    dh.className='fl'; dh.style.marginTop='8px';
+    dh.textContent='Changes to apply'+(inNo!=null ? ' (addendum #'+inNo+')' : '');
+    diffWrap.appendChild(dh);
+    var box=document.createElement('div');
+    box.style.cssText='background:var(--surface2);border-radius:8px;padding:8px 10px;margin-bottom:8px;';
+    rows.forEach(function(row){
+      var line=document.createElement('label');
+      line.style.cssText='display:flex;align-items:center;gap:8px;padding:4px 0;font-size:13px;cursor:pointer;border-bottom:1px solid var(--border);';
+      var cb=document.createElement('input'); cb.type='checkbox'; cb.className='sc_diff_cb';
+      cb.setAttribute('data-field', row.f.field);
+      cb.setAttribute('data-id', row.f.id);
+      cb.checked = !row.stale;                     // stale edits are opt-in, never default
+      cb.style.cssText='accent-color:var(--accent);flex:0 0 auto;';
+      var t=document.createElement('div'); t.style.flex='1';
+      t.innerHTML='<b style="color:var(--text);">'+row.f.label+'</b> '
+        +'<span style="color:var(--text3);">'+(row.cur==='' ? '(empty)' : row.cur)+'</span>'
+        +'<span style="color:var(--accent);"> &rarr; </span>'
+        +'<span style="color:var(--text);font-weight:600;">'+row.nw+'</span>';
+      line.appendChild(cb); line.appendChild(t);
+      if(row.stale){
+        var w=document.createElement('div');
+        w.style.cssText='color:var(--danger);font-size:11px;white-space:nowrap;';
+        w.textContent='older than #'+row.latest;
+        line.appendChild(w);
+      }
+      box.appendChild(line);
+    });
+    diffWrap.appendChild(box);
+    if(rows.some(function(x){ return x.stale; })){
+      var warn=document.createElement('div');
+      warn.style.cssText='color:var(--danger);font-size:12px;margin:-4px 0 8px;';
+      warn.textContent='Some fields were already changed by a NEWER addendum. Those are unchecked - tick them only if this document really should win.';
+      diffWrap.appendChild(warn);
+    }
+  }
+
   function renderTxChoice(){
     txChoice.innerHTML = '';
     var cid = newCb.checked ? null : (scPicker.hidden.value ? parseInt(scPicker.hidden.value) : null);
@@ -3909,6 +4023,7 @@ function showScannerResults(r){
         lab.style.cssText='display:flex;align-items:center;gap:8px;cursor:pointer;padding:4px 0;font-size:13px;color:var(--text2);';
         var rb=document.createElement('input'); rb.type='radio'; rb.name='sc_tx_choice'; rb.value='existing:'+t.id;
         rb.style.cssText='accent-color:var(--accent);';
+        rb.addEventListener('change', renderDiff);
         lab.appendChild(rb);
         lab.appendChild(document.createTextNode((t.address||'Unknown address')+' ('+(t.type||'')+')'));
         exWrap.appendChild(lab);
@@ -3919,8 +4034,11 @@ function showScannerResults(r){
       txChoice.appendChild(exHdr);
       txChoice.appendChild(exWrap);
     }
+    renderDiff();
   }
   renderTxChoice();
+  SC_DIFF_FIELDS.forEach(function(f){ var el=ge(f.id); if(el) el.addEventListener('input', renderDiff); });
+  if(ge('sc_addendum_no')) ge('sc_addendum_no').addEventListener('input', renderDiff);
   scPicker.input.addEventListener('blur', function(){ setTimeout(renderTxChoice, 200); });
 
   // ---- Single action + result state ----
@@ -4070,17 +4188,51 @@ async function commitScanImport(r, btn){
   }
 
   if(tx){
-    if(closingDate) tx.closingDate = closingDate;
-    if(earnestDate) tx.earnestDate = earnestDate;
-    if(dueDiligDate) tx.dueDiligDate = dueDiligDate;
-    if(financingDate) tx.financingDate = financingDate;
-    if(appraisalDate) tx.appraisalDate = appraisalDate;
-    if(contractDate) tx.contractDate = contractDate;
-    if(lender) tx.lender = lender;
-    if(titleCo) tx.titleCo = titleCo;
-    if(price) tx.price = price;
-    if(String(listCommPct).trim()!=='') tx.listCommissionPct = normPct(listCommPct);
-    if(String(buyerCommPct).trim()!=='') tx.buyerCommissionPct = normPct(buyerCommPct);
+    // ---- Addendum reconciliation ----
+    // Apply ONLY what was accepted in the diff review, and log every applied change.
+    var accNo = null, accDate = '';
+    var _anEl = ge('sc_addendum_no');
+    if(_anEl){ var _n = parseFloat(String(_anEl.value).replace(/[^0-9.]/g,'')); if(!isNaN(_n)) accNo = _n; }
+    var _adEl = ge('sc_addendum_date'); if(_adEl && _adEl.value) accDate = _adEl.value;
+
+    var _boxes = document.querySelectorAll('.sc_diff_cb');
+    var _applied = 0;
+    Array.prototype.forEach.call(_boxes, function(cb){
+      if(!cb.checked) return;
+      var fld = cb.getAttribute('data-field');
+      var el = ge(cb.getAttribute('data-id'));
+      if(!fld || !el) return;
+      var raw = String(el.value).trim();
+      if(raw === '') return;
+      var isPct = (fld === 'listCommissionPct' || fld === 'buyerCommissionPct');
+      var newVal = isPct ? normPct(raw) : raw;
+      var oldVal = tx[fld];
+      if(String(oldVal == null ? '' : oldVal) === String(newVal == null ? '' : newVal)) return;
+      tx[fld] = newVal;
+      _applied++;
+      var chRow = {
+        id: Date.now() + Math.floor(Math.random()*100000) + _applied,
+        transactionId: tx.id,
+        contactId: contactId,
+        field: fld,
+        oldValue: (oldVal == null ? null : String(oldVal)),
+        newValue: (newVal == null ? null : String(newVal)),
+        docType: r.docType || 'Document',
+        addendumNo: accNo,
+        effectiveDate: accDate || null,
+        documentId: null,
+        appliedAt: new Date().toISOString()
+      };
+      CH.push(chRow); saveCH(chRow);
+    });
+    // Track the highest addendum applied so later scans can detect out-of-order documents.
+    if(accNo != null){
+      var prevNo = (tx.lastAddendumNo == null ? null : parseFloat(tx.lastAddendumNo));
+      if(prevNo == null || isNaN(prevNo) || accNo > prevNo){
+        tx.lastAddendumNo = accNo;
+        if(accDate) tx.lastAddendumDate = accDate;
+      }
+    }
   } else {
     var txType = (ge('sc_client_side') && ge('sc_client_side').value) ? ge('sc_client_side').value : ((r.docType && r.docType.toLowerCase().indexOf('list') >= 0) ? 'seller' : 'buyer');
     tx = {
@@ -4130,12 +4282,14 @@ async function commitScanImport(r, btn){
   }
 
   // ---- Deadlines (tagged with transactionId) ----
+  // Derive deadlines from the transaction's actual values (post-review), never from raw
+  // extracted values - otherwise a change you rejected would still create a deadline.
   var dlMap = [
-    {type:'Earnest Money Due', val:earnestDate},
-    {type:'Due Diligence Deadline', val:dueDiligDate},
-    {type:'Financing Deadline', val:financingDate},
-    {type:'Appraisal Deadline', val:appraisalDate},
-    {type:'Closing Date', val:closingDate}
+    {type:'Earnest Money Due', val:tx.earnestDate},
+    {type:'Due Diligence Deadline', val:tx.dueDiligDate},
+    {type:'Financing Deadline', val:tx.financingDate},
+    {type:'Appraisal Deadline', val:tx.appraisalDate},
+    {type:'Closing Date', val:tx.closingDate}
   ];
   dlMap.forEach(function(dm){
     if(!dm.val) return;
