@@ -593,8 +593,8 @@ function rb(){
   var td=tod();
   var tFU=F.filter(function(f){return !f.done&&f.date===td;});
   var oFU=F.filter(function(f){return !f.done&&f.date<td;});
-  var uDL=D.filter(function(d){return du(d.date)<=0;});
-  var wDL=D.filter(function(d){var n=du(d.date);return n>0&&n<=7;});
+  var uDL=D.filter(function(d){return du(d.date)<=0 && !dlIsClosed(d);});
+  var wDL=D.filter(function(d){var n=du(d.date);return n>0&&n<=7&&!dlIsClosed(d);});
   var act=C.filter(function(c){return c.stage && c.stage!=='Closed';});
   var urg=uDL.length+oFU.length;
   ge('bUrgNum').textContent=urg;
@@ -630,7 +630,7 @@ function rd(){
   if(!rec.length){rEl.innerHTML='<div class="empty">No activity yet</div>';}
   else rec.forEach(function(act){var c=gc(act.contactId);var row=document.createElement('div');row.style.cssText='display:flex;align-items:center;justify-content:space-between;padding:9px 18px;border-bottom:1px solid var(--border);';var nameEl=document.createElement('span');nameEl.style.cssText='font-size:16px;font-weight:600;color:var(--text);';nameEl.textContent=c?fn(c):'Unknown';var typeEl=document.createElement('span');typeEl.style.cssText='font-size:16px;color:var(--text2);';typeEl.textContent=act.type;row.appendChild(nameEl);row.appendChild(typeEl);rEl.appendChild(row);});
   var dlEl=ge('dDeadlines');dlEl.innerHTML='';
-  var dl=D.slice().sort(function(a,b){return new Date(a.date)-new Date(b.date);}).slice(0,5);
+  var dl=D.filter(function(d){return !dlIsClosed(d);}).sort(function(a,b){return new Date(a.date)-new Date(b.date);}).slice(0,5);
   if(!dl.length){dlEl.innerHTML='<div class="empty">No deadlines</div>';}
   else dl.forEach(function(d){var c=gc(d.contactId);var n=du(d.date);var lbl=n<0?'Overdue':n===0?'Today':n+'d';var row=mkRow('dl-row');row.style.cursor='pointer';row.addEventListener('click',function(){sp('deadlines');});row.appendChild(mkDot(dc(n)));var info=mkDiv('flex:1;');info.appendChild(mkDiv('font-size:18px;',d.type));info.appendChild(mkDiv('font-size:18px;color:var(--text3);',c?fn(c):''));row.appendChild(info);row.appendChild(mkDiv('font-family:monospace;font-size:18px;color:var(--text2);',lbl));dlEl.appendChild(row);});
   var fuEl=ge('dFollowups');fuEl.innerHTML='';
@@ -1500,6 +1500,21 @@ function openEditNote(note){
   ge('btnSaveNote') && ge('btnSaveNote').setAttribute('data-edit-id', note.id);
   om('noteModal');
 }
+// Resolve the transaction a deadline belongs to. When a deadline is only tied to a contact,
+// prefer an OPEN deal - otherwise a contact-level deadline could attach to a closed deal
+// (and get hidden) while their active deal is the one that actually needs it.
+function dlTxFor(d){
+  var tx=null;
+  if(d.transactionId!=null) tx=TX.find(function(t){ return String(t.id)===String(d.transactionId); });
+  if(!tx && d.contactId!=null){
+    tx = TX.find(function(t){ return String(t.contactId)===String(d.contactId) && t.status!=='closed'; })
+      || TX.find(function(t){ return String(t.contactId)===String(d.contactId); });
+  }
+  return tx||null;
+}
+// A closed deal's deadlines are done - they shouldn't linger anywhere.
+function dlIsClosed(d){ var t=dlTxFor(d); return !!(t && t.status==='closed'); }
+
 function rdl(){
   var el=ge('dlList');
   el.innerHTML='';
@@ -1521,12 +1536,7 @@ function rdl(){
     if(tx){ for(var i=0;i<REPC_DEADLINES.length;i++){ if(tx[REPC_DEADLINES[i].key]===d.date) return REPC_DEADLINES[i].label; } }
     return 'Deadline';
   }
-  function dlDeal(d){
-    var tx=null;
-    if(d.transactionId!=null) tx=TX.find(function(t){return String(t.id)===String(d.transactionId);});
-    if(!tx && d.contactId!=null) tx=TX.find(function(t){return String(t.contactId)===String(d.contactId);});
-    return tx||null;
-  }
+  function dlDeal(d){ return dlTxFor(d); }
 
   var groups={}, order=[];
   function ensureGroup(key, tx, contactId){
@@ -1544,6 +1554,7 @@ function rdl(){
     if(filterFrom && d.date < filterFrom) return;
     if(filterTo && d.date > filterTo) return;
     var tx=dlDeal(d);
+    if(tx && tx.status==='closed') return;   // closed deal: nothing left to track
     var key = tx ? ('tx_'+tx.id) : (d.contactId!=null ? ('c_'+d.contactId) : 'none');
     ensureGroup(key, tx, tx?null:d.contactId).dated.push(d);
   });
