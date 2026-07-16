@@ -2419,10 +2419,15 @@ function renderTC(){
       if(tx.buyerCommissionAmt!=null){ var bc=document.createElement('div'); bc.style.cssText='font-size:18px;'; bc.innerHTML='<span style="color:var(--text3);">Buyer comm:</span> <b>'+fmtUSD(tx.buyerCommissionAmt)+(tx.buyerCommissionPct!=null?' ('+tx.buyerCommissionPct+'%)':'')+'</b>'; dates.appendChild(bc); }
       if(tx.closingDate){
         var d=document.createElement('div'); d.style.cssText='font-size:18px;';
-        var n=daysToClose;
-        var color = n < 0 ? 'var(--danger)' : n <= 7 ? 'var(--warn)' : 'var(--lead)';
-        var lbl = n < 0 ? Math.abs(n)+'d overdue' : n === 0 ? 'TODAY' : n+'d to close';
-        d.innerHTML='<span style="color:var(--text3);">Close:</span> <b style="color:'+color+';">'+lbl+'</b>';
+        if(tx.status==='closed'){
+          // A closed deal is never "overdue" - show the close date instead of a countdown.
+          d.innerHTML='<span style="color:var(--text3);">Closed:</span> <b style="color:var(--text3);">'+fd(tx.closingDate)+'</b>';
+        } else {
+          var n=daysToClose;
+          var color = n < 0 ? 'var(--danger)' : n <= 7 ? 'var(--warn)' : 'var(--lead)';
+          var lbl = n < 0 ? Math.abs(n)+'d overdue' : n === 0 ? 'TODAY' : n+'d to close';
+          d.innerHTML='<span style="color:var(--text3);">Close:</span> <b style="color:'+color+';">'+lbl+'</b>';
+        }
         dates.appendChild(d);
       }
       body.appendChild(dates);
@@ -2480,6 +2485,19 @@ function openTCDetail(id){
     if(!t) return;
     t.status = (t.status==='closed') ? 'active' : 'closed';
     saveTX(t);
+    // Keep the Pipeline in step with the transaction. Only move the client to Closed once
+    // they have no other open deals - otherwise an active transaction would vanish from the board.
+    if(t.contactId){
+      if(t.status==='closed'){
+        var stillOpen = TX.some(function(x){
+          return String(x.contactId)===String(t.contactId) && String(x.id)!==String(t.id) && x.status!=='closed';
+        });
+        if(!stillOpen) ss(t.contactId, 'Closed');
+      } else {
+        var oc = gc(t.contactId);
+        if(oc && oc.stage==='Closed') ss(t.contactId, 'Under Contract');
+      }
+    }
     renderTC(); updateNbTC(); rd();
     openTCDetail(txId);
   }); })(id);
@@ -3398,6 +3416,15 @@ var lastScanResult = null;
 var lastScanFile = null;
 
 function initScanner(){
+  // Present a clean window on every entry. Without this, leaving the tab and coming back
+  // still shows the previous scan's result card (only a page refresh cleared it).
+  var res = ge('scannerResults');  if(res){ res.style.display='none'; res.innerHTML=''; }
+  var proc = ge('scannerProcessing'); if(proc) proc.style.display='none';
+  var up = ge('scannerUploadArea'); if(up) up.style.display='block';
+  var fi = ge('scannerFileInput'); if(fi) fi.value='';
+  lastScanResult = null;
+  lastScanFile = null;
+  var hist = ge('scannerHistory'); if(hist) hist.style.display = scannerHistory.length ? 'block' : 'none';
   renderScannerHistory();
 }
 
