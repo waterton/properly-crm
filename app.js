@@ -465,6 +465,10 @@ function deleteTXfromDB(id){
   if(!supaReady) return;
   getAuthHeaders().then(function(h){
     fetch(SUPA_URL+'/rest/v1/transactions?id=eq.'+id,{method:'DELETE',headers:h});
+    fetch(SUPA_URL+'/rest/v1/deadlines?transactionId=eq.'+id,{method:'DELETE',headers:h});
+    fetch(SUPA_URL+'/rest/v1/followups?transactionId=eq.'+id,{method:'DELETE',headers:h});
+    fetch(SUPA_URL+'/rest/v1/notes?transactionId=eq.'+id,{method:'DELETE',headers:h});
+    fetch(SUPA_URL+'/rest/v1/tx_changes?transactionId=eq.'+id,{method:'DELETE',headers:h});
   });
 }
 function updateContact(c){ sv(); if(supaReady) dbSave('contacts', [c]); }
@@ -1340,15 +1344,32 @@ function vc(id){
   var txsec=mksec('Transactions');
   var cTX=TX.filter(function(t){return t.contactId===id;});
   if(!cTX.length)txsec.appendChild(mkDiv('font-size:18px;color:var(--text3);padding:4px 0;','None yet.'));
-  else cTX.forEach(function(t){
-    var trow=document.createElement('div');
-    trow.style.cssText='display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border);cursor:pointer;';
-    var tnm=mkDiv('flex:1;font-size:18px;color:var(--accent);',(t.address||'Transaction')+(t.type?' ('+t.type+')':''));
-    var tst=mkDiv('font-size:16px;color:var(--text3);white-space:nowrap;',t.closingDate?('Close '+fd(t.closingDate)):'');
-    trow.appendChild(tnm);trow.appendChild(tst);
-    (function(txId){trow.addEventListener('click',function(){ cd(); openTCDetail(txId); });})(t.id);
-    txsec.appendChild(trow);
-  });
+  else {
+    // Repeat clients accumulate deals over the years. Show what's live now, then the history
+    // underneath, so "what are we working on" and "what have we done" are both answerable here.
+    var actTX=cTX.filter(function(t){ return t.status!=='closed'; });
+    var pastTX=cTX.filter(function(t){ return t.status==='closed'; });
+    var byDateDesc=function(a,b){ var x=String(a.closingDate||''), y=String(b.closingDate||''); return x<y?1:(x>y?-1:0); };
+    actTX.sort(byDateDesc); pastTX.sort(byDateDesc);
+    var txRow=function(t, isPast){
+      var trow=document.createElement('div');
+      trow.style.cssText='display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border);cursor:pointer;'+(isPast?'opacity:0.6;':'');
+      var tnm=mkDiv('flex:1;font-size:18px;color:'+(isPast?'var(--text2)':'var(--accent)')+';',(t.address||'Transaction')+(t.type?' ('+t.type+')':''));
+      var bits=[];
+      if(t.price) bits.push(t.price);
+      if(t.closingDate) bits.push((isPast?'Closed ':'Close ')+fd(t.closingDate));
+      var tst=mkDiv('font-size:16px;color:var(--text3);white-space:nowrap;', bits.join(' - '));
+      trow.appendChild(tnm);trow.appendChild(tst);
+      (function(txId){ trow.addEventListener('click',function(){ cd(); openTCDetail(txId); }); })(t.id);
+      return trow;
+    };
+    if(actTX.length) actTX.forEach(function(t){ txsec.appendChild(txRow(t,false)); });
+    else txsec.appendChild(mkDiv('font-size:16px;color:var(--text3);padding:4px 0;','No active deals.'));
+    if(pastTX.length){
+      txsec.appendChild(mkDiv('font-size:14px;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin:10px 0 2px;','Past deals ('+pastTX.length+')'));
+      pastTX.forEach(function(t){ txsec.appendChild(txRow(t,true)); });
+    }
+  }
   body.appendChild(txsec);
   var docsec=mksec('Documents');
   var docab=mkBtn('','+ Upload','background:none;border:none;color:var(--accent);cursor:pointer;font-size:18px;margin-left:8px;');
@@ -2355,7 +2376,17 @@ var TC_TEMPLATES = {
 function saveTX(tx){ recomputeCommission(tx); sv(); if(supaReady && tx) dbSave('transactions', [tx]); }
 function deleteTX(id){
   if(!confirm('Delete this transaction and all its data?')) return;
+  // Remove everything hanging off the deal too. Without this, its deadlines / follow-ups /
+  // notes survive as orphans - still assigned to someone, pointing at a deal that's gone.
   TX=TX.filter(function(t){return t.id!==id;});
+  D =D.filter(function(d){ return String(d.transactionId)!==String(id); });
+  F =F.filter(function(f){ return String(f.transactionId)!==String(id); });
+  N =N.filter(function(n){ return String(n.transactionId)!==String(id); });
+  CH=CH.filter(function(h){ return String(h.transactionId)!==String(id); });
+  // Documents keep their files and stay with the client - just drop the dead deal link.
+  DOCS.forEach(function(dc){
+    if(String(dc.transaction_id)===String(id)){ dc.transaction_id = null; if(supaReady) dbSave('documents',[dc]); }
+  });
   sv();
   pausePoll(8000); deleteTXfromDB(id);
   var ov=ge('tcDetOv'); if(ov) ov.classList.remove('open');
@@ -5422,10 +5453,11 @@ function renderTeamCards(){
 
   TM.forEach(function(m){
     // Count assigned items
+    // Closed deals aren't live work - keep them out of the workload counts.
     var contacts = C.filter(function(c){ return c.assignedTo === m.id; }).length;
-    var transactions = TX.filter(function(t){ return t.assignedTo === m.id; }).length;
-    var deadlines = D.filter(function(d){ return d.assignedTo === m.id; }).length;
-    var followups = F.filter(function(f){ return f.assignedTo === m.id && !f.done; }).length;
+    var transactions = TX.filter(function(t){ return t.assignedTo === m.id && t.status !== 'closed'; }).length;
+    var deadlines = D.filter(function(d){ return d.assignedTo === m.id && !dlIsClosed(d); }).length;
+    var followups = F.filter(function(f){ return f.assignedTo === m.id && !f.done && !dlIsClosed(f); }).length;
 
     var card = document.createElement('div');
     card.className = 'team-card';
@@ -5530,7 +5562,7 @@ function renderTeamAssignments(){
   }
   // Transactions
   if(!filterType || filterType==='transaction'){
-    TX.filter(function(t){ return t.assignedTo; }).forEach(function(t){
+    TX.filter(function(t){ return t.assignedTo && t.status !== 'closed'; }).forEach(function(t){
       if(filterMember && t.assignedTo !== filterMember) return;
       var c2=gc(t.contactId);
       items.push({type:'transaction', icon:'T', label:t.address||'Unknown', sub:(c2?fn(c2):'')+(t.closingDate?' - Close: '+fd(t.closingDate):''), assignedTo:t.assignedTo, id:t.id, obj:t});
@@ -5538,7 +5570,7 @@ function renderTeamAssignments(){
   }
   // Deadlines
   if(!filterType || filterType==='deadline'){
-    D.filter(function(d){ return d.assignedTo; }).forEach(function(d){
+    D.filter(function(d){ return d.assignedTo && !dlIsClosed(d); }).forEach(function(d){
       if(filterMember && d.assignedTo !== filterMember) return;
       var c3=gc(d.contactId);
       items.push({type:'deadline', icon:'D', label:d.type, sub:(c3?fn(c3):'Unknown')+' - '+fd(d.date), assignedTo:d.assignedTo, id:d.id, obj:d});
@@ -5546,7 +5578,7 @@ function renderTeamAssignments(){
   }
   // Follow-ups
   if(!filterType || filterType==='followup'){
-    F.filter(function(f){ return f.assignedTo && !f.done; }).forEach(function(f){
+    F.filter(function(f){ return f.assignedTo && !f.done && !dlIsClosed(f); }).forEach(function(f){
       if(filterMember && f.assignedTo !== filterMember) return;
       var c4=gc(f.contactId);
       items.push({type:'followup', icon:'F', label:f.label, sub:(c4?fn(c4):'Unknown')+' - Due: '+fd(f.date), assignedTo:f.assignedTo, id:f.id, obj:f});
