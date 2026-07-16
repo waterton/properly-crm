@@ -150,6 +150,33 @@ async function deleteDocument(doc){
   if(i >= 0) DOCS.splice(i, 1);
 }
 
+// Delete many documents at once: storage files sequentially (best-effort), then the DB rows
+// batched via "in.(...)" so we don't fire a request per document.
+async function bulkDeleteDocuments(docs, onProgress){
+  var out = {ok:0, fail:0};
+  if(!docs || !docs.length) return out;
+  for(var i=0; i<docs.length; i++){
+    if(docs[i].file_path){ try{ await deleteDocFile(docs[i].file_path); }catch(e){} }
+    if(onProgress) onProgress(i+1, docs.length);
+  }
+  if(supaReady){
+    var h = await getAuthHeaders();
+    var ids = docs.map(function(d){ return d.id; });
+    var CHUNK = 100;
+    for(var j=0; j<ids.length; j+=CHUNK){
+      var list = '(' + ids.slice(j, j+CHUNK).join(',') + ')';
+      try{
+        var res = await fetch(SUPA_URL+'/rest/v1/documents?id=in.'+list, {method:'DELETE', headers:h});
+        if(res.ok) out.ok++; else out.fail++;
+      }catch(e){ out.fail++; }
+    }
+  }
+  var gone = {};
+  docs.forEach(function(d){ gone[String(d.id)] = true; });
+  DOCS = DOCS.filter(function(d){ return !gone[String(d.id)]; });
+  return out;
+}
+
 async function saveDocument(file, meta){
   meta = meta || {};
   var fname = file.name || 'document';
@@ -207,6 +234,14 @@ async function openDocument(doc){
 }
 function docsForContact(cid){ return DOCS.filter(function(d){ return d.contact_id === cid; }); }
 function docsForTransaction(tid){ return DOCS.filter(function(d){ return d.transaction_id === tid; }); }
+// A document is "archived" once its deal closes. The file stays put in storage - this is a
+// view filter, so reopening the transaction brings its paperwork straight back.
+function docIsArchived(d){
+  if(d.transaction_id == null) return false;
+  var t = TX.find(function(x){ return String(x.id)===String(d.transaction_id); });
+  return !!(t && t.status === 'closed');
+}
+var selectedDocs = new Set();
 
 function openDocUpload(meta, onDone){
   var input = document.createElement('input');
@@ -6959,7 +6994,8 @@ ge('nav-drips').addEventListener('click',function(){sp('drips');});
 ge('nav-documents').addEventListener('click',function(){sp('documents');});
 if(ge('docSearch')) ge('docSearch').addEventListener('input', renderDocsPage);
 if(ge('docTypeFilter')) ge('docTypeFilter').addEventListener('change', renderDocsPage);
-if(ge('docClear')) ge('docClear').addEventListener('click', function(){ ge('docSearch').value=''; ge('docTypeFilter').value=''; renderDocsPage(); });
+if(ge('docClear')) ge('docClear').addEventListener('click', function(){ ge('docSearch').value=''; ge('docTypeFilter').value=''; if(ge('docShowArchived')) ge('docShowArchived').checked=false; selectedDocs.clear(); renderDocsPage(); });
+if(ge('docShowArchived')) ge('docShowArchived').addEventListener('change', function(){ selectedDocs.clear(); renderDocsPage(); });
 
 function renderDocsPage(){
   var listEl = ge('docsList');
@@ -6977,8 +7013,11 @@ function renderDocsPage(){
   }
   var q = ((ge('docSearch') && ge('docSearch').value) || '').trim().toLowerCase();
   var typeF = (ge('docTypeFilter') && ge('docTypeFilter').value) || '';
+  var showArch = !!(ge('docShowArchived') && ge('docShowArchived').checked);
   var rows = DOCS.slice().sort(function(a,b){ return (b.id||0) - (a.id||0); });
+  var archCount = rows.filter(docIsArchived).length;
   var filtered = rows.filter(function(d){
+    if(!showArch && docIsArchived(d)) return false;   // closed deals are archived out of view
     if(typeF && d.doc_type !== typeF) return false;
     if(!q) return true;
     var contact = d.contact_id ? gc(d.contact_id) : null;
@@ -6988,12 +7027,57 @@ function renderDocsPage(){
   });
   listEl.innerHTML = '';
   if(!filtered.length){
-    listEl.appendChild(mkDiv('font-size:18px;color:var(--text3);padding:20px;text-align:center;', DOCS.length ? 'No documents match your search.' : 'No documents stored yet.'));
+    var emptyMsg = DOCS.length ? 'No documents match your search.' : 'No documents stored yet.';
+    if(!showArch && archCount && !q && !typeF) emptyMsg = 'No active documents. ' + archCount + ' archived with closed deals - tick "Show closed deals" to see them.';
+    listEl.appendChild(mkDiv('font-size:18px;color:var(--text3);padding:20px;text-align:center;', emptyMsg));
     return;
   }
+
+  // ---- Bulk selection bar ----
+  Array.from(selectedDocs).forEach(function(id){   // forget selections that scrolled out of view
+    if(!filtered.some(function(d){ return String(d.id)===String(id); })) selectedDocs.delete(id);
+  });
+  var bar = document.createElement('div');
+  bar.style.cssText = 'display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);flex-wrap:wrap;';
+  var cnt = mkDiv('font-size:15px;color:var(--text2);flex:1;min-width:120px;', '');
+  var selAllB = mkBtn('btn btn-g','Select All','font-size:14px;padding:4px 10px;');
+  var clrSelB = mkBtn('btn btn-g','Clear','font-size:14px;padding:4px 10px;');
+  var delSelB = mkBtn('btn btn-d','Delete Selected','font-size:14px;padding:4px 10px;');
+  function refreshBulkUI(){
+    cnt.textContent = selectedDocs.size
+      ? selectedDocs.size + ' selected'
+      : filtered.length + ' document' + (filtered.length===1 ? '' : 's') + (!showArch && archCount ? ' (' + archCount + ' archived)' : '');
+    delSelB.disabled = !selectedDocs.size;
+    delSelB.style.opacity = selectedDocs.size ? '1' : '0.5';
+  }
+  selAllB.addEventListener('click', function(){ filtered.forEach(function(d){ selectedDocs.add(d.id); }); renderDocsPage(); });
+  clrSelB.addEventListener('click', function(){ selectedDocs.clear(); renderDocsPage(); });
+  delSelB.addEventListener('click', async function(){
+    var picked = filtered.filter(function(d){ return selectedDocs.has(d.id); });
+    if(!picked.length) return;
+    if(!confirm('Delete ' + picked.length + ' document(s)? The files will be permanently removed.')) return;
+    delSelB.disabled = true;
+    var res = await bulkDeleteDocuments(picked, function(done, total){ delSelB.textContent = 'Deleting ' + done + '/' + total + '...'; });
+    selectedDocs.clear();
+    renderDocsPage();
+    if(res.fail) alert('Delete finished, but ' + res.fail + ' request(s) failed. Some documents may remain.');
+  });
+  bar.appendChild(cnt); bar.appendChild(selAllB); bar.appendChild(clrSelB); bar.appendChild(delSelB);
+  listEl.appendChild(bar);
+  refreshBulkUI();
+
   filtered.forEach(function(d){
     var row = document.createElement('div');
     row.style.cssText = 'display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);flex-wrap:wrap;';
+    var cbx = document.createElement('input');
+    cbx.type = 'checkbox';
+    cbx.checked = selectedDocs.has(d.id);
+    cbx.style.cssText = 'accent-color:var(--accent);flex:0 0 auto;cursor:pointer;';
+    (function(doc){ cbx.addEventListener('change', function(){
+      if(cbx.checked) selectedDocs.add(doc.id); else selectedDocs.delete(doc.id);
+      refreshBulkUI();
+    }); })(d);
+    row.appendChild(cbx);
     var nameWrap = mkDiv('flex:1;min-width:180px;');
     var name = mkDiv('font-size:18px;color:var(--accent);cursor:pointer;text-decoration:underline;word-break:break-word;', d.file_name||'Document');
     (function(doc){ name.addEventListener('click', function(){ openDocument(doc); }); })(d);
