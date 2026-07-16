@@ -5970,6 +5970,8 @@ function switchGmailAccount(memberId){
 async function loadGmailInbox(searchTerm){
   if(!gmailState.activeMemberId) return;
   var filter = ge('gmailInboxFilter') ? ge('gmailInboxFilter').value : 'in:inbox';
+  // Default to whatever is in the search box, so refreshes and folder changes keep the search.
+  if(typeof searchTerm !== 'string' && ge('gmailSearch')) searchTerm = ge('gmailSearch').value;
   if(typeof searchTerm === 'string' && searchTerm.trim()){ filter = filter + ' ' + searchTerm.trim(); }
   if(!gmailState.silentRefresh) ge('gmailMsgList').innerHTML = '<div style="padding:20px;text-align:center;color:var(--text3);font-size:18px;">Loading...</div>';
   try{
@@ -7587,9 +7589,22 @@ ge('searchBox').addEventListener('input',function(){
 });
 ge('searchBox').addEventListener('keydown',function(e){
   if(e.key!=='Enter') return;
-  if(curPage==='gmail'){ loadGmailInbox(ge('searchBox').value); }
+  if(curPage==='gmail'){
+    // Mirror into the Gmail search box so the two never disagree about what's being searched.
+    if(ge('gmailSearch')) ge('gmailSearch').value = ge('searchBox').value;
+    loadGmailInbox(ge('searchBox').value);
+  }
   else if(curPage!=='contacts'){ sp('contacts'); }
   else { rc(); }
+});
+
+// ---- Gmail search bar ----
+if(ge('gmailSearchBtn')) ge('gmailSearchBtn').addEventListener('click', function(){ loadGmailInbox(); });
+if(ge('gmailSearch')) ge('gmailSearch').addEventListener('keydown', function(e){ if(e.key==='Enter') loadGmailInbox(); });
+if(ge('gmailSearchClear')) ge('gmailSearchClear').addEventListener('click', function(){
+  if(ge('gmailSearch')) ge('gmailSearch').value='';
+  if(ge('searchBox') && curPage==='gmail') ge('searchBox').value='';
+  loadGmailInbox('');
 });
 
 // Auth event listeners

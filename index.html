@@ -705,6 +705,11 @@
                   <option value="is:starred">Starred</option>
                 </select>
               </div>
+              <div style="display:flex;gap:6px;align-items:center;padding:6px 10px;border-bottom:1px solid var(--border);">
+                <input type="text" id="gmailSearch" class="fi" style="flex:1;font-size:15px;padding:4px 8px;min-width:0;" placeholder="Search mail - e.g. subject:offer, from:elda, after:2026/01/01" title="Supports Gmail search syntax: from: to: subject: has:attachment before: after:">
+                <button class="btn btn-g" id="gmailSearchBtn" style="font-size:14px;padding:4px 10px;flex-shrink:0;">Search</button>
+                <button class="btn btn-g" id="gmailSearchClear" style="font-size:14px;padding:4px 8px;flex-shrink:0;">&times;</button>
+              </div>
               <div class="gmail-msg-list" id="gmailMsgList">
                 <div style="padding:20px;text-align:center;color:var(--text3);font-size:16px;">Loading emails...</div>
               </div>
