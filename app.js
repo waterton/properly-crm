@@ -1401,6 +1401,43 @@ function vc(id){
     }
   }
   body.appendChild(txsec);
+  // Campaigns this contact is in. The Drips tab has a global list; this answers the question
+  // you actually ask - "is this person getting emails from us right now?"
+  var casec=mksec('Campaigns');
+  var cEnr=ENR.filter(function(e){ return String(e.contactId)===String(id); });
+  var actEnr=cEnr.filter(function(e){ return e.status==='active'; });
+  var pastEnr=cEnr.filter(function(e){ return e.status!=='active'; });
+  if(!cEnr.length) casec.appendChild(mkDiv('font-size:18px;color:var(--text3);padding:4px 0;','Not in any campaign.'));
+  else {
+    var enrRow=function(e, isActive){
+      var ecamp=CAMP.find(function(x){ return String(x.id)===String(e.campaignId); });
+      var etotal=(ecamp&&ecamp.steps)?ecamp.steps.length:0;
+      var er=document.createElement('div');
+      er.style.cssText='display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border);'+(isActive?'':'opacity:0.6;');
+      var einf=mkDiv('flex:1;');
+      einf.appendChild(mkDiv('font-size:18px;color:'+(isActive?'var(--accent)':'var(--text2)')+';', ecamp?ecamp.name:'(deleted campaign)'));
+      var esub = isActive
+        ? ('step '+(e.stepIndex+1)+' of '+etotal+'  -  next: '+(e.nextSendAt?fmtDripWhen(e.nextSendAt):'-'))
+        : (e.status+(e.stepIndex?(' after step '+e.stepIndex):''));
+      einf.appendChild(mkDiv('font-size:16px;color:var(--text3);margin-top:2px;', esub));
+      er.appendChild(einf);
+      if(isActive){
+        var esb=mkBtn('btn btn-g','Stop','font-size:15px;padding:4px 10px;color:var(--danger);');
+        (function(eid,cid2){ esb.addEventListener('click',function(){
+          if(!confirm('Stop this campaign for this contact? No further emails will be sent.')) return;
+          stopEnrollment(eid); vc(cid2);
+        }); })(e.id,id);
+        er.appendChild(esb);
+      }
+      return er;
+    };
+    actEnr.forEach(function(e){ casec.appendChild(enrRow(e,true)); });
+    if(pastEnr.length){
+      casec.appendChild(mkDiv('font-size:14px;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin:10px 0 2px;','Past ('+pastEnr.length+')'));
+      pastEnr.forEach(function(e){ casec.appendChild(enrRow(e,false)); });
+    }
+  }
+  body.appendChild(casec);
   var docsec=mksec('Documents');
   var docab=mkBtn('','+ Upload','background:none;border:none;color:var(--accent);cursor:pointer;font-size:18px;margin-left:8px;');
   (function(cid){docab.addEventListener('click',function(){ openDocUpload({contact_id:cid}, function(){ vc(cid); }); });})(id);
