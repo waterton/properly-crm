@@ -3098,9 +3098,10 @@ function saveTransaction(){
   });
 
   saveTX(tx); if(tx.contactId) logActivity(tx.contactId,'Updated transaction');
-  // A transaction means a signed contract, so put the client on the Pipeline board.
-  // Mirrors the scanner path. Only ever moves forward - never pulls a Closed deal back.
-  if(tx.contactId && tx.status !== 'closed'){
+  // A contract date is the signal that they're actually under contract - that's what puts
+  // them on the Pipeline board. No contract date yet (e.g. prepping a listing) = no move.
+  // Only ever moves forward: never pulls a Closed deal back.
+  if(tx.contactId && tx.contractDate && tx.status !== 'closed'){
     var _sc = gc(tx.contactId);
     if(_sc && _sc.stage !== 'Under Contract' && _sc.stage !== 'Closed') ss(tx.contactId, 'Under Contract');
   }
@@ -4558,7 +4559,7 @@ async function commitScanImport(r, btn){
   //      Skip if already Under Contract or Closed: avoids duplicate activity log / drip re-enroll
   //      and never revives a closed deal. ss() mirrors the manual pipeline-stage change exactly.
   var _ucC = gc(contactId);
-  if(_ucC && _ucC.stage !== 'Under Contract' && _ucC.stage !== 'Closed'){
+  if(tx.contractDate && _ucC && _ucC.stage !== 'Under Contract' && _ucC.stage !== 'Closed'){
     ss(contactId, 'Under Contract');
   }
 
@@ -7509,6 +7510,9 @@ function onAuthSuccess(user){
     subscribeRealtime();
     updateNbTC();
     restoreTabFromHash();
+    // Know which Gmail accounts are connected from the start, not just after visiting
+    // the Gmail tab - enrolling and sending need this everywhere.
+    try{ checkConnectedAccounts(); }catch(e){}
   });
 }
 
@@ -8328,7 +8332,12 @@ function deleteCampaign(id){
 }
 
 // ===================== ENROLL MODAL =====================
-function openEnrollModal(presetCampaignId, presetContactId){
+async function openEnrollModal(presetCampaignId, presetContactId){
+  // Connected Gmail accounts are only loaded by initGmail(), which only runs when you visit
+  // the Gmail tab. Without this, enrolling from anywhere else says "No Gmail connected".
+  if(typeof gmailState !== 'undefined' && !Object.keys(gmailState.connectedAccounts || {}).length){
+    try{ await checkConnectedAccounts(); }catch(e){}
+  }
   var cs = ge('enrollCampaign'); cs.textContent='';
   CAMP.filter(function(x){ return x.active!==false && x.active!=='false'; }).forEach(function(camp){
     var o=document.createElement('option'); o.value=camp.id; o.textContent=camp.name; cs.appendChild(o);
