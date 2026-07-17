@@ -7199,6 +7199,37 @@ if(ge('docShowArchived')) ge('docShowArchived').addEventListener('change', funct
 if(ge('btnReminderSettings')) ge('btnReminderSettings').addEventListener('click', openReminderSettings);
 if(ge('btnSaveRS')) ge('btnSaveRS').addEventListener('click', saveReminderSettings);
 
+// Trigger the daily reminder job on demand. Sends your Supabase session token, which the
+// endpoint accepts as an alternative to CRON_SECRET - so the secret stays server-side.
+async function runRemindersNow(){
+  var btn = ge('btnRunReminders');
+  var old = btn ? btn.textContent : '';
+  if(btn){ btn.disabled = true; btn.textContent = 'Running...'; }
+  try{
+    var h = await getAuthHeaders();
+    var resp = await fetch('/api/run-drips', { headers: h });
+    var txt = await resp.text();
+    var data;
+    try{ data = JSON.parse(txt); }
+    catch(e){ alert('Unexpected response (' + resp.status + '):\n' + txt.substring(0,300)); return; }
+    if(data.error){ alert('Error: ' + data.error); return; }
+    var r = (data.result && data.result.reminders) || {};
+    var d2 = (data.result && data.result.drips) || {};
+    var msg = 'REMINDERS\n'
+      + '  deadlines checked: ' + (r.checked||0) + '\n'
+      + '  emails sent: ' + (r.sent||0) + '\n'
+      + '  skipped (already sent, or closed deal): ' + (r.skipped||0) + '\n'
+      + '  failed: ' + (r.failed||0) + '\n\n'
+      + 'DRIP STEPS SENT: ' + (d2.sent||0);
+    var errs = (r.errors||[]).concat(d2.errors||[]);
+    if(errs.length) msg += '\n\nErrors:\n- ' + errs.slice(0,6).join('\n- ');
+    if(!(r.checked||0) && !(r.sent||0)) msg += '\n\nNothing checked means no deadlines fall on your reminder days right now.';
+    alert(msg);
+  }catch(e){ alert('Could not run: ' + e.message); }
+  finally{ if(btn){ btn.disabled = false; btn.textContent = old || 'Send Reminders Now'; } }
+}
+if(ge('btnRunReminders')) ge('btnRunReminders').addEventListener('click', runRemindersNow);
+
 function renderDocsPage(){
   var listEl = ge('docsList');
   if(!listEl) return;

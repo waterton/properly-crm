@@ -413,16 +413,31 @@ async function buildBriefing() {
     + '</div></body></html>';
 }
 
-function authorized(req) {
+async function authorized(req) {
   const secret = process.env.CRON_SECRET;
-  if (!secret) return true;
   const hdr = req.headers['x-cron-secret'];
   const auth = req.headers['authorization'] || '';
-  return hdr === secret || auth === ('Bearer ' + secret);
+
+  // 1. Vercel's scheduled cron (or anything holding the secret).
+  if (secret && (hdr === secret || auth === ('Bearer ' + secret))) return true;
+  if (!secret) return true;   // no secret configured: unchanged behaviour
+
+  // 2. A signed-in CRM user. Lets the in-app "Send Reminders Now" button trigger a run
+  //    without CRON_SECRET ever reaching the browser. The anon key is NOT a user.
+  const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
+  if (!token || token === SUPA_KEY) return false;
+  try {
+    const r = await fetch(SUPA_URL + '/auth/v1/user', {
+      headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + token }
+    });
+    if (!r.ok) return false;
+    const u = await r.json();
+    return !!(u && u.id);
+  } catch (e) { return false; }
 }
 
 export default async function handler(req, res) {
-  if (!authorized(req)) return res.status(401).json({ error: 'Unauthorized' });
+  if (!(await authorized(req))) return res.status(401).json({ error: 'Unauthorized' });
   if (!CLIENT_ID || !CLIENT_SECRET) {
     return res.status(500).json({ error: 'GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET not set' });
   }
