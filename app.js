@@ -1299,6 +1299,7 @@ function vc(id){
   
   var fb=mkBtn('btn btn-g','+ FU','font-size:18px;padding:5px 11px;');(function(cid){fb.addEventListener('click',function(){ofc(cid);});})(id);acts.appendChild(fb);
   var db=mkBtn('btn btn-g','+ DL','font-size:18px;padding:5px 11px;');(function(cid){db.addEventListener('click',function(){odc(cid);});})(id);acts.appendChild(db);
+  var camb=mkBtn('btn btn-g','+ Campaign','font-size:18px;padding:5px 11px;');(function(cid){camb.addEventListener('click',function(){ if(!CAMP.length){ alert('No campaigns yet. Create one in the Drip Campaigns tab first.'); return; } openEnrollModal(null, cid); });})(id);acts.appendChild(camb);
   var delb=mkBtn('btn btn-d','Delete','font-size:18px;padding:5px 11px;margin-left:auto;');(function(cid){delb.addEventListener('click',function(){delc(cid);});})(id);acts.appendChild(delb);
   var body=ge('detBody');body.innerHTML='';
   var isec=mksec('Contact Info');
@@ -3097,6 +3098,12 @@ function saveTransaction(){
   });
 
   saveTX(tx); if(tx.contactId) logActivity(tx.contactId,'Updated transaction');
+  // A transaction means a signed contract, so put the client on the Pipeline board.
+  // Mirrors the scanner path. Only ever moves forward - never pulls a Closed deal back.
+  if(tx.contactId && tx.status !== 'closed'){
+    var _sc = gc(tx.contactId);
+    if(_sc && _sc.stage !== 'Under Contract' && _sc.stage !== 'Closed') ss(tx.contactId, 'Under Contract');
+  }
   cm('tcModal');
   renderTC();
   updateNbTC();
@@ -8321,7 +8328,7 @@ function deleteCampaign(id){
 }
 
 // ===================== ENROLL MODAL =====================
-function openEnrollModal(presetCampaignId){
+function openEnrollModal(presetCampaignId, presetContactId){
   var cs = ge('enrollCampaign'); cs.textContent='';
   CAMP.filter(function(x){ return x.active!==false && x.active!=='false'; }).forEach(function(camp){
     var o=document.createElement('option'); o.value=camp.id; o.textContent=camp.name; cs.appendChild(o);
@@ -8329,7 +8336,8 @@ function openEnrollModal(presetCampaignId){
   if(presetCampaignId) cs.value = presetCampaignId;
 
   var enCP = ge('enrollContactPick'); enCP.innerHTML='';
-  buildContactPicker(enCP, 'enrollContact', 'Search contact by name, email, phone...');
+  var enPick = buildContactPicker(enCP, 'enrollContact', 'Search contact by name, email, phone...');
+  if(presetContactId){ var _pc = gc(presetContactId); if(_pc) enPick.setContact(_pc); }
 
   var fs = ge('enrollFrom'); fs.textContent='';
   var accts = (typeof gmailState!=='undefined' && gmailState.connectedAccounts) ? gmailState.connectedAccounts : {};
