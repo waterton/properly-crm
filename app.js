@@ -7202,6 +7202,13 @@ if(ge('btnSaveRS')) ge('btnSaveRS').addEventListener('click', saveReminderSettin
 // Trigger the daily reminder job on demand. Sends your Supabase session token, which the
 // endpoint accepts as an alternative to CRON_SECRET - so the secret stays server-side.
 async function runRemindersNow(){
+  if(!confirm(
+    'Send any reminders that are due right now?\n\n'
+    + 'This runs the same job as the 7am automatic one - it emails clients whose deadlines '
+    + 'fall on your reminder days, and Ccs the team.\n\n'
+    + 'Reminders already sent will NOT be sent again, and closed deals are skipped. '
+    + 'The only difference from waiting is that today\'s reminders go out now instead of at 7am.'
+  )) return;
   var btn = ge('btnRunReminders');
   var old = btn ? btn.textContent : '';
   if(btn){ btn.disabled = true; btn.textContent = 'Running...'; }
