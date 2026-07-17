@@ -70,15 +70,22 @@ async function getAccessToken(memberId) {
   return { accessToken: accessToken, email: rec.email, memberId: memberId };
 }
 
-async function gmailSend(accessToken, to, subject, htmlBody) {
-  const lines = [
-    'To: ' + to,
-    'Subject: ' + subject,
+// Subject headers must be RFC 2047 encoded or non-ASCII (Spanish accents) arrives mangled.
+function encodeSubject(s) {
+  s = String(s || '');
+  return /^[\x00-\x7F]*$/.test(s) ? s : '=?UTF-8?B?' + Buffer.from(s, 'utf8').toString('base64') + '?=';
+}
+
+async function gmailSend(accessToken, to, subject, htmlBody, cc) {
+  const lines = ['To: ' + to];
+  if (cc) lines.push('Cc: ' + cc);
+  lines.push(
+    'Subject: ' + encodeSubject(subject),
     'Content-Type: text/html; charset=utf-8',
     'MIME-Version: 1.0',
     '',
     htmlBody || ''
-  ];
+  );
   const raw = Buffer.from(lines.join('\r\n')).toString('base64')
     .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   const resp = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
@@ -121,6 +128,178 @@ function daysUntil(dateStr) {
 function cName(c) {
   if (!c) return 'Unknown';
   return ((c.first || '') + ' ' + (c.last || '')).trim() || c.email || 'Unknown';
+}
+
+// ===================== TRANSACTION REMINDERS =====================
+// Transactional, not marketing: no unsubscribe footer. One email per deadline,
+// To: the client, Cc: the team - so you see the exact message the client got.
+
+const DEADLINE_LABEL = {
+  'Earnest Money Due':         { en: 'Earnest Money Due',         es: 'Depósito de garantía' },
+  'Due Diligence Deadline':    { en: 'Due Diligence Deadline',    es: 'Fecha límite de diligencia debida' },
+  'Financing Deadline':        { en: 'Financing Deadline',        es: 'Fecha límite de financiamiento' },
+  'Appraisal Deadline':        { en: 'Appraisal Deadline',        es: 'Fecha límite de avalúo' },
+  'Closing Date':              { en: 'Closing Date',              es: 'Fecha de cierre' },
+  'Closing / Settlement Date': { en: 'Closing / Settlement Date', es: 'Fecha de cierre' },
+  'Inspection Period Ends':    { en: 'Inspection Period Ends',    es: 'Fin del período de inspección' },
+  'Financing Contingency':     { en: 'Financing Contingency',     es: 'Contingencia de financiamiento' },
+  'Offer Expiration':          { en: 'Offer Expiration',          es: 'Vencimiento de la oferta' },
+  'Final Walkthrough':         { en: 'Final Walkthrough',         es: 'Inspección final' },
+  'Pre-Approval Expires':      { en: 'Pre-Approval Expires',      es: 'Vencimiento de la precalificación' }
+};
+
+function dlLabel(type, lang) {
+  const m = DEADLINE_LABEL[type];
+  if (m) return m[lang] || m.en;
+  return type || (lang === 'es' ? 'Fecha límite' : 'Deadline');
+}
+
+function fmtDateLang(iso, lang) {
+  if (!iso) return '-';
+  const d = new Date(iso + 'T12:00:00');
+  return d.toLocaleDateString(lang === 'es' ? 'es-US' : 'en-US',
+    { weekday: 'long', month: 'long', day: 'numeric' });
+}
+
+function whenPhrase(n, lang) {
+  if (lang === 'es') return n === 0 ? 'hoy' : n === 1 ? 'mañana' : 'en ' + n + ' días';
+  return n === 0 ? 'today' : n === 1 ? 'tomorrow' : 'in ' + n + ' days';
+}
+
+function buildReminder(c, dl, tx, n) {
+  const lang = (c && c.lang === 'es') ? 'es' : 'en';
+  const label = dlLabel(dl.type, lang);
+  const addr = (tx && tx.address) ? tx.address : ((c && c.property) || '');
+  const when = whenPhrase(n, lang);
+  const dateStr = fmtDateLang(dl.date, lang);
+  const first = (c && c.first) || (lang === 'es' ? 'cliente' : 'there');
+  if (lang === 'es') {
+    return {
+      lang: lang,
+      subject: 'Recordatorio: ' + label + (addr ? ' - ' + addr : '') + ' (' + when + ')',
+      body: '<p>Hola ' + first + ',</p>' +
+            '<p>Un recordatorio de que <b>' + label + '</b>' + (addr ? ' para <b>' + addr + '</b>' : '') +
+            ' es <b>' + when + '</b> (' + dateStr + ').</p>' +
+            '<p>Si tiene alguna pregunta o necesita algo, simplemente responda a este correo.</p>' +
+            '<p>' + AGENT_NAME + '<br>Palacios Baker Real Estate</p>'
+    };
+  }
+  return {
+    lang: lang,
+    subject: 'Reminder: ' + label + (addr ? ' - ' + addr : '') + ' (' + when + ')',
+    body: '<p>Hi ' + first + ',</p>' +
+          '<p>A quick reminder that the <b>' + label + '</b>' + (addr ? ' for <b>' + addr + '</b>' : '') +
+          ' is <b>' + when + '</b> (' + dateStr + ').</p>' +
+          '<p>If you have any questions or need anything, just reply to this email.</p>' +
+          '<p>' + AGENT_NAME + '<br>Palacios Baker Real Estate</p>'
+  };
+}
+
+function contactEmails(c) {
+  const out = [];
+  if (!c) return out;
+  if (c.email) out.push(c.email);
+  let extra = c.emails;
+  if (typeof extra === 'string') { try { extra = JSON.parse(extra); } catch (e) { extra = []; } }
+  if (Array.isArray(extra)) {
+    extra.forEach(e => {
+      const v = (e && e.value) ? e.value : e;
+      if (v && typeof v === 'string' && out.indexOf(v) === -1) out.push(v);
+    });
+  }
+  return out.filter(Boolean);
+}
+
+async function processReminders(result) {
+  const settings = await supaGet('reminder_settings?limit=100');
+  if (!Array.isArray(settings)) {
+    result.reminders.errors.push('Could not read reminder_settings (check SUPA_SERVICE_KEY)');
+    return;
+  }
+  const def = settings.find(s => !s.deadlineType) || { daysBefore: [3, 1], enabled: true };
+  const byType = {};
+  settings.forEach(s => { if (s.deadlineType) byType[s.deadlineType] = s; });
+
+  let maxDays = 0;
+  [def].concat(Object.keys(byType).map(k => byType[k])).forEach(s => {
+    (s.daysBefore || []).forEach(d => { if (d > maxDays) maxDays = d; });
+  });
+
+  const today = todayMtn();
+  const until = new Date(new Date(today + 'T00:00:00').getTime() + maxDays * DAY_MS)
+    .toLocaleDateString('en-CA', { timeZone: 'America/Denver' });
+
+  const dls = await supaGet('deadlines?date=gte.' + today + '&date=lte.' + until + '&limit=500');
+  if (!Array.isArray(dls) || !dls.length) return;
+
+  const tokens = await supaGet('gmail_tokens?select=member_id,email&limit=50');
+  const teamEmails = (Array.isArray(tokens) ? tokens : []).map(t => t.email).filter(Boolean);
+  const defaultSender = (Array.isArray(tokens) && tokens[0]) ? tokens[0].member_id : null;
+  const tokenCache = {};
+
+  for (let i = 0; i < dls.length; i++) {
+    const dl = dls[i];
+    result.reminders.checked++;
+    const n = daysUntil(dl.date);
+    if (n === null || n < 0) continue;
+
+    const set = byType[dl.type] || def;
+    if (set.enabled === false) continue;
+    if ((set.daysBefore || []).indexOf(n) === -1) continue;
+
+    // Closed deals don't need reminding.
+    let tx = null;
+    if (dl.transactionId != null) {
+      const txs = await supaGet('transactions?id=eq.' + encodeURIComponent(dl.transactionId) + '&limit=1');
+      tx = (Array.isArray(txs) && txs[0]) ? txs[0] : null;
+      if (tx && tx.status === 'closed') { result.reminders.skipped++; continue; }
+    }
+
+    const cs = dl.contactId != null
+      ? await supaGet('contacts?id=eq.' + encodeURIComponent(dl.contactId) + '&limit=1')
+      : [];
+    const c = (Array.isArray(cs) && cs[0]) ? cs[0] : null;
+
+    const clientEmails = contactEmails(c);
+    // No client address? Still tell the team, so someone knows to call.
+    const to = clientEmails.length ? clientEmails.join(', ') : teamEmails.join(', ');
+    const cc = clientEmails.length ? teamEmails.join(', ') : '';
+    if (!to) { result.reminders.skipped++; continue; }
+
+    const senderId = dl.assignedTo || (tx && tx.assignedTo) || defaultSender;
+    if (!senderId) { result.reminders.errors.push('No sending account for deadline ' + dl.id); continue; }
+    if (!tokenCache[senderId]) tokenCache[senderId] = await getAccessToken(senderId);
+    const tok = tokenCache[senderId];
+    if (tok.error) { result.reminders.errors.push(tok.error); continue; }
+
+    const msg = buildReminder(c, dl, tx, n);
+    const logRow = {
+      id: Date.now() + Math.floor(Math.random() * 100000) + i,
+      deadlineId: dl.id,
+      transactionId: dl.transactionId || null,
+      contactId: dl.contactId || null,
+      deadlineType: dl.type || '',
+      deadlineDate: dl.date,
+      daysBefore: n,
+      sentTo: to + (cc ? ' | cc: ' + cc : ''),
+      status: 'pending',
+      error: '',
+      sentAt: new Date().toISOString()
+    };
+
+    // Claim the reminder BEFORE sending. The unique index on (deadlineId, daysBefore)
+    // makes a duplicate send impossible even if the cron overlaps or is re-triggered.
+    const claim = await supaUpsert('reminder_log', [logRow]);
+    if (!claim.ok) { result.reminders.skipped++; continue; }
+
+    const sent = await gmailSend(tok.accessToken, to, msg.subject, msg.body, cc);
+    logRow.status = sent.error ? 'failed' : 'sent';
+    logRow.error = sent.error || '';
+    await supaUpsert('reminder_log', [logRow]);
+
+    if (sent.error) { result.reminders.failed++; result.reminders.errors.push(sent.error); }
+    else { result.reminders.sent++; }
+  }
 }
 
 async function buildBriefing() {
@@ -250,7 +429,8 @@ export default async function handler(req, res) {
 
   const nowIso = new Date().toISOString();
   const result = {
-    drips: { checked: 0, sent: 0, failed: 0, completed: 0, skipped: 0, errors: [] }
+    drips: { checked: 0, sent: 0, failed: 0, completed: 0, skipped: 0, errors: [] },
+    reminders: { checked: 0, sent: 0, failed: 0, skipped: 0, errors: [] }
   };
 
   // 1. Process drip enrollments
@@ -357,7 +537,12 @@ export default async function handler(req, res) {
     result.drips.errors.push('Drip error: ' + err.message);
   }
 
-
+  // 2. Transaction deadline reminders (transactional - separate from drips)
+  try {
+    await processReminders(result);
+  } catch (err) {
+    result.reminders.errors.push('Reminder error: ' + err.message);
+  }
 
   return res.status(200).json({ ok: true, result });
 }

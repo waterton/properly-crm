@@ -54,6 +54,7 @@ async function getAuthHeaders(extra) {
 var C=[],N=[],F=[],D=[],TX=[],TM=[],A=[],curDet=null,curFilter='all',curPage='dashboard';
 var CAMP=[],ENR=[],SENDLOG=[],DOCS=[];
 var CH=[]; // tx_changes: audit trail of field changes applied from scanned documents
+var RS=[]; // reminder_settings: how many days before each deadline type to remind (cron reads these)
 var curSort='last'; // 'last' or 'first'
 var selectedContacts = new Set();
 // TM = Team Members: [{id, first, last, role, email, phone, color, calLink}]
@@ -78,7 +79,7 @@ function sv(){
 // Supabase sync functions
 // Known columns per table — strips unknown fields before sending to Supabase
 var DB_COLS = {
-  contacts: ['id','first','last','type','phone','email','property','stage','price','notes','added','closeDate','assignedTo','emails','phones','addresses','whatsapp','closedAt'],
+  contacts: ['id','first','last','type','phone','email','property','stage','price','notes','added','closeDate','assignedTo','emails','phones','addresses','whatsapp','closedAt','lang'],
   notes: ['id','contactId','transactionId','text','date'],
   followups: ['id','contactId','transactionId','label','date','pri','done','assignedTo'],
   deadlines: ['id','contactId','transactionId','type','date','assignedTo'],
@@ -88,7 +89,8 @@ var DB_COLS = {
   send_log: null,
   gmail_tokens: null,
   documents: ['id','contact_id','transaction_id','file_path','file_name','doc_type','summary','mime_type','size','created_at'],
-  tx_changes: ['id','transactionId','contactId','field','oldValue','newValue','docType','addendumNo','effectiveDate','documentId','appliedAt']
+  tx_changes: ['id','transactionId','contactId','field','oldValue','newValue','docType','addendumNo','effectiveDate','documentId','appliedAt'],
+  reminder_settings: ['id','deadlineType','daysBefore','enabled','updatedAt']
 };
 function stripForDB(table, row){
   var cols = DB_COLS[table];
@@ -344,7 +346,8 @@ async function loadFromDB(){
       fetchAllRows(base, 'enrollments?order=created_at.asc,id.asc', headers).catch(function(){return [];}),
       fetchAllRows(base, 'send_log?order=created_at.asc,id.asc', headers).catch(function(){return []; }),
       fetchAllRows(base, 'documents?order=created_at.asc,id.asc', headers).catch(function(){return []; }),
-      fetchAllRows(base, 'tx_changes?order=id.asc', headers).catch(function(){return []; })
+      fetchAllRows(base, 'tx_changes?order=id.asc', headers).catch(function(){return []; }),
+      fetchAllRows(base, 'reminder_settings?order=id.asc', headers).catch(function(){return []; })
     ]);
     var rc = results[0], rn = results[1], rf = results[2], rd = results[3], rtx = results[4];
 
@@ -367,6 +370,8 @@ async function loadFromDB(){
     if(Array.isArray(rdoc)) DOCS = rdoc;
     var rch = results[9];
     if(Array.isArray(rch)) CH = rch;
+    var rrs = results[10];
+    if(Array.isArray(rrs)) RS = rrs;
     DOCS.forEach(function(d){
       d.id = typeof d.id === 'string' ? parseInt(d.id)||d.id : d.id;
       if(d.contact_id != null) d.contact_id = typeof d.contact_id === 'string' ? parseInt(d.contact_id) : d.contact_id;
@@ -406,6 +411,7 @@ function logActivity(contactId,type){A.unshift({contactId:contactId,type:type,da
 function saveFU(f){ sv(); if(supaReady) dbSave('followups', [f]); }
 function saveDL(d){ sv(); if(supaReady) dbSave('deadlines', [d]); }
 function saveCH(x){ sv(); if(supaReady) dbSave('tx_changes', [x]); }
+function saveRS(x){ if(supaReady) dbSave('reminder_settings', [x]); }
 function deleteCfromDB(id){
   if(!supaReady) return;
   getAuthHeaders().then(function(h){
@@ -542,6 +548,15 @@ function demo(){
 }
 function ini(c){return (c.first[0]+c.last[0]).toUpperCase();}
 function fn(c){return c.first+' '+c.last;}
+// Single source of truth for a contact's language. Set once on the contact; every reminder,
+// check-in and campaign email reads it from here. Defaults to English.
+function clang(c){ return (c && c.lang === 'es') ? 'es' : 'en'; }
+// Pick the right language variant: t({en:'Hi', es:'Hola'}, contact)
+function t(variants, c){
+  var L = clang(c);
+  if(!variants) return '';
+  return (variants[L] != null && variants[L] !== '') ? variants[L] : (variants.en || '');
+}
 function ctypes(c){
   // Always returns an array of types. Handles new array, legacy single string,
   // and pipe-joined string stored in the 'type' column for Supabase persistence.
@@ -1312,6 +1327,20 @@ function vc(id){
     tr.appendChild(b);
   });
   tsec.appendChild(tr);body.appendChild(tsec);
+  // Language preference: set once here, every reminder / campaign email reads it.
+  var lsec=mksec('Language');
+  var lr=mkRow('stage-row');
+  [['en','English'],['es','Español']].forEach(function(pair){
+    var lv=pair[0], llbl=pair[1];
+    var lb=mkBtn('sp'+((clang(c)===lv)?' active':''),llbl,'');
+    (function(cid,val){ lb.addEventListener('click',function(){
+      var ct=gc(cid); if(!ct) return;
+      ct.lang=val; updateContact(ct); logActivity(cid,'Language set to '+(val==='es'?'Español':'English'));
+      vc(cid);
+    }); })(id,lv);
+    lr.appendChild(lb);
+  });
+  lsec.appendChild(lr);body.appendChild(lsec);
 
   var ssec=mksec('Stage');var sr=mkRow('stage-row');
   stgs.forEach(function(s){
@@ -1559,6 +1588,96 @@ function openEditNote(note){
 // Resolve the transaction a deadline belongs to. When a deadline is only tied to a contact,
 // prefer an OPEN deal - otherwise a contact-level deadline could attach to a closed deal
 // (and get hidden) while their active deal is the one that actually needs it.
+// ---- Reminder settings ----
+// The cron reads reminder_settings from Supabase, so these must round-trip through the DB,
+// not localStorage. A row with deadlineType = null is the default for every type.
+var RS_TYPES = ['Earnest Money Due','Due Diligence Deadline','Financing Deadline','Appraisal Deadline',
+                'Closing Date','Closing / Settlement Date','Inspection Period Ends','Financing Contingency',
+                'Offer Expiration','Final Walkthrough'];
+function rsDefault(){ return RS.find(function(r){ return !r.deadlineType; }) || null; }
+function rsForType(t){ return RS.find(function(r){ return r.deadlineType === t; }) || null; }
+// "3, 1" -> [3,1]. Ignores junk, drops negatives/dupes, sorts furthest-out first.
+function rsParseDays(str){
+  var out = [];
+  String(str||'').split(',').forEach(function(p){
+    var n = parseInt(String(p).trim(), 10);
+    if(!isNaN(n) && n >= 0 && out.indexOf(n) === -1) out.push(n);
+  });
+  out.sort(function(a,b){ return b-a; });
+  return out;
+}
+function rsFmtDays(arr){ return (arr||[]).join(', '); }
+
+function openReminderSettings(){
+  var def = rsDefault();
+  ge('rsDefaultDays').value = def ? rsFmtDays(def.daysBefore) : '3, 1';
+  ge('rsDefaultEnabled').checked = def ? (def.enabled !== false) : true;
+
+  // Offer the standard types plus anything actually in use, so nothing is unreachable.
+  var types = RS_TYPES.slice();
+  D.forEach(function(d){ if(d.type && types.indexOf(d.type) === -1) types.push(d.type); });
+  RS.forEach(function(r){ if(r.deadlineType && types.indexOf(r.deadlineType) === -1) types.push(r.deadlineType); });
+
+  var wrap = ge('rsTypeList');
+  wrap.innerHTML = '';
+  types.forEach(function(t){
+    var row = rsForType(t);
+    var line = document.createElement('div');
+    line.style.cssText = 'display:flex;gap:8px;align-items:center;margin-bottom:6px;';
+    var lbl = mkDiv('flex:1;font-size:15px;color:var(--text2);min-width:120px;', t);
+    var inp = document.createElement('input');
+    inp.className = 'fi'; inp.style.cssText = 'width:110px;font-size:15px;padding:4px 8px;';
+    inp.setAttribute('data-rs-type', t);
+    inp.placeholder = 'default';
+    inp.value = row ? rsFmtDays(row.daysBefore) : '';
+    var onWrap = document.createElement('label');
+    onWrap.style.cssText = 'display:flex;align-items:center;gap:5px;font-size:14px;color:var(--text3);cursor:pointer;';
+    var onCb = document.createElement('input');
+    onCb.type = 'checkbox'; onCb.style.accentColor = 'var(--accent)';
+    onCb.setAttribute('data-rs-on', t);
+    onCb.checked = row ? (row.enabled !== false) : true;
+    onWrap.appendChild(onCb); onWrap.appendChild(document.createTextNode('On'));
+    line.appendChild(lbl); line.appendChild(inp); line.appendChild(onWrap);
+    wrap.appendChild(line);
+  });
+  om('rsModal');
+}
+
+function saveReminderSettings(){
+  var days = rsParseDays(ge('rsDefaultDays').value);
+  if(!days.length){ alert('Enter at least one number for the default, e.g. 3, 1'); return; }
+  var def = rsDefault();
+  if(!def){ def = { id: 1, deadlineType: null }; RS.push(def); }
+  def.daysBefore = days;
+  def.enabled = ge('rsDefaultEnabled').checked;
+  def.updatedAt = new Date().toISOString();
+  saveRS(def);
+
+  var inputs = document.querySelectorAll('[data-rs-type]');
+  Array.prototype.forEach.call(inputs, function(inp){
+    var t = inp.getAttribute('data-rs-type');
+    var onCb = document.querySelector('[data-rs-on="' + t.replace(/"/g,'\\"') + '"]');
+    var isOn = onCb ? onCb.checked : true;
+    var d2 = rsParseDays(inp.value);
+    var row = rsForType(t);
+    // Blank + On = "just use the default", so drop any override we had.
+    if(!d2.length && isOn){
+      if(row){ row.enabled = true; row.daysBefore = null; row.updatedAt = new Date().toISOString(); saveRS(row); }
+      return;
+    }
+    if(!row){
+      row = { id: Date.now() + Math.floor(Math.random()*100000), deadlineType: t };
+      RS.push(row);
+    }
+    row.daysBefore = d2.length ? d2 : days;
+    row.enabled = isOn;
+    row.updatedAt = new Date().toISOString();
+    saveRS(row);
+  });
+  cm('rsModal');
+  alert('Reminder settings saved. The daily cron picks these up on its next run.');
+}
+
 function dlTxFor(d){
   var tx=null;
   if(d.transactionId!=null) tx=TX.find(function(t){ return String(t.id)===String(d.transactionId); });
@@ -7030,6 +7149,10 @@ if(ge('docSearch')) ge('docSearch').addEventListener('input', renderDocsPage);
 if(ge('docTypeFilter')) ge('docTypeFilter').addEventListener('change', renderDocsPage);
 if(ge('docClear')) ge('docClear').addEventListener('click', function(){ ge('docSearch').value=''; ge('docTypeFilter').value=''; if(ge('docShowArchived')) ge('docShowArchived').checked=false; selectedDocs.clear(); renderDocsPage(); });
 if(ge('docShowArchived')) ge('docShowArchived').addEventListener('change', function(){ selectedDocs.clear(); renderDocsPage(); });
+
+// ---- Reminder settings ----
+if(ge('btnReminderSettings')) ge('btnReminderSettings').addEventListener('click', openReminderSettings);
+if(ge('btnSaveRS')) ge('btnSaveRS').addEventListener('click', saveReminderSettings);
 
 function renderDocsPage(){
   var listEl = ge('docsList');

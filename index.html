@@ -235,7 +235,10 @@
         <div class="card">
           <div class="card-hdr">
             <div class="card-title">Transaction Deadlines</div>
-            <button class="btn btn-p" id="btnAddDL">+ Add Deadline</button>
+            <div style="display:flex;gap:8px;">
+              <button class="btn btn-g" id="btnReminderSettings">Reminder Settings</button>
+              <button class="btn btn-p" id="btnAddDL">+ Add Deadline</button>
+            </div>
           </div>
           <!-- Filter bar -->
           <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;">
@@ -961,6 +964,32 @@
     <div class="mftr"><button class="btn btn-g" data-close="fuModal">Cancel</button><button class="btn btn-p" id="btnSaveFU">Save</button></div>
   </div>
 </div>
+<div class="modal-ov" id="rsModal">
+  <div class="modal">
+    <div class="mhdr"><div class="mtitle">Reminder Settings</div><button class="mx" data-close="rsModal">&#x2715;</button></div>
+    <div class="mbody">
+      <div style="font-size:15px;color:var(--text2);line-height:1.5;margin-bottom:12px;">
+        Reminders go out automatically each morning - <b>To</b> the client, <b>Cc</b> the team - in the contact's language.
+        Enter how many days before a deadline to send, separated by commas (e.g. <b>3, 1</b> = three days before, then the day before).
+        Use <b>0</b> for the day of.
+      </div>
+      <div class="fg">
+        <label class="fl">Default - applies to every deadline type</label>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input class="fi" id="rsDefaultDays" placeholder="3, 1" style="flex:1;">
+          <label style="display:flex;align-items:center;gap:6px;font-size:15px;color:var(--text2);white-space:nowrap;cursor:pointer;">
+            <input type="checkbox" id="rsDefaultEnabled" style="accent-color:var(--accent);">On
+          </label>
+        </div>
+      </div>
+      <div style="font-size:16px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);margin:16px 0 6px;">Per-type overrides</div>
+      <div style="font-size:14px;color:var(--text3);margin-bottom:8px;">Leave blank to use the default. Untick to switch reminders off for that type entirely.</div>
+      <div id="rsTypeList"></div>
+    </div>
+    <div class="mftr"><button class="btn btn-g" data-close="rsModal">Cancel</button><button class="btn btn-p" id="btnSaveRS">Save Settings</button></div>
+  </div>
+</div>
+
 <div class="modal-ov" id="dlModal">
   <div class="modal">
     <div class="mhdr"><div class="mtitle">Add Deadline</div><button class="mx" data-close="dlModal">&#x2715;</button></div>
