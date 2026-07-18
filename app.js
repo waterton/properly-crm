@@ -5965,10 +5965,28 @@ async function checkConnectedAccounts(){
       });
     }
     renderGmailAccountBar();
-    // Auto-load first connected account
-    var firstConnected = Object.keys(gmailState.connectedAccounts)[0];
-    if(firstConnected){
-      gmailState.activeMemberId = firstConnected;
+    // Show the inbox belonging to whoever is signed in - NOT just the lowest member id,
+    // which always resolved to member 1 and showed Randy's mail to everyone.
+    // Match on the connected Gmail address first: it comes straight from gmail_tokens and
+    // needs no TM data (TM is localStorage-only and may not be loaded yet at this point).
+    var preferred = null;
+    var myEmail = (currentUser && currentUser.email) ? currentUser.email.toLowerCase() : '';
+    if(myEmail){
+      Object.keys(gmailState.connectedAccounts).forEach(function(k){
+        var a = gmailState.connectedAccounts[k];
+        if(!preferred && a && a.email && String(a.email).toLowerCase() === myEmail) preferred = k;
+      });
+    }
+    // Fallback: match via the team-member record (covers a CRM login that differs from the
+    // connected Gmail address).
+    if(!preferred){
+      var mid = resolveMyMember();
+      if(mid != null && gmailState.connectedAccounts[String(mid)]) preferred = String(mid);
+    }
+    // Last resort: whatever is connected (e.g. your own Gmail isn't linked yet).
+    if(!preferred) preferred = Object.keys(gmailState.connectedAccounts)[0];
+    if(preferred){
+      gmailState.activeMemberId = preferred;
       ge('gmailNotConnected').style.display = 'none';
       ge('gmailConnected').style.display = 'block';
       ge('btnGmailCompose').style.display = 'inline-flex';
@@ -7466,11 +7484,22 @@ showSyncStatus(supaReady ? 'live' : 'off');
 // -- STARTUP ----------------------------------------------------------
 // -- AUTH SYSTEM --
 var currentUser = null;
+var myMemberId = null; // team member id matching whoever is signed into the CRM right now
 
 function showLoginScreen(){
   ge('loginScreen').classList.add('visible');
   ge('mainApp').style.display = 'none';
   clearLoginMessages();
+}
+
+// Which team member is signed in right now. TM lives only in localStorage and is loaded
+// lazily by initTeam()/initGmail(), so this pulls it in itself rather than assuming.
+function resolveMyMember(){
+  if(!currentUser || !currentUser.email) return null;
+  if(!TM.length){ try{ var s = localStorage.getItem('crm_tm'); if(s) TM = JSON.parse(s); }catch(e){} }
+  var m = TM.find(function(x){ return x.email && x.email.toLowerCase() === currentUser.email.toLowerCase(); });
+  myMemberId = m ? m.id : null;
+  return myMemberId;
 }
 
 function showApp(user){
@@ -7480,6 +7509,7 @@ function showApp(user){
   // Set topbar initials
   var initials = user.email ? user.email.substring(0,2).toUpperCase() : 'PB';
   // Try to match to team member
+  resolveMyMember();
   var tm = TM.find(function(m){ return m.email && m.email.toLowerCase() === user.email.toLowerCase(); });
   if(tm) initials = (tm.first.charAt(0) + tm.last.charAt(0)).toUpperCase();
   ge('topbarUser').textContent = initials;
