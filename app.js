@@ -90,7 +90,8 @@ var DB_COLS = {
   gmail_tokens: null,
   documents: ['id','contact_id','transaction_id','file_path','file_name','doc_type','summary','mime_type','size','created_at'],
   tx_changes: ['id','transactionId','contactId','field','oldValue','newValue','docType','addendumNo','effectiveDate','documentId','appliedAt'],
-  reminder_settings: ['id','deadlineType','daysBefore','enabled','updatedAt']
+  reminder_settings: ['id','deadlineType','daysBefore','enabled','updatedAt'],
+  team: ['id','first','last','role','email','phone','color','calLink']
 };
 function stripForDB(table, row){
   var cols = DB_COLS[table];
@@ -347,7 +348,8 @@ async function loadFromDB(){
       fetchAllRows(base, 'send_log?order=created_at.asc,id.asc', headers).catch(function(){return []; }),
       fetchAllRows(base, 'documents?order=created_at.asc,id.asc', headers).catch(function(){return []; }),
       fetchAllRows(base, 'tx_changes?order=id.asc', headers).catch(function(){return []; }),
-      fetchAllRows(base, 'reminder_settings?order=id.asc', headers).catch(function(){return []; })
+      fetchAllRows(base, 'reminder_settings?order=id.asc', headers).catch(function(){return []; }),
+      fetchAllRows(base, 'team?order=id.asc', headers).catch(function(){return []; })
     ]);
     var rc = results[0], rn = results[1], rf = results[2], rd = results[3], rtx = results[4];
 
@@ -372,6 +374,9 @@ async function loadFromDB(){
     if(Array.isArray(rch)) CH = rch;
     var rrs = results[10];
     if(Array.isArray(rrs)) RS = rrs;
+    // The team comes from the database so member ids are the same on every machine.
+    var rtm = results[11];
+    if(Array.isArray(rtm) && rtm.length) TM = rtm;
     DOCS.forEach(function(d){
       d.id = typeof d.id === 'string' ? parseInt(d.id)||d.id : d.id;
       if(d.contact_id != null) d.contact_id = typeof d.contact_id === 'string' ? parseInt(d.contact_id) : d.contact_id;
@@ -412,6 +417,15 @@ function saveFU(f){ sv(); if(supaReady) dbSave('followups', [f]); }
 function saveDL(d){ sv(); if(supaReady) dbSave('deadlines', [d]); }
 function saveCH(x){ sv(); if(supaReady) dbSave('tx_changes', [x]); }
 function saveRS(x){ if(supaReady) dbSave('reminder_settings', [x]); }
+// Team members MUST be shared, not per-browser. Member ids key gmail_tokens, assignedTo,
+// calendar filters and drip senders - inventing them locally silently breaks all of it.
+function saveTM(m){ sv(); if(supaReady) dbSave('team', [m]); }
+function deleteTMfromDB(id){
+  if(!supaReady) return;
+  getAuthHeaders().then(function(h){
+    fetch(SUPA_URL+'/rest/v1/team?id=eq.'+id, {method:'DELETE', headers:h});
+  });
+}
 function deleteCfromDB(id){
   if(!supaReady) return;
   getAuthHeaders().then(function(h){
@@ -5592,15 +5606,9 @@ function initTeam(){
     }
   }catch(e){}
 
-  // Seed with Palacios Baker team if empty
-  if(!TM.length){
-    TM = [
-      {id:1, first:'Randy', last:'Baker', role:'Agent', email:'randyknowsutah@gmail.com', phone:'801-910-2296', color:'#C9A84C', calLink:''},
-      {id:2, first:'Elda', last:'Palacios Baker', role:'Agent', email:'eldarealtor@gmail.com', phone:'801-706-3806', color:'#4C8EC9', calLink:''}
-    ];
-    sv();
-  }
-
+  // NO local seeding. Team members live in Supabase so ids are shared across machines.
+  // Inventing {id:1, id:2} here is what made Elda's browser see a team that matched no
+  // gmail_token and no assignedTo value - failing silently instead of saying "not set up".
   renderTeamCards();
   renderTeamAssignments();
   populateTeamFilters();
@@ -5872,6 +5880,8 @@ function saveMember(){
       role:ge('mRole').value, email:ge('mEmail').value.trim(), phone:ge('mPhone').value.trim(),
       calLink:ge('mCalLink').value.trim(), color:selectedMemberColor});
   }
+  // Persist the whole team to Supabase so every machine sees the same ids.
+  TM.forEach(function(m){ saveTM(m); });
   sv(); cm('memberModal');
   renderTeamCards(); renderTeamAssignments(); populateTeamFilters();
   // Also update assignment dropdowns everywhere
@@ -5935,15 +5945,9 @@ var EMAIL_TEMPLATES = {
 };
 
 function initGmail(){
-  // Load TM first if empty
+  // TM comes from Supabase via loadFromDB; localStorage is only a cache for offline reloads.
   if(!TM.length){
     try{ var s=localStorage.getItem('crm_tm'); if(s) TM=JSON.parse(s); }catch(e){}
-    if(!TM.length){
-      TM=[
-        {id:1,first:'Randy',last:'Baker',role:'Agent',email:'randyknowsutah@gmail.com',phone:'801-910-2296',color:'#C9A84C',calLink:''},
-        {id:2,first:'Elda',last:'Palacios Baker',role:'Agent',email:'eldarealtor@gmail.com',phone:'801-706-3806',color:'#4C8EC9',calLink:''}
-      ];
-    }
   }
   renderGmailAccountBar();
   checkConnectedAccounts();
@@ -6002,18 +6006,13 @@ function renderGmailAccountBar(){
   if(!bar) return;
   bar.innerHTML = '';
 
-  // Ensure TM is loaded - seed defaults if empty
+  // TM comes from Supabase (loadFromDB); localStorage is only an offline cache. No seeding:
+  // invented ids match no gmail_token and no assignedTo, which is what broke Elda's view.
   if(!TM.length){
     try{
       var saved = localStorage.getItem('crm_tm');
       if(saved) TM = JSON.parse(saved);
     }catch(e){}
-    if(!TM.length){
-      TM = [
-        {id:1,first:'Randy',last:'Baker',role:'Agent',email:'randyknowsutah@gmail.com',phone:'801-910-2296',color:'#C9A84C',calLink:''},
-        {id:2,first:'Elda',last:'Palacios Baker',role:'Agent',email:'eldarealtor@gmail.com',phone:'801-706-3806',color:'#4C8EC9',calLink:''}
-      ];
-    }
   }
 
   // Show connected accounts as tabs
@@ -6040,7 +6039,25 @@ function renderGmailAccountBar(){
     }
   });
 
-  // Connect buttons for unconnected members
+  // Connect buttons for unconnected members.
+  // These also go in the always-visible account bar. They used to live ONLY inside the
+  // #gmailNotConnected panel, which is hidden the moment any one account connects - so
+  // once Randy connected, "Connect Elda's Gmail" became permanently unreachable.
+  TM.forEach(function(m){
+    if(!gmailState.connectedAccounts[String(m.id)]){
+      var bbtn = document.createElement('button');
+      bbtn.className = 'btn btn-g';
+      bbtn.style.cssText += 'display:flex;align-items:center;gap:6px;font-size:15px;padding:5px 10px;';
+      bbtn.textContent = '+ Connect ' + (m.first || 'member') + "'s Gmail";
+      (function(mid){ bbtn.addEventListener('click', function(){ connectGmail(mid); }); })(m.id);
+      bar.appendChild(bbtn);
+    }
+  });
+  if(!TM.length){
+    bar.appendChild(mkDiv('font-size:15px;color:var(--text3);',
+      'No team members yet - add them on the Team tab, then connect each Gmail.'));
+  }
+
   if(connectBtns){
     connectBtns.innerHTML = '';
     TM.forEach(function(m){
@@ -6062,7 +6079,11 @@ async function connectGmail(memberId){
     var connectBtns = ge('gmailConnectButtons');
     if(connectBtns) connectBtns.innerHTML = '<div style="color:var(--text3);font-size:18px;">Connecting...</div>';
 
-    var resp = await fetch('/api/gmail-auth?action=url&memberId=' + memberId);
+    // Send the team member's own address as a hint so Google's account chooser
+    // highlights the right one - you still have to pick it deliberately.
+    var _hm = TM.find(function(m){ return String(m.id) === String(memberId); });
+    var _hint = (_hm && _hm.email) ? '&hint=' + encodeURIComponent(_hm.email) : '';
+    var resp = await fetch('/api/gmail-auth?action=url&memberId=' + memberId + _hint);
     if(!resp.ok){
       var errText = await resp.text();
       alert('Server error: ' + errText);

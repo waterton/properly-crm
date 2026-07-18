@@ -63,15 +63,22 @@ export default async function handler(req, res) {
       // Generate OAuth URL
       const redirectUri = baseUrl + '/api/gmail-callback';
       const state = Buffer.from(JSON.stringify({ memberId })).toString('base64');
-      const authUrl = 'https://accounts.google.com/o/oauth2/v2/auth?' + new URLSearchParams({
+      // 'select_account' is essential: with 'consent' alone Google silently uses whichever
+      // Google account is already signed into the browser. Connecting Elda's Gmail while
+      // signed in as Randy handed over Randy's mailbox and filed it under Elda's member id.
+      const authParams = {
         client_id: clientId,
         redirect_uri: redirectUri,
         response_type: 'code',
         scope: SCOPES,
         access_type: 'offline',
-        prompt: 'consent',
+        prompt: 'select_account consent',
         state: state
-      });
+      };
+      // Pre-highlight the expected account in the chooser (still overridable by the user).
+      const hint = req.query.hint || req.query.login_hint;
+      if (hint) authParams.login_hint = hint;
+      const authUrl = 'https://accounts.google.com/o/oauth2/v2/auth?' + new URLSearchParams(authParams);
       return res.status(200).json({ url: authUrl });
     }
 
