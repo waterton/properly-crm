@@ -166,13 +166,45 @@ function whenPhrase(n, lang) {
   return n === 0 ? 'today' : n === 1 ? 'tomorrow' : 'in ' + n + ' days';
 }
 
-function buildReminder(c, dl, tx, n) {
+// Fill {{tags}} in a custom reminder template. Same tags shown in the Reminder Types editor.
+function renderReminderTemplate(text, ctx) {
+  if (!text) return '';
+  return String(text)
+    .replace(/\{\{\s*first\s*\}\}/gi, ctx.first)
+    .replace(/\{\{\s*last\s*\}\}/gi, ctx.last)
+    .replace(/\{\{\s*property\s*\}\}/gi, ctx.property)
+    .replace(/\{\{\s*address\s*\}\}/gi, ctx.property)
+    .replace(/\{\{\s*date\s*\}\}/gi, ctx.dateStr)
+    .replace(/\{\{\s*when\s*\}\}/gi, ctx.when)
+    .replace(/\{\{\s*type\s*\}\}/gi, ctx.label)
+    .replace(/\{\{\s*agent\s*\}\}/gi, AGENT_NAME);
+}
+
+function buildReminder(c, dl, tx, n, set) {
   const lang = (c && c.lang === 'es') ? 'es' : 'en';
   const label = dlLabel(dl.type, lang);
   const addr = (tx && tx.address) ? tx.address : ((c && c.property) || '');
   const when = whenPhrase(n, lang);
   const dateStr = fmtDateLang(dl.date, lang);
   const first = (c && c.first) || (lang === 'es' ? 'cliente' : 'there');
+
+  // Custom per-type template wins over the automatic wording, but STRICTLY by language:
+  // a Spanish contact only ever gets the Spanish template. If none was written, we fall
+  // through to the generic Spanish wording below - never the English template.
+  if (set) {
+    const subj = (lang === 'es') ? set.subjectEs : set.subjectEn;
+    const bodyRaw = (lang === 'es') ? set.bodyEs : set.bodyEn;
+    if (subj || bodyRaw) {
+      const ctx = { first: first, last: (c && c.last) || '', property: addr, dateStr: dateStr, when: when, label: label };
+      const bodyHtml = renderReminderTemplate(bodyRaw, ctx).replace(/\n/g, '<br>');
+      return {
+        lang: lang,
+        subject: renderReminderTemplate(subj || ('Reminder: ' + label + ' (' + when + ')'), ctx),
+        body: bodyHtml || ('<p>' + renderReminderTemplate(subj, ctx) + '</p>')
+      };
+    }
+  }
+
   if (lang === 'es') {
     return {
       lang: lang,
@@ -233,9 +265,15 @@ async function processReminders(result) {
   if (!Array.isArray(dls) || !dls.length) return;
 
   const tokens = await supaGet('gmail_tokens?select=member_id,email&limit=50');
-  const teamEmails = (Array.isArray(tokens) ? tokens : []).map(t => t.email).filter(Boolean);
   const defaultSender = (Array.isArray(tokens) && tokens[0]) ? tokens[0].member_id : null;
   const tokenCache = {};
+
+  // Team addresses come from the shared team table (real inboxes), not gmail_tokens.
+  const team = await supaGet('team?select=id,email&limit=50');
+  const teamById = {};
+  (Array.isArray(team) ? team : []).forEach(t => { if (t.email) teamById[String(t.id)] = t.email; });
+  const teamEmails = Object.keys(teamById).map(k => teamById[k]);
+  const memberEmail = (id) => (id != null && teamById[String(id)]) ? teamById[String(id)] : '';
 
   for (let i = 0; i < dls.length; i++) {
     const dl = dls[i];
@@ -261,9 +299,17 @@ async function processReminders(result) {
     const c = (Array.isArray(cs) && cs[0]) ? cs[0] : null;
 
     const clientEmails = contactEmails(c);
-    // No client address? Still tell the team, so someone knows to call.
-    const to = clientEmails.length ? clientEmails.join(', ') : teamEmails.join(', ');
-    const cc = clientEmails.length ? teamEmails.join(', ') : '';
+    let to, cc;
+    if (clientEmails.length) {
+      // Client reminder: To the client, Cc the team so you see the exact message sent.
+      to = clientEmails.join(', ');
+      cc = teamEmails.join(', ');
+    } else {
+      // Personal / client-less reminder: goes to whoever it's assigned to (falls back to
+      // the whole team if unassigned, or if that member has no address on file).
+      to = memberEmail(dl.assignedTo) || teamEmails.join(', ');
+      cc = '';
+    }
     if (!to) { result.reminders.skipped++; continue; }
 
     const senderId = dl.assignedTo || (tx && tx.assignedTo) || defaultSender;
@@ -272,7 +318,7 @@ async function processReminders(result) {
     const tok = tokenCache[senderId];
     if (tok.error) { result.reminders.errors.push(tok.error); continue; }
 
-    const msg = buildReminder(c, dl, tx, n);
+    const msg = buildReminder(c, dl, tx, n, set);
     const logRow = {
       id: Date.now() + Math.floor(Math.random() * 100000) + i,
       deadlineId: dl.id,

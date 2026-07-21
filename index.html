@@ -983,8 +983,12 @@
           </label>
         </div>
       </div>
-      <div style="font-size:16px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);margin:16px 0 6px;">Per-type overrides</div>
-      <div style="font-size:14px;color:var(--text3);margin-bottom:8px;">Leave blank to use the default. Untick to switch reminders off for that type entirely.</div>
+      <div style="font-size:16px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);margin:16px 0 6px;">Reminder types</div>
+      <div style="font-size:14px;color:var(--text3);margin-bottom:8px;">Leave days blank to use the default timing. Untick to switch that reminder off. Click <b>Email</b> to write custom wording (English + Spanish) - blank means the automatic wording is used.</div>
+      <div style="display:flex;gap:6px;margin-bottom:10px;">
+        <input class="fi" id="rsNewType" placeholder="New reminder name (e.g. Lunch with lender)" style="flex:1;font-size:15px;padding:5px 8px;">
+        <button class="btn btn-g" id="rsAddType" style="font-size:14px;padding:5px 12px;white-space:nowrap;">+ Add type</button>
+      </div>
       <div id="rsTypeList"></div>
     </div>
     <div class="mftr"><button class="btn btn-g" data-close="rsModal">Cancel</button><button class="btn btn-p" id="btnSaveRS">Save Settings</button></div>

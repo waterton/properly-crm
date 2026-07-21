@@ -90,7 +90,7 @@ var DB_COLS = {
   gmail_tokens: null,
   documents: ['id','contact_id','transaction_id','file_path','file_name','doc_type','summary','mime_type','size','created_at'],
   tx_changes: ['id','transactionId','contactId','field','oldValue','newValue','docType','addendumNo','effectiveDate','documentId','appliedAt'],
-  reminder_settings: ['id','deadlineType','daysBefore','enabled','updatedAt'],
+  reminder_settings: ['id','deadlineType','daysBefore','enabled','updatedAt','subjectEn','bodyEn','subjectEs','bodyEs'],
   team: ['id','first','last','role','email','phone','color','calLink']
 };
 function stripForDB(table, row){
@@ -1660,39 +1660,96 @@ function rsParseDays(str){
 }
 function rsFmtDays(arr){ return (arr||[]).join(', '); }
 
+// Every reminder type known to the app: the standard transaction ones, anything already used
+// on a deadline, and any custom type saved in reminder_settings. This is also what feeds the
+// Add Deadline dropdown, so a custom "Lunch with lender" becomes selectable there.
+function rsAllTypes(){
+  var types = RS_TYPES.slice();
+  D.forEach(function(d){ if(d.type && types.indexOf(d.type) === -1) types.push(d.type); });
+  RS.forEach(function(r){ if(r.deadlineType && types.indexOf(r.deadlineType) === -1) types.push(r.deadlineType); });
+  return types;
+}
+
+var rsTypeSet = []; // types currently rendered in the modal, indexed so field ids stay simple
+
+function rsRenderTypes(){
+  var wrap = ge('rsTypeList'); if(!wrap) return;
+  wrap.innerHTML = '';
+  rsTypeSet = rsAllTypes();
+  rsTypeSet.forEach(function(t, i){ wrap.appendChild(rsTypeRow(t, i)); });
+}
+
+function rsTypeRow(t, i){
+  var row = rsForType(t);
+  var isCustom = RS_TYPES.indexOf(t) === -1;
+  var box = document.createElement('div');
+  box.style.cssText = 'border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:8px;';
+
+  var top = document.createElement('div');
+  top.style.cssText = 'display:flex;gap:8px;align-items:center;flex-wrap:wrap;';
+  var nm = mkDiv('flex:1;font-size:15px;font-weight:600;color:var(--text);min-width:130px;', t + (isCustom ? '  • custom' : ''));
+  top.appendChild(nm);
+  var daysI = document.createElement('input');
+  daysI.className = 'fi'; daysI.id = 'rs_days_' + i; daysI.placeholder = 'default';
+  daysI.style.cssText = 'width:90px;font-size:15px;padding:4px 8px;'; daysI.title = 'Days before, e.g. 3, 1';
+  daysI.value = row ? rsFmtDays(row.daysBefore) : '';
+  top.appendChild(daysI);
+  var onL = document.createElement('label');
+  onL.style.cssText = 'display:flex;align-items:center;gap:5px;font-size:14px;color:var(--text3);cursor:pointer;';
+  var onC = document.createElement('input'); onC.type = 'checkbox'; onC.id = 'rs_on_' + i; onC.style.accentColor = 'var(--accent)';
+  onC.checked = row ? (row.enabled !== false) : true;
+  onL.appendChild(onC); onL.appendChild(document.createTextNode('On'));
+  top.appendChild(onL);
+  var tgl = mkBtn('btn btn-g', 'Email', 'font-size:14px;padding:4px 9px;');
+  var hasTpl = row && (row.subjectEn || row.bodyEn || row.subjectEs || row.bodyEs);
+  if(hasTpl) tgl.textContent = 'Email ✓';
+  top.appendChild(tgl);
+  box.appendChild(top);
+
+  var ed = document.createElement('div'); ed.style.cssText = 'display:none;margin-top:8px;';
+  function field(id, ph, val, rows){
+    var w = mkDiv('margin-bottom:6px;');
+    var el = document.createElement(rows ? 'textarea' : 'input');
+    el.className = 'fi'; el.id = id; el.placeholder = ph;
+    el.style.cssText = 'width:100%;font-size:14px;padding:5px 8px;';
+    if(rows) el.rows = rows;
+    if(val) el.value = val;
+    w.appendChild(el); return w;
+  }
+  ed.appendChild(mkDiv('font-size:13px;color:var(--text3);margin-bottom:4px;', 'English'));
+  ed.appendChild(field('rs_suben_' + i, 'Subject (blank = automatic wording)', row ? row.subjectEn : '', 0));
+  ed.appendChild(field('rs_bodyen_' + i, 'Body (blank = automatic wording)', row ? row.bodyEn : '', 4));
+  ed.appendChild(mkDiv('font-size:13px;color:var(--text3);margin:8px 0 4px;', 'Español'));
+  ed.appendChild(field('rs_subes_' + i, 'Asunto (opcional)', row ? row.subjectEs : '', 0));
+  ed.appendChild(field('rs_bodyes_' + i, 'Cuerpo (opcional)', row ? row.bodyEs : '', 4));
+  ed.appendChild(mkDiv('font-size:12px;color:var(--text3);margin-top:2px;',
+    'Tags: {{first}} {{last}} {{property}} {{date}} {{when}} {{type}} {{agent}}'));
+  box.appendChild(ed);
+  tgl.addEventListener('click', function(){ ed.style.display = ed.style.display === 'none' ? 'block' : 'none'; });
+  return box;
+}
+
 function openReminderSettings(){
   var def = rsDefault();
   ge('rsDefaultDays').value = def ? rsFmtDays(def.daysBefore) : '3, 1';
   ge('rsDefaultEnabled').checked = def ? (def.enabled !== false) : true;
-
-  // Offer the standard types plus anything actually in use, so nothing is unreachable.
-  var types = RS_TYPES.slice();
-  D.forEach(function(d){ if(d.type && types.indexOf(d.type) === -1) types.push(d.type); });
-  RS.forEach(function(r){ if(r.deadlineType && types.indexOf(r.deadlineType) === -1) types.push(r.deadlineType); });
-
-  var wrap = ge('rsTypeList');
-  wrap.innerHTML = '';
-  types.forEach(function(t){
-    var row = rsForType(t);
-    var line = document.createElement('div');
-    line.style.cssText = 'display:flex;gap:8px;align-items:center;margin-bottom:6px;';
-    var lbl = mkDiv('flex:1;font-size:15px;color:var(--text2);min-width:120px;', t);
-    var inp = document.createElement('input');
-    inp.className = 'fi'; inp.style.cssText = 'width:110px;font-size:15px;padding:4px 8px;';
-    inp.setAttribute('data-rs-type', t);
-    inp.placeholder = 'default';
-    inp.value = row ? rsFmtDays(row.daysBefore) : '';
-    var onWrap = document.createElement('label');
-    onWrap.style.cssText = 'display:flex;align-items:center;gap:5px;font-size:14px;color:var(--text3);cursor:pointer;';
-    var onCb = document.createElement('input');
-    onCb.type = 'checkbox'; onCb.style.accentColor = 'var(--accent)';
-    onCb.setAttribute('data-rs-on', t);
-    onCb.checked = row ? (row.enabled !== false) : true;
-    onWrap.appendChild(onCb); onWrap.appendChild(document.createTextNode('On'));
-    line.appendChild(lbl); line.appendChild(inp); line.appendChild(onWrap);
-    wrap.appendChild(line);
-  });
+  rsRenderTypes();
   om('rsModal');
+}
+
+// Add a brand-new reminder type on the spot (e.g. "Lunch with lender"). Persisted immediately
+// so it shows up in the Add Deadline dropdown even before the modal is saved.
+function rsAddType(){
+  var nm = (ge('rsNewType') && ge('rsNewType').value || '').trim();
+  if(!nm) return;
+  if(rsAllTypes().some(function(x){ return x.toLowerCase() === nm.toLowerCase(); })){
+    alert('A reminder called "' + nm + '" already exists.'); return;
+  }
+  var newRow = { id: Date.now() + Math.floor(Math.random()*100000), deadlineType: nm,
+                 daysBefore: null, enabled: true, updatedAt: new Date().toISOString() };
+  RS.push(newRow); saveRS(newRow);
+  if(ge('rsNewType')) ge('rsNewType').value = '';
+  rsRenderTypes();
 }
 
 function saveReminderSettings(){
@@ -1705,29 +1762,32 @@ function saveReminderSettings(){
   def.updatedAt = new Date().toISOString();
   saveRS(def);
 
-  var inputs = document.querySelectorAll('[data-rs-type]');
-  Array.prototype.forEach.call(inputs, function(inp){
-    var t = inp.getAttribute('data-rs-type');
-    var onCb = document.querySelector('[data-rs-on="' + t.replace(/"/g,'\\"') + '"]');
-    var isOn = onCb ? onCb.checked : true;
-    var d2 = rsParseDays(inp.value);
+  rsTypeSet.forEach(function(t, i){
+    var isCustom = RS_TYPES.indexOf(t) === -1;
+    var d2 = rsParseDays((ge('rs_days_' + i) || {}).value || '');
+    var isOn = (ge('rs_on_' + i) || {}).checked !== false;
+    var subEn = (((ge('rs_suben_' + i) || {}).value) || '').trim();
+    var bodyEn = (((ge('rs_bodyen_' + i) || {}).value) || '').trim();
+    var subEs = (((ge('rs_subes_' + i) || {}).value) || '').trim();
+    var bodyEs = (((ge('rs_bodyes_' + i) || {}).value) || '').trim();
+    var hasTpl = subEn || bodyEn || subEs || bodyEs;
     var row = rsForType(t);
-    // Blank + On = "just use the default", so drop any override we had.
-    if(!d2.length && isOn){
-      if(row){ row.enabled = true; row.daysBefore = null; row.updatedAt = new Date().toISOString(); saveRS(row); }
+
+    // A standard type with no custom timing and no template needs no row - fall back to default.
+    if(!isCustom && !d2.length && isOn && !hasTpl){
+      if(row){ row.daysBefore = null; row.enabled = true; row.subjectEn = row.bodyEn = row.subjectEs = row.bodyEs = null; row.updatedAt = new Date().toISOString(); saveRS(row); }
       return;
     }
-    if(!row){
-      row = { id: Date.now() + Math.floor(Math.random()*100000), deadlineType: t };
-      RS.push(row);
-    }
-    row.daysBefore = d2.length ? d2 : days;
+    if(!row){ row = { id: Date.now() + Math.floor(Math.random()*100000), deadlineType: t }; RS.push(row); }
+    row.daysBefore = d2.length ? d2 : null;   // null = use the default timing
     row.enabled = isOn;
+    row.subjectEn = subEn || null; row.bodyEn = bodyEn || null;
+    row.subjectEs = subEs || null; row.bodyEs = bodyEs || null;
     row.updatedAt = new Date().toISOString();
     saveRS(row);
   });
   cm('rsModal');
-  alert('Reminder settings saved. The daily cron picks these up on its next run.');
+  alert('Reminders saved. The daily job uses these on its next run.');
 }
 
 function dlTxFor(d){
@@ -1914,7 +1974,27 @@ function fsDeals(selId, contactId, selectedId){
   if(selectedId!=null && String(selectedId)!=='') sel.value=String(selectedId);
 }
 function ofc(id){fs('fuContact');ge('fuContact').value=id;ge('fuDate').value=tod();populateAssignDropdowns();om('fuModal');}
-function odc(id){fs('dlContact');ge('dlContact').value=id;ge('dlDate').value=tod();populateAssignDropdowns();om('dlModal');}
+// Fill the deadline Type dropdown from the managed reminder-type list (standard + custom),
+// so anything added in Reminder Settings is selectable here.
+function populateDeadlineTypes(selected){
+  var sel = ge('dlType'); if(!sel) return;
+  sel.innerHTML = '';
+  rsAllTypes().forEach(function(t){
+    var o = document.createElement('option'); o.value = t; o.textContent = t; sel.appendChild(o);
+  });
+  var other = document.createElement('option'); other.value = 'Other'; other.textContent = 'Other'; sel.appendChild(other);
+  if(selected){ if(!Array.prototype.some.call(sel.options,function(o){return o.value===selected;})){ var e=document.createElement('option'); e.value=selected; e.textContent=selected; sel.appendChild(e); } sel.value = selected; }
+}
+// Add a blank first option so a reminder can exist with no client (personal reminders like
+// "take out the trash"). Those email the assigned team member instead of a client.
+function dlContactAllowNone(){
+  var sel = ge('dlContact'); if(!sel) return;
+  if(!sel.querySelector('option[value=""]')){
+    var o = document.createElement('option'); o.value=''; o.textContent='— None (personal reminder) —';
+    sel.insertBefore(o, sel.firstChild);
+  }
+}
+function odc(id){fs('dlContact');dlContactAllowNone();ge('dlContact').value=id;populateDeadlineTypes('');ge('dlDate').value=tod();populateAssignDropdowns();om('dlModal');}
 
 function getFTypeValues(){
   var vals=[];
@@ -2092,10 +2172,13 @@ function svfu(){
   cm('fuModal'); ge('fuLabel').value=''; rfu(); rd(); if(curDet)vc(curDet);
 }
 function openEditDL(d){
-  fs('dlContact'); ge('dlContact').value=d.contactId;
+  fs('dlContact'); dlContactAllowNone();
+  ge('dlContact').value = d.contactId != null ? d.contactId : '';
   fsDeals('dlDeal', d.contactId, d.transactionId);
-  ge('dlType').value=d.type||'';
+  populateDeadlineTypes(d.type||'');
   ge('dlDate').value=d.date||'';
+  populateAssignDropdowns();
+  if(ge('dlAssign')) ge('dlAssign').value = d.assignedTo != null ? d.assignedTo : '';
   ge('btnSaveDL') && ge('btnSaveDL').setAttribute('data-edit-id', d.id);
   om('dlModal');
 }
@@ -2104,16 +2187,17 @@ function svdl(){
   if(editId){
     var existing = D.find(function(x){ return String(x.id)===String(editId); });
     if(existing){
-      existing.contactId=parseInt(ge('dlContact').value);
+      existing.contactId=parseInt(ge('dlContact').value)||null;   // blank = personal reminder
       existing.transactionId=parseInt(ge('dlDeal').value)||null;
       existing.type=ge('dlType').value;
       existing.date=ge('dlDate').value;
+      existing.assignedTo=parseInt(ge('dlAssign')&&ge('dlAssign').value)||null;
       sv(); if(supaReady) dbSave('deadlines',[existing]);
     }
     ge('btnSaveDL') && ge('btnSaveDL').setAttribute('data-edit-id','');
   } else {
-    var nd={id:Date.now(),contactId:parseInt(ge('dlContact').value),transactionId:parseInt(ge('dlDeal').value)||null,type:ge('dlType').value,date:ge('dlDate').value,assignedTo:parseInt(ge('dlAssign')&&ge('dlAssign').value)||null};
-    D.push(nd); saveDL(nd); logActivity(nd.contactId,'Updated deadlines');
+    var nd={id:Date.now(),contactId:parseInt(ge('dlContact').value)||null,transactionId:parseInt(ge('dlDeal').value)||null,type:ge('dlType').value,date:ge('dlDate').value,assignedTo:parseInt(ge('dlAssign')&&ge('dlAssign').value)||null};
+    D.push(nd); saveDL(nd); if(nd.contactId) logActivity(nd.contactId,'Updated deadlines');
   }
   cm('dlModal'); rdl(); rd(); if(curDet)vc(curDet);
 }
@@ -7237,6 +7321,8 @@ if(ge('docShowArchived')) ge('docShowArchived').addEventListener('change', funct
 // ---- Reminder settings ----
 if(ge('btnReminderSettings')) ge('btnReminderSettings').addEventListener('click', openReminderSettings);
 if(ge('btnSaveRS')) ge('btnSaveRS').addEventListener('click', saveReminderSettings);
+if(ge('rsAddType')) ge('rsAddType').addEventListener('click', rsAddType);
+if(ge('rsNewType')) ge('rsNewType').addEventListener('keydown', function(e){ if(e.key==='Enter'){ e.preventDefault(); rsAddType(); } });
 
 // Trigger the daily reminder job on demand. Sends your Supabase session token, which the
 // endpoint accepts as an alternative to CRON_SECRET - so the secret stays server-side.
@@ -7831,7 +7917,7 @@ ge('fEmailsAdd') && ge('fEmailsAdd').addEventListener('click',function(){mvAddRo
 ge('fAddressesAdd') && ge('fAddressesAdd').addEventListener('click',function(){mvAddRow('fAddresses','','');});
 ge('btnAddFU').addEventListener('click',function(){ge('btnSaveFU')&&ge('btnSaveFU').setAttribute('data-edit-id','');ge('fuLabel').value='';fs('fuContact');fsDeals('fuDeal',ge('fuContact').value,'');ge('fuDate').value=tod();om('fuModal');});
 ge('btnAddNote').addEventListener('click',function(){ge('btnSaveNote')&&ge('btnSaveNote').setAttribute('data-edit-id','');ge('nText').value='';fs('nContact');fsDeals('nDeal',ge('nContact').value,'');om('noteModal');});
-ge('btnAddDL').addEventListener('click',function(){ge('btnSaveDL')&&ge('btnSaveDL').setAttribute('data-edit-id','');fs('dlContact');fsDeals('dlDeal',ge('dlContact').value,'');ge('dlDate').value=tod();om('dlModal');});
+ge('btnAddDL').addEventListener('click',function(){ge('btnSaveDL')&&ge('btnSaveDL').setAttribute('data-edit-id','');fs('dlContact');dlContactAllowNone();ge('dlContact').value='';populateDeadlineTypes('');fsDeals('dlDeal',ge('dlContact').value,'');ge('dlDate').value=tod();populateAssignDropdowns();om('dlModal');});
 ge('btnViewNotes').addEventListener('click',function(){sp('notes');});
 ge('btnViewFU').addEventListener('click',function(){sp('followups');});
 ge('btnSaveContact').addEventListener('click',svc);
