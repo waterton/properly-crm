@@ -82,7 +82,7 @@ var DB_COLS = {
   contacts: ['id','first','last','type','phone','email','property','stage','price','notes','added','closeDate','assignedTo','emails','phones','addresses','whatsapp','closedAt','lang'],
   notes: ['id','contactId','transactionId','text','date'],
   followups: ['id','contactId','transactionId','label','date','pri','done','assignedTo'],
-  deadlines: ['id','contactId','transactionId','type','date','assignedTo'],
+  deadlines: ['id','contactId','transactionId','type','date','assignedTo','time'],
   transactions: null, // allow all
   campaigns: null,
   enrollments: null,
@@ -1851,7 +1851,7 @@ function renderPersonalReminders(){
     info.appendChild(mkDiv('font-size:17px;font-weight:600;color:var(--text);', d.type||'Reminder'));
     var m = d.assignedTo ? TM.find(function(x){ return String(x.id)===String(d.assignedTo); }) : null;
     var who = m ? fn(m) : 'Me / team';
-    info.appendChild(mkDiv('font-size:15px;color:var(--text3);margin-top:2px;', (d.date?fd(d.date):'no date') + '  -  ' + who));
+    info.appendChild(mkDiv('font-size:15px;color:var(--text3);margin-top:2px;', (d.date?fd(d.date):'no date') + (d.time?(' at '+d.time):'') + '  -  ' + who));
     row.appendChild(info);
     if(n!=null){
       var lbl = n<0 ? Math.abs(n)+'d ago' : n===0 ? 'today' : 'in '+n+'d';
@@ -1882,6 +1882,7 @@ function openPersonalReminder(id){
   var d = id ? D.find(function(x){ return String(x.id)===String(id); }) : null;
   ge('prName').value = d ? (d.type||'') : '';
   ge('prDate').value = d ? (d.date||'') : tod();
+  if(ge('prTime')) ge('prTime').value = d ? (d.time||'') : '';
   if(ge('prAssign')) ge('prAssign').value = (d && d.assignedTo!=null) ? d.assignedTo : '';
   ge('btnSavePR').setAttribute('data-edit-id', id||'');
   om('prModal');
@@ -1894,11 +1895,12 @@ function savePersonalReminder(){
   if(!date){ alert('Pick a date.'); return; }
   var assign = parseInt(ge('prAssign') && ge('prAssign').value) || null;
   var editId = ge('btnSavePR').getAttribute('data-edit-id');
+  var time = (ge('prTime') && ge('prTime').value) || null;
   if(editId){
     var ex = D.find(function(x){ return String(x.id)===String(editId); });
-    if(ex){ ex.type=name; ex.date=date; ex.assignedTo=assign; ex.contactId=null; ex.transactionId=null; saveDL(ex); }
+    if(ex){ ex.type=name; ex.date=date; ex.time=time; ex.assignedTo=assign; ex.contactId=null; ex.transactionId=null; saveDL(ex); }
   } else {
-    var nd = { id:Date.now(), contactId:null, transactionId:null, type:name, date:date, assignedTo:assign };
+    var nd = { id:Date.now(), contactId:null, transactionId:null, type:name, date:date, time:time, assignedTo:assign };
     D.push(nd); saveDL(nd);
   }
   cm('prModal'); renderPersonalReminders(); rd();
@@ -2097,7 +2099,7 @@ function dlContactAllowNone(){
     sel.insertBefore(o, sel.firstChild);
   }
 }
-function odc(id){fs('dlContact');dlContactAllowNone();ge('dlContact').value=id;populateDeadlineTypes('');ge('dlDate').value=tod();populateAssignDropdowns();om('dlModal');}
+function odc(id){fs('dlContact');dlContactAllowNone();ge('dlContact').value=id;populateDeadlineTypes('');ge('dlDate').value=tod();if(ge('dlTime'))ge('dlTime').value='';populateAssignDropdowns();om('dlModal');}
 
 function getFTypeValues(){
   var vals=[];
@@ -2280,6 +2282,7 @@ function openEditDL(d){
   fsDeals('dlDeal', d.contactId, d.transactionId);
   populateDeadlineTypes(d.type||'');
   ge('dlDate').value=d.date||'';
+  if(ge('dlTime')) ge('dlTime').value=d.time||'';
   populateAssignDropdowns();
   if(ge('dlAssign')) ge('dlAssign').value = d.assignedTo != null ? d.assignedTo : '';
   ge('btnSaveDL') && ge('btnSaveDL').setAttribute('data-edit-id', d.id);
@@ -2294,12 +2297,13 @@ function svdl(){
       existing.transactionId=parseInt(ge('dlDeal').value)||null;
       existing.type=ge('dlType').value;
       existing.date=ge('dlDate').value;
+      existing.time=(ge('dlTime')&&ge('dlTime').value)||null;
       existing.assignedTo=parseInt(ge('dlAssign')&&ge('dlAssign').value)||null;
       sv(); if(supaReady) dbSave('deadlines',[existing]);
     }
     ge('btnSaveDL') && ge('btnSaveDL').setAttribute('data-edit-id','');
   } else {
-    var nd={id:Date.now(),contactId:parseInt(ge('dlContact').value)||null,transactionId:parseInt(ge('dlDeal').value)||null,type:ge('dlType').value,date:ge('dlDate').value,assignedTo:parseInt(ge('dlAssign')&&ge('dlAssign').value)||null};
+    var nd={id:Date.now(),contactId:parseInt(ge('dlContact').value)||null,transactionId:parseInt(ge('dlDeal').value)||null,type:ge('dlType').value,date:ge('dlDate').value,time:(ge('dlTime')&&ge('dlTime').value)||null,assignedTo:parseInt(ge('dlAssign')&&ge('dlAssign').value)||null};
     D.push(nd); saveDL(nd); if(nd.contactId) logActivity(nd.contactId,'Updated deadlines');
   }
   cm('dlModal'); rdl(); rd(); if(curDet)vc(curDet);
@@ -8025,7 +8029,7 @@ ge('fEmailsAdd') && ge('fEmailsAdd').addEventListener('click',function(){mvAddRo
 ge('fAddressesAdd') && ge('fAddressesAdd').addEventListener('click',function(){mvAddRow('fAddresses','','');});
 ge('btnAddFU').addEventListener('click',function(){ge('btnSaveFU')&&ge('btnSaveFU').setAttribute('data-edit-id','');ge('fuLabel').value='';fs('fuContact');fsDeals('fuDeal',ge('fuContact').value,'');ge('fuDate').value=tod();om('fuModal');});
 ge('btnAddNote').addEventListener('click',function(){ge('btnSaveNote')&&ge('btnSaveNote').setAttribute('data-edit-id','');ge('nText').value='';fs('nContact');fsDeals('nDeal',ge('nContact').value,'');om('noteModal');});
-ge('btnAddDL').addEventListener('click',function(){ge('btnSaveDL')&&ge('btnSaveDL').setAttribute('data-edit-id','');fs('dlContact');dlContactAllowNone();ge('dlContact').value='';populateDeadlineTypes('');fsDeals('dlDeal',ge('dlContact').value,'');ge('dlDate').value=tod();populateAssignDropdowns();om('dlModal');});
+ge('btnAddDL').addEventListener('click',function(){ge('btnSaveDL')&&ge('btnSaveDL').setAttribute('data-edit-id','');fs('dlContact');dlContactAllowNone();ge('dlContact').value='';populateDeadlineTypes('');fsDeals('dlDeal',ge('dlContact').value,'');ge('dlDate').value=tod();if(ge('dlTime'))ge('dlTime').value='';populateAssignDropdowns();om('dlModal');});
 ge('btnViewNotes').addEventListener('click',function(){sp('notes');});
 ge('btnViewFU').addEventListener('click',function(){sp('followups');});
 ge('btnSaveContact').addEventListener('click',svc);

@@ -114,6 +114,11 @@ function fmtDate(iso) {
   return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 }
 
+// Current wall-clock time in Mountain, as "HH:MM" (24h) - for holding timed reminders until due.
+function nowHmMtn() {
+  return new Date().toLocaleTimeString('en-GB', { timeZone: 'America/Denver', hour: '2-digit', minute: '2-digit' });
+}
+
 function todayMtn() {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Denver' });
 }
@@ -287,6 +292,10 @@ async function processReminders(result) {
     // "use the default timing". Only use the type's own days when it actually has some.
     const days = (set.daysBefore && set.daysBefore.length) ? set.daysBefore : (def.daysBefore || []);
     if (days.indexOf(n) === -1) continue;
+
+    // Optional per-reminder time: on the send-day, hold until the clock reaches it. Earlier
+    // cron runs skip (staying pending); a later run at/after the time sends it. Blank = send now.
+    if (dl.time && nowHmMtn() < String(dl.time).slice(0, 5)) { result.reminders.skipped++; continue; }
 
     // Closed deals don't need reminding.
     let tx = null;
