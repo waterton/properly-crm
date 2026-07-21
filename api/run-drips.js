@@ -283,7 +283,10 @@ async function processReminders(result) {
 
     const set = byType[dl.type] || def;
     if (set.enabled === false) continue;
-    if ((set.daysBefore || []).indexOf(n) === -1) continue;
+    // A type row can exist just to hold an On/Off flag or a template, with blank days meaning
+    // "use the default timing". Only use the type's own days when it actually has some.
+    const days = (set.daysBefore && set.daysBefore.length) ? set.daysBefore : (def.daysBefore || []);
+    if (days.indexOf(n) === -1) continue;
 
     // Closed deals don't need reminding.
     let tx = null;
