@@ -417,6 +417,12 @@ function saveFU(f){ sv(); if(supaReady) dbSave('followups', [f]); }
 function saveDL(d){ sv(); if(supaReady) dbSave('deadlines', [d]); }
 function saveCH(x){ sv(); if(supaReady) dbSave('tx_changes', [x]); }
 function saveRS(x){ if(supaReady) dbSave('reminder_settings', [x]); }
+function deleteRSfromDB(id){
+  if(!supaReady) return;
+  getAuthHeaders().then(function(h){
+    fetch(SUPA_URL+'/rest/v1/reminder_settings?id=eq.'+id, {method:'DELETE', headers:h});
+  });
+}
 // Team members MUST be shared, not per-browser. Member ids key gmail_tokens, assignedTo,
 // calendar filters and drip senders - inventing them locally silently breaks all of it.
 function saveTM(m){ sv(); if(supaReady) dbSave('team', [m]); }
@@ -623,7 +629,7 @@ function sp(id, fromHistory){
         dlFc.appendChild(o);
       });
     }
-    rdl();
+    dlShowView(dlView);
   }
   else if(id==='tc')initTC();
   else if(id==='drips'){ processDrips(); renderDrips(); }
@@ -1704,6 +1710,17 @@ function rsTypeRow(t, i){
   var hasTpl = row && (row.subjectEn || row.bodyEn || row.subjectEs || row.bodyEs);
   if(hasTpl) tgl.textContent = 'Email ✓';
   top.appendChild(tgl);
+  // Only custom types can be deleted; standard transaction types are built in.
+  if(isCustom){
+    var delB = mkBtn('btn btn-d', '✕', 'font-size:14px;padding:4px 9px;');
+    delB.title = 'Delete this reminder type';
+    (function(tt, rr){ delB.addEventListener('click', function(){
+      if(!confirm('Delete the reminder type "' + tt + '"?\n\nExisting reminders already created with this type keep working; you just can\'t pick it for new ones.')) return;
+      if(rr){ RS = RS.filter(function(r){ return r.id !== rr.id; }); deleteRSfromDB(rr.id); }
+      rsRenderTypes();
+    }); })(t, row);
+    top.appendChild(delB);
+  }
   box.appendChild(top);
 
   var ed = document.createElement('div'); ed.style.cssText = 'display:none;margin-top:8px;';
@@ -1802,6 +1819,91 @@ function dlTxFor(d){
 // A closed deal's deadlines are done - they shouldn't linger anywhere.
 function dlIsClosed(d){ var t=dlTxFor(d); return !!(t && t.status==='closed'); }
 
+// ---- Deadlines page: two subtabs (transaction deadlines vs personal reminders) ----
+var dlView = 'transactions';
+function personalReminders(){ return D.filter(function(d){ return d.contactId==null && d.transactionId==null; }); }
+function dlShowView(view){
+  dlView = (view === 'personal') ? 'personal' : 'transactions';
+  var on = dlView === 'personal';
+  if(ge('dlViewTransactions')) ge('dlViewTransactions').style.display = on ? 'none' : 'block';
+  if(ge('dlViewPersonal'))     ge('dlViewPersonal').style.display     = on ? 'block' : 'none';
+  if(ge('dlTabTx'))       ge('dlTabTx').className       = 'btn ' + (on ? 'btn-g' : 'btn-p');
+  if(ge('dlTabPersonal')) ge('dlTabPersonal').className = 'btn ' + (on ? 'btn-p' : 'btn-g');
+  if(ge('dlTabTx'))       ge('dlTabTx').style.padding = '6px 12px';
+  if(ge('dlTabPersonal')) ge('dlTabPersonal').style.padding = '6px 12px';
+  if(on) renderPersonalReminders(); else rdl();
+}
+
+function renderPersonalReminders(){
+  var el = ge('prList'); if(!el) return;
+  el.innerHTML = '';
+  var list = personalReminders().slice().sort(function(a,b){ return String(a.date||'').localeCompare(String(b.date||'')); });
+  if(!list.length){
+    el.appendChild(mkDiv('font-size:16px;color:var(--text3);padding:20px;text-align:center;','No personal reminders yet. Click "+ Add Reminder".'));
+    return;
+  }
+  list.forEach(function(d){
+    var n = d.date ? du(d.date) : null;
+    var row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);flex-wrap:wrap;';
+    if(n!=null) row.appendChild(mkDot(dc(n)));
+    var info = mkDiv('flex:1;min-width:150px;');
+    info.appendChild(mkDiv('font-size:17px;font-weight:600;color:var(--text);', d.type||'Reminder'));
+    var m = d.assignedTo ? TM.find(function(x){ return String(x.id)===String(d.assignedTo); }) : null;
+    var who = m ? fn(m) : 'Me / team';
+    info.appendChild(mkDiv('font-size:15px;color:var(--text3);margin-top:2px;', (d.date?fd(d.date):'no date') + '  -  ' + who));
+    row.appendChild(info);
+    if(n!=null){
+      var lbl = n<0 ? Math.abs(n)+'d ago' : n===0 ? 'today' : 'in '+n+'d';
+      row.appendChild(mkDiv('font-family:monospace;font-size:15px;color:'+(n<0?'var(--text3)':n<=1?'var(--accent)':'var(--text2)')+';white-space:nowrap;', lbl));
+    }
+    var eb = mkBtn('btn btn-g','Edit','font-size:14px;padding:4px 9px;');
+    (function(id){ eb.addEventListener('click', function(){ openPersonalReminder(id); }); })(d.id);
+    row.appendChild(eb);
+    var db = mkBtn('btn btn-d','Del','font-size:14px;padding:4px 9px;');
+    (function(id){ db.addEventListener('click', function(){
+      if(!confirm('Delete this reminder?')) return;
+      D = D.filter(function(x){ return x.id!==id; }); sv();
+      pausePoll(8000); deleteDLfromDB(id);
+      renderPersonalReminders(); rd();
+    }); })(d.id);
+    row.appendChild(db);
+    el.appendChild(row);
+  });
+}
+
+function openPersonalReminder(id){
+  var dl = ge('prTypeList');
+  if(dl){ dl.innerHTML=''; rsAllTypes().forEach(function(t){ var o=document.createElement('option'); o.value=t; dl.appendChild(o); }); }
+  populateAssignDropdowns();
+  // populateAssignDropdowns labels the blank option "Unassigned"; for a personal reminder
+  // that blank means "goes to the whole team", so make that explicit here.
+  var pa = ge('prAssign'); if(pa && pa.options.length && pa.options[0].value==='') pa.options[0].textContent = 'Me / whole team';
+  var d = id ? D.find(function(x){ return String(x.id)===String(id); }) : null;
+  ge('prName').value = d ? (d.type||'') : '';
+  ge('prDate').value = d ? (d.date||'') : tod();
+  if(ge('prAssign')) ge('prAssign').value = (d && d.assignedTo!=null) ? d.assignedTo : '';
+  ge('btnSavePR').setAttribute('data-edit-id', id||'');
+  om('prModal');
+}
+
+function savePersonalReminder(){
+  var name = (ge('prName').value||'').trim();
+  if(!name){ alert('Enter a reminder name.'); return; }
+  var date = ge('prDate').value;
+  if(!date){ alert('Pick a date.'); return; }
+  var assign = parseInt(ge('prAssign') && ge('prAssign').value) || null;
+  var editId = ge('btnSavePR').getAttribute('data-edit-id');
+  if(editId){
+    var ex = D.find(function(x){ return String(x.id)===String(editId); });
+    if(ex){ ex.type=name; ex.date=date; ex.assignedTo=assign; ex.contactId=null; ex.transactionId=null; saveDL(ex); }
+  } else {
+    var nd = { id:Date.now(), contactId:null, transactionId:null, type:name, date:date, assignedTo:assign };
+    D.push(nd); saveDL(nd);
+  }
+  cm('prModal'); renderPersonalReminders(); rd();
+}
+
 function rdl(){
   var el=ge('dlList');
   el.innerHTML='';
@@ -1841,8 +1943,9 @@ function rdl(){
     if(filterFrom && d.date < filterFrom) return;
     if(filterTo && d.date > filterTo) return;
     var tx=dlDeal(d);
-    if(tx && tx.status==='closed') return;   // closed deal: nothing left to track
-    var key = tx ? ('tx_'+tx.id) : (d.contactId!=null ? ('c_'+d.contactId) : 'none');
+    if(tx && tx.status==='closed') return;        // closed deal: nothing left to track
+    if(!tx && d.contactId==null) return;          // personal reminder -> its own subtab
+    var key = tx ? ('tx_'+tx.id) : ('c_'+d.contactId);
     ensureGroup(key, tx, tx?null:d.contactId).dated.push(d);
   });
 
@@ -7322,6 +7425,11 @@ if(ge('docShowArchived')) ge('docShowArchived').addEventListener('change', funct
 if(ge('btnReminderSettings')) ge('btnReminderSettings').addEventListener('click', openReminderSettings);
 if(ge('btnSaveRS')) ge('btnSaveRS').addEventListener('click', saveReminderSettings);
 if(ge('rsAddType')) ge('rsAddType').addEventListener('click', rsAddType);
+// ---- Deadlines subtabs + personal reminders ----
+if(ge('dlTabTx')) ge('dlTabTx').addEventListener('click', function(){ dlShowView('transactions'); });
+if(ge('dlTabPersonal')) ge('dlTabPersonal').addEventListener('click', function(){ dlShowView('personal'); });
+if(ge('btnAddPR')) ge('btnAddPR').addEventListener('click', function(){ openPersonalReminder(''); });
+if(ge('btnSavePR')) ge('btnSavePR').addEventListener('click', savePersonalReminder);
 if(ge('rsNewType')) ge('rsNewType').addEventListener('keydown', function(e){ if(e.key==='Enter'){ e.preventDefault(); rsAddType(); } });
 
 // Trigger the daily reminder job on demand. Sends your Supabase session token, which the

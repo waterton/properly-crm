@@ -234,32 +234,48 @@
       <div class="page" id="page-deadlines">
         <div class="card">
           <div class="card-hdr">
-            <div class="card-title">Transaction Deadlines</div>
-            <div style="display:flex;gap:8px;">
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+              <button class="btn btn-p" id="dlTabTx" style="padding:6px 12px;">Transaction Deadlines</button>
+              <button class="btn btn-g" id="dlTabPersonal" style="padding:6px 12px;">Personal Reminders</button>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
               <button class="btn btn-g" id="btnRunReminders" title="Run the daily reminder job right now instead of waiting for 7am">Send Reminders Now</button>
               <button class="btn btn-g" id="btnReminderSettings">Reminder Settings</button>
+            </div>
+          </div>
+
+          <div id="dlViewTransactions">
+            <div style="padding:10px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:flex-end;">
               <button class="btn btn-p" id="btnAddDL">+ Add Deadline</button>
             </div>
+            <!-- Filter bar -->
+            <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;">
+              <div>
+                <label style="font-size:16px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);display:block;margin-bottom:4px;">From Date</label>
+                <input type="date" id="dlFilterFrom" class="fi" style="padding:5px 8px;font-size:16px;width:140px;" oninput="rdl()">
+              </div>
+              <div>
+                <label style="font-size:16px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);display:block;margin-bottom:4px;">To Date</label>
+                <input type="date" id="dlFilterTo" class="fi" style="padding:5px 8px;font-size:16px;width:140px;" oninput="rdl()">
+              </div>
+              <div>
+                <label style="font-size:16px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);display:block;margin-bottom:4px;">Client</label>
+                <select id="dlFilterContact" class="fsel" style="padding:5px 8px;font-size:16px;width:160px;" onchange="rdl()">
+                  <option value="">All Clients</option>
+                </select>
+              </div>
+              <button class="btn btn-g" style="padding:5px 12px;font-size:16px;" onclick="ge('dlFilterFrom').value='';ge('dlFilterTo').value='';ge('dlFilterContact').value='';rdl();">Clear Filters</button>
+            </div>
+            <div id="dlList" style="padding:12px 16px;"></div>
           </div>
-          <!-- Filter bar -->
-          <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;">
-            <div>
-              <label style="font-size:16px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);display:block;margin-bottom:4px;">From Date</label>
-              <input type="date" id="dlFilterFrom" class="fi" style="padding:5px 8px;font-size:16px;width:140px;" oninput="rdl()">
+
+          <div id="dlViewPersonal" style="display:none;">
+            <div style="padding:10px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+              <div style="font-size:14px;color:var(--text3);">Reminders for you or the team - not tied to any client. Emails whoever it's assigned to, on your reminder days.</div>
+              <button class="btn btn-p" id="btnAddPR" style="white-space:nowrap;">+ Add Reminder</button>
             </div>
-            <div>
-              <label style="font-size:16px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);display:block;margin-bottom:4px;">To Date</label>
-              <input type="date" id="dlFilterTo" class="fi" style="padding:5px 8px;font-size:16px;width:140px;" oninput="rdl()">
-            </div>
-            <div>
-              <label style="font-size:16px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);display:block;margin-bottom:4px;">Client</label>
-              <select id="dlFilterContact" class="fsel" style="padding:5px 8px;font-size:16px;width:160px;" onchange="rdl()">
-                <option value="">All Clients</option>
-              </select>
-            </div>
-            <button class="btn btn-g" style="padding:5px 12px;font-size:16px;" onclick="ge('dlFilterFrom').value='';ge('dlFilterTo').value='';ge('dlFilterContact').value='';rdl();">Clear Filters</button>
+            <div id="prList" style="padding:12px 16px;"></div>
           </div>
-          <div id="dlList" style="padding:12px 16px;"></div>
         </div>
       </div>
 
@@ -965,6 +981,24 @@
     <div class="mftr"><button class="btn btn-g" data-close="fuModal">Cancel</button><button class="btn btn-p" id="btnSaveFU">Save</button></div>
   </div>
 </div>
+<div class="modal-ov" id="prModal">
+  <div class="modal">
+    <div class="mhdr"><div class="mtitle">Personal Reminder</div><button class="mx" data-close="prModal">&#x2715;</button></div>
+    <div class="mbody">
+      <div class="fg"><label class="fl">Reminder</label>
+        <input class="fi" id="prName" list="prTypeList" placeholder="e.g. Take out the trash, Lunch with lender">
+        <datalist id="prTypeList"></datalist>
+      </div>
+      <div class="fg"><label class="fl">Date</label><input class="fi" id="prDate" type="date"></div>
+      <div class="fg"><label class="fl">Remind (assign to)</label>
+        <select class="fsel assign-to-select" id="prAssign"><option value="">Me / whole team</option></select>
+      </div>
+      <div style="font-size:13px;color:var(--text3);line-height:1.4;">Emails whoever it's assigned to on your reminder days. To give this a custom email, add a matching name under <b>Reminder Settings</b>.</div>
+    </div>
+    <div class="mftr"><button class="btn btn-g" data-close="prModal">Cancel</button><button class="btn btn-p" id="btnSavePR">Save</button></div>
+  </div>
+</div>
+
 <div class="modal-ov" id="rsModal">
   <div class="modal">
     <div class="mhdr"><div class="mtitle">Reminder Settings</div><button class="mx" data-close="rsModal">&#x2715;</button></div>
