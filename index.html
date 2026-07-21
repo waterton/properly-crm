@@ -312,6 +312,7 @@
             <div style="font-size:16px;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:4px;">Active Transactions</div>
             <div style="font-size:16px;color:var(--text2);">Track every deal from contract to close  -  and beyond.</div>
           </div>
+          <button class="btn btn-g" id="btnImportPastSales">Import Past Sales</button>
           <button class="btn btn-p" id="btnNewTransaction">+ New Transaction</button>
         </div>
         <!-- Filter tabs -->
@@ -981,6 +982,27 @@
     <div class="mftr"><button class="btn btn-g" data-close="fuModal">Cancel</button><button class="btn btn-p" id="btnSaveFU">Save</button></div>
   </div>
 </div>
+<div class="modal-ov" id="impPSModal">
+  <div class="modal" style="max-width:900px;width:96%;">
+    <div class="mhdr"><div class="mtitle">Import Past Sales</div><button class="mx" data-close="impPSModal">&#x2715;</button></div>
+    <div class="mbody">
+      <div style="font-size:14px;color:var(--text2);line-height:1.5;margin-bottom:10px;">
+        Upload a CSV or Excel file of past sales. Expected columns (headers are matched loosely):
+        <b>Client Name</b>, Client Email, MLS#, Address, Sold Price, Sold Date, Terms, Concessions, Buyer's Agent, Buyer's Agent Brokerage.
+        Each row is matched to a contact by name; review below and fix any that didn't match, then import. Each becomes a closed transaction on that contact.
+      </div>
+      <div style="margin-bottom:12px;">
+        <input type="file" id="psFile" accept=".csv,.xlsx,.xls" style="font-size:15px;">
+      </div>
+      <div id="psReview"></div>
+    </div>
+    <div class="mftr">
+      <button class="btn btn-g" data-close="impPSModal">Cancel</button>
+      <button class="btn btn-p" id="btnCommitPS" style="display:none;">Import Assigned Rows</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-ov" id="prModal">
   <div class="modal">
     <div class="mhdr"><div class="mtitle">Personal Reminder</div><button class="mx" data-close="prModal">&#x2715;</button></div>
@@ -1050,6 +1072,7 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

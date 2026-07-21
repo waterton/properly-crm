@@ -2856,6 +2856,9 @@ function renderTC(){
       if(tx.price){ var p=document.createElement('div'); p.style.cssText='font-size:18px;'; p.innerHTML='<span style="color:var(--text3);">Price:</span> <b style="color:var(--accent);">'+tx.price+'</b>'; dates.appendChild(p); }
       if(tx.listCommissionAmt!=null){ var lc=document.createElement('div'); lc.style.cssText='font-size:18px;'; lc.innerHTML='<span style="color:var(--text3);">List comm:</span> <b>'+fmtUSD(tx.listCommissionAmt)+(tx.listCommissionPct!=null?' ('+tx.listCommissionPct+'%)':'')+'</b>'; dates.appendChild(lc); }
       if(tx.buyerCommissionAmt!=null){ var bc=document.createElement('div'); bc.style.cssText='font-size:18px;'; bc.innerHTML='<span style="color:var(--text3);">Buyer comm:</span> <b>'+fmtUSD(tx.buyerCommissionAmt)+(tx.buyerCommissionPct!=null?' ('+tx.buyerCommissionPct+'%)':'')+'</b>'; dates.appendChild(bc); }
+      if(tx.soldTerms){ var st=document.createElement('div'); st.style.cssText='font-size:18px;'; st.innerHTML='<span style="color:var(--text3);">Terms:</span> <b>'+tx.soldTerms+'</b>'; dates.appendChild(st); }
+      if(tx.concessions){ var cn=document.createElement('div'); cn.style.cssText='font-size:18px;'; cn.innerHTML='<span style="color:var(--text3);">Concessions:</span> <b>'+tx.concessions+'</b>'; dates.appendChild(cn); }
+      if(tx.buyerAgent){ var ba=document.createElement('div'); ba.style.cssText='font-size:18px;'; ba.innerHTML='<span style="color:var(--text3);">Buyer’s agent:</span> <b>'+tx.buyerAgent+(tx.buyerAgentBrokerage?(' ('+tx.buyerAgentBrokerage+')'):'')+'</b>'; dates.appendChild(ba); }
       if(tx.closingDate){
         var d=document.createElement('div'); d.style.cssText='font-size:18px;';
         if(tx.status==='closed'){
@@ -2894,6 +2897,136 @@ function renderTC(){
   });
 
   updateNbTC();
+}
+
+// ===================== IMPORT PAST SALES =====================
+// Historical sales -> closed transactions on the matching contact. Auto-match by client name
+// (token match, same as the scanner); anything unmatched is assigned by hand in the review.
+var psRows = [];
+
+function psGet(o, keys){
+  for(var k=0;k<keys.length;k++){ var v=o[keys[k]]; if(v!=null && String(v).trim()!=='') return String(v).trim(); }
+  return '';
+}
+function psMap(o){
+  return {
+    clientName: psGet(o,['client name','client','name','seller','seller name','owner']),
+    clientEmail: psGet(o,['client email','email','e-mail','email address']),
+    mls: psGet(o,['mls#','mls #','mls','mls number','mlsnum','mls no']),
+    address: psGet(o,['address','property address','property','street address']),
+    soldPrice: psGet(o,['sold price','sale price','sales price','price','sold']),
+    soldDate: psGet(o,['sold date','close date','closing date','settlement date','date']),
+    terms: psGet(o,['sold terms','terms','financing','loan type','financing type']),
+    concessions: psGet(o,['concessions','seller concessions','seller paid']),
+    buyerAgent: psGet(o,["buyer's agent",'buyers agent','buyer agent','selling agent']),
+    buyerBrokerage: psGet(o,["buyer's agent brokerage",'buyers agent brokerage','buyer agent brokerage','selling brokerage','brokerage','office'])
+  };
+}
+// Normalize a sold date to YYYY-MM-DD; keep '' if unparseable.
+function psDate(s){
+  if(!s) return '';
+  s = String(s).trim();
+  if(/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0,10);
+  var m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
+  if(m){ var y=m[3].length===2?('20'+m[3]):m[3]; return y+'-'+('0'+m[1]).slice(-2)+'-'+('0'+m[2]).slice(-2); }
+  var d=new Date(s); return isNaN(d)?'':d.toISOString().slice(0,10);
+}
+function psRawCSV(text){
+  var lines=text.trim().replace(/\r\n/g,'\n').replace(/\r/g,'\n').split('\n');
+  if(lines.length<2) return [];
+  var headers=csvSplit(lines[0]).map(function(h){ return h.trim().toLowerCase().replace(/"/g,''); });
+  var out=[];
+  for(var i=1;i<lines.length;i++){ if(!lines[i].trim()) continue; var cols=csvSplit(lines[i]); var o={}; headers.forEach(function(h,idx){ o[h]=(cols[idx]||'').trim(); }); out.push(o); }
+  return out;
+}
+function psLoadFile(file){
+  if(!file) return;
+  var name=(file.name||'').toLowerCase();
+  var rdr=new FileReader();
+  if(name.slice(-4)==='.csv'){
+    rdr.onload=function(){ try{ psRows=psRawCSV(rdr.result).map(psMap); renderPSReview(); }catch(e){ alert('Could not read the CSV: '+e.message); } };
+    rdr.readAsText(file);
+  } else {
+    rdr.onload=function(){
+      try{
+        if(typeof XLSX==='undefined'){ alert('Excel support did not load. Try a CSV, or check your connection and reload.'); return; }
+        var wb=XLSX.read(new Uint8Array(rdr.result),{type:'array'});
+        var ws=wb.Sheets[wb.SheetNames[0]];
+        var arr=XLSX.utils.sheet_to_json(ws,{defval:''});
+        psRows=arr.map(function(o){ var lo={}; Object.keys(o).forEach(function(k){ lo[String(k).trim().toLowerCase().replace(/"/g,'')]=o[k]; }); return psMap(lo); });
+        renderPSReview();
+      }catch(e){ alert('Could not read the Excel file: '+e.message); }
+    };
+    rdr.readAsArrayBuffer(file);
+  }
+}
+function renderPSReview(){
+  var wrap=ge('psReview'); if(!wrap) return;
+  wrap.innerHTML='';
+  if(!psRows.length){ wrap.appendChild(mkDiv('font-size:15px;color:var(--text3);padding:14px 0;','No rows found. Check the file has a header row and data.')); ge('btnCommitPS').style.display='none'; return; }
+  wrap.appendChild(mkDiv('font-size:14px;color:var(--text3);margin-bottom:8px;', psRows.length+' row'+(psRows.length===1?'':'s')+' found. Assign each to a contact (auto-matched where possible), or tick "new contact".'));
+  psRows.forEach(function(r,i){
+    var box=document.createElement('div');
+    box.style.cssText='border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px;';
+    var head=r.address||'(no address)';
+    var meta=[r.soldPrice?('$'+String(r.soldPrice).replace(/[^0-9.,]/g,'')):'', r.soldDate?psDate(r.soldDate):'', r.mls?('MLS '+r.mls):''].filter(Boolean).join('  •  ');
+    box.appendChild(mkDiv('font-size:16px;font-weight:600;color:var(--text);', head));
+    if(meta) box.appendChild(mkDiv('font-size:14px;color:var(--text3);margin:2px 0 4px;', meta));
+    var extra=[r.terms?('Terms: '+r.terms):'', r.concessions?('Concessions: '+r.concessions):'', r.buyerAgent?("Buyer's agent: "+r.buyerAgent+(r.buyerBrokerage?(' ('+r.buyerBrokerage+')'):'')):''].filter(Boolean).join('  •  ');
+    if(extra) box.appendChild(mkDiv('font-size:13px;color:var(--text3);margin-bottom:6px;', extra));
+
+    var assignRow=document.createElement('div');
+    assignRow.style.cssText='display:flex;gap:10px;align-items:center;flex-wrap:wrap;';
+    assignRow.appendChild(mkDiv('font-size:14px;color:var(--text2);min-width:70px;', r.clientName||'(no name in file)'));
+    var pickWrap=document.createElement('div'); pickWrap.style.cssText='flex:1;min-width:200px;';
+    assignRow.appendChild(pickWrap);
+    var picker=buildContactPicker(pickWrap, 'ps_contact_'+i, 'Search / assign contact...');
+    var match = r.clientName ? scMatch(r.clientName) : null;
+    if(match) picker.setContact(match);
+    var newLbl=document.createElement('label'); newLbl.style.cssText='display:flex;align-items:center;gap:5px;font-size:13px;color:var(--text3);cursor:pointer;white-space:nowrap;';
+    var newCb=document.createElement('input'); newCb.type='checkbox'; newCb.id='ps_new_'+i; newCb.style.accentColor='var(--accent)';
+    if(!match && r.clientName) newCb.checked=false;
+    (function(pk){ newCb.addEventListener('change', function(){ pk.input.disabled=newCb.checked; pk.input.style.opacity=newCb.checked?'0.5':'1'; }); })(picker);
+    newLbl.appendChild(newCb); newLbl.appendChild(document.createTextNode('new contact'));
+    assignRow.appendChild(newLbl);
+    box.appendChild(assignRow);
+    wrap.appendChild(box);
+  });
+  ge('btnCommitPS').style.display='inline-flex';
+}
+function openPastSalesImport(){
+  psRows=[];
+  if(ge('psFile')) ge('psFile').value='';
+  if(ge('psReview')) ge('psReview').innerHTML='';
+  if(ge('btnCommitPS')) ge('btnCommitPS').style.display='none';
+  om('impPSModal');
+}
+function commitPastSalesImport(){
+  var made=0, skipped=0;
+  psRows.forEach(function(r,i){
+    var contactId=null;
+    var newCb=ge('ps_new_'+i);
+    if(newCb && newCb.checked){
+      var parts=(r.clientName||'').trim().split(/\s+/);
+      if(!parts[0]){ skipped++; return; }
+      var nc={ id:Date.now()+Math.floor(Math.random()*100000)+i, first:parts[0], last:parts.slice(1).join(' '),
+        type:'seller', email:r.clientEmail||'', emails:r.clientEmail?[{value:r.clientEmail,label:''}]:[], phones:[], addresses:[],
+        property:r.address||'', stage:'', notes:'Created from past-sales import.', added:new Date().toISOString() };
+      C.push(nc); saveContact(nc); contactId=nc.id;
+    } else {
+      var picked=ge('ps_contact_'+i) ? ge('ps_contact_'+i).value : '';
+      if(!picked){ skipped++; return; }   // unassigned rows are left for later
+      contactId=parseInt(picked);
+    }
+    var tx={ id:Date.now()+Math.floor(Math.random()*100000)+i, contactId:contactId, type:'seller', status:'closed',
+      address:r.address||'', price:r.soldPrice||'', mlsNum:r.mls||'', closingDate:psDate(r.soldDate),
+      soldTerms:r.terms||'', concessions:r.concessions||'', buyerAgent:r.buyerAgent||'', buyerAgentBrokerage:r.buyerBrokerage||'',
+      notes:'Imported past sale.', steps:{}, added:new Date().toISOString() };
+    TX.push(tx); saveTX(tx); made++;
+  });
+  cm('impPSModal');
+  alert('Imported '+made+' past sale'+(made===1?'':'s')+'.' + (skipped?('\n'+skipped+' row(s) had no contact assigned and were skipped.'):''));
+  renderTC(); rd(); if(curDet) vc(curDet);
 }
 
 function openTCDetail(id){
@@ -7434,6 +7567,10 @@ if(ge('dlTabTx')) ge('dlTabTx').addEventListener('click', function(){ dlShowView
 if(ge('dlTabPersonal')) ge('dlTabPersonal').addEventListener('click', function(){ dlShowView('personal'); });
 if(ge('btnAddPR')) ge('btnAddPR').addEventListener('click', function(){ openPersonalReminder(''); });
 if(ge('btnSavePR')) ge('btnSavePR').addEventListener('click', savePersonalReminder);
+// ---- Import past sales ----
+if(ge('btnImportPastSales')) ge('btnImportPastSales').addEventListener('click', openPastSalesImport);
+if(ge('psFile')) ge('psFile').addEventListener('change', function(){ psLoadFile(this.files && this.files[0]); });
+if(ge('btnCommitPS')) ge('btnCommitPS').addEventListener('click', commitPastSalesImport);
 if(ge('rsNewType')) ge('rsNewType').addEventListener('keydown', function(e){ if(e.key==='Enter'){ e.preventDefault(); rsAddType(); } });
 
 // Trigger the daily reminder job on demand. Sends your Supabase session token, which the
