@@ -269,6 +269,18 @@ async function processReminders(result) {
   const dls = await supaGet('deadlines?date=gte.' + today + '&date=lte.' + until + '&limit=500');
   if (!Array.isArray(dls) || !dls.length) return;
 
+  // Preload existing log rows for these deadlines so we can tell "already sent" (skip) apart
+  // from "tried and failed" (retry). Keyed by deadlineId|daysBefore; a 'sent' row wins.
+  const logByKey = {};
+  const dlIds = dls.map(d => d.id).filter(x => x != null);
+  if (dlIds.length) {
+    const logs = await supaGet('reminder_log?deadlineId=in.(' + dlIds.join(',') + ')&limit=2000');
+    (Array.isArray(logs) ? logs : []).forEach(r => {
+      const k = r.deadlineId + '|' + r.daysBefore;
+      if (!logByKey[k] || r.status === 'sent') logByKey[k] = r;
+    });
+  }
+
   const tokens = await supaGet('gmail_tokens?select=member_id,email&limit=50');
   const defaultSender = (Array.isArray(tokens) && tokens[0]) ? tokens[0].member_id : null;
   const tokenCache = {};
@@ -339,8 +351,15 @@ async function processReminders(result) {
     if (tok.error) { result.reminders.errors.push(tok.error); continue; }
 
     const msg = buildReminder(c, dl, tx, n, set);
+    // Already sent successfully? Leave it alone. A failed/pending row does NOT block a retry.
+    const logKey = dl.id + '|' + n;
+    const prior = logByKey[logKey];
+    if (prior && prior.status === 'sent') { result.reminders.skipped++; continue; }
+
     const logRow = {
-      id: Date.now() + Math.floor(Math.random() * 100000) + i,
+      // Reuse the prior row's id when retrying so we update it in place (the unique index on
+      // deadlineId+daysBefore would reject a second insert); otherwise a fresh id.
+      id: prior ? prior.id : (Date.now() + Math.floor(Math.random() * 100000) + i),
       deadlineId: dl.id,
       transactionId: dl.transactionId || null,
       contactId: dl.contactId || null,
@@ -353,15 +372,18 @@ async function processReminders(result) {
       sentAt: new Date().toISOString()
     };
 
-    // Claim the reminder BEFORE sending. The unique index on (deadlineId, daysBefore)
-    // makes a duplicate send impossible even if the cron overlaps or is re-triggered.
-    const claim = await supaUpsert('reminder_log', [logRow]);
-    if (!claim.ok) { result.reminders.skipped++; continue; }
+    // For a brand-new reminder, claim BEFORE sending: the unique index on (deadlineId,
+    // daysBefore) makes a concurrent double-send impossible. (A retry reuses the existing row.)
+    if (!prior) {
+      const claim = await supaUpsert('reminder_log', [logRow]);
+      if (!claim.ok) { result.reminders.skipped++; continue; }  // another run just claimed it
+    }
 
     const sent = await gmailSend(tok.accessToken, to, msg.subject, msg.body, cc);
     logRow.status = sent.error ? 'failed' : 'sent';
     logRow.error = sent.error || '';
     await supaUpsert('reminder_log', [logRow]);
+    logByKey[logKey] = logRow;
 
     if (sent.error) { result.reminders.failed++; result.reminders.errors.push(sent.error); }
     else { result.reminders.sent++; }
