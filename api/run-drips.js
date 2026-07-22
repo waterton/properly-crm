@@ -287,14 +287,16 @@ async function processReminders(result) {
     if (n === null || n < 0) continue;
 
     const personal = (dl.contactId == null && dl.transactionId == null);
-    const set = byType[dl.type] || def;
+    const typeSet = byType[dl.type];         // explicit config for THIS type, or undefined
+    const set = typeSet || def;              // used for the enabled flag / fallback
     if (set.enabled === false) continue;
-    // Which days-before to use:
-    //  - the type's own timing if it was explicitly set;
+    // Which days-before to use. IMPORTANT: check the TYPE's own config, not `set` - `set`
+    // falls back to `def` (e.g. [3,1]), which would hijack a personal reminder's day-of rule.
+    //  - the type's own timing if it was explicitly configured;
     //  - otherwise a personal reminder fires on its own date (day-of), since it's a to-do;
     //  - otherwise a transaction deadline uses the default advance timing (e.g. 3, 1).
     let days;
-    if (set.daysBefore && set.daysBefore.length) days = set.daysBefore;
+    if (typeSet && typeSet.daysBefore && typeSet.daysBefore.length) days = typeSet.daysBefore;
     else if (personal) days = [0];
     else days = (def.daysBefore || []);
     if (days.indexOf(n) === -1) continue;
