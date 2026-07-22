@@ -55,6 +55,7 @@ var C=[],N=[],F=[],D=[],TX=[],TM=[],A=[],curDet=null,curFilter='all',curPage='da
 var CAMP=[],ENR=[],SENDLOG=[],DOCS=[];
 var CH=[]; // tx_changes: audit trail of field changes applied from scanned documents
 var RS=[]; // reminder_settings: how many days before each deadline type to remind (cron reads these)
+var RL=[]; // reminder_log: which reminders the cron has already sent (used to hide sent personal reminders)
 var curSort='last'; // 'last' or 'first'
 var selectedContacts = new Set();
 // TM = Team Members: [{id, first, last, role, email, phone, color, calLink}]
@@ -349,7 +350,8 @@ async function loadFromDB(){
       fetchAllRows(base, 'documents?order=created_at.asc,id.asc', headers).catch(function(){return []; }),
       fetchAllRows(base, 'tx_changes?order=id.asc', headers).catch(function(){return []; }),
       fetchAllRows(base, 'reminder_settings?order=id.asc', headers).catch(function(){return []; }),
-      fetchAllRows(base, 'team?order=id.asc', headers).catch(function(){return []; })
+      fetchAllRows(base, 'team?order=id.asc', headers).catch(function(){return []; }),
+      fetchAllRows(base, 'reminder_log?order=id.desc', headers).catch(function(){return []; })
     ]);
     var rc = results[0], rn = results[1], rf = results[2], rd = results[3], rtx = results[4];
 
@@ -377,6 +379,8 @@ async function loadFromDB(){
     // The team comes from the database so member ids are the same on every machine.
     var rtm = results[11];
     if(Array.isArray(rtm) && rtm.length) TM = rtm;
+    var rrl = results[12];
+    if(Array.isArray(rrl)) RL = rrl;
     DOCS.forEach(function(d){
       d.id = typeof d.id === 'string' ? parseInt(d.id)||d.id : d.id;
       if(d.contact_id != null) d.contact_id = typeof d.contact_id === 'string' ? parseInt(d.contact_id) : d.contact_id;
@@ -1824,6 +1828,13 @@ function dlIsClosed(d){ var t=dlTxFor(d); return !!(t && t.status==='closed'); }
 // ---- Deadlines page: two subtabs (transaction deadlines vs personal reminders) ----
 var dlView = 'transactions';
 function personalReminders(){ return D.filter(function(d){ return d.contactId==null && d.transactionId==null; }); }
+// A personal reminder is "done" once the cron has actually sent it (a reminder_log row),
+// or once its date has passed (a fallback so unsent past ones don't linger forever).
+function personalReminderDone(d){
+  if(RL.some(function(r){ return String(r.deadlineId)===String(d.id) && r.status==='sent'; })) return true;
+  if(d.date && d.date < tod()) return true;
+  return false;
+}
 function dlShowView(view){
   dlView = (view === 'personal') ? 'personal' : 'transactions';
   var on = dlView === 'personal';
@@ -1839,7 +1850,7 @@ function dlShowView(view){
 function renderPersonalReminders(){
   var el = ge('prList'); if(!el) return;
   el.innerHTML = '';
-  var list = personalReminders().slice().sort(function(a,b){ return String(a.date||'').localeCompare(String(b.date||'')); });
+  var list = personalReminders().filter(function(d){ return !personalReminderDone(d); }).sort(function(a,b){ return String(a.date||'').localeCompare(String(b.date||'')); });
   if(!list.length){
     el.appendChild(mkDiv('font-size:16px;color:var(--text3);padding:20px;text-align:center;','No personal reminders yet. Click "+ Add Reminder".'));
     return;
