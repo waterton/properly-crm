@@ -481,9 +481,12 @@ async function authorized(req) {
   const secret = process.env.CRON_SECRET;
   const hdr = req.headers['x-cron-secret'];
   const auth = req.headers['authorization'] || '';
+  const qs = (req.query && req.query.secret) || '';   // cron-jobs.org passes ?secret=...
 
-  // 1. Vercel's scheduled cron (or anything holding the secret).
-  if (secret && (hdr === secret || auth === ('Bearer ' + secret))) return true;
+  // 1. Vercel's scheduled cron, cron-jobs.org, or anything holding the secret. Accept the
+  //    secret as a query param, a raw Authorization header, a Bearer token, or x-cron-secret -
+  //    matching how /api/cron-briefing already validates it.
+  if (secret && (qs === secret || hdr === secret || auth === secret || auth === ('Bearer ' + secret))) return true;
   if (!secret) return true;   // no secret configured: unchanged behaviour
 
   // 2. A signed-in CRM user. Lets the in-app "Send Reminders Now" button trigger a run
