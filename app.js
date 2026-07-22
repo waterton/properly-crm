@@ -1670,8 +1670,10 @@ function rsFmtDays(arr){ return (arr||[]).join(', '); }
 // on a deadline, and any custom type saved in reminder_settings. This is also what feeds the
 // Add Deadline dropdown, so a custom "Lunch with lender" becomes selectable there.
 function rsAllTypes(){
+  // Standard transaction types plus the custom types you've configured (RS rows).
+  // Deliberately NOT every type used by a deadline - otherwise a type could never be deleted
+  // because a reminder still referencing the name would keep re-adding it to the list.
   var types = RS_TYPES.slice();
-  D.forEach(function(d){ if(d.type && types.indexOf(d.type) === -1) types.push(d.type); });
   RS.forEach(function(r){ if(r.deadlineType && types.indexOf(r.deadlineType) === -1) types.push(r.deadlineType); });
   return types;
 }
