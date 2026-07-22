@@ -671,8 +671,8 @@ function rb(){
   var td=tod();
   var tFU=F.filter(function(f){return !f.done&&f.date===td;});
   var oFU=F.filter(function(f){return !f.done&&f.date<td;});
-  var uDL=D.filter(function(d){return du(d.date)<=0 && !dlIsClosed(d);});
-  var wDL=D.filter(function(d){var n=du(d.date);return n>0&&n<=7&&!dlIsClosed(d);});
+  var uDL=D.filter(function(d){return du(d.date)<=0 && !dlIsClosed(d) && !dlDonePersonal(d);});
+  var wDL=D.filter(function(d){var n=du(d.date);return n>0&&n<=7&&!dlIsClosed(d) && !dlDonePersonal(d);});
   var act=C.filter(function(c){return c.stage && c.stage!=='Closed';});
   var urg=uDL.length+oFU.length;
   ge('bUrgNum').textContent=urg;
@@ -708,7 +708,7 @@ function rd(){
   if(!rec.length){rEl.innerHTML='<div class="empty">No activity yet</div>';}
   else rec.forEach(function(act){var c=gc(act.contactId);var row=document.createElement('div');row.style.cssText='display:flex;align-items:center;justify-content:space-between;padding:9px 18px;border-bottom:1px solid var(--border);';var nameEl=document.createElement('span');nameEl.style.cssText='font-size:16px;font-weight:600;color:var(--text);';nameEl.textContent=c?fn(c):'Unknown';var typeEl=document.createElement('span');typeEl.style.cssText='font-size:16px;color:var(--text2);';typeEl.textContent=act.type;row.appendChild(nameEl);row.appendChild(typeEl);rEl.appendChild(row);});
   var dlEl=ge('dDeadlines');dlEl.innerHTML='';
-  var dl=D.filter(function(d){return !dlIsClosed(d);}).sort(function(a,b){return new Date(a.date)-new Date(b.date);}).slice(0,5);
+  var dl=D.filter(function(d){return !dlIsClosed(d) && !dlDonePersonal(d);}).sort(function(a,b){return new Date(a.date)-new Date(b.date);}).slice(0,5);
   if(!dl.length){dlEl.innerHTML='<div class="empty">No deadlines</div>';}
   else dl.forEach(function(d){var c=gc(d.contactId);var n=du(d.date);var lbl=n<0?'Overdue':n===0?'Today':n+'d';var row=mkRow('dl-row');row.style.cursor='pointer';row.addEventListener('click',function(){sp('deadlines');});row.appendChild(mkDot(dc(n)));var info=mkDiv('flex:1;');info.appendChild(mkDiv('font-size:18px;',d.type));info.appendChild(mkDiv('font-size:18px;color:var(--text3);',c?fn(c):''));row.appendChild(info);row.appendChild(mkDiv('font-family:monospace;font-size:18px;color:var(--text2);',lbl));dlEl.appendChild(row);});
   var fuEl=ge('dFollowups');fuEl.innerHTML='';
@@ -1835,6 +1835,9 @@ function personalReminderDone(d){
   if(d.date && d.date < tod()) return true;
   return false;
 }
+// A personal reminder that's already fired (or is past) shouldn't clutter the dashboard/briefing.
+// Only applies to personal reminders - an overdue TRANSACTION deadline is still genuinely urgent.
+function dlDonePersonal(d){ return d.contactId==null && d.transactionId==null && personalReminderDone(d); }
 function dlShowView(view){
   dlView = (view === 'personal') ? 'personal' : 'transactions';
   var on = dlView === 'personal';
