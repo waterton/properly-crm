@@ -1071,6 +1071,29 @@
   </div>
 </div>
 
+<!-- Ask-CRM voice assistant -->
+<button id="askFab" title="Ask the CRM" style="position:fixed;bottom:20px;right:20px;z-index:400;width:58px;height:58px;border-radius:50%;background:var(--accent);color:#0d0f14;border:none;box-shadow:0 4px 16px rgba(0,0,0,0.35);cursor:pointer;display:flex;align-items:center;justify-content:center;">
+  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg>
+</button>
+<div class="modal-ov" id="askModal">
+  <div class="modal">
+    <div class="mhdr"><div class="mtitle">Ask the CRM</div><button class="mx" data-close="askModal">&#x2715;</button></div>
+    <div class="mbody">
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;">
+        <button id="askMic" class="btn btn-p" style="padding:9px 16px;font-size:16px;white-space:nowrap;">Speak</button>
+        <input id="askInput" class="fi" style="flex:1;min-width:150px;font-size:16px;" placeholder="e.g. when is the financing deadline for the Cuban family">
+        <button id="askGo" class="btn btn-g" style="padding:9px 14px;font-size:16px;">Ask</button>
+      </div>
+      <div id="askStatus" style="font-size:13px;color:var(--text3);min-height:16px;"></div>
+      <div id="askAnswer" style="font-size:18px;color:var(--text);line-height:1.5;margin-top:6px;white-space:pre-wrap;"></div>
+      <div id="askActions" style="display:none;gap:8px;margin-top:14px;flex-wrap:wrap;">
+        <button id="askReplay" class="btn btn-g" style="padding:6px 12px;font-size:15px;">Replay</button>
+        <button id="askStop" class="btn btn-g" style="padding:6px 12px;font-size:15px;">Stop</button>
+        <button id="askEmail" class="btn btn-g" style="padding:6px 12px;font-size:15px;">Email me this</button>
+      </div>
+    </div>
+  </div>
+</div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="app.js"></script>

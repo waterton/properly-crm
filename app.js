@@ -2915,6 +2915,114 @@ function renderTC(){
   updateNbTC();
 }
 
+// ===================== ASK-CRM VOICE ASSISTANT =====================
+// A quick, on-the-go assistant: speak a question, it answers from your CRM data and reads it
+// back aloud. Reuses the existing Gemini endpoint. Grounded to answer only from the data.
+var lastAskAnswer = '';
+
+// Compact snapshot of the data the assistant can reason over. Kept lean for speed/cost.
+function askSnapshot(){
+  var nm = {};
+  C.forEach(function(c){ nm[c.id] = fn(c); });
+  return {
+    today: tod(),
+    contacts: C.map(function(c){ return {
+      name: fn(c), types: ctypes(c), stage: c.stage||'', phone: c.phone||'', email: c.email||'',
+      property: c.property||'', price: c.price||'', lang: clang(c), notes: (c.notes||'').slice(0,500)
+    }; }),
+    transactions: TX.map(function(t){ return {
+      client: nm[t.contactId]||'', address: t.address||'', side: t.type, status: t.status||'active',
+      price: t.price||'', mls: t.mlsNum||'', lender: t.lender||'', title: t.titleCo||'',
+      contractDate: t.contractDate||'', closingDate: t.closingDate||'', earnestDate: t.earnestDate||'',
+      dueDiligenceDate: t.dueDiligDate||'', financingDate: t.financingDate||'', appraisalDate: t.appraisalDate||'',
+      listCommissionPct: t.listCommissionPct, buyerCommissionPct: t.buyerCommissionPct,
+      soldTerms: t.soldTerms||'', concessions: t.concessions||''
+    }; }),
+    deadlines: D.filter(function(d){ return !dlIsClosed(d); }).map(function(d){ return {
+      client: d.contactId!=null ? (nm[d.contactId]||'') : '(personal)', type: d.type, date: d.date, time: d.time||''
+    }; }),
+    followups: F.filter(function(f){ return !f.done; }).map(function(f){ return {
+      client: nm[f.contactId]||'', task: f.label, date: f.date, priority: f.pri||''
+    }; })
+  };
+}
+
+async function askCrm(question){
+  question = (question||'').trim();
+  if(!question) return;
+  lastAskAnswer = '';
+  var ans = ge('askAnswer'), st = ge('askStatus'), acts = ge('askActions');
+  if(st) st.textContent = 'Thinking...';
+  if(ans) ans.textContent = '';
+  if(acts) acts.style.display = 'none';
+
+  var prompt = 'You are a helpful assistant for a busy real estate agent using their CRM on the go. '
+    + 'Answer the question using ONLY the JSON data provided below. '
+    + 'If the answer is not in the data, say plainly that you do not have that information - NEVER guess or invent a number, date, name, or address. '
+    + 'Keep the answer short and conversational, one or two sentences, because it will be read out loud. '
+    + 'Include the specific value (amount, date, address) when you have it. Today is ' + tod() + '.\n\n'
+    + 'DATA:\n' + JSON.stringify(askSnapshot()) + '\n\n'
+    + 'QUESTION: ' + question;
+
+  try{
+    var resp = await fetch('/api/claude', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ max_tokens: 600, messages: [{ role:'user', content: prompt }] })
+    });
+    var data = await resp.json();
+    var answer = (data.content && data.content[0] && data.content[0].text)
+      ? data.content[0].text.trim()
+      : (data.error ? ('Sorry, there was an error: ' + (data.error.message||'unknown')) : 'Sorry, I could not get an answer.');
+    lastAskAnswer = answer;
+    if(ans) ans.textContent = answer;
+    if(st) st.textContent = '';
+    if(acts) acts.style.display = 'flex';
+    askSpeak(answer);
+  }catch(e){
+    if(st) st.textContent = '';
+    if(ans) ans.textContent = 'Could not reach the assistant. Check your connection and try again.';
+  }
+}
+
+function askSpeak(text){
+  try{
+    if(!window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    var u = new SpeechSynthesisUtterance(text);
+    u.rate = 1.0; u.pitch = 1.0;
+    window.speechSynthesis.speak(u);
+  }catch(e){}
+}
+function askStopSpeak(){ try{ if(window.speechSynthesis) window.speechSynthesis.cancel(); }catch(e){} }
+
+function askListen(){
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!SR){ alert('Voice input needs Chrome (or your phone keyboard mic). You can type the question instead.'); if(ge('askInput')) ge('askInput').focus(); return; }
+  askStopSpeak();
+  var rec = new SR();
+  rec.lang = 'en-US'; rec.interimResults = false; rec.maxAlternatives = 1;
+  var mic = ge('askMic'), st = ge('askStatus');
+  if(mic){ mic.textContent = 'Listening...'; mic.disabled = true; }
+  if(st) st.textContent = 'Listening - speak your question.';
+  rec.onresult = function(e){
+    var t = e.results[0][0].transcript;
+    if(ge('askInput')) ge('askInput').value = t;
+    askCrm(t);
+  };
+  rec.onerror = function(e){ if(st) st.textContent = (e.error==='not-allowed') ? 'Microphone blocked - allow mic access, or type instead.' : 'Did not catch that - try again or type.'; };
+  rec.onend = function(){ if(mic){ mic.textContent = 'Speak'; mic.disabled = false; } };
+  try{ rec.start(); }catch(e){ if(mic){ mic.textContent='Speak'; mic.disabled=false; } }
+}
+
+function openAskModal(){
+  lastAskAnswer = '';
+  if(ge('askInput')) ge('askInput').value = '';
+  if(ge('askAnswer')) ge('askAnswer').textContent = '';
+  if(ge('askStatus')) ge('askStatus').textContent = '';
+  if(ge('askActions')) ge('askActions').style.display = 'none';
+  om('askModal');
+}
+
 // ===================== IMPORT PAST SALES =====================
 // Historical sales -> closed transactions on the matching contact. Auto-match by client name
 // (token match, same as the scanner); anything unmatched is assigned by hand in the review.
@@ -7583,6 +7691,21 @@ if(ge('dlTabTx')) ge('dlTabTx').addEventListener('click', function(){ dlShowView
 if(ge('dlTabPersonal')) ge('dlTabPersonal').addEventListener('click', function(){ dlShowView('personal'); });
 if(ge('btnAddPR')) ge('btnAddPR').addEventListener('click', function(){ openPersonalReminder(''); });
 if(ge('btnSavePR')) ge('btnSavePR').addEventListener('click', savePersonalReminder);
+// ---- Ask-CRM voice assistant ----
+if(ge('askFab')) ge('askFab').addEventListener('click', openAskModal);
+if(ge('askMic')) ge('askMic').addEventListener('click', askListen);
+if(ge('askGo')) ge('askGo').addEventListener('click', function(){ askCrm(ge('askInput').value); });
+if(ge('askInput')) ge('askInput').addEventListener('keydown', function(e){ if(e.key==='Enter'){ e.preventDefault(); askCrm(this.value); } });
+if(ge('askReplay')) ge('askReplay').addEventListener('click', function(){ if(lastAskAnswer) askSpeak(lastAskAnswer); });
+if(ge('askStop')) ge('askStop').addEventListener('click', askStopSpeak);
+if(ge('askEmail')) ge('askEmail').addEventListener('click', function(){
+  if(!lastAskAnswer){ return; }
+  if(typeof gmailState==='undefined' || !Object.keys(gmailState.connectedAccounts||{}).length){ alert('Connect a Gmail account first (Gmail tab) to email answers.'); return; }
+  var myEmail = (currentUser && currentUser.email) ? currentUser.email : '';
+  cm('askModal'); askStopSpeak();
+  openCompose({ to: myEmail, subject: 'From your CRM assistant', body: lastAskAnswer });
+});
+
 // ---- Import past sales ----
 if(ge('btnImportPastSales')) ge('btnImportPastSales').addEventListener('click', openPastSalesImport);
 if(ge('psFile')) ge('psFile').addEventListener('change', function(){ psLoadFile(this.files && this.files[0]); });
