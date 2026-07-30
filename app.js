@@ -4622,6 +4622,7 @@ function showScannerResults(r){
   var fields = document.createElement('div');
   fields.className = 'scanner-fields';
   var fieldDefs = [
+    {label:'Property Address', key:'address', id:'sc_address'},
     {label:'Buyer Name', key:'buyerName', id:'sc_buyer'},
     {label:'Seller Name', key:'sellerName', id:'sc_seller'},
     {label:'Purchase Price', key:'purchasePrice', id:'sc_price'},
@@ -5106,7 +5107,7 @@ async function commitScanImport(r, btn){
   var appraisalDate = ge('sc_appraisal') ? ge('sc_appraisal').value : (r.appraisalDeadline||'');
   var listCommPct = ge('sc_list_comm') ? ge('sc_list_comm').value : (r.listingCommissionPct||'');
   var buyerCommPct = ge('sc_buyer_comm') ? ge('sc_buyer_comm').value : (r.buyerCommissionPct||'');
-  var address = r.address||'';
+  var address = ge('sc_address') ? ge('sc_address').value.trim() : (r.address||'');
 
   // ---- Resolve transaction choice ----
   var choiceEl = document.querySelector('input[name="sc_tx_choice"]:checked');
@@ -5164,6 +5165,8 @@ async function commitScanImport(r, btn){
         if(accDate) tx.lastAddendumDate = accDate;
       }
     }
+    // Fill in a blank address from the scanned doc - never overwrite one that's already set.
+    if(!tx.address && address) tx.address = address;
   } else {
     var txType = (ge('sc_client_side') && ge('sc_client_side').value) ? ge('sc_client_side').value : ((r.docType && r.docType.toLowerCase().indexOf('list') >= 0) ? 'seller' : 'buyer');
     tx = {
