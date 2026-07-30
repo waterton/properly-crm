@@ -2767,21 +2767,30 @@ var TC_TEMPLATES = {
 };
 
 function saveTX(tx){ recomputeCommission(tx); sv(); if(supaReady && tx) dbSave('transactions', [tx]); }
-function deleteTX(id){
-  if(!confirm('Delete this transaction and all its data?')) return;
-  // Remove everything hanging off the deal too. Without this, its deadlines / follow-ups /
-  // notes survive as orphans - still assigned to someone, pointing at a deal that's gone.
+async function deleteTX(id){
+  var tx = TX.find(function(t){ return String(t.id)===String(id); });
+  var txDocs = DOCS.filter(function(dc){ return String(dc.transaction_id)===String(id); });
+  var msg = 'Delete this transaction and everything attached to it';
+  var bits = [];
+  if(txDocs.length) bits.push(txDocs.length+' document'+(txDocs.length===1?'':'s'));
+  var dl = D.filter(function(d){ return String(d.transactionId)===String(id); }).length;
+  var fu = F.filter(function(f){ return String(f.transactionId)===String(id); }).length;
+  if(dl) bits.push(dl+' deadline'+(dl===1?'':'s'));
+  if(fu) bits.push(fu+' follow-up'+(fu===1?'':'s'));
+  msg += bits.length ? (' ('+bits.join(', ')+')') : '';
+  msg += '?\n\nThe contact stays. This cannot be undone.';
+  if(!confirm(msg)) return;
+
+  // Cancelled deal = wipe everything hanging off it. The CONTACT is deliberately left alone.
   TX=TX.filter(function(t){return t.id!==id;});
   D =D.filter(function(d){ return String(d.transactionId)!==String(id); });
   F =F.filter(function(f){ return String(f.transactionId)!==String(id); });
   N =N.filter(function(n){ return String(n.transactionId)!==String(id); });
   CH=CH.filter(function(h){ return String(h.transactionId)!==String(id); });
-  // Documents keep their files and stay with the client - just drop the dead deal link.
-  DOCS.forEach(function(dc){
-    if(String(dc.transaction_id)===String(id)){ dc.transaction_id = null; if(supaReady) dbSave('documents',[dc]); }
-  });
   sv();
-  pausePoll(8000); deleteTXfromDB(id);
+  pausePoll(15000); deleteTXfromDB(id);
+  // Documents: delete files + rows too (bulkDeleteDocuments handles storage, DB, and DOCS).
+  if(txDocs.length){ try{ await bulkDeleteDocuments(txDocs); }catch(e){} }
   var ov=ge('tcDetOv'); if(ov) ov.classList.remove('open');
   renderTC(); rd();
 }
