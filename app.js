@@ -4353,7 +4353,20 @@ function buildContactPicker(containerEl, hiddenId, placeholder, onPick){
   box.type = 'text';
   box.className = 'fi';
   box.setAttribute('autocomplete', 'off');
+  box.setAttribute('inputmode', 'search');
   box.placeholder = placeholder || 'Search contacts by name, email, or phone...';
+  box.style.fontSize = '16px';       // 16px keeps mobile from zooming and gives a big tap target
+  box.style.paddingRight = '34px';   // room for the clear button
+
+  // Persistent clear/search button. On a phone, once a name is auto-filled there's nothing to
+  // tap "into" to raise the keyboard - this button empties the field AND focuses it (focusing
+  // inside a tap reliably opens the mobile keyboard), so you can always search.
+  var clr = document.createElement('button');
+  clr.type = 'button';
+  clr.textContent = '✕';
+  clr.title = 'Clear and search';
+  clr.setAttribute('aria-label', 'Clear and search');
+  clr.style.cssText = 'position:absolute;right:6px;top:8px;background:var(--surface2);border:1px solid var(--border);border-radius:50%;width:26px;height:26px;line-height:1;color:var(--text2);cursor:pointer;font-size:13px;padding:0;z-index:3;display:flex;align-items:center;justify-content:center;';
  
   var menu = document.createElement('div');
   menu.style.cssText = 'position:absolute;left:0;right:0;top:100%;z-index:50;background:var(--surface);border:1px solid var(--border);border-radius:7px;margin-top:3px;max-height:260px;overflow-y:auto;box-shadow:0 6px 20px rgba(0,0,0,0.12);display:none;';
@@ -4427,12 +4440,18 @@ function buildContactPicker(containerEl, hiddenId, placeholder, onPick){
     render(box.value);
   });
   box.addEventListener('focus', function(){ if(box.value) render(box.value); });
+  clr.addEventListener('click', function(e){
+    e.preventDefault();
+    box.value = ''; hidden.value = ''; menu.style.display = 'none';
+    box.focus();   // focus within the tap -> keyboard opens on mobile
+  });
   document.addEventListener('click', function(e){
     if(!wrap.contains(e.target)) menu.style.display = 'none';
   });
- 
+
   wrap.appendChild(hidden);
   wrap.appendChild(box);
+  wrap.appendChild(clr);
   wrap.appendChild(menu);
   containerEl.appendChild(wrap);
   return { input: box, hidden: hidden, setContact: pick };
