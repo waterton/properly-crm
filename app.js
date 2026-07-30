@@ -491,6 +491,44 @@ function deleteDLfromDB(id){
     fetch(SUPA_URL+'/rest/v1/deadlines?id=eq.'+id,{method:'DELETE',headers:h});
   });
 }
+// Delete rows from a table by a column match (used for cascade deletes).
+function dbDeleteBy(table, col, val){
+  if(!supaReady) return;
+  getAuthHeaders().then(function(h){
+    fetch(SUPA_URL+'/rest/v1/'+table+'?'+col+'=eq.'+val, {method:'DELETE', headers:h});
+  });
+}
+
+// Reusable delete-confirmation dialog. Shows a permanent-delete warning and a checkbox list of
+// associated data that WILL also be deleted - unchecking an item keeps it. onConfirm receives an
+// object of the checked (to-delete) cascade ids, e.g. {docs:true, deadlines:true}.
+var _delOnConfirm = null;
+function openDeleteConfirm(cfg){
+  cfg = cfg || {};
+  if(ge('delTitle')) ge('delTitle').textContent = cfg.title || 'Confirm delete';
+  if(ge('delWarn')) ge('delWarn').textContent = cfg.warnLine || 'This is permanent and cannot be undone.';
+  var cascades = cfg.cascades || [];
+  if(ge('delSubtitle')) ge('delSubtitle').textContent = cascades.length
+    ? 'This will also permanently delete the following. Uncheck anything you want to keep:'
+    : '';
+  var wrap = ge('delCascadeWrap');
+  if(wrap){
+    wrap.innerHTML = '';
+    cascades.forEach(function(c){
+      var lab = document.createElement('label');
+      lab.style.cssText = 'display:flex;align-items:center;gap:9px;padding:8px 0;font-size:15px;color:var(--text);cursor:pointer;border-bottom:1px solid var(--border);';
+      var cb = document.createElement('input'); cb.type = 'checkbox';
+      cb.checked = (c.defaultChecked !== false);
+      cb.setAttribute('data-cascade', c.id);
+      cb.style.cssText = 'accent-color:var(--danger);width:18px;height:18px;flex:0 0 auto;';
+      lab.appendChild(cb); lab.appendChild(document.createTextNode(c.label));
+      wrap.appendChild(lab);
+    });
+  }
+  _delOnConfirm = cfg.onConfirm || null;
+  om('delModal');
+}
+
 function deleteTXfromDB(id){
   if(!supaReady) return;
   getAuthHeaders().then(function(h){
@@ -1548,7 +1586,7 @@ function vc(id){
   delCBtn.className = 'btn';
   delCBtn.style.cssText = 'background:rgba(201,76,76,0.15);color:var(--danger);border:1px solid rgba(201,76,76,0.3);border-radius:7px;padding:8px 14px;cursor:pointer;font-size:18px;font-family:DM Sans,sans-serif;';
   delCBtn.textContent = 'Delete Contact';
-  (function(cid){ delCBtn.addEventListener('click', function(){ if(confirm('Delete this contact and all their data?')) delc(cid); }); })(id);
+  (function(cid){ delCBtn.addEventListener('click', function(){ delc(cid); }); })(id);
   actSec.appendChild(editCBtn); actSec.appendChild(delCBtn);
   body.appendChild(actSec);
 
@@ -1558,7 +1596,51 @@ function mksec(title){var s=mkRow('det-sec');var t=mkDiv('det-sec-title',title);
 function mkfld(lbl,val,href,style){var r=mkRow('det-field');var l=mkDiv('det-flbl',lbl);l.className='det-flbl';var v=mkDiv('det-fval','');v.className='det-fval';if(style)v.style.cssText=style;if(href){var a=document.createElement('a');a.href=href;a.textContent=val;v.appendChild(a);}else v.textContent=val;r.appendChild(l);r.appendChild(v);return r;}
 function cd(){ge('detOv').classList.remove('open');curDet=null;}
 function ss(id,stage){var c=gc(id);if(!c)return;c.stage=stage;if(stage==='Closed')c.closedAt=new Date().toISOString();updateContact(c);logActivity(id,'Pipeline update');autoEnrollOnStage(c,stage);rd();if(curPage==='pipeline')rp();if(curPage==='contacts')rc();}
-function delc(id, silent){if(!silent&&!confirm('Delete this contact?'))return;C=C.filter(function(c){return c.id!==id;});N=N.filter(function(n){return n.contactId!==id;});F=F.filter(function(f){return f.contactId!==id;});D=D.filter(function(d){return d.contactId!==id;});sv();deleteCfromDB(id);if(!silent){cd();rd();if(curPage==='contacts')rc();}}
+function delc(id, silent){
+  // Silent path (used by merge): immediate, no dialog. Unchanged behavior.
+  if(silent){
+    C=C.filter(function(c){return c.id!==id;});
+    N=N.filter(function(n){return n.contactId!==id;});
+    F=F.filter(function(f){return f.contactId!==id;});
+    D=D.filter(function(d){return d.contactId!==id;});
+    sv(); deleteCfromDB(id);
+    return;
+  }
+  var c=gc(id);
+  var cTx =TX.filter(function(t){ return String(t.contactId)===String(id); });
+  var cDocs=DOCS.filter(function(dc){ return String(dc.contact_id)===String(id); });
+  var cDl =D.filter(function(d){ return String(d.contactId)===String(id); });
+  var cFu =F.filter(function(f){ return String(f.contactId)===String(id); });
+  var cNt =N.filter(function(n){ return String(n.contactId)===String(id); });
+  var cascades=[];
+  if(cTx.length)   cascades.push({id:'tx',        label: cTx.length+' transaction'+(cTx.length===1?'':'s')});
+  if(cDocs.length) cascades.push({id:'docs',      label: cDocs.length+' document'+(cDocs.length===1?'':'s')});
+  if(cDl.length)   cascades.push({id:'deadlines', label: cDl.length+' deadline'+(cDl.length===1?'':'s')});
+  if(cFu.length)   cascades.push({id:'followups', label: cFu.length+' follow-up'+(cFu.length===1?'':'s')});
+  if(cNt.length)   cascades.push({id:'notes',     label: cNt.length+' note'+(cNt.length===1?'':'s')});
+
+  openDeleteConfirm({
+    title: 'Delete contact' + (c?(' — '+fn(c)):''),
+    warnLine: 'Deleting this contact is permanent and cannot be undone.',
+    cascades: cascades,
+    onConfirm: async function(del){
+      C=C.filter(function(x){ return x.id!==id; });
+      pausePoll(20000);
+      dbDeleteBy('contacts','id',id);
+      if(del.notes){ N=N.filter(function(n){ return String(n.contactId)!==String(id); }); dbDeleteBy('notes','contactId',id); }
+      else cNt.forEach(function(n){ n.contactId=null; saveNote(n); });
+      if(del.deadlines){ D=D.filter(function(d){ return String(d.contactId)!==String(id); }); dbDeleteBy('deadlines','contactId',id); }
+      else cDl.forEach(function(d){ d.contactId=null; saveDL(d); });
+      if(del.followups){ F=F.filter(function(f){ return String(f.contactId)!==String(id); }); dbDeleteBy('followups','contactId',id); }
+      else cFu.forEach(function(f){ f.contactId=null; saveFU(f); });
+      if(del.tx){ cTx.forEach(function(t){ dbDeleteBy('transactions','id',t.id); dbDeleteBy('tx_changes','transactionId',t.id); CH=CH.filter(function(h){ return String(h.transactionId)!==String(t.id); }); }); TX=TX.filter(function(t){ return String(t.contactId)!==String(id); }); }
+      else cTx.forEach(function(t){ t.contactId=null; saveTX(t); });
+      if(del.docs && cDocs.length){ try{ await bulkDeleteDocuments(cDocs); }catch(e){} }
+      else cDocs.forEach(function(dc){ dc.contact_id=null; if(supaReady) dbSave('documents',[dc]); });
+      sv(); cd(); rd(); if(curPage==='contacts')rc(); if(curPage==='pipeline')rp();
+    }
+  });
+}
 
 function rfu(){
   var el=ge('fuList');el.innerHTML='';
@@ -2767,32 +2849,42 @@ var TC_TEMPLATES = {
 };
 
 function saveTX(tx){ recomputeCommission(tx); sv(); if(supaReady && tx) dbSave('transactions', [tx]); }
-async function deleteTX(id){
-  var tx = TX.find(function(t){ return String(t.id)===String(id); });
+function deleteTX(id){
   var txDocs = DOCS.filter(function(dc){ return String(dc.transaction_id)===String(id); });
-  var msg = 'Delete this transaction and everything attached to it';
-  var bits = [];
-  if(txDocs.length) bits.push(txDocs.length+' document'+(txDocs.length===1?'':'s'));
-  var dl = D.filter(function(d){ return String(d.transactionId)===String(id); }).length;
-  var fu = F.filter(function(f){ return String(f.transactionId)===String(id); }).length;
-  if(dl) bits.push(dl+' deadline'+(dl===1?'':'s'));
-  if(fu) bits.push(fu+' follow-up'+(fu===1?'':'s'));
-  msg += bits.length ? (' ('+bits.join(', ')+')') : '';
-  msg += '?\n\nThe contact stays. This cannot be undone.';
-  if(!confirm(msg)) return;
+  var dlList = D.filter(function(d){ return String(d.transactionId)===String(id); });
+  var fuList = F.filter(function(f){ return String(f.transactionId)===String(id); });
+  var ntList = N.filter(function(n){ return String(n.transactionId)===String(id); });
+  var cascades = [];
+  if(txDocs.length) cascades.push({id:'docs',      label: txDocs.length+' document'+(txDocs.length===1?'':'s')});
+  if(dlList.length) cascades.push({id:'deadlines', label: dlList.length+' deadline'+(dlList.length===1?'':'s')});
+  if(fuList.length) cascades.push({id:'followups', label: fuList.length+' follow-up'+(fuList.length===1?'':'s')});
+  if(ntList.length) cascades.push({id:'notes',     label: ntList.length+' note'+(ntList.length===1?'':'s')});
 
-  // Cancelled deal = wipe everything hanging off it. The CONTACT is deliberately left alone.
-  TX=TX.filter(function(t){return t.id!==id;});
-  D =D.filter(function(d){ return String(d.transactionId)!==String(id); });
-  F =F.filter(function(f){ return String(f.transactionId)!==String(id); });
-  N =N.filter(function(n){ return String(n.transactionId)!==String(id); });
-  CH=CH.filter(function(h){ return String(h.transactionId)!==String(id); });
-  sv();
-  pausePoll(15000); deleteTXfromDB(id);
-  // Documents: delete files + rows too (bulkDeleteDocuments handles storage, DB, and DOCS).
-  if(txDocs.length){ try{ await bulkDeleteDocuments(txDocs); }catch(e){} }
-  var ov=ge('tcDetOv'); if(ov) ov.classList.remove('open');
-  renderTC(); rd();
+  openDeleteConfirm({
+    title: 'Delete transaction',
+    warnLine: 'Deleting this transaction is permanent and cannot be undone. The contact is always kept.',
+    cascades: cascades,
+    onConfirm: async function(del){
+      // Transaction row + its change history: always removed.
+      TX = TX.filter(function(t){ return String(t.id)!==String(id); });
+      CH = CH.filter(function(h){ return String(h.transactionId)!==String(id); });
+      pausePoll(20000);
+      dbDeleteBy('transactions', 'id', id);
+      dbDeleteBy('tx_changes', 'transactionId', id);
+      // Each cascade: delete if checked, otherwise unlink (transactionId=null) so it survives.
+      if(del.deadlines){ D = D.filter(function(d){ return String(d.transactionId)!==String(id); }); dbDeleteBy('deadlines','transactionId',id); }
+      else dlList.forEach(function(d){ d.transactionId=null; saveDL(d); });
+      if(del.followups){ F = F.filter(function(f){ return String(f.transactionId)!==String(id); }); dbDeleteBy('followups','transactionId',id); }
+      else fuList.forEach(function(f){ f.transactionId=null; saveFU(f); });
+      if(del.notes){ N = N.filter(function(n){ return String(n.transactionId)!==String(id); }); dbDeleteBy('notes','transactionId',id); }
+      else ntList.forEach(function(n){ n.transactionId=null; saveNote(n); });
+      if(del.docs && txDocs.length){ try{ await bulkDeleteDocuments(txDocs); }catch(e){} }
+      else txDocs.forEach(function(dc){ dc.transaction_id=null; if(supaReady) dbSave('documents',[dc]); });
+      sv();
+      var ov=ge('tcDetOv'); if(ov) ov.classList.remove('open');
+      renderTC(); rd(); if(curPage==='deadlines') dlShowView(dlView);
+    }
+  });
 }
 function initTC(){ renderTC(); updateNbTC(); }
 function updateNbTC(){
@@ -7750,6 +7842,17 @@ if(ge('dlTabPersonal')) ge('dlTabPersonal').addEventListener('click', function()
 if(ge('btnAddPR')) ge('btnAddPR').addEventListener('click', function(){ openPersonalReminder(''); });
 if(ge('btnSavePR')) ge('btnSavePR').addEventListener('click', savePersonalReminder);
 // ---- Ask-CRM voice assistant ----
+// ---- Reusable delete-confirmation dialog ----
+if(ge('delConfirmBtn')) ge('delConfirmBtn').addEventListener('click', function(){
+  var del = {};
+  document.querySelectorAll('#delCascadeWrap [data-cascade]').forEach(function(cb){
+    if(cb.checked) del[cb.getAttribute('data-cascade')] = true;   // checked = delete; unchecked = keep
+  });
+  cm('delModal');
+  var fn2 = _delOnConfirm; _delOnConfirm = null;
+  if(typeof fn2 === 'function') fn2(del);
+});
+
 if(ge('askFab')) ge('askFab').addEventListener('click', openAskModal);
 if(ge('askMic')) ge('askMic').addEventListener('click', askListen);
 if(ge('askGo')) ge('askGo').addEventListener('click', function(){ askCrm(ge('askInput').value); });

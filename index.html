@@ -982,6 +982,21 @@
     <div class="mftr"><button class="btn btn-g" data-close="fuModal">Cancel</button><button class="btn btn-p" id="btnSaveFU">Save</button></div>
   </div>
 </div>
+<div class="modal-ov" id="delModal">
+  <div class="modal">
+    <div class="mhdr"><div class="mtitle" id="delTitle">Confirm delete</div><button class="mx" data-close="delModal">&#x2715;</button></div>
+    <div class="mbody">
+      <div id="delWarn" style="font-size:15px;color:var(--danger);font-weight:600;line-height:1.5;margin-bottom:10px;"></div>
+      <div id="delSubtitle" style="font-size:14px;color:var(--text2);margin-bottom:8px;"></div>
+      <div id="delCascadeWrap"></div>
+    </div>
+    <div class="mftr">
+      <button class="btn btn-g" data-close="delModal">Cancel</button>
+      <button class="btn btn-d" id="delConfirmBtn">Delete</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-ov" id="impPSModal">
   <div class="modal" style="max-width:900px;width:96%;">
     <div class="mhdr"><div class="mtitle">Import Past Sales</div><button class="mx" data-close="impPSModal">&#x2715;</button></div>
