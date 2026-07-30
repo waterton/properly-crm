@@ -5205,6 +5205,22 @@ async function commitScanImport(r, btn){
       }
     });
   });
+
+  // ---- A REPC means the deal is under contract, so the pre-contract work is done. Mark the
+  // first two phases (intake + search/go-live) complete and the "offer submitted" step. The
+  // date-driven Phase 3 steps (due diligence, financing, appraisal, earnest) are handled above -
+  // checked only when their date is present, left unchecked when it isn't. Everything else stays
+  // unchecked. Only ADDS checks; never unchecks anything you may have set by hand.
+  var scIsREPC = r.docType && r.docType.toLowerCase().indexOf('repc') >= 0;
+  if(scIsREPC){
+    template.forEach(function(phase, pi){
+      if(pi <= 1){
+        phase.steps.forEach(function(step){ tx.steps[step.key] = true; });        // Phase 1 & 2: all done
+      } else if(pi === 2){
+        phase.steps.forEach(function(step){ if(/_offer$/.test(step.key)) tx.steps[step.key] = true; }); // offer submitted
+      }
+    });
+  }
   saveTX(tx);
 
   // ---- Auto-advance contact to "Under Contract" (a scanned transaction means under contract).
