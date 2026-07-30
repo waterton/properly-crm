@@ -2095,6 +2095,21 @@ function fsDeals(selId, contactId, selectedId){
   if(selectedId!=null && String(selectedId)!=='') sel.value=String(selectedId);
 }
 function ofc(id){fs('fuContact');ge('fuContact').value=id;ge('fuDate').value=tod();populateAssignDropdowns();om('fuModal');}
+// Open the follow-up modal for a specific transaction: prefills the client AND the deal, so you
+// can schedule a reminder straight from a transaction card or its detail window.
+function ofcTx(txId){
+  var tx = TX.find(function(t){ return String(t.id)===String(txId); });
+  if(!tx) return;
+  if(ge('btnSaveFU')) ge('btnSaveFU').setAttribute('data-edit-id','');
+  if(ge('fuLabel')) ge('fuLabel').value='';
+  fs('fuContact');
+  if(ge('fuContact')) ge('fuContact').value = tx.contactId!=null ? tx.contactId : '';
+  fsDeals('fuDeal', tx.contactId, tx.id);   // deal dropdown for this client, this deal preselected
+  if(ge('fuDate')) ge('fuDate').value = tod();
+  populateAssignDropdowns();
+  if(ge('fuAssign')) ge('fuAssign').value = tx.assignedTo!=null ? tx.assignedTo : '';
+  om('fuModal');
+}
 // Fill the deadline Type dropdown from the managed reminder-type list (standard + custom),
 // so anything added in Reminder Settings is selectable here.
 function populateDeadlineTypes(selected){
@@ -2909,6 +2924,15 @@ function renderTC(){
     }
 
     card.appendChild(body);
+
+    // Quick "+ Follow-up" straight from the card - stopPropagation so it doesn't open the detail.
+    var cardFoot = document.createElement('div');
+    cardFoot.style.cssText = 'padding:8px 14px;border-top:1px solid var(--border);';
+    var cardFuBtn = mkBtnEl('btn btn-g', '+ Follow-up', 'font-size:14px;padding:5px 11px;');
+    (function(txId){ cardFuBtn.addEventListener('click', function(e){ e.stopPropagation(); ofcTx(txId); }); })(tx.id);
+    cardFoot.appendChild(cardFuBtn);
+    card.appendChild(cardFoot);
+
     grid.appendChild(card);
   });
 
@@ -3197,7 +3221,13 @@ function openTCDetail(id){
     renderTC(); updateNbTC(); rd();
     openTCDetail(txId);
   }); })(id);
-  stRow.appendChild(stLbl); stRow.appendChild(stBtn);
+  var stRight = document.createElement('div'); stRight.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;';
+  var detFuBtn = document.createElement('button');
+  detFuBtn.className = 'btn btn-g'; detFuBtn.style.cssText = 'font-size:15px;padding:6px 12px;';
+  detFuBtn.textContent = '+ Follow-up';
+  (function(txId){ detFuBtn.addEventListener('click', function(){ ofcTx(txId); }); })(id);
+  stRight.appendChild(detFuBtn); stRight.appendChild(stBtn);
+  stRow.appendChild(stLbl); stRow.appendChild(stRight);
   body.appendChild(stRow);
 
   // Contact reassign row at top of detail body
