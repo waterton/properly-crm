@@ -2920,6 +2920,84 @@ function tcNextSteps(tx){
   return next;
 }
 
+// ===================== CONTRACT RISK REVIEW =====================
+// Deterministic checks computed live from the transaction's own data - no AI, no guessing, so
+// these never miss the obvious and clear themselves the moment you fix the underlying issue.
+function _riskFieldLabel(f){
+  return ({closingDate:'Closing date', financingDate:'Financing deadline', dueDiligDate:'Due diligence deadline',
+           appraisalDate:'Appraisal deadline', earnestDate:'Earnest money deadline', price:'Purchase price'})[f] || f;
+}
+function computeTxRisks(tx){
+  var risks = [];
+  if(!tx || tx.status === 'closed') return risks;   // closed deals aren't live risk
+  function add(sev, msg){ risks.push({sev: sev, msg: msg}); }
+  var today = tod();
+  var cd = tx.contractDate, close = tx.closingDate;
+  var deadlines = [
+    {k:'earnestDate',   label:'Earnest money deadline'},
+    {k:'dueDiligDate',  label:'Due diligence deadline'},
+    {k:'financingDate', label:'Financing deadline'},
+    {k:'appraisalDate', label:'Appraisal deadline'}
+  ];
+
+  // Missing essentials
+  if(!close)             add('red',     'No closing / settlement date set.');
+  if(!tx.financingDate)  add('caution', 'No financing deadline set.');
+  if(!tx.dueDiligDate)   add('caution', 'No due diligence deadline set.');
+  if(!tx.earnestDate)    add('caution', 'No earnest money deadline set.');
+
+  // Date-order sanity
+  if(cd && close && close < cd) add('red', 'Closing date is BEFORE the contract date.');
+  deadlines.forEach(function(d){
+    var v = tx[d.k]; if(!v) return;
+    if(close && v > close) add('red', d.label + ' falls AFTER closing (' + fd(v) + ' vs close ' + fd(close) + ').');
+    if(v < today)          add('caution', d.label + ' is in the past (' + fd(v) + ').');
+  });
+
+  // Tight windows (from contract date)
+  if(cd && tx.financingDate){
+    var fdays = Math.round((pld(tx.financingDate) - pld(cd)) / 864e5);
+    if(fdays >= 0 && fdays < 14) add('caution', 'Financing deadline is only ' + fdays + ' day' + (fdays===1?'':'s') + ' after contract - tight.');
+  }
+  if(cd && tx.dueDiligDate){
+    var ddays = Math.round((pld(tx.dueDiligDate) - pld(cd)) / 864e5);
+    if(ddays >= 0 && ddays < 7) add('caution', 'Due diligence window is only ' + ddays + ' day' + (ddays===1?'':'s') + ' - short.');
+  }
+
+  // Addendum red flags, straight from the change log we already keep.
+  CH.filter(function(h){ return String(h.transactionId) === String(tx.id); }).forEach(function(h){
+    var dateFields = ['closingDate','financingDate','dueDiligDate','appraisalDate','earnestDate'];
+    var by = (h.addendumNo != null) ? (' by addendum #' + h.addendumNo) : '';
+    if(dateFields.indexOf(h.field) >= 0 && h.oldValue && h.newValue && String(h.newValue) < String(h.oldValue)){
+      add('caution', _riskFieldLabel(h.field) + ' was moved EARLIER' + by + ' (' + h.oldValue + ' → ' + h.newValue + ').');
+    }
+    if(h.field === 'price' && h.oldValue && h.newValue){
+      var op = parsePrice(h.oldValue), np = parsePrice(h.newValue);
+      if(op && np && Math.abs(np - op) / op >= 0.03) add('caution', 'Purchase price changed' + by + ' (' + h.oldValue + ' → ' + h.newValue + ').');
+    }
+  });
+
+  return risks;
+}
+function renderRiskReview(tx){
+  var risks = computeTxRisks(tx);
+  if(!risks.length) return null;
+  var reds = risks.filter(function(r){ return r.sev==='red'; }).length;
+  var sec = document.createElement('div');
+  sec.style.cssText = 'padding:12px 20px;border-bottom:1px solid var(--border);background:rgba(201,76,76,0.06);';
+  var hd = mkDiv('font-size:14px;text-transform:uppercase;letter-spacing:1.2px;color:var(--danger);font-weight:700;margin-bottom:8px;',
+    '⚠ Risk Review — ' + risks.length + ' flag' + (risks.length===1?'':'s') + (reds?(' ('+reds+' serious)'):''));
+  sec.appendChild(hd);
+  risks.forEach(function(r){
+    var row = document.createElement('div');
+    row.style.cssText = 'display:flex;gap:8px;align-items:flex-start;padding:4px 0;font-size:15px;color:var(--text);';
+    var dot = mkDiv('flex:0 0 auto;width:9px;height:9px;border-radius:50%;margin-top:5px;background:'+(r.sev==='red'?'var(--danger)':'var(--warn)')+';','');
+    row.appendChild(dot); row.appendChild(mkDiv('flex:1;', r.msg));
+    sec.appendChild(row);
+  });
+  return sec;
+}
+
 function renderTC(){
   var grid = ge('tcGrid');
   grid.innerHTML = '';
@@ -2953,6 +3031,13 @@ function renderTC(){
     sub.style.cssText = 'font-size:18px;color:var(--text3);margin-top:2px;';
     sub.textContent = c ? fn(c) : 'Unknown client';
     tl.appendChild(title); tl.appendChild(sub);
+    var _risks = computeTxRisks(tx);
+    if(_risks.length){
+      var _reds = _risks.filter(function(r){ return r.sev==='red'; }).length;
+      var rflag = mkDiv('font-size:13px;font-weight:700;margin-top:3px;color:'+(_reds?'var(--danger)':'var(--warn)')+';',
+        '⚠ ' + _risks.length + ' risk flag' + (_risks.length===1?'':'s'));
+      tl.appendChild(rflag);
+    }
     var badge = document.createElement('span');
     badge.className = 'tc-type-badge tc-' + tx.type;
     badge.textContent = tx.type;
@@ -3330,6 +3415,10 @@ function openTCDetail(id){
   stRight.appendChild(detFuBtn); stRight.appendChild(stBtn);
   stRow.appendChild(stLbl); stRow.appendChild(stRight);
   body.appendChild(stRow);
+
+  // Contract Risk Review - prominent, right under the status.
+  var riskSec = renderRiskReview(tx);
+  if(riskSec) body.appendChild(riskSec);
 
   // Contact reassign row at top of detail body
   var cRow = document.createElement('div');
