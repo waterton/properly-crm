@@ -653,7 +653,7 @@ function sp(id, fromHistory){
   ge('pageTitle').textContent=pn[id]||id;
   csb();
   if(id==='briefing'){rb();loadBriefingSchedule();}
-  else if(id==='dashboard')rd();
+  else if(id==='dashboard'){rd();loadBriefingSchedule();}
   else if(id==='pipeline')rp();
   else if(id==='contacts'){ selectedContacts.clear(); updateBulkBar(); rc(); }
   else if(id==='followups')rfu();
@@ -8489,6 +8489,9 @@ function onAuthSuccess(user){
     subscribeRealtime();
     updateNbTC();
     restoreTabFromHash();
+    // Email-schedule editor now lives on the dashboard; ensure it populates on first load
+    // (restoreTabFromHash only triggers it when a #hash routes through sp()).
+    try{ loadBriefingSchedule(); }catch(e){}
     // Know which Gmail accounts are connected from the start, not just after visiting
     // the Gmail tab - enrolling and sending need this everywhere.
     try{ checkConnectedAccounts(); }catch(e){}
