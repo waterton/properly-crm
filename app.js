@@ -5507,7 +5507,8 @@ async function commitScanImport(r, btn){
   // summary in textEs so the Notes tab can offer an EN/ES toggle. Categorized as Document.
   var noteText = 'Document scanned: ' + (r.docType||'Document') + '. ' + (r.summary||'');
   var noteEs = r.spanishSummary ? ('Documento escaneado: ' + (r.docType||'Documento') + '. ' + r.spanishSummary) : '';
-  var newNote = {id:Date.now()+Math.floor(Math.random()*100000), contactId:contactId, text:noteText, date:new Date().toISOString(), category:'Document', textEs:noteEs};
+  // Tag with the transaction so deleting the transaction also removes this note (cascade).
+  var newNote = {id:Date.now()+Math.floor(Math.random()*100000), contactId:contactId, transactionId:tx.id, text:noteText, date:new Date().toISOString(), category:'Document', textEs:noteEs};
   N.push(newNote); saveNote(newNote); logActivity(contactId,'Document scanned');
 
   r.imported = true;
