@@ -335,15 +335,7 @@ function buildDocRow(doc, onChange){
   }); // end getAuthHeaders
 }
 
-function dbDelete(table, id){
-  if(!supaReady) return;
-  getAuthHeaders().then(function(headers){
-    fetch(SUPA_URL + '/rest/v1/' + table + '?id=eq.' + id, {
-      method: 'DELETE',
-      headers: headers
-    }).catch(function(e){ console.log('DB delete error:', e.message); });
-  });
-}
+function dbDelete(table, id){ dbDeleteBy(table, 'id', id); }
 
 function fetchAllRows(base, path, headers){
   var pageSize = 1000;
@@ -526,8 +518,23 @@ function deleteDLfromDB(id){
 // Delete rows from a table by a column match (used for cascade deletes).
 function dbDeleteBy(table, col, val){
   if(!supaReady) return;
-  getAuthHeaders().then(function(h){
-    fetch(SUPA_URL+'/rest/v1/'+table+'?'+col+'=eq.'+val, {method:'DELETE', headers:h});
+  getAuthHeaders({'Prefer':'return=representation'}).then(function(h){
+    fetch(SUPA_URL+'/rest/v1/'+table+'?'+col+'=eq.'+val, {method:'DELETE', headers:h})
+      .then(function(r){
+        if(!r.ok){
+          r.text().then(function(t){ console.log('DB DELETE failed on '+table+' ('+col+'='+val+'):', r.status, t); });
+          showSyncStatus('error');
+          return;
+        }
+        // 200 with an empty array = RLS silently blocked the delete (no matching DELETE policy).
+        r.json().then(function(rows){
+          if(Array.isArray(rows) && rows.length===0){
+            console.log('DB DELETE affected 0 rows on '+table+' ('+col+'='+val+') - likely a missing RLS delete policy. Row will return on next sync.');
+            showSyncStatus('error');
+          }
+        }).catch(function(){});
+      })
+      .catch(function(e){ console.log('DB DELETE fetch error on '+table+':', e.message); showSyncStatus('error'); });
   });
 }
 
@@ -2945,6 +2952,8 @@ var TC_TEMPLATES = {
 
 function saveTX(tx){ recomputeCommission(tx); sv(); if(supaReady && tx) dbSave('transactions', [tx]); }
 function deleteTX(id){
+  var _delTx = TX.find(function(t){ return String(t.id)===String(id); });
+  var _delCid = _delTx ? _delTx.contactId : null;
   var txDocs = DOCS.filter(function(dc){ return String(dc.transaction_id)===String(id); });
   var dlList = D.filter(function(d){ return String(d.transactionId)===String(id); });
   var fuList = F.filter(function(f){ return String(f.transactionId)===String(id); });
@@ -2957,7 +2966,7 @@ function deleteTX(id){
 
   openDeleteConfirm({
     title: 'Delete transaction',
-    warnLine: 'Deleting this transaction is permanent and cannot be undone. The contact is always kept.',
+    warnLine: 'Deleting this transaction is permanent and cannot be undone. The contact is kept (and removed from the pipeline board if this was their only open deal).',
     cascades: cascades,
     onConfirm: async function(del){
       // Transaction row + its change history: always removed.
@@ -2975,6 +2984,13 @@ function deleteTX(id){
       else ntList.forEach(function(n){ n.transactionId=null; saveNote(n); });
       if(del.docs && txDocs.length){ try{ await bulkDeleteDocuments(txDocs); }catch(e){} }
       else txDocs.forEach(function(dc){ dc.transaction_id=null; if(supaReady) dbSave('documents',[dc]); });
+      // A cancelled deal shouldn't linger on the pipeline. If the contact has no other OPEN deal,
+      // clear their pipeline stage so the board reflects reality. The contact is always kept.
+      if(_delCid != null){
+        var _stillOpen = TX.some(function(t){ return String(t.contactId)===String(_delCid) && t.status!=='closed'; });
+        var _oc = gc(_delCid);
+        if(!_stillOpen && _oc && (_oc.stage==='Under Contract' || _oc.stage==='Closed')){ ss(_delCid, ''); }
+      }
       sv();
       var ov=ge('tcDetOv'); if(ov) ov.classList.remove('open');
       renderTC(); rd(); if(curPage==='deadlines') dlShowView(dlView);
