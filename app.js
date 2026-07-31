@@ -773,7 +773,15 @@ function rp(){
   var stages=['New Lead','Contacted','Showing','Under Contract','Closed'];
   var stageColors={'New Lead':'var(--lead)','Contacted':'var(--buyer)','Showing':'var(--accent)','Under Contract':'var(--seller)','Closed':'var(--text3)'};
   stages.forEach(function(s){
-    var sc=C.filter(function(c){return c.stage===s && (s!=='Closed' || closedRecently(c));});
+    var sc=C.filter(function(c){
+      if(c.stage===s && (s!=='Closed' || closedRecently(c))) return true;
+      // Safety net: an active deal must never fall off the board. If a contact's stage value
+      // is blank or drifted (not one of the columns) but they have an OPEN transaction, surface
+      // them under "Under Contract" so the deal can't silently vanish from the pipeline.
+      if(s==='Under Contract' && stages.indexOf(c.stage)<0 &&
+         TX.some(function(t){return String(t.contactId)===String(c.id) && t.status!=='closed';})) return true;
+      return false;
+    });
     var col=document.createElement('div');
     col.style.cssText='min-width:220px;flex-shrink:0;display:flex;flex-direction:column;';
 
