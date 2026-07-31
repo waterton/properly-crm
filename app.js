@@ -3049,10 +3049,34 @@ function computePriorities(){
   items.sort(function(a,b){ return b.score - a.score; });
   return items;
 }
+// AI "Rundown": one warm sentence over the Priorities list. Grounded in the computed list so it
+// can't invent anything, and cached by a signature of that list so it isn't re-called every poll.
+var _rundown = { sig:'', text:'' };
+async function generateRundown(items){
+  var el = ge('bRundown'); if(!el) return;
+  if(!items.length){ el.style.display='none'; el.textContent=''; return; }
+  var sig = items.slice(0,15).map(function(i){ return i.sev+'|'+i.who+'|'+i.reason; }).join('~');
+  if(_rundown.sig===sig && _rundown.text){ el.textContent=_rundown.text; el.style.display='block'; return; }
+  el.style.display='block'; el.textContent='…';
+  var lines = items.slice(0,15).map(function(i){ return (i.sev==='red'?'[urgent] ':'')+i.who+': '+i.reason; }).join('\n');
+  var prompt = 'You are a concise assistant for a busy real estate agent. Below is their ranked to-do list for today. '
+    + 'Write ONE warm, natural sentence (about 25-30 words max) that summarizes the most important 1-3 items so they know their day at a glance. '
+    + 'Be specific with names and timeframes. Do NOT invent anything that is not in the list.\n\nLIST:\n' + lines;
+  try{
+    var resp = await fetch('/api/claude', { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ max_tokens:120, messages:[{ role:'user', content: prompt }] }) });
+    var data = await resp.json();
+    var txt = (data.content && data.content[0] && data.content[0].text) ? data.content[0].text.trim() : '';
+    if(txt){ _rundown = { sig:sig, text:txt }; el.textContent = txt; el.style.display='block'; }
+    else { el.style.display='none'; }
+  }catch(e){ el.style.display='none'; }   // fail quietly - the ranked list below still stands
+}
+
 function renderBriefingPriorities(){
   var el = ge('bPriorities'); if(!el) return;
   el.innerHTML = '';
   var items = computePriorities();
+  generateRundown(items);
   if(!items.length){ el.appendChild(mkDiv('font-size:16px;color:var(--text3);padding:8px 0;','Nothing needs your attention right now. Nice.')); return; }
   items.slice(0,15).forEach(function(it){
     var row = document.createElement('div');

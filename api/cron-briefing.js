@@ -116,7 +116,8 @@ module.exports = async function (req, res) {
     });
 
     const priorities = computeEmailPriorities(transactions || [], deadlines || [], followups || [], notes || [], contactMap, fullName, fmtDate, daysDiff);
-    const emailHtml = buildEmailHtml(dateLabel, overdueFU, todayFU, weekDL, pipeline, contactMap, fullName, fmtDate, daysDiff, priorities);
+    const rundown = await geminiRundown(priorities);
+    const emailHtml = buildEmailHtml(dateLabel, overdueFU, todayFU, weekDL, pipeline, contactMap, fullName, fmtDate, daysDiff, priorities, rundown);
     const subject   = `Daily Briefing — ${dateLabel}`;
 
     // ── Send to each connected user ─────────────────────────────────────────
@@ -241,6 +242,26 @@ async function sendEmail(accessToken, to, subject, htmlBody) {
   return r.json();
 }
 
+// One warm AI sentence over the priorities. Grounded in the computed list; fails to '' quietly.
+async function geminiRundown(priorities) {
+  const key = process.env.GEMINI_API_KEY;
+  if (!key || !priorities || !priorities.length) return '';
+  const lines = priorities.slice(0, 15).map(p => (p.sev === 'red' ? '[urgent] ' : '') + p.who + ': ' + p.reason).join('\n');
+  const prompt = 'You are a concise assistant for a busy real estate agent. Below is their ranked to-do list for today. '
+    + 'Write ONE warm, natural sentence (about 25-30 words max) that summarizes the most important 1-3 items so they know their day at a glance. '
+    + 'Be specific with names and timeframes. Do NOT invent anything that is not in the list.\n\nLIST:\n' + lines;
+  try {
+    const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + key, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.3, maxOutputTokens: 120 } })
+    });
+    const d = await r.json();
+    const t = d.candidates && d.candidates[0] && d.candidates[0].content && d.candidates[0].content.parts && d.candidates[0].content.parts[0]
+      ? d.candidates[0].content.parts[0].text : '';
+    return (t || '').trim();
+  } catch (e) { return ''; }
+}
+
 // Server-side mirror of the app's Today's Priorities - deterministic, ranked, explainable.
 function computeEmailPriorities(transactions, deadlines, followups, notes, contactMap, fullName, fmtDate, daysDiff) {
   const items = [];
@@ -284,7 +305,7 @@ function computeEmailPriorities(transactions, deadlines, followups, notes, conta
   return items;
 }
 
-function buildEmailHtml(dateLabel, overdueFU, todayFU, weekDL, pipeline, contactMap, fullName, fmtDate, daysDiff, priorities) {
+function buildEmailHtml(dateLabel, overdueFU, todayFU, weekDL, pipeline, contactMap, fullName, fmtDate, daysDiff, priorities, rundown) {
   const accentGold = '#c9a84c';
   const bg         = '#0d0f14';
   const surface    = '#151820';
@@ -356,6 +377,7 @@ function buildEmailHtml(dateLabel, overdueFU, todayFU, weekDL, pipeline, contact
 
         <!-- Body -->
         <tr><td style="background:${surface};border-left:1px solid ${border};border-right:1px solid ${border};padding:28px 32px;">
+          ${rundown ? `<div style="background:rgba(201,168,76,0.1);border-left:3px solid ${accentGold};border-radius:6px;padding:14px 16px;margin-bottom:24px;font-size:16px;color:${textLight};line-height:1.5;">${rundown}</div>` : ''}
           ${urgentNote}
           ${section("⚡ Today's Priorities", accentGold, (priorities || []).slice(0, 15).map(p => row(
             `<span style="color:${p.sev === 'red' ? danger : warn};">&#9679;</span> <b>${p.who}</b> &mdash; ${p.reason}`,
