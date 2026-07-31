@@ -181,6 +181,37 @@ async function bulkDeleteDocuments(docs, onProgress){
   return out;
 }
 
+// Pull the fields we need for cross-document checks + AI advisory out of a raw scan result,
+// so they ride along on the stored document (documents.extracted jsonb).
+function buildDocExtract(r){
+  if(!r) return null;
+  return {
+    docType: r.docType || '',
+    addendumNumber: r.addendumNumber || '',
+    effectiveDate: r.effectiveDate || '',
+    address: r.address || '',
+    buyerName: r.buyerName || '',
+    sellerName: r.sellerName || '',
+    purchasePrice: r.purchasePrice || '',
+    loanAmount: r.loanAmount || '',
+    earnestMoney: r.earnestMoney || '',
+    contractDate: r.contractDate || '',
+    closingDate: r.closingDate || '',
+    earnestMoneyDeadline: r.earnestMoneyDeadline || '',
+    dueDiligenceDeadline: r.dueDiligenceDeadline || '',
+    financingDeadline: r.financingDeadline || '',
+    appraisalDeadline: r.appraisalDeadline || '',
+    settlementDeadline: r.settlementDeadline || '',
+    lenderName: r.lenderName || '',
+    titleCompany: r.titleCompany || '',
+    listingCommissionPct: r.listingCommissionPct || '',
+    buyerCommissionPct: r.buyerCommissionPct || '',
+    mlsNumber: r.mlsNumber || '',
+    contingencies: Array.isArray(r.contingencies) ? r.contingencies : [],
+    redFlags: Array.isArray(r.redFlags) ? r.redFlags : []
+  };
+}
+
 async function saveDocument(file, meta){
   meta = meta || {};
   var fname = file.name || 'document';
@@ -204,7 +235,8 @@ async function saveDocument(file, meta){
     doc_type: meta.doc_type || null,
     summary: meta.summary || null,
     mime_type: file.type || null,
-    size: fsize
+    size: fsize,
+    extracted: meta.extracted || null   // full scan extraction: powers cross-doc + AI advisory
   };
   DOCS.push(doc);
   if(supaReady) dbSave('documents', [doc]);
@@ -3042,22 +3074,130 @@ function computeTxRisks(tx){
 
   return risks;
 }
+// ---- Contract intelligence: cross-document discrepancies + AI advisory ----
+// Deterministic wherever it matters. Reads each document's stored extraction (documents.extracted)
+// and (1) checks stable fields agree across documents, (2) checks the transaction reflects the
+// newest authoritative document, (3) surfaces the AI's own redFlags from reading the contracts.
+function computeTxIntel(tx){
+  var out = { discrepancies: [], aiFlags: [] };
+  if(!tx) return out;
+  var docs = DOCS.filter(function(d){ return String(d.transaction_id)===String(tx.id) && d.extracted; });
+  if(!docs.length) return out;
+
+  function docLabel(d){
+    var e=d.extracted||{}, t=e.docType||d.doc_type||'Document';
+    if(/addendum/i.test(t) && e.addendumNumber) return 'Addendum #'+e.addendumNumber;
+    return t;
+  }
+
+  // (3) AI advisory: aggregate each document's redFlags, dedupe, keep the source doc.
+  var seen={};
+  docs.forEach(function(d){
+    (d.extracted.redFlags||[]).forEach(function(f){
+      if(!f) return;
+      var key=String(f).trim().toLowerCase();
+      if(!key || seen[key]) return; seen[key]=true;
+      out.aiFlags.push({ msg:String(f).trim(), src:docLabel(d) });
+    });
+  });
+
+  // (1) Stable fields shouldn't differ between documents on the same deal.
+  function norm(s){ return String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim(); }
+  [['buyerName','Buyer name'],['sellerName','Seller name'],['address','Property address']].forEach(function(pair){
+    var field=pair[0], label=pair[1], vals=[];
+    docs.forEach(function(d){ var v=(d.extracted[field]||'').trim(); if(v) vals.push({v:v, n:norm(v), src:docLabel(d)}); });
+    for(var i=1;i<vals.length;i++){
+      if(vals[i].n !== vals[0].n){
+        out.discrepancies.push({ sev:'caution',
+          msg: label+' differs across documents: "'+vals[0].v+'" ('+vals[0].src+') vs "'+vals[i].v+'" ('+vals[i].src+'). Verify the right file is attached.' });
+        break;
+      }
+    }
+  });
+
+  // (2) Transaction vs authority document. Authority = highest-numbered addendum stating the
+  //     field, else a base document (REPC). Catches an addendum change that never got applied.
+  function addNum(d){ var e=d.extracted||{}, t=e.docType||d.doc_type||''; return /addendum/i.test(t) ? (parseInt(e.addendumNumber,10)||0) : -1; }
+  function authorityFor(field){
+    var best=null, bestRank=-2;
+    docs.forEach(function(d){
+      var v=(d.extracted[field]||'').toString().trim(); if(!v) return;
+      var rank=addNum(d);
+      if(rank>bestRank){ bestRank=rank; best={v:v, src:docLabel(d)}; }
+    });
+    return best;
+  }
+  [['closingDate','closingDate','Closing date'],
+   ['earnestMoneyDeadline','earnestDate','Earnest money deadline'],
+   ['dueDiligenceDeadline','dueDiligDate','Due diligence deadline'],
+   ['financingDeadline','financingDate','Financing deadline'],
+   ['appraisalDeadline','appraisalDate','Appraisal deadline']].forEach(function(m){
+    var auth=authorityFor(m[0]); if(!auth) return;
+    var txv=(tx[m[1]]||'').toString().trim();
+    if(txv && auth.v && txv!==auth.v){
+      out.discrepancies.push({ sev:'red',
+        msg: m[2]+': '+auth.src+' shows '+fd(auth.v)+', but the transaction has '+fd(txv)+'. Confirm the transaction reflects the latest document.' });
+    }
+  });
+  var pAuth=authorityFor('purchasePrice');
+  if(pAuth && tx.price){
+    var pa=parsePrice(pAuth.v), pb=parsePrice(tx.price);
+    if(pa && pb && Math.abs(pa-pb)/pb >= 0.005){
+      out.discrepancies.push({ sev:'red',
+        msg: 'Purchase price: '+pAuth.src+' shows '+pAuth.v+', but the transaction has '+tx.price+'. Confirm the latest document is applied.' });
+    }
+  }
+  [['listingCommissionPct','listCommissionPct','Listing commission'],
+   ['buyerCommissionPct','buyerCommissionPct','Buyer commission']].forEach(function(m){
+    var auth=authorityFor(m[0]); if(!auth) return;
+    var txv=(tx[m[1]]!=null?String(tx[m[1]]):'').trim();
+    if(txv && auth.v && parseFloat(auth.v)!==parseFloat(txv)){
+      out.discrepancies.push({ sev:'caution',
+        msg: m[2]+': '+auth.src+' shows '+auth.v+'%, but the transaction has '+txv+'%.' });
+    }
+  });
+
+  return out;
+}
 function renderRiskReview(tx){
   var risks = computeTxRisks(tx);
-  if(!risks.length) return null;
-  var reds = risks.filter(function(r){ return r.sev==='red'; }).length;
+  var intel = computeTxIntel(tx);
+  if(!risks.length && !intel.discrepancies.length && !intel.aiFlags.length) return null;
   var sec = document.createElement('div');
   sec.style.cssText = 'padding:12px 20px;border-bottom:1px solid var(--border);background:rgba(201,76,76,0.06);';
-  var hd = mkDiv('font-size:14px;text-transform:uppercase;letter-spacing:1.2px;color:var(--danger);font-weight:700;margin-bottom:8px;',
-    '⚠ Risk Review — ' + risks.length + ' flag' + (risks.length===1?'':'s') + (reds?(' ('+reds+' serious)'):''));
-  sec.appendChild(hd);
-  risks.forEach(function(r){
+  function rowFor(msg, color){
     var row = document.createElement('div');
-    row.style.cssText = 'display:flex;gap:8px;align-items:flex-start;padding:4px 0;font-size:15px;color:var(--text);';
-    var dot = mkDiv('flex:0 0 auto;width:9px;height:9px;border-radius:50%;margin-top:5px;background:'+(r.sev==='red'?'var(--danger)':'var(--warn)')+';','');
-    row.appendChild(dot); row.appendChild(mkDiv('flex:1;', r.msg));
-    sec.appendChild(row);
-  });
+    row.style.cssText='display:flex;gap:8px;align-items:flex-start;padding:4px 0;font-size:15px;color:var(--text);';
+    var dot=mkDiv('flex:0 0 auto;width:9px;height:9px;border-radius:50%;margin-top:5px;background:'+color+';','');
+    row.appendChild(dot); row.appendChild(mkDiv('flex:1;', msg));
+    return row;
+  }
+  function subhdr(text, color){
+    return mkDiv('font-size:13px;text-transform:uppercase;letter-spacing:1px;color:'+color+';font-weight:700;margin:10px 0 4px;', text);
+  }
+  var totalReds = risks.filter(function(r){return r.sev==='red';}).length
+                + intel.discrepancies.filter(function(r){return r.sev==='red';}).length;
+  var totalFlags = risks.length + intel.discrepancies.length + intel.aiFlags.length;
+  var hd = mkDiv('font-size:14px;text-transform:uppercase;letter-spacing:1.2px;color:var(--danger);font-weight:700;margin-bottom:4px;',
+    '⚠ Risk Review — ' + totalFlags + ' flag' + (totalFlags===1?'':'s') + (totalReds?(' ('+totalReds+' serious)'):''));
+  sec.appendChild(hd);
+
+  // Deterministic computed checks (existing engine)
+  if(risks.length){
+    sec.appendChild(subhdr('Computed checks', 'var(--text3)'));
+    risks.forEach(function(r){ sec.appendChild(rowFor(r.msg, r.sev==='red'?'var(--danger)':'var(--warn)')); });
+  }
+  // Cross-document discrepancies (deterministic comparison of stored extractions)
+  if(intel.discrepancies.length){
+    sec.appendChild(subhdr('Document discrepancies', 'var(--seller)'));
+    intel.discrepancies.forEach(function(r){ sec.appendChild(rowFor(r.msg, r.sev==='red'?'var(--danger)':'var(--warn)')); });
+  }
+  // AI advisory — the scanner's own flags from reading the contract. Explicitly labeled so the
+  // trust boundary is clear: verify before acting.
+  if(intel.aiFlags.length){
+    sec.appendChild(subhdr('AI advisory — from the contract scan (verify)', 'var(--accent)'));
+    intel.aiFlags.forEach(function(f){ sec.appendChild(rowFor(f.msg + (f.src?(' — '+f.src):''), 'var(--accent)')); });
+  }
   return sec;
 }
 
@@ -3074,6 +3214,13 @@ function computePriorities(){
   activeTx.forEach(function(tx){
     computeTxRisks(tx).filter(function(r){ return r.sev==='red'; }).forEach(function(r){
       items.push({ score:1000, sev:'red', tx:tx, contactId:tx.contactId, who:who(tx, gc(tx.contactId)), reason:r.msg });
+    });
+  });
+  // 1b. Serious document discrepancies (e.g. an addendum change never applied to the deal).
+  //     Deterministic; keeps chasing you until the transaction is reconciled.
+  activeTx.forEach(function(tx){
+    computeTxIntel(tx).discrepancies.filter(function(r){ return r.sev==='red'; }).forEach(function(r){
+      items.push({ score:980, sev:'red', tx:tx, contactId:tx.contactId, who:who(tx, gc(tx.contactId)), reason:r.msg });
     });
   });
   // 2. Deadlines you must act on, due within the next 7 days.
@@ -5305,7 +5452,8 @@ async function saveScanDocument(r, btn){
       contact_id: contact_id,
       transaction_id: transaction_id,
       doc_type: r.docType || 'Document',
-      summary: r.summary || ''
+      summary: r.summary || '',
+      extracted: buildDocExtract(r)
     });
     if(btn){ btn.textContent = 'Saved!'; }
     alert('Document saved to CRM.');
@@ -5523,7 +5671,8 @@ async function commitScanImport(r, btn){
         contact_id: contactId,
         transaction_id: tx.id,
         doc_type: r.docType || 'Document',
-        summary: r.summary || ''
+        summary: r.summary || '',
+        extracted: buildDocExtract(r)
       });
     }catch(e){
       fileWarn = ' (Note: the original file was not stored - ' + e.message + '. You can re-scan to store it.)';
