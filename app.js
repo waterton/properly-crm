@@ -699,6 +699,7 @@ function mkDot(cls){var d=document.createElement('div');d.className='dot '+cls;r
 function mkBadge(pri){var s=document.createElement('span');s.className='badge '+pb(pri);s.textContent=pl(pri);return s;}
 
 function rb(){
+  renderBriefingPriorities();
   var h=new Date().getHours();
   var g=h<12?'Good Morning':h<17?'Good Afternoon':'Good Evening';
   var days=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
@@ -2996,6 +2997,81 @@ function renderRiskReview(tx){
     sec.appendChild(row);
   });
   return sec;
+}
+
+// ===================== TODAY'S PRIORITIES (proactive) =====================
+// One ranked, explainable list across every deal - deterministic scoring, no AI deciding your
+// day. Higher score = more urgent. Feeds the Briefing tab and the morning email.
+function computePriorities(){
+  var items = [];
+  var activeTx = TX.filter(function(t){ return t.status!=='closed'; });
+  var txById = {}; activeTx.forEach(function(t){ txById[String(t.id)] = t; });
+  function who(tx, c){ return (tx && tx.address) ? tx.address : (c ? fn(c) : 'Transaction'); }
+
+  // 1. Serious (red) risk flags on active deals.
+  activeTx.forEach(function(tx){
+    computeTxRisks(tx).filter(function(r){ return r.sev==='red'; }).forEach(function(r){
+      items.push({ score:1000, sev:'red', tx:tx, contactId:tx.contactId, who:who(tx, gc(tx.contactId)), reason:r.msg });
+    });
+  });
+  // 2. Deadlines you must act on, due within the next 7 days.
+  D.forEach(function(d){
+    if(dlIsClosed(d)) return;
+    if(d.contactId==null && d.transactionId==null && personalReminderDone(d)) return;
+    if(!d.date) return; var n = du(d.date); if(n<0 || n>7) return;
+    var c = d.contactId!=null ? gc(d.contactId) : null;
+    var tx = d.transactionId!=null ? txById[String(d.transactionId)] : null;
+    items.push({ score:760-n*20, sev:(n<=1?'red':'caution'), tx:tx, contactId:d.contactId,
+      who:(c?fn(c):d.type), reason:d.type+' '+(n===0?'today':n===1?'tomorrow':'in '+n+' days')+' ('+fd(d.date)+')' });
+  });
+  // 3. Overdue follow-ups.
+  F.filter(function(f){ return !f.done; }).forEach(function(f){
+    if(!f.date) return; var n = du(f.date); if(n>0) return;
+    var c = gc(f.contactId); var tx = f.transactionId!=null ? txById[String(f.transactionId)] : null;
+    items.push({ score:820+Math.min(Math.abs(n),30)*4, sev:(n<0?'red':'caution'), tx:tx, contactId:f.contactId,
+      who:(c?fn(c):'Unknown'), reason:(n===0?'Follow-up due today':'Follow-up '+Math.abs(n)+'d overdue')+': '+f.label });
+  });
+  // 4. Deals gone quiet: under contract, deadline within 14 days, nothing logged in 7+ days.
+  activeTx.filter(function(t){ return t.contractDate; }).forEach(function(tx){
+    var next=null;
+    ['financingDate','dueDiligDate','appraisalDate','closingDate','earnestDate'].forEach(function(k){
+      if(tx[k]){ var n=du(tx[k]); if(n>=0 && (next==null||n<next)) next=n; }
+    });
+    if(next==null || next>14) return;
+    var last=null;
+    N.forEach(function(nn){ if(String(nn.contactId)===String(tx.contactId)){ var t=new Date(nn.date).getTime(); if(!isNaN(t) && (last==null||t>last)) last=t; } });
+    var since = last!=null ? Math.round((Date.now()-last)/864e5) : null;
+    if(since!=null && since<7) return;
+    items.push({ score:520+(14-next)*8, sev:'caution', tx:tx, contactId:tx.contactId, who:who(tx, gc(tx.contactId)),
+      reason:'Deadline in '+next+'d, nothing logged '+(since==null?'yet':'in '+since+'d')+'.' });
+  });
+
+  items.sort(function(a,b){ return b.score - a.score; });
+  return items;
+}
+function renderBriefingPriorities(){
+  var el = ge('bPriorities'); if(!el) return;
+  el.innerHTML = '';
+  var items = computePriorities();
+  if(!items.length){ el.appendChild(mkDiv('font-size:16px;color:var(--text3);padding:8px 0;','Nothing needs your attention right now. Nice.')); return; }
+  items.slice(0,15).forEach(function(it){
+    var row = document.createElement('div');
+    row.style.cssText = 'display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-bottom:1px solid var(--border);flex-wrap:wrap;';
+    row.appendChild(mkDiv('flex:0 0 auto;width:9px;height:9px;border-radius:50%;margin-top:6px;background:'+(it.sev==='red'?'var(--danger)':'var(--warn)')+';',''));
+    var info = mkDiv('flex:1;min-width:170px;');
+    info.appendChild(mkDiv('font-size:17px;font-weight:600;color:var(--text);', it.who));
+    info.appendChild(mkDiv('font-size:15px;color:var(--text3);margin-top:1px;', it.reason));
+    row.appendChild(info);
+    var acts = mkDiv('display:flex;gap:6px;flex-wrap:wrap;');
+    var ob = mkBtnEl('btn btn-g','Open','font-size:13px;padding:4px 9px;');
+    (function(x){ ob.addEventListener('click', function(){ if(x.tx){ sp('tc'); openTCDetail(x.tx.id); } else if(x.contactId!=null){ vc(x.contactId); } }); })(it);
+    acts.appendChild(ob);
+    var rb2 = mkBtnEl('btn btn-g','+ Reminder','font-size:13px;padding:4px 9px;');
+    (function(x){ rb2.addEventListener('click', function(){ if(x.tx){ ofcTx(x.tx.id); } else if(x.contactId!=null){ ofc(x.contactId); } }); })(it);
+    acts.appendChild(rb2);
+    row.appendChild(acts);
+    el.appendChild(row);
+  });
 }
 
 function renderTC(){

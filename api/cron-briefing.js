@@ -63,11 +63,13 @@ module.exports = async function (req, res) {
     }
 
     // ── Load all data ───────────────────────────────────────────────────────
-    const [contacts, followups, deadlines, tokens] = await Promise.all([
+    const [contacts, followups, deadlines, tokens, transactions, notes] = await Promise.all([
       supa('contacts?select=*'),
       supa('followups?select=*&done=is.false'),
       supa('deadlines?select=*'),
       supa('gmail_tokens?select=*'),
+      supa('transactions?select=*'),
+      supa('notes?select=*'),
     ]);
 
     if (!tokens.length) {
@@ -113,7 +115,8 @@ module.exports = async function (req, res) {
       weekday: 'long', month: 'long', day: 'numeric', year: 'numeric'
     });
 
-    const emailHtml = buildEmailHtml(dateLabel, overdueFU, todayFU, weekDL, pipeline, contactMap, fullName, fmtDate, daysDiff);
+    const priorities = computeEmailPriorities(transactions || [], deadlines || [], followups || [], notes || [], contactMap, fullName, fmtDate, daysDiff);
+    const emailHtml = buildEmailHtml(dateLabel, overdueFU, todayFU, weekDL, pipeline, contactMap, fullName, fmtDate, daysDiff, priorities);
     const subject   = `Daily Briefing — ${dateLabel}`;
 
     // ── Send to each connected user ─────────────────────────────────────────
@@ -238,7 +241,50 @@ async function sendEmail(accessToken, to, subject, htmlBody) {
   return r.json();
 }
 
-function buildEmailHtml(dateLabel, overdueFU, todayFU, weekDL, pipeline, contactMap, fullName, fmtDate, daysDiff) {
+// Server-side mirror of the app's Today's Priorities - deterministic, ranked, explainable.
+function computeEmailPriorities(transactions, deadlines, followups, notes, contactMap, fullName, fmtDate, daysDiff) {
+  const items = [];
+  const active = transactions.filter(t => (t.status || 'active') !== 'closed');
+  const who = (tx) => (tx && tx.address) ? tx.address : fullName(contactMap[tx && tx.contactId]);
+  const dlLabel = { earnestDate:'Earnest money deadline', dueDiligDate:'Due diligence deadline', financingDate:'Financing deadline', appraisalDate:'Appraisal deadline' };
+
+  // 1. Serious risk flags on active deals.
+  active.forEach(tx => {
+    if (!tx.closingDate) items.push({ score:1000, sev:'red', who:who(tx), reason:'No closing / settlement date set.' });
+    ['earnestDate','dueDiligDate','financingDate','appraisalDate'].forEach(k => {
+      if (tx[k] && tx.closingDate && tx[k] > tx.closingDate) items.push({ score:1000, sev:'red', who:who(tx), reason:(dlLabel[k]||k)+' falls after closing.' });
+    });
+    if (tx.contractDate && tx.financingDate) { const d = daysDiff(tx.financingDate) - daysDiff(tx.contractDate); if (d >= 0 && d < 14) items.push({ score:640, sev:'caution', who:who(tx), reason:'Financing deadline only '+d+'d after contract - tight.' }); }
+  });
+  // 2. Deadlines due within the next 7 days.
+  deadlines.forEach(d => {
+    const n = d.date ? daysDiff(d.date) : null; if (n == null || n < 0 || n > 7) return;
+    const c = contactMap[d.contactId];
+    items.push({ score:760-n*20, sev:(n<=1?'red':'caution'), who:(c?fullName(c):d.type), reason:d.type+' '+(n===0?'today':n===1?'tomorrow':'in '+n+' days')+' ('+fmtDate(d.date)+')' });
+  });
+  // 3. Overdue follow-ups.
+  followups.forEach(f => {
+    const n = f.date ? daysDiff(f.date) : null; if (n == null || n > 0) return;
+    const c = contactMap[f.contactId];
+    items.push({ score:820+Math.min(Math.abs(n),30)*4, sev:(n<0?'red':'caution'), who:(c?fullName(c):'Unknown'), reason:(n===0?'Follow-up due today':'Follow-up '+Math.abs(n)+'d overdue')+': '+f.label });
+  });
+  // 4. Deals gone quiet.
+  active.filter(t => t.contractDate).forEach(tx => {
+    let next = null;
+    ['financingDate','dueDiligDate','appraisalDate','closingDate','earnestDate'].forEach(k => { if (tx[k]) { const n = daysDiff(tx[k]); if (n >= 0 && (next == null || n < next)) next = n; } });
+    if (next == null || next > 14) return;
+    let last = null;
+    notes.forEach(nn => { if (String(nn.contactId) === String(tx.contactId)) { const t = new Date(nn.date).getTime(); if (!isNaN(t) && (last == null || t > last)) last = t; } });
+    const since = last != null ? Math.round((Date.now() - last) / 86400000) : null;
+    if (since != null && since < 7) return;
+    items.push({ score:520+(14-next)*8, sev:'caution', who:who(tx), reason:'Deadline in '+next+'d, nothing logged '+(since==null?'yet':'in '+since+'d')+'.' });
+  });
+
+  items.sort((a, b) => b.score - a.score);
+  return items;
+}
+
+function buildEmailHtml(dateLabel, overdueFU, todayFU, weekDL, pipeline, contactMap, fullName, fmtDate, daysDiff, priorities) {
   const accentGold = '#c9a84c';
   const bg         = '#0d0f14';
   const surface    = '#151820';
@@ -311,6 +357,10 @@ function buildEmailHtml(dateLabel, overdueFU, todayFU, weekDL, pipeline, contact
         <!-- Body -->
         <tr><td style="background:${surface};border-left:1px solid ${border};border-right:1px solid ${border};padding:28px 32px;">
           ${urgentNote}
+          ${section("⚡ Today's Priorities", accentGold, (priorities || []).slice(0, 15).map(p => row(
+            `<span style="color:${p.sev === 'red' ? danger : warn};">&#9679;</span> <b>${p.who}</b> &mdash; ${p.reason}`,
+            '', textMuted
+          )), APP_URL)}
           ${section('🚨 Overdue', danger, urgentRows, `${APP_URL}#followups`)}
           ${section('📋 Due Today', warn, todayRows, `${APP_URL}#followups`)}
           ${section('📅 Deadlines This Week', accentGold, dlRows, `${APP_URL}#deadlines`)}
