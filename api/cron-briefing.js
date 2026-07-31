@@ -117,7 +117,7 @@ module.exports = async function (req, res) {
 
     const priorities = computeEmailPriorities(transactions || [], deadlines || [], followups || [], notes || [], contactMap, fullName, fmtDate, daysDiff);
     const rundown = await geminiRundown(priorities);
-    const emailHtml = buildEmailHtml(dateLabel, overdueFU, todayFU, weekDL, pipeline, contactMap, fullName, fmtDate, daysDiff, priorities, rundown);
+    const emailHtml = buildEmailHtml(dateLabel, overdueFU, todayFU, weekDL, pipeline, contactMap, fullName, fmtDate, daysDiff, priorities, rundown, transactions || []);
     const subject   = `Daily Briefing — ${dateLabel}`;
 
     // ── Send to each connected user ─────────────────────────────────────────
@@ -266,7 +266,15 @@ async function geminiRundown(priorities) {
 function computeEmailPriorities(transactions, deadlines, followups, notes, contactMap, fullName, fmtDate, daysDiff) {
   const items = [];
   const active = transactions.filter(t => (t.status || 'active') !== 'closed');
+  const txById = {}; transactions.forEach(t => { txById[String(t.id)] = t; });
   const who = (tx) => (tx && tx.address) ? tx.address : fullName(contactMap[tx && tx.contactId]);
+  // Resolve a name via contact, else the deal's transaction (its contact or address) - avoids "Unknown".
+  const whoFor = (contactId, transactionId) => {
+    const c = contactMap[contactId]; if (c) return fullName(c);
+    const tx = transactionId != null ? txById[String(transactionId)] : null;
+    if (tx) { const tc = contactMap[tx.contactId]; if (tc) return fullName(tc); if (tx.address) return tx.address; }
+    return 'a deal';
+  };
   const dlLabel = { earnestDate:'Earnest money deadline', dueDiligDate:'Due diligence deadline', financingDate:'Financing deadline', appraisalDate:'Appraisal deadline' };
 
   // 1. Serious risk flags on active deals.
@@ -277,17 +285,17 @@ function computeEmailPriorities(transactions, deadlines, followups, notes, conta
     });
     if (tx.contractDate && tx.financingDate) { const d = daysDiff(tx.financingDate) - daysDiff(tx.contractDate); if (d >= 0 && d < 14) items.push({ score:640, sev:'caution', who:who(tx), reason:'Financing deadline only '+d+'d after contract - tight.' }); }
   });
-  // 2. Deadlines due within the next 7 days.
+  // 2. Deadlines that are overdue or within ~2 days (imminent - true "today" priorities).
   deadlines.forEach(d => {
-    const n = d.date ? daysDiff(d.date) : null; if (n == null || n < 0 || n > 7) return;
-    const c = contactMap[d.contactId];
-    items.push({ score:760-n*20, sev:(n<=1?'red':'caution'), who:(c?fullName(c):d.type), reason:d.type+' '+(n===0?'today':n===1?'tomorrow':'in '+n+' days')+' ('+fmtDate(d.date)+')' });
+    const n = d.date ? daysDiff(d.date) : null; if (n == null || n > 2) return;
+    items.push({ score:760-n*20, sev:(n<=1?'red':'caution'), who:whoFor(d.contactId, d.transactionId),
+      reason:d.type+' '+(n<0?(Math.abs(n)+'d overdue'):n===0?'today':n===1?'tomorrow':'in '+n+' days')+' ('+fmtDate(d.date)+')' });
   });
   // 3. Overdue follow-ups.
   followups.forEach(f => {
     const n = f.date ? daysDiff(f.date) : null; if (n == null || n > 0) return;
-    const c = contactMap[f.contactId];
-    items.push({ score:820+Math.min(Math.abs(n),30)*4, sev:(n<0?'red':'caution'), who:(c?fullName(c):'Unknown'), reason:(n===0?'Follow-up due today':'Follow-up '+Math.abs(n)+'d overdue')+': '+f.label });
+    items.push({ score:820+Math.min(Math.abs(n),30)*4, sev:(n<0?'red':'caution'), who:whoFor(f.contactId, f.transactionId),
+      reason:(n===0?'Follow-up due today':'Follow-up '+Math.abs(n)+'d overdue')+': '+f.label });
   });
   // 4. Deals gone quiet.
   active.filter(t => t.contractDate).forEach(tx => {
@@ -305,7 +313,14 @@ function computeEmailPriorities(transactions, deadlines, followups, notes, conta
   return items;
 }
 
-function buildEmailHtml(dateLabel, overdueFU, todayFU, weekDL, pipeline, contactMap, fullName, fmtDate, daysDiff, priorities, rundown) {
+function buildEmailHtml(dateLabel, overdueFU, todayFU, weekDL, pipeline, contactMap, fullName, fmtDate, daysDiff, priorities, rundown, transactions) {
+  const _txById = {}; (transactions || []).forEach(t => { _txById[String(t.id)] = t; });
+  const whoFor = (contactId, transactionId) => {
+    const c = contactMap[contactId]; if (c) return fullName(c);
+    const tx = transactionId != null ? _txById[String(transactionId)] : null;
+    if (tx) { const tc = contactMap[tx.contactId]; if (tc) return fullName(tc); if (tx.address) return tx.address; }
+    return 'a deal';
+  };
   const accentGold = '#c9a84c';
   const bg         = '#0d0f14';
   const surface    = '#151820';
@@ -329,13 +344,13 @@ function buildEmailHtml(dateLabel, overdueFU, todayFU, weekDL, pipeline, contact
 
   const urgentRows = [
     ...overdueFU.map(f => row(
-      `<b>${f.label}</b> — ${fullName(contactMap[f.contactId])}`,
+      `<b>${f.label}</b> — ${whoFor(f.contactId, f.transactionId)}`,
       `${Math.abs(daysDiff(f.date))}d overdue`, danger
     )),
   ];
 
   const todayRows = todayFU.map(f => row(
-    `<b>${f.label}</b> — ${fullName(contactMap[f.contactId])}`,
+    `<b>${f.label}</b> — ${whoFor(f.contactId, f.transactionId)}`,
     'Due today', warn
   ));
 
@@ -343,7 +358,7 @@ function buildEmailHtml(dateLabel, overdueFU, todayFU, weekDL, pipeline, contact
     const n = daysDiff(d.date);
     const label = n === 0 ? 'TODAY' : `${n}d`;
     return row(
-      `<b>${d.type}</b> — ${fullName(contactMap[d.contactId])}`,
+      `<b>${d.type}</b> — ${whoFor(d.contactId, d.transactionId)}`,
       `${fmtDate(d.date)} (${label})`,
       n <= 2 ? warn : textMuted
     );

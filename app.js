@@ -3018,18 +3018,20 @@ function computePriorities(){
   D.forEach(function(d){
     if(dlIsClosed(d)) return;
     if(d.contactId==null && d.transactionId==null && personalReminderDone(d)) return;
-    if(!d.date) return; var n = du(d.date); if(n<0 || n>7) return;
+    if(!d.date) return; var n = du(d.date); if(n > 2) return;   // overdue or within ~2 days only
     var c = d.contactId!=null ? gc(d.contactId) : null;
     var tx = d.transactionId!=null ? txById[String(d.transactionId)] : null;
-    items.push({ score:760-n*20, sev:(n<=1?'red':'caution'), tx:tx, contactId:d.contactId,
-      who:(c?fn(c):d.type), reason:d.type+' '+(n===0?'today':n===1?'tomorrow':'in '+n+' days')+' ('+fd(d.date)+')' });
+    var dwho = c ? fn(c) : (tx ? (tx.address || (gc(tx.contactId) ? fn(gc(tx.contactId)) : '')) : '');
+    items.push({ score:760-n*20, sev:(n<=1?'red':'caution'), tx:tx, contactId:(d.contactId!=null?d.contactId:(tx?tx.contactId:null)),
+      who:(dwho || d.type), reason:d.type+' '+(n<0?(Math.abs(n)+'d overdue'):n===0?'today':n===1?'tomorrow':'in '+n+' days')+' ('+fd(d.date)+')' });
   });
   // 3. Overdue follow-ups.
   F.filter(function(f){ return !f.done; }).forEach(function(f){
     if(!f.date) return; var n = du(f.date); if(n>0) return;
     var c = gc(f.contactId); var tx = f.transactionId!=null ? txById[String(f.transactionId)] : null;
-    items.push({ score:820+Math.min(Math.abs(n),30)*4, sev:(n<0?'red':'caution'), tx:tx, contactId:f.contactId,
-      who:(c?fn(c):'Unknown'), reason:(n===0?'Follow-up due today':'Follow-up '+Math.abs(n)+'d overdue')+': '+f.label });
+    var fwho = c ? fn(c) : (tx ? (tx.address || (gc(tx.contactId) ? fn(gc(tx.contactId)) : '')) : '');
+    items.push({ score:820+Math.min(Math.abs(n),30)*4, sev:(n<0?'red':'caution'), tx:tx, contactId:(f.contactId!=null?f.contactId:(tx?tx.contactId:null)),
+      who:(fwho || 'Follow-up'), reason:(n===0?'Follow-up due today':'Follow-up '+Math.abs(n)+'d overdue')+': '+f.label });
   });
   // 4. Deals gone quiet: under contract, deadline within 14 days, nothing logged in 7+ days.
   activeTx.filter(function(t){ return t.contractDate; }).forEach(function(tx){
