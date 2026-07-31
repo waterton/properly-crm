@@ -237,7 +237,21 @@
         <div class="card"><div class="card-hdr"><div class="card-title">Follow-up Reminders</div><button class="btn btn-p" id="btnAddFU">+ Add Reminder</button></div><div id="fuList"></div></div>
       </div>
       <div class="page" id="page-notes">
-        <div class="card"><div class="card-hdr"><div class="card-title">All Notes</div><button class="btn btn-p" id="btnAddNote">+ Add Note</button></div><div id="nList"></div></div>
+        <div class="card">
+          <div class="card-hdr"><div class="card-title">All Notes</div><button class="btn btn-p" id="btnAddNote">+ Add Note</button></div>
+          <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+            <input type="text" id="nSearch" placeholder="Search notes or client..." style="flex:1;min-width:180px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;font-size:16px;color:var(--text);font-family:'DM Sans',sans-serif;outline:none;">
+            <div id="nCatFilter" style="display:flex;gap:6px;flex-wrap:wrap;">
+              <button class="btn nchip nchip-on" data-cat="all">All</button>
+              <button class="btn nchip" data-cat="General">General</button>
+              <button class="btn nchip" data-cat="Call">Call</button>
+              <button class="btn nchip" data-cat="Meeting">Meeting</button>
+              <button class="btn nchip" data-cat="Document">Document</button>
+            </div>
+            <button class="btn btn-g" id="nToggleGroups" style="padding:6px 12px;white-space:nowrap;">Collapse all</button>
+          </div>
+          <div id="nList"></div>
+        </div>
       </div>
       <div class="page" id="page-deadlines">
         <div class="card">
@@ -978,7 +992,7 @@
 <div class="modal-ov" id="noteModal">
   <div class="modal">
     <div class="mhdr"><div class="mtitle">Add Note</div><button class="mx" data-close="noteModal">&#x2715;</button></div>
-    <div class="mbody"><div class="fg"><label class="fl">Contact</label><select class="fsel" id="nContact"></select></div><div class="fg"><label class="fl">Deal</label><select class="fsel" id="nDeal"></select></div><div class="fg"><label class="fl">Note</label><textarea class="fi" id="nText" rows="4" placeholder="Call recap, showing feedback..."></textarea></div></div>
+    <div class="mbody"><div class="fg"><label class="fl">Contact</label><select class="fsel" id="nContact"></select></div><div class="fg"><label class="fl">Deal</label><select class="fsel" id="nDeal"></select></div><div class="fg"><label class="fl">Category</label><select class="fsel" id="nCategory"><option value="General">General</option><option value="Call">Call</option><option value="Meeting">Meeting</option><option value="Document">Document</option></select></div><div class="fg"><label class="fl">Note</label><textarea class="fi" id="nText" rows="4" placeholder="Call recap, showing feedback..."></textarea></div></div>
     <div class="mftr"><button class="btn btn-g" data-close="noteModal">Cancel</button><button class="btn btn-p" id="btnSaveNote">Save Note</button></div>
   </div>
 </div>

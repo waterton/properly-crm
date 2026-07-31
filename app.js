@@ -81,7 +81,7 @@ function sv(){
 // Known columns per table — strips unknown fields before sending to Supabase
 var DB_COLS = {
   contacts: ['id','first','last','type','phone','email','property','stage','price','notes','added','closeDate','assignedTo','emails','phones','addresses','whatsapp','closedAt','lang'],
-  notes: ['id','contactId','transactionId','text','date'],
+  notes: ['id','contactId','transactionId','text','date','category','textEs'],
   followups: ['id','contactId','transactionId','label','date','pri','done','assignedTo'],
   deadlines: ['id','contactId','transactionId','type','date','assignedTo','time'],
   transactions: null, // allow all
@@ -1681,52 +1681,104 @@ function rfu(){
 }
 function tfu(id){var f=F.find(function(x){return x.id===id;});if(f){f.done=!f.done;sv();if(supaReady) dbSave('followups',[f]);}}
 
+// ---- Notes tab state ----
+var _noteSearch='', _noteCat='all', _noteCollapsed={}, _noteAllCollapsed=false;
+function ncat(n){ return (n && n.category) || 'General'; }
+function _noteCatColor(cat){
+  return cat==='Document' ? 'var(--seller)' : cat==='Call' ? 'var(--buyer)' :
+         cat==='Meeting' ? 'var(--accent)' : 'var(--text3)';
+}
+// Build one note card (shared header/text/actions + category tag + EN/ES toggle).
+function _buildNoteCard(note){
+  var c=gc(note.contactId);
+  var d=mkRow('note-item'); d.style.position='relative';
+  var h=mkRow('note-hdr');
+  var av=mkDiv('av av-'+(c?c.type:'lead'),c?ini(c):'?');
+  av.className='av av-'+(c?c.type:'lead');
+  av.style.cssText='width:26px;height:26px;font-size:18px;';
+  var b=document.createElement('b'); b.style.fontSize='12px'; b.textContent=c?fn(c):'Unknown';
+  h.appendChild(av); h.appendChild(b);
+  if(c){var tg=document.createElement('span');tg.className='tag tag-'+ctype1(c);tg.textContent=ctype1(c);h.appendChild(tg);}
+  // Category tag
+  var cat=ncat(note);
+  var ct=document.createElement('span');
+  ct.style.cssText='font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;padding:2px 8px;border-radius:20px;color:#0d0f14;background:'+_noteCatColor(cat)+';';
+  ct.textContent=cat; h.appendChild(ct);
+  h.appendChild(mkDiv('font-size:18px;color:var(--text3);',rt(note.date)));
+  var acts=document.createElement('div');
+  acts.style.cssText='margin-left:auto;display:flex;gap:6px;flex-shrink:0;align-items:center;';
+  // EN/ES toggle (only when a Spanish version exists)
+  var txt=document.createElement('div');
+  txt.className='note-text'; txt.style.whiteSpace='pre-wrap'; txt.style.wordBreak='break-word';
+  txt.textContent=note.text;
+  if(note.textEs){
+    var enB=document.createElement('button'); enB.className='nlang-btn on'; enB.textContent='EN';
+    var esB=document.createElement('button'); esB.className='nlang-btn'; esB.textContent='ES';
+    enB.addEventListener('click',function(){ txt.textContent=note.text; enB.classList.add('on'); esB.classList.remove('on'); });
+    esB.addEventListener('click',function(){ txt.textContent=note.textEs; esB.classList.add('on'); enB.classList.remove('on'); });
+    acts.appendChild(enB); acts.appendChild(esB);
+  }
+  var editBtn=document.createElement('button');
+  editBtn.style.cssText='background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:3px 8px;cursor:pointer;font-size:18px;color:var(--text2);font-family:DM Sans,sans-serif;';
+  editBtn.textContent='Edit';
+  (function(n2){ editBtn.addEventListener('click',function(){ openEditNote(n2); }); })(note);
+  var delBtn=document.createElement('button');
+  delBtn.style.cssText='background:rgba(201,76,76,0.1);border:1px solid rgba(201,76,76,0.2);border-radius:5px;padding:3px 8px;cursor:pointer;font-size:18px;color:var(--danger);font-family:DM Sans,sans-serif;';
+  delBtn.textContent='Del';
+  (function(nid){ delBtn.addEventListener('click',function(){
+    if(!confirm('Delete this note?')) return;
+    N=N.filter(function(x){return x.id!==nid;});
+    sv(); pausePoll(8000); deleteNotefromDB(nid); rn(); rd();
+  }); })(note.id);
+  acts.appendChild(editBtn); acts.appendChild(delBtn);
+  h.appendChild(acts); d.appendChild(h); d.appendChild(txt);
+  return d;
+}
 function rn(){
   var el=ge('nList');el.innerHTML='';
-  var sorted=N.slice().sort(function(a,b){return new Date(b.date)-new Date(a.date);});
-  if(!sorted.length){el.innerHTML='<div class="empty">No notes yet.</div>';return;}
-  sorted.forEach(function(note){
-    var c=gc(note.contactId);
-    var d=mkRow('note-item');
-    d.style.position='relative';
-    var h=mkRow('note-hdr');
-    var av=mkDiv('av av-'+(c?c.type:'lead'),c?ini(c):'?');
-    av.className='av av-'+(c?c.type:'lead');
-    av.style.cssText='width:26px;height:26px;font-size:18px;';
-    var b=document.createElement('b');
-    b.style.fontSize='12px';
-    b.textContent=c?fn(c):'Unknown';
-    h.appendChild(av);h.appendChild(b);
-    if(c){var tg=document.createElement('span');tg.className='tag tag-'+ctype1(c);tg.textContent=ctype1(c);h.appendChild(tg);}
-    h.appendChild(mkDiv('font-size:18px;color:var(--text3);',rt(note.date)));
-    // Edit/Delete buttons
-    var acts=document.createElement('div');
-    acts.style.cssText='margin-left:auto;display:flex;gap:6px;flex-shrink:0;';
-    var editBtn=document.createElement('button');
-    editBtn.style.cssText='background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:3px 8px;cursor:pointer;font-size:18px;color:var(--text2);font-family:DM Sans,sans-serif;';
-    editBtn.textContent='Edit';
-    (function(n2){ editBtn.addEventListener('click',function(){ openEditNote(n2); }); })(note);
-    var delBtn=document.createElement('button');
-    delBtn.style.cssText='background:rgba(201,76,76,0.1);border:1px solid rgba(201,76,76,0.2);border-radius:5px;padding:3px 8px;cursor:pointer;font-size:18px;color:var(--danger);font-family:DM Sans,sans-serif;';
-    delBtn.textContent='Del';
-    (function(nid){ delBtn.addEventListener('click',function(){
-      if(!confirm('Delete this note?')) return;
-      N=N.filter(function(x){return x.id!==nid;});
-      sv();
-      pausePoll(8000); deleteNotefromDB(nid);
-      rn(); rd();
-    }); })(note.id);
-    acts.appendChild(editBtn); acts.appendChild(delBtn);
-    h.appendChild(acts);
-    d.appendChild(h);
-    // Note text - full display, no truncation
-    var txt=document.createElement('div');
-    txt.className='note-text';
-    txt.style.whiteSpace='pre-wrap';
-    txt.style.wordBreak='break-word';
-    txt.textContent=note.text;
-    d.appendChild(txt);
-    el.appendChild(d);
+  if(!N.length){el.innerHTML='<div class="empty">No notes yet.</div>';return;}
+  var q=(_noteSearch||'').trim().toLowerCase();
+  // Filter by category + search (text, spanish, client name, category)
+  var matched=N.filter(function(n){
+    if(_noteCat!=='all' && ncat(n)!==_noteCat) return false;
+    if(!q) return true;
+    var c=gc(n.contactId);
+    var hay=((n.text||'')+' '+(n.textEs||'')+' '+ncat(n)+' '+(c?fn(c):'')).toLowerCase();
+    return hay.indexOf(q)>=0;
+  });
+  if(!matched.length){el.innerHTML='<div class="empty">No notes match your search.</div>';return;}
+  // Group by client
+  var groups={}, order=[];
+  matched.forEach(function(n){
+    var key=n.contactId?String(n.contactId):'unknown';
+    if(!groups[key]){ groups[key]={notes:[], latest:0, contactId:n.contactId}; order.push(key); }
+    groups[key].notes.push(n);
+    var t=new Date(n.date).getTime()||0; if(t>groups[key].latest) groups[key].latest=t;
+  });
+  // Most recently active client first
+  order.sort(function(a,b){ return groups[b].latest-groups[a].latest; });
+  order.forEach(function(key){
+    var g=groups[key];
+    var c=g.contactId?gc(g.contactId):null;
+    var name=c?fn(c):'Unassigned / Unknown';
+    var collapsed=!!_noteCollapsed[key];
+    var wrap=document.createElement('div');
+    wrap.style.cssText='border-bottom:1px solid var(--border);';
+    if(collapsed) wrap.className='ngrp-collapsed';
+    // Header
+    var hdr=document.createElement('div'); hdr.className='ngrp-hdr';
+    var caret=mkDiv('','▼'); caret.className='ngrp-caret';
+    var nm=mkDiv('font-weight:700;font-size:14px;color:var(--text);',name);
+    var cnt=mkDiv('',g.notes.length+(g.notes.length===1?' note':' notes')); cnt.className='ngrp-count';
+    hdr.appendChild(caret); hdr.appendChild(nm); hdr.appendChild(cnt);
+    var body=document.createElement('div'); body.style.display=collapsed?'none':'';
+    g.notes.sort(function(a,b){return new Date(b.date)-new Date(a.date);});
+    g.notes.forEach(function(n){ body.appendChild(_buildNoteCard(n)); });
+    (function(k,bodyEl,wrapEl){ hdr.addEventListener('click',function(){
+      var nowCollapsed=!_noteCollapsed[k]; _noteCollapsed[k]=nowCollapsed;
+      bodyEl.style.display=nowCollapsed?'none':''; wrapEl.classList.toggle('ngrp-collapsed',nowCollapsed);
+    }); })(key,body,wrap);
+    wrap.appendChild(hdr); wrap.appendChild(body); el.appendChild(wrap);
   });
 }
 
@@ -1734,6 +1786,7 @@ function openEditNote(note){
   // Pre-fill the note modal
   fs('nContact'); ge('nContact').value=note.contactId;
   fsDeals('nDeal', note.contactId, note.transactionId);
+  if(ge('nCategory')) ge('nCategory').value=note.category||'General';
   ge('nText').value=note.text;
   ge('btnSaveNote') && ge('btnSaveNote').setAttribute('data-edit-id', note.id);
   om('noteModal');
@@ -2358,11 +2411,12 @@ function svn(){
       existing.text=text;
       existing.contactId=parseInt(ge('nContact').value);
       existing.transactionId=parseInt(ge('nDeal').value)||null;
+      existing.category=(ge('nCategory')&&ge('nCategory').value)||'General';
       sv(); if(supaReady) dbSave('notes',[existing]);
     }
     ge('btnSaveNote') && ge('btnSaveNote').setAttribute('data-edit-id','');
   } else {
-    var nn={id:Date.now(),contactId:parseInt(ge('nContact').value),transactionId:parseInt(ge('nDeal').value)||null,text:text,date:new Date().toISOString()};
+    var nn={id:Date.now(),contactId:parseInt(ge('nContact').value),transactionId:parseInt(ge('nDeal').value)||null,text:text,date:new Date().toISOString(),category:(ge('nCategory')&&ge('nCategory').value)||'General'};
     N.push(nn); saveNote(nn);
   }
   cm('noteModal'); ge('nText').value=''; rn(); rd();
@@ -2430,7 +2484,7 @@ function svdl(){
   }
   cm('dlModal'); rdl(); rd(); if(curDet)vc(curDet);
 }
-function adn(){var text=ge('detNoteTA').value.trim();if(!text||!curDet)return;var nn={id:Date.now(),contactId:curDet,text:text,date:new Date().toISOString()};N.push(nn);saveNote(nn);logActivity(curDet,'Added notes');ge('detNoteTA').value='';vc(curDet);rd();}
+function adn(){var text=ge('detNoteTA').value.trim();if(!text||!curDet)return;var nn={id:Date.now(),contactId:curDet,text:text,date:new Date().toISOString(),category:'General'};N.push(nn);saveNote(nn);logActivity(curDet,'Added notes');ge('detNoteTA').value='';vc(curDet);rd();}
 
 function tsb(){ge('sidebar').classList.toggle('open');ge('sbOv').classList.toggle('open');}
 function csb(){ge('sidebar').classList.remove('open');ge('sbOv').classList.remove('open');}
@@ -5449,8 +5503,11 @@ async function commitScanImport(r, btn){
   });
 
   // ---- Note ----
+  // Persist BOTH languages: the English summary as the note body, and the AI's Spanish
+  // summary in textEs so the Notes tab can offer an EN/ES toggle. Categorized as Document.
   var noteText = 'Document scanned: ' + (r.docType||'Document') + '. ' + (r.summary||'');
-  var newNote = {id:Date.now()+Math.floor(Math.random()*100000), contactId:contactId, text:noteText, date:new Date().toISOString()};
+  var noteEs = r.spanishSummary ? ('Documento escaneado: ' + (r.docType||'Documento') + '. ' + r.spanishSummary) : '';
+  var newNote = {id:Date.now()+Math.floor(Math.random()*100000), contactId:contactId, text:noteText, date:new Date().toISOString(), category:'Document', textEs:noteEs};
   N.push(newNote); saveNote(newNote); logActivity(contactId,'Document scanned');
 
   r.imported = true;
@@ -8686,7 +8743,28 @@ ge('fPhonesAdd') && ge('fPhonesAdd').addEventListener('click',function(){mvAddRo
 ge('fEmailsAdd') && ge('fEmailsAdd').addEventListener('click',function(){mvAddRow('fEmails','','');});
 ge('fAddressesAdd') && ge('fAddressesAdd').addEventListener('click',function(){mvAddRow('fAddresses','','');});
 ge('btnAddFU').addEventListener('click',function(){ge('btnSaveFU')&&ge('btnSaveFU').setAttribute('data-edit-id','');ge('fuLabel').value='';fs('fuContact');fsDeals('fuDeal',ge('fuContact').value,'');ge('fuDate').value=tod();om('fuModal');});
-ge('btnAddNote').addEventListener('click',function(){ge('btnSaveNote')&&ge('btnSaveNote').setAttribute('data-edit-id','');ge('nText').value='';fs('nContact');fsDeals('nDeal',ge('nContact').value,'');om('noteModal');});
+ge('btnAddNote').addEventListener('click',function(){ge('btnSaveNote')&&ge('btnSaveNote').setAttribute('data-edit-id','');ge('nText').value='';if(ge('nCategory'))ge('nCategory').value='General';fs('nContact');fsDeals('nDeal',ge('nContact').value,'');om('noteModal');});
+// Notes tab: search, category chips, collapse-all
+(function(){
+  var s=ge('nSearch'); if(s) s.addEventListener('input',function(){ _noteSearch=this.value; rn(); });
+  var cf=ge('nCatFilter');
+  if(cf) cf.addEventListener('click',function(e){
+    var btn=e.target.closest('.nchip'); if(!btn) return;
+    _noteCat=btn.getAttribute('data-cat');
+    cf.querySelectorAll('.nchip').forEach(function(x){ x.classList.toggle('nchip-on', x===btn); });
+    rn();
+  });
+  var tg=ge('nToggleGroups');
+  if(tg) tg.addEventListener('click',function(){
+    _noteAllCollapsed=!_noteAllCollapsed;
+    // Apply to every currently visible group
+    var keys={};
+    N.forEach(function(n){ keys[n.contactId?String(n.contactId):'unknown']=1; });
+    Object.keys(keys).forEach(function(k){ _noteCollapsed[k]=_noteAllCollapsed; });
+    this.textContent=_noteAllCollapsed?'Expand all':'Collapse all';
+    rn();
+  });
+})();
 ge('btnAddDL').addEventListener('click',function(){ge('btnSaveDL')&&ge('btnSaveDL').setAttribute('data-edit-id','');fs('dlContact');dlContactAllowNone();ge('dlContact').value='';populateDeadlineTypes('');fsDeals('dlDeal',ge('dlContact').value,'');ge('dlDate').value=tod();if(ge('dlTime'))ge('dlTime').value='';populateAssignDropdowns();om('dlModal');});
 ge('btnViewNotes').addEventListener('click',function(){sp('notes');});
 ge('btnViewFU').addEventListener('click',function(){sp('followups');});

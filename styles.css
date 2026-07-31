@@ -465,3 +465,14 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
   .content{padding:14px;}
   .det-panel{max-width:100%;}
 }
+
+/* Notes tab: category filter chips + group headers */
+.nchip{padding:6px 12px;font-size:14px;background:var(--surface2);color:var(--text2);border:1px solid var(--border);border-radius:20px;cursor:pointer;font-family:'DM Sans',sans-serif;}
+.nchip-on{background:var(--accent);color:#0d0f14;border-color:var(--accent);font-weight:600;}
+.ngrp-hdr{display:flex;align-items:center;gap:10px;padding:11px 16px;cursor:pointer;border-bottom:1px solid var(--border);background:var(--surface2);position:sticky;top:0;z-index:1;}
+.ngrp-hdr:hover{background:var(--surface3);}
+.ngrp-caret{transition:transform 0.15s;color:var(--text3);font-size:12px;}
+.ngrp-collapsed .ngrp-caret{transform:rotate(-90deg);}
+.ngrp-count{margin-left:auto;background:var(--surface3);color:var(--text2);font-size:12px;font-weight:700;padding:2px 9px;border-radius:20px;}
+.nlang-btn{background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:2px 9px;cursor:pointer;font-size:13px;color:var(--text2);font-family:'DM Sans',sans-serif;}
+.nlang-btn.on{background:var(--seller);color:#0d0f14;border-color:var(--seller);font-weight:600;}
