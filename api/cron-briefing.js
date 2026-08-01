@@ -88,17 +88,38 @@ module.exports = async function (req, res) {
     const fmtDate  = d => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     const daysDiff = d => Math.round((new Date(d) - today) / 86400000);
 
+    // ── Drop orphaned / stale rows so the email matches what the app actually shows ──────────
+    // A deadline or follow-up is real ONLY if it's still attached to something that exists:
+    //   - its transaction still exists AND isn't closed, or
+    //   - (no transaction) its contact still exists, or
+    //   - it's a personal reminder (no transaction, no contact).
+    // Leftover test rows whose transaction/contact was deleted are ignored - they were showing
+    // up as bogus "overdue" priorities even though the CRM is empty.
+    const _txById = {}; (transactions || []).forEach(t => { _txById[String(t.id)] = t; });
+    const isLive = row => {
+      if (row.transactionId != null) {
+        const tx = _txById[String(row.transactionId)];
+        if (!tx) return false;                                  // transaction deleted -> orphan
+        if ((tx.status || 'active') === 'closed') return false; // closed deal -> not a live item
+        return true;
+      }
+      if (row.contactId != null) return !!contactMap[row.contactId]; // contact must still exist
+      return true;                                                    // personal reminder
+    };
+    const liveDeadlines = (deadlines || []).filter(isLive);
+    const liveFollowups = (followups || []).filter(isLive);
+
     // Overdue follow-ups
-    const overdueFU = followups.filter(f => {
+    const overdueFU = liveFollowups.filter(f => {
       const diff = daysDiff(f.date);
       return diff < 0;
     });
 
     // Today's follow-ups
-    const todayFU = followups.filter(f => daysDiff(f.date) === 0);
+    const todayFU = liveFollowups.filter(f => daysDiff(f.date) === 0);
 
     // This week's deadlines
-    const weekDL = deadlines.filter(d => {
+    const weekDL = liveDeadlines.filter(d => {
       const n = daysDiff(d.date);
       return n >= 0 && n <= 7;
     }).sort((a, b) => new Date(a.date) - new Date(b.date));
@@ -115,7 +136,7 @@ module.exports = async function (req, res) {
       weekday: 'long', month: 'long', day: 'numeric', year: 'numeric'
     });
 
-    const priorities = computeEmailPriorities(transactions || [], deadlines || [], followups || [], notes || [], contactMap, fullName, fmtDate, daysDiff);
+    const priorities = computeEmailPriorities(transactions || [], liveDeadlines, liveFollowups, notes || [], contactMap, fullName, fmtDate, daysDiff);
     const rundown = await geminiRundown(priorities);
     const emailHtml = buildEmailHtml(dateLabel, overdueFU, todayFU, weekDL, pipeline, contactMap, fullName, fmtDate, daysDiff, priorities, rundown, transactions || []);
     const subject   = `Daily Briefing — ${dateLabel}`;
