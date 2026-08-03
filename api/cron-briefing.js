@@ -63,13 +63,14 @@ module.exports = async function (req, res) {
     }
 
     // ── Load all data ───────────────────────────────────────────────────────
-    const [contacts, followups, deadlines, tokens, transactions, notes] = await Promise.all([
+    const [contacts, followups, deadlines, tokens, transactions, notes, documents] = await Promise.all([
       supa('contacts?select=*'),
       supa('followups?select=*&done=is.false'),
       supa('deadlines?select=*'),
       supa('gmail_tokens?select=*'),
       supa('transactions?select=*'),
       supa('notes?select=*'),
+      supa('documents?select=*').catch(() => []),
     ]);
 
     if (!tokens.length) {
@@ -138,9 +139,30 @@ module.exports = async function (req, res) {
       weekday: 'long', month: 'long', day: 'numeric', year: 'numeric'
     });
 
-    const priorities = computeEmailPriorities(transactions || [], liveDeadlines, liveFollowups, notes || [], contactMap, fullName, fmtDate, daysDiff);
+    // ── Contract intelligence: cross-document discrepancies + AI advisory (active deals only) ──
+    const docsByTx = {};
+    (documents || []).forEach(d => {
+      if (!d.extracted || d.transaction_id == null) return;
+      (docsByTx[String(d.transaction_id)] = docsByTx[String(d.transaction_id)] || []).push(d);
+    });
+    const activeTx = (transactions || []).filter(t => (t.status || 'active') !== 'closed');
+    const docReview = [];   // {who, sev, msg} for the Document Review section
+    const discPriorities = []; // red discrepancies that should rank in Today's Priorities
+    activeTx.forEach(tx => {
+      const docs = docsByTx[String(tx.id)];
+      if (!docs || !docs.length) return;
+      const who = tx.address || fullName(contactMap[tx.contactId]);
+      const intel = computeTxIntelEmail(tx, docs, fmtDate);
+      intel.discrepancies.forEach(r => {
+        docReview.push({ who, sev: r.sev, msg: r.msg });
+        if (r.sev === 'red') discPriorities.push({ score: 980, sev: 'red', who, reason: r.msg });
+      });
+      intel.aiFlags.forEach(f => docReview.push({ who, sev: 'ai', msg: f.msg + ' — ' + f.src }));
+    });
+
+    const priorities = computeEmailPriorities(transactions || [], liveDeadlines, liveFollowups, notes || [], contactMap, fullName, fmtDate, daysDiff, discPriorities);
     const rundown = await geminiRundown(priorities);
-    const emailHtml = buildEmailHtml(dateLabel, overdueFU, todayFU, weekDL, pipeline, contactMap, fullName, fmtDate, daysDiff, priorities, rundown, transactions || []);
+    const emailHtml = buildEmailHtml(dateLabel, overdueFU, todayFU, weekDL, pipeline, contactMap, fullName, fmtDate, daysDiff, priorities, rundown, transactions || [], docReview);
     const subject   = `Daily Briefing — ${dateLabel}`;
 
     // ── Send to each connected user ─────────────────────────────────────────
@@ -286,7 +308,60 @@ async function geminiRundown(priorities) {
 }
 
 // Server-side mirror of the app's Today's Priorities - deterministic, ranked, explainable.
-function computeEmailPriorities(transactions, deadlines, followups, notes, contactMap, fullName, fmtDate, daysDiff) {
+function _parsePriceNum(s){ if(s==null) return 0; const n=parseFloat(String(s).replace(/[^0-9.]/g,'')); return isNaN(n)?0:n; }
+
+// Server-side twin of the app's computeTxIntel: deterministic cross-document discrepancies plus
+// the scanner's own AI redFlags. Reads each document's stored extraction (documents.extracted).
+function computeTxIntelEmail(tx, docs, fmtDate) {
+  const out = { discrepancies: [], aiFlags: [] };
+  if (!tx || !docs || !docs.length) return out;
+  const docLabel = d => {
+    const e = d.extracted || {}, t = e.docType || d.doc_type || 'Document';
+    return (/addendum/i.test(t) && e.addendumNumber) ? 'Addendum #' + e.addendumNumber : t;
+  };
+  const seen = {};
+  docs.forEach(d => {
+    ((d.extracted && d.extracted.redFlags) || []).forEach(f => {
+      if (!f) return; const key = String(f).trim().toLowerCase();
+      if (!key || seen[key]) return; seen[key] = true;
+      out.aiFlags.push({ msg: String(f).trim(), src: docLabel(d) });
+    });
+  });
+  const norm = s => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  [['buyerName','Buyer name'],['sellerName','Seller name'],['address','Property address']].forEach(pair => {
+    const field = pair[0], label = pair[1], vals = [];
+    docs.forEach(d => { const e = d.extracted || {}; const v = (e[field] || '').trim(); if (v) vals.push({ v, n: norm(v), src: docLabel(d) }); });
+    for (let i = 1; i < vals.length; i++) {
+      if (vals[i].n !== vals[0].n) { out.discrepancies.push({ sev:'caution', msg: `${label} differs across documents: "${vals[0].v}" (${vals[0].src}) vs "${vals[i].v}" (${vals[i].src}).` }); break; }
+    }
+  });
+  const addNum = d => { const e = d.extracted || {}, t = e.docType || d.doc_type || ''; return /addendum/i.test(t) ? (parseInt(e.addendumNumber,10)||0) : -1; };
+  const authorityFor = field => {
+    let best = null, bestRank = -2;
+    docs.forEach(d => { const e = d.extracted || {}; const v = (e[field] || '').toString().trim(); if (!v) return; const rank = addNum(d); if (rank > bestRank) { bestRank = rank; best = { v, src: docLabel(d) }; } });
+    return best;
+  };
+  [['closingDate','closingDate','Closing date'],
+   ['earnestMoneyDeadline','earnestDate','Earnest money deadline'],
+   ['dueDiligenceDeadline','dueDiligDate','Due diligence deadline'],
+   ['financingDeadline','financingDate','Financing deadline'],
+   ['appraisalDeadline','appraisalDate','Appraisal deadline']].forEach(m => {
+    const auth = authorityFor(m[0]); if (!auth) return;
+    const txv = (tx[m[1]] || '').toString().trim();
+    if (txv && auth.v && txv !== auth.v) out.discrepancies.push({ sev:'red', msg: `${m[2]}: ${auth.src} shows ${fmtDate(auth.v)}, but the transaction has ${fmtDate(txv)}. Confirm the transaction reflects the latest document.` });
+  });
+  const pAuth = authorityFor('purchasePrice');
+  if (pAuth && tx.price) { const pa = _parsePriceNum(pAuth.v), pb = _parsePriceNum(tx.price); if (pa && pb && Math.abs(pa-pb)/pb >= 0.005) out.discrepancies.push({ sev:'red', msg: `Purchase price: ${pAuth.src} shows ${pAuth.v}, but the transaction has ${tx.price}.` }); }
+  [['listingCommissionPct','listCommissionPct','Listing commission'],
+   ['buyerCommissionPct','buyerCommissionPct','Buyer commission']].forEach(m => {
+    const auth = authorityFor(m[0]); if (!auth) return;
+    const txv = (tx[m[1]] != null ? String(tx[m[1]]) : '').trim();
+    if (txv && auth.v && parseFloat(auth.v) !== parseFloat(txv)) out.discrepancies.push({ sev:'caution', msg: `${m[2]}: ${auth.src} shows ${auth.v}%, but the transaction has ${txv}%.` });
+  });
+  return out;
+}
+
+function computeEmailPriorities(transactions, deadlines, followups, notes, contactMap, fullName, fmtDate, daysDiff, extraItems) {
   const items = [];
   const active = transactions.filter(t => (t.status || 'active') !== 'closed');
   const txById = {}; transactions.forEach(t => { txById[String(t.id)] = t; });
@@ -332,11 +407,12 @@ function computeEmailPriorities(transactions, deadlines, followups, notes, conta
     items.push({ score:520+(14-next)*8, sev:'caution', who:who(tx), reason:'Deadline in '+next+'d, nothing logged '+(since==null?'yet':'in '+since+'d')+'.' });
   });
 
+  (extraItems || []).forEach(it => items.push(it));
   items.sort((a, b) => b.score - a.score);
   return items;
 }
 
-function buildEmailHtml(dateLabel, overdueFU, todayFU, weekDL, pipeline, contactMap, fullName, fmtDate, daysDiff, priorities, rundown, transactions) {
+function buildEmailHtml(dateLabel, overdueFU, todayFU, weekDL, pipeline, contactMap, fullName, fmtDate, daysDiff, priorities, rundown, transactions, docReview) {
   const _txById = {}; (transactions || []).forEach(t => { _txById[String(t.id)] = t; });
   const whoFor = (contactId, transactionId) => {
     const c = contactMap[contactId]; if (c) return fullName(c);
@@ -419,6 +495,10 @@ function buildEmailHtml(dateLabel, overdueFU, todayFU, weekDL, pipeline, contact
           ${urgentNote}
           ${section("⚡ Today's Priorities", accentGold, (priorities || []).slice(0, 15).map(p => row(
             `<span style="color:${p.sev === 'red' ? danger : warn};">&#9679;</span> <b>${p.who}</b> &mdash; ${p.reason}`,
+            '', textMuted
+          )), APP_URL)}
+          ${section('⚠ Document Review', '#c97a4c', (docReview || []).map(d => row(
+            `<span style="color:${d.sev === 'red' ? danger : (d.sev === 'ai' ? accentGold : warn)};">&#9679;</span> <b>${d.who}</b> &mdash; ${d.msg}${d.sev === 'ai' ? ' <span style="color:'+textMuted+';font-size:11px;">(AI · verify)</span>' : ''}`,
             '', textMuted
           )), APP_URL)}
           ${section('🚨 Overdue', danger, urgentRows, `${APP_URL}#followups`)}
