@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Palacios Baker Real Estate — Client Portal</title>
+  <style>
+    :root{
+      --gold:#c9a84c; --bg:#0d0f14; --surface:#151820; --surface2:#1c2029;
+      --border:#2a2f45; --text:#e8eaf0; --muted:#8b90a8; --green:#5fa86a; --danger:#c94c4c;
+    }
+    *{box-sizing:border-box;}
+    body{margin:0;background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,Segoe UI,Arial,sans-serif;
+      min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:24px 16px;}
+    .wrap{width:100%;max-width:560px;}
+    .brand{text-align:center;margin-bottom:24px;}
+    .brand .name{font-size:30px;letter-spacing:4px;font-weight:800;color:var(--gold);}
+    .brand .sub{font-size:11px;letter-spacing:4px;text-transform:uppercase;color:var(--muted);margin-top:2px;}
+    .card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:26px 24px;margin-bottom:16px;}
+    h1{font-size:20px;margin:0 0 6px;}
+    p.lead{color:var(--muted);font-size:15px;line-height:1.5;margin:0 0 20px;}
+    label{display:block;font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:7px;}
+    input[type=email]{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:9px;
+      padding:14px 15px;font-size:17px;color:var(--text);outline:none;font-family:inherit;}
+    input[type=email]:focus{border-color:var(--gold);}
+    .btn{display:inline-block;width:100%;background:var(--gold);color:var(--bg);border:none;border-radius:9px;
+      padding:14px;font-size:16px;font-weight:700;cursor:pointer;margin-top:16px;font-family:inherit;}
+    .btn:disabled{opacity:.6;cursor:default;}
+    .msg{margin-top:16px;font-size:15px;line-height:1.5;padding:12px 14px;border-radius:9px;display:none;}
+    .msg.show{display:block;}
+    .msg.ok{background:rgba(95,168,106,.12);border:1px solid rgba(95,168,106,.3);color:var(--green);}
+    .msg.err{background:rgba(201,76,76,.12);border:1px solid rgba(201,76,76,.3);color:var(--danger);}
+    .langbar{text-align:center;margin-bottom:18px;}
+    .langbar button{background:none;border:1px solid var(--border);color:var(--muted);border-radius:20px;
+      padding:5px 14px;font-size:13px;cursor:pointer;margin:0 3px;font-family:inherit;}
+    .langbar button.on{background:var(--gold);color:var(--bg);border-color:var(--gold);font-weight:700;}
+    .addr{font-size:19px;font-weight:700;margin:0 0 4px;}
+    .statusrow{display:flex;align-items:center;gap:10px;margin-bottom:20px;flex-wrap:wrap;}
+    .badge{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;padding:4px 11px;border-radius:20px;
+      background:rgba(201,168,76,.15);color:var(--gold);}
+    .next{background:var(--surface2);border-left:3px solid var(--gold);border-radius:8px;padding:13px 15px;margin-bottom:22px;}
+    .next .k{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);}
+    .next .v{font-size:17px;font-weight:700;margin-top:3px;}
+    .tl{position:relative;padding-left:8px;}
+    .ms{display:flex;gap:14px;padding:9px 0;align-items:flex-start;}
+    .dot{flex:0 0 auto;width:14px;height:14px;border-radius:50%;margin-top:3px;border:2px solid var(--border);background:var(--surface);}
+    .ms.done .dot{background:var(--green);border-color:var(--green);}
+    .ms.nextms .dot{background:var(--gold);border-color:var(--gold);box-shadow:0 0 0 4px rgba(201,168,76,.15);}
+    .ms .lbl{font-size:16px;font-weight:600;}
+    .ms.done .lbl{color:var(--muted);}
+    .ms .dt{font-size:14px;color:var(--muted);margin-top:1px;}
+    .agent{border-top:1px solid var(--border);margin-top:20px;padding-top:16px;font-size:15px;color:var(--muted);}
+    .agent b{color:var(--text);}
+    .foot{text-align:center;color:var(--muted);font-size:12px;margin-top:10px;}
+    a{color:var(--gold);}
+    .hidden{display:none!important;}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="brand">
+      <div class="name">PALACIOS BAKER</div>
+      <div class="sub">Real Estate</div>
+    </div>
+    <div class="langbar">
+      <button id="langEn" class="on" onclick="setLang('en')">English</button>
+      <button id="langEs" onclick="setLang('es')">Español</button>
+    </div>
+
+    <!-- LOGIN VIEW -->
+    <div id="loginView" class="card">
+      <h1 data-en="Client Portal" data-es="Portal del Cliente">Client Portal</h1>
+      <p class="lead" data-en="Enter the email on file for your transaction and we'll send you a secure link to view your status."
+         data-es="Ingrese el correo electrónico registrado en su transacción y le enviaremos un enlace seguro para ver el estado.">Enter the email on file for your transaction and we'll send you a secure link to view your status.</p>
+      <label data-en="Email address" data-es="Correo electrónico">Email address</label>
+      <input type="email" id="email" autocomplete="email" placeholder="you@example.com">
+      <button class="btn" id="sendBtn" onclick="requestLink()" data-en="Send my link" data-es="Enviar mi enlace">Send my link</button>
+      <div class="msg" id="loginMsg"></div>
+    </div>
+
+    <!-- STATUS VIEW -->
+    <div id="statusView" class="hidden"></div>
+
+    <div class="foot" data-en="Palacios Baker Real Estate · Questions? Contact your agent."
+         data-es="Palacios Baker Real Estate · ¿Preguntas? Contacte a su agente.">Palacios Baker Real Estate · Questions? Contact your agent.</div>
+  </div>
+
+<script>
+var LANG='en';
+var SUMMARY=null;
+function qs(k){var m=new RegExp('[?&]'+k+'=([^&]+)').exec(location.search);return m?decodeURIComponent(m[1]):'';}
+
+function setLang(l){
+  LANG=l;
+  document.getElementById('langEn').classList.toggle('on',l==='en');
+  document.getElementById('langEs').classList.toggle('on',l==='es');
+  document.documentElement.lang=l;
+  // Swap all static labels
+  document.querySelectorAll('[data-en]').forEach(function(el){ el.textContent = el.getAttribute('data-'+l) || el.getAttribute('data-en'); });
+  if(SUMMARY) renderStatus(SUMMARY); // re-render dynamic view in new language
+}
+
+function fmtDate(d){
+  if(!d) return '';
+  try{ return new Date(d+'T00:00:00').toLocaleDateString(LANG==='es'?'es-ES':'en-US',{month:'long',day:'numeric',year:'numeric'}); }
+  catch(e){ return d; }
+}
+
+async function requestLink(){
+  var email=(document.getElementById('email').value||'').trim();
+  var msg=document.getElementById('loginMsg');
+  var btn=document.getElementById('sendBtn');
+  if(!email || email.indexOf('@')<0){
+    msg.className='msg err show';
+    msg.textContent = LANG==='es' ? 'Ingrese un correo electrónico válido.' : 'Please enter a valid email address.';
+    return;
+  }
+  btn.disabled=true;
+  btn.textContent = LANG==='es' ? 'Enviando…' : 'Sending…';
+  try{
+    await fetch('/api/portal?action=request',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:email})});
+  }catch(e){}
+  msg.className='msg ok show';
+  msg.textContent = LANG==='es'
+    ? 'Si ese correo está registrado, le enviamos un enlace. Revise su bandeja de entrada.'
+    : 'If that email is on file, we just sent you a link. Please check your inbox.';
+  btn.textContent = LANG==='es' ? 'Enlace enviado' : 'Link sent';
+}
+
+async function loadSummary(token){
+  try{
+    var r=await fetch('/api/portal?action=summary&token='+encodeURIComponent(token));
+    var d=await r.json();
+    if(!d.ok){ showExpired(); return; }
+    SUMMARY=d;
+    if(d.lang) setLang(d.lang);
+    document.getElementById('loginView').classList.add('hidden');
+    document.getElementById('statusView').classList.remove('hidden');
+    renderStatus(d);
+  }catch(e){ showExpired(); }
+}
+
+function showExpired(){
+  var lv=document.getElementById('loginView');
+  lv.classList.remove('hidden');
+  document.getElementById('statusView').classList.add('hidden');
+  var msg=document.getElementById('loginMsg');
+  msg.className='msg err show';
+  msg.textContent = LANG==='es'
+    ? 'Su enlace expiró o no es válido. Ingrese su correo para recibir uno nuevo.'
+    : 'Your link has expired or is invalid. Enter your email to get a new one.';
+}
+
+function esc(s){var d=document.createElement('div');d.textContent=s==null?'':String(s);return d.innerHTML;}
+
+function renderStatus(d){
+  var host=document.getElementById('statusView');
+  var hi = LANG==='es' ? ('Hola '+esc(d.client_name)) : ('Hi '+esc(d.client_name));
+  var html = '<div class="card"><h1>'+hi+'</h1><p class="lead">'
+    + (LANG==='es' ? 'Aquí está el estado de su transacción.' : "Here's where your transaction stands.")
+    + '</p></div>';
+
+  if(!d.deals || !d.deals.length){
+    html += '<div class="card"><p class="lead">'
+      + (LANG==='es' ? 'No hay transacciones activas en este momento.' : 'There are no active transactions right now.')
+      + '</p></div>';
+    host.innerHTML=html; return;
+  }
+
+  d.deals.forEach(function(deal){
+    var status = LANG==='es' ? deal.status_es : deal.status_en;
+    var nextLbl = LANG==='es' ? deal.next_es : deal.next_en;
+    html += '<div class="card">';
+    html += '<div class="addr">'+esc(deal.address || (LANG==='es'?'Su propiedad':'Your property'))+'</div>';
+    html += '<div class="statusrow"><span class="badge">'+esc(status)+'</span></div>';
+    html += '<div class="next"><div class="k">'+(LANG==='es'?'Siguiente paso':'What\'s next')+'</div><div class="v">'
+      + esc(nextLbl) + (deal.next_date ? ' — '+esc(fmtDate(deal.next_date)) : '') + '</div></div>';
+
+    html += '<div class="tl">';
+    (deal.milestones||[]).forEach(function(m){
+      var cls='ms'+(m.done?' done':'');
+      if(!m.done && deal.next_date && m.date===deal.next_date) cls+=' nextms';
+      var lbl = LANG==='es' ? m.label_es : m.label_en;
+      html += '<div class="'+cls+'"><span class="dot"></span><div><div class="lbl">'+esc(lbl)+'</div><div class="dt">'+esc(fmtDate(m.date))+'</div></div></div>';
+    });
+    html += '</div>';
+
+    if(deal.agent_name || deal.agent_phone){
+      html += '<div class="agent">'+(LANG==='es'?'Su agente: ':'Your agent: ')+'<b>'+esc(deal.agent_name||'')+'</b>'
+        + (deal.agent_phone ? ' · <a href="tel:'+esc(deal.agent_phone)+'">'+esc(deal.agent_phone)+'</a>' : '') + '</div>';
+    }
+    html += '</div>';
+  });
+  host.innerHTML=html;
+}
+
+// Boot
+(function(){
+  var token=qs('token');
+  if(token){ loadSummary(token); }
+})();
+</script>
+</body>
+</html>

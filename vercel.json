@@ -1,6 +1,7 @@
 {
   "rewrites": [
-    { "source": "/((?!api/).*)", "destination": "/index.html" }
+    { "source": "/portal", "destination": "/portal.html" },
+    { "source": "/((?!api/|portal).*)", "destination": "/index.html" }
   ],
   "headers": [
     {
