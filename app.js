@@ -337,6 +337,39 @@ function buildDocRow(doc, onChange){
 
 function dbDelete(table, id){ dbDeleteBy(table, 'id', id); }
 
+// Self-cleaning sweep: removes rows that can no longer be valid so stale data can't accumulate
+// and resurface (e.g. in the daily briefing). Runs once per session after the first DB load.
+// Deletes only unambiguous garbage:
+//   - a deadline/follow-up whose transaction was deleted (dangling transactionId)
+//   - a deadline/follow-up (no transaction) whose contact was deleted (dangling contactId)
+//   - a personal reminder (no transaction, no contact) whose date has already passed (fired/done)
+// It never touches items tied to an existing transaction or contact, or dated today/future.
+var _sweepDone = false;
+function sweepStaleItems(){
+  if(_sweepDone || !supaReady) return;
+  _sweepDone = true;
+  var txIds = {}; TX.forEach(function(t){ txIds[String(t.id)] = true; });
+  var cIds  = {}; C.forEach(function(c){ cIds[String(c.id)]  = true; });
+  var todayStr = new Date().toISOString().slice(0,10);
+  function isStale(row){
+    if(row.transactionId != null) return !txIds[String(row.transactionId)];     // deal deleted
+    if(row.contactId != null)     return !cIds[String(row.contactId)];          // contact deleted
+    return row.date ? (String(row.date).slice(0,10) < todayStr) : false;        // fired reminder
+  }
+  var delD = D.filter(isStale), delF = F.filter(isStale);
+  if(!delD.length && !delF.length) return;
+  pausePoll(15000);
+  delD.forEach(function(d){ dbDeleteBy('deadlines','id',d.id); });
+  delF.forEach(function(f){ dbDeleteBy('followups','id',f.id); });
+  var dGone={}; delD.forEach(function(d){ dGone[String(d.id)]=true; });
+  var fGone={}; delF.forEach(function(f){ fGone[String(f.id)]=true; });
+  D = D.filter(function(d){ return !dGone[String(d.id)]; });
+  F = F.filter(function(f){ return !fGone[String(f.id)]; });
+  sv();
+  console.log('Swept '+delD.length+' stale deadline(s) and '+delF.length+' stale follow-up(s).');
+  rd(); if(curPage==='deadlines') dlShowView(dlView);
+}
+
 function fetchAllRows(base, path, headers){
   var pageSize = 1000;
   var all = [];
@@ -8711,6 +8744,7 @@ function onAuthSuccess(user){
     rd();
     subscribeRealtime();
     updateNbTC();
+    if(ok) try{ sweepStaleItems(); }catch(e){}   // auto-remove orphaned/fired items so they can't resurface
     restoreTabFromHash();
     // Email-schedule editor now lives on the dashboard; ensure it populates on first load
     // (restoreTabFromHash only triggers it when a #hash routes through sp()).
