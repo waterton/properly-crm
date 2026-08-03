@@ -104,7 +104,9 @@ module.exports = async function (req, res) {
         return true;
       }
       if (row.contactId != null) return !!contactMap[row.contactId]; // contact must still exist
-      return true;                                                    // personal reminder
+      // Personal reminder (no transaction, no contact): a one-time nudge. Once its date has
+      // passed it has already fired and is "done" - the app hides it, so the email must too.
+      return row.date ? daysDiff(row.date) >= 0 : true;
     };
     const liveDeadlines = (deadlines || []).filter(isLive);
     const liveFollowups = (followups || []).filter(isLive);
