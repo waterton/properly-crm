@@ -3071,6 +3071,21 @@ function _riskFieldLabel(f){
   return ({closingDate:'Closing date', financingDate:'Financing deadline', dueDiligDate:'Due diligence deadline',
            appraisalDate:'Appraisal deadline', earnestDate:'Earnest money deadline', price:'Purchase price'})[f] || f;
 }
+// A past deadline date is only a real risk if its work isn't done yet. Each checklist step
+// records the dateField it covers (e.g. earnestDate), so if that step is checked, the past date
+// has been handled and must not flag. This stops "earnest money deadline is in the past" from
+// nagging every day once the earnest money is received and the step is marked complete.
+function _dateHandled(tx, field){
+  var tmpl = (typeof TC_TEMPLATES !== 'undefined') ? (TC_TEMPLATES[tx.type] || TC_TEMPLATES['buyer']) : null;
+  if(!tmpl || !tx.steps) return false;
+  for(var i=0;i<tmpl.length;i++){
+    var steps = tmpl[i].steps || [];
+    for(var j=0;j<steps.length;j++){
+      if(steps[j].dateField === field && tx.steps[steps[j].key]) return true;
+    }
+  }
+  return false;
+}
 function computeTxRisks(tx){
   var risks = [];
   if(!tx || tx.status === 'closed') return risks;   // closed deals aren't live risk
@@ -3098,7 +3113,7 @@ function computeTxRisks(tx){
   deadlines.forEach(function(d){
     var v = tx[d.k]; if(!v) return;
     if(close && v > close) add('red', d.label + ' falls AFTER closing (' + fd(v) + ' vs close ' + fd(close) + ').');
-    if(v < today)          add('caution', d.label + ' is in the past (' + fd(v) + ').');
+    if(v < today && !_dateHandled(tx, d.k)) add('caution', d.label + ' is in the past (' + fd(v) + ').');
   });
 
   // Tight windows (from contract date)
