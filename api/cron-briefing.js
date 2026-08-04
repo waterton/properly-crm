@@ -152,12 +152,15 @@ module.exports = async function (req, res) {
       const docs = docsByTx[String(tx.id)];
       if (!docs || !docs.length) return;
       const who = tx.address || fullName(contactMap[tx.contactId]);
+      const dismissed = Array.isArray(tx.dismissedRisks) ? tx.dismissedRisks : [];
+      const isDone = k => k && dismissed.indexOf(k) >= 0;   // reviewed in-app -> don't nag by email
       const intel = computeTxIntelEmail(tx, docs, fmtDate);
       intel.discrepancies.forEach(r => {
+        if (isDone(r.key)) return;
         docReview.push({ who, sev: r.sev, msg: r.msg });
         if (r.sev === 'red') discPriorities.push({ score: 980, sev: 'red', who, reason: r.msg });
       });
-      intel.aiFlags.forEach(f => docReview.push({ who, sev: 'ai', msg: f.msg + ' — ' + f.src }));
+      intel.aiFlags.forEach(f => { if (!isDone(f.key)) docReview.push({ who, sev: 'ai', msg: f.msg + ' — ' + f.src }); });
     });
 
     const priorities = computeEmailPriorities(transactions || [], liveDeadlines, liveFollowups, notes || [], contactMap, fullName, fmtDate, daysDiff, discPriorities);
@@ -324,7 +327,7 @@ function computeTxIntelEmail(tx, docs, fmtDate) {
     ((d.extracted && d.extracted.redFlags) || []).forEach(f => {
       if (!f) return; const key = String(f).trim().toLowerCase();
       if (!key || seen[key]) return; seen[key] = true;
-      out.aiFlags.push({ msg: String(f).trim(), src: docLabel(d) });
+      out.aiFlags.push({ msg: String(f).trim(), src: docLabel(d), key: 'ai:' + key });
     });
   });
   const norm = s => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
@@ -332,7 +335,7 @@ function computeTxIntelEmail(tx, docs, fmtDate) {
     const field = pair[0], label = pair[1], vals = [];
     docs.forEach(d => { const e = d.extracted || {}; const v = (e[field] || '').trim(); if (v) vals.push({ v, n: norm(v), src: docLabel(d) }); });
     for (let i = 1; i < vals.length; i++) {
-      if (vals[i].n !== vals[0].n) { out.discrepancies.push({ sev:'caution', msg: `${label} differs across documents: "${vals[0].v}" (${vals[0].src}) vs "${vals[i].v}" (${vals[i].src}).` }); break; }
+      if (vals[i].n !== vals[0].n) { out.discrepancies.push({ sev:'caution', key: 'party:'+field+':'+vals[0].n+'|'+vals[i].n, msg: `${label} differs across documents: "${vals[0].v}" (${vals[0].src}) vs "${vals[i].v}" (${vals[i].src}).` }); break; }
     }
   });
   const addNum = d => { const e = d.extracted || {}, t = e.docType || d.doc_type || ''; return /addendum/i.test(t) ? (parseInt(e.addendumNumber,10)||0) : -1; };
@@ -348,15 +351,15 @@ function computeTxIntelEmail(tx, docs, fmtDate) {
    ['appraisalDeadline','appraisalDate','Appraisal deadline']].forEach(m => {
     const auth = authorityFor(m[0]); if (!auth) return;
     const txv = (tx[m[1]] || '').toString().trim();
-    if (txv && auth.v && txv !== auth.v) out.discrepancies.push({ sev:'red', msg: `${m[2]}: ${auth.src} shows ${fmtDate(auth.v)}, but the transaction has ${fmtDate(txv)}. Confirm the transaction reflects the latest document.` });
+    if (txv && auth.v && txv !== auth.v) out.discrepancies.push({ sev:'red', key: 'val:'+m[1]+':'+auth.v+'>'+txv, msg: `${m[2]}: ${auth.src} shows ${fmtDate(auth.v)}, but the transaction has ${fmtDate(txv)}. Confirm the transaction reflects the latest document.` });
   });
   const pAuth = authorityFor('purchasePrice');
-  if (pAuth && tx.price) { const pa = _parsePriceNum(pAuth.v), pb = _parsePriceNum(tx.price); if (pa && pb && Math.abs(pa-pb)/pb >= 0.005) out.discrepancies.push({ sev:'red', msg: `Purchase price: ${pAuth.src} shows ${pAuth.v}, but the transaction has ${tx.price}.` }); }
+  if (pAuth && tx.price) { const pa = _parsePriceNum(pAuth.v), pb = _parsePriceNum(tx.price); if (pa && pb && Math.abs(pa-pb)/pb >= 0.005) out.discrepancies.push({ sev:'red', key: 'val:price:'+pAuth.v+'>'+tx.price, msg: `Purchase price: ${pAuth.src} shows ${pAuth.v}, but the transaction has ${tx.price}.` }); }
   [['listingCommissionPct','listCommissionPct','Listing commission'],
    ['buyerCommissionPct','buyerCommissionPct','Buyer commission']].forEach(m => {
     const auth = authorityFor(m[0]); if (!auth) return;
     const txv = (tx[m[1]] != null ? String(tx[m[1]]) : '').trim();
-    if (txv && auth.v && parseFloat(auth.v) !== parseFloat(txv)) out.discrepancies.push({ sev:'caution', msg: `${m[2]}: ${auth.src} shows ${auth.v}%, but the transaction has ${txv}%.` });
+    if (txv && auth.v && parseFloat(auth.v) !== parseFloat(txv)) out.discrepancies.push({ sev:'caution', key: 'val:'+m[1]+':'+auth.v+'>'+txv, msg: `${m[2]}: ${auth.src} shows ${auth.v}%, but the transaction has ${txv}%.` });
   });
   return out;
 }

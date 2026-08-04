@@ -3092,7 +3092,7 @@ function computeTxRisks(tx){
   // These checks are residential-purchase specific (closing, earnest, financing, appraisal). A
   // commercial lease has none of those, so skip them - lease-specific risk checks are a later add.
   if(tx.category === 'commercial_lease') return risks;
-  function add(sev, msg){ risks.push({sev: sev, msg: msg}); }
+  function add(sev, msg){ risks.push({sev: sev, msg: msg, key: 'risk:'+msg}); }
   var today = tod();
   var cd = tx.contractDate, close = tx.closingDate;
   var deadlines = [
@@ -3164,7 +3164,7 @@ function computeTxIntel(tx){
       if(!f) return;
       var key=String(f).trim().toLowerCase();
       if(!key || seen[key]) return; seen[key]=true;
-      out.aiFlags.push({ msg:String(f).trim(), src:docLabel(d) });
+      out.aiFlags.push({ msg:String(f).trim(), src:docLabel(d), key:'ai:'+key });
     });
   });
 
@@ -3175,7 +3175,7 @@ function computeTxIntel(tx){
     docs.forEach(function(d){ var v=(d.extracted[field]||'').trim(); if(v) vals.push({v:v, n:norm(v), src:docLabel(d)}); });
     for(var i=1;i<vals.length;i++){
       if(vals[i].n !== vals[0].n){
-        out.discrepancies.push({ sev:'caution',
+        out.discrepancies.push({ sev:'caution', key:'party:'+field+':'+vals[0].n+'|'+vals[i].n,
           msg: label+' differs across documents: "'+vals[0].v+'" ('+vals[0].src+') vs "'+vals[i].v+'" ('+vals[i].src+'). Verify the right file is attached.' });
         break;
       }
@@ -3202,7 +3202,7 @@ function computeTxIntel(tx){
     var auth=authorityFor(m[0]); if(!auth) return;
     var txv=(tx[m[1]]||'').toString().trim();
     if(txv && auth.v && txv!==auth.v){
-      out.discrepancies.push({ sev:'red',
+      out.discrepancies.push({ sev:'red', key:'val:'+m[1]+':'+auth.v+'>'+txv,
         msg: m[2]+': '+auth.src+' shows '+fd(auth.v)+', but the transaction has '+fd(txv)+'. Confirm the transaction reflects the latest document.' });
     }
   });
@@ -3210,7 +3210,7 @@ function computeTxIntel(tx){
   if(pAuth && tx.price){
     var pa=parsePrice(pAuth.v), pb=parsePrice(tx.price);
     if(pa && pb && Math.abs(pa-pb)/pb >= 0.005){
-      out.discrepancies.push({ sev:'red',
+      out.discrepancies.push({ sev:'red', key:'val:price:'+pAuth.v+'>'+tx.price,
         msg: 'Purchase price: '+pAuth.src+' shows '+pAuth.v+', but the transaction has '+tx.price+'. Confirm the latest document is applied.' });
     }
   }
@@ -3219,51 +3219,88 @@ function computeTxIntel(tx){
     var auth=authorityFor(m[0]); if(!auth) return;
     var txv=(tx[m[1]]!=null?String(tx[m[1]]):'').trim();
     if(txv && auth.v && parseFloat(auth.v)!==parseFloat(txv)){
-      out.discrepancies.push({ sev:'caution',
+      out.discrepancies.push({ sev:'caution', key:'val:'+m[1]+':'+auth.v+'>'+txv,
         msg: m[2]+': '+auth.src+' shows '+auth.v+'%, but the transaction has '+txv+'%.' });
     }
   });
 
   return out;
 }
+// Reviewed/dismissed risk flags: keyed by a stable, wording-independent id so a dismissal sticks
+// (and matches the same flag in the daily email).
+function isRiskDismissed(tx, key){ var d = tx && tx.dismissedRisks; return !!(d && key && d.indexOf(key) >= 0); }
+function dismissRisk(txId, key){
+  var tx = TX.find(function(t){ return t.id === txId; }); if(!tx || !key) return;
+  tx.dismissedRisks = tx.dismissedRisks || [];
+  if(tx.dismissedRisks.indexOf(key) < 0) tx.dismissedRisks.push(key);
+  saveTX(tx); openTCDetail(txId); rd();
+}
+function restoreRisk(txId, key){
+  var tx = TX.find(function(t){ return t.id === txId; }); if(!tx || !tx.dismissedRisks) return;
+  tx.dismissedRisks = tx.dismissedRisks.filter(function(x){ return x !== key; });
+  saveTX(tx); openTCDetail(txId); rd();
+}
 function renderRiskReview(tx){
   var risks = computeTxRisks(tx);
   var intel = computeTxIntel(tx);
-  if(!risks.length && !intel.discrepancies.length && !intel.aiFlags.length) return null;
+  var aiDisp = function(f){ return f.msg + (f.src ? (' — ' + f.src) : ''); };
+
+  // Unified flag list: {msg, key, color, sev}. AI flags share the accent color.
+  var all = []
+    .concat(risks.map(function(r){ return {msg:r.msg, key:r.key, sev:r.sev, color:(r.sev==='red'?'var(--danger)':'var(--warn)'), grp:'Computed checks', gc:'var(--text3)'}; }))
+    .concat(intel.discrepancies.map(function(r){ return {msg:r.msg, key:r.key, sev:r.sev, color:(r.sev==='red'?'var(--danger)':'var(--warn)'), grp:'Document discrepancies', gc:'var(--seller)'}; }))
+    .concat(intel.aiFlags.map(function(f){ return {msg:aiDisp(f), key:f.key, sev:'ai', color:'var(--accent)', grp:'AI advisory — from the contract scan (verify)', gc:'var(--accent)'}; }));
+
+  var active = all.filter(function(x){ return !isRiskDismissed(tx, x.key); });
+  var reviewed = all.filter(function(x){ return isRiskDismissed(tx, x.key); });
+  if(!active.length && !reviewed.length) return null;
+
   var sec = document.createElement('div');
   sec.style.cssText = 'padding:12px 20px;border-bottom:1px solid var(--border);background:rgba(201,76,76,0.06);';
-  function rowFor(msg, color){
+  function subhdr(text, color){ return mkDiv('font-size:13px;text-transform:uppercase;letter-spacing:1px;color:'+color+';font-weight:700;margin:10px 0 4px;', text); }
+  function flagRow(f){
     var row = document.createElement('div');
-    row.style.cssText='display:flex;gap:8px;align-items:flex-start;padding:4px 0;font-size:15px;color:var(--text);';
-    var dot=mkDiv('flex:0 0 auto;width:9px;height:9px;border-radius:50%;margin-top:5px;background:'+color+';','');
-    row.appendChild(dot); row.appendChild(mkDiv('flex:1;', msg));
+    row.style.cssText='display:flex;gap:8px;align-items:flex-start;padding:5px 0;font-size:15px;color:var(--text);';
+    var dot=mkDiv('flex:0 0 auto;width:9px;height:9px;border-radius:50%;margin-top:6px;background:'+f.color+';','');
+    var txt=mkDiv('flex:1;', f.msg);
+    var btn=document.createElement('button');
+    btn.textContent='✓ Reviewed'; btn.title='Mark reviewed — stop flagging this';
+    btn.style.cssText='flex:0 0 auto;background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:2px 9px;font-size:12px;color:var(--text2);cursor:pointer;font-family:DM Sans,sans-serif;';
+    (function(k){ btn.addEventListener('click', function(){ dismissRisk(tx.id, k); }); })(f.key);
+    row.appendChild(dot); row.appendChild(txt); row.appendChild(btn);
     return row;
   }
-  function subhdr(text, color){
-    return mkDiv('font-size:13px;text-transform:uppercase;letter-spacing:1px;color:'+color+';font-weight:700;margin:10px 0 4px;', text);
-  }
-  var totalReds = risks.filter(function(r){return r.sev==='red';}).length
-                + intel.discrepancies.filter(function(r){return r.sev==='red';}).length;
-  var totalFlags = risks.length + intel.discrepancies.length + intel.aiFlags.length;
-  var hd = mkDiv('font-size:14px;text-transform:uppercase;letter-spacing:1.2px;color:var(--danger);font-weight:700;margin-bottom:4px;',
-    '⚠ Risk Review — ' + totalFlags + ' flag' + (totalFlags===1?'':'s') + (totalReds?(' ('+totalReds+' serious)'):''));
-  sec.appendChild(hd);
 
-  // Deterministic computed checks (existing engine)
-  if(risks.length){
-    sec.appendChild(subhdr('Computed checks', 'var(--text3)'));
-    risks.forEach(function(r){ sec.appendChild(rowFor(r.msg, r.sev==='red'?'var(--danger)':'var(--warn)')); });
-  }
-  // Cross-document discrepancies (deterministic comparison of stored extractions)
-  if(intel.discrepancies.length){
-    sec.appendChild(subhdr('Document discrepancies', 'var(--seller)'));
-    intel.discrepancies.forEach(function(r){ sec.appendChild(rowFor(r.msg, r.sev==='red'?'var(--danger)':'var(--warn)')); });
-  }
-  // AI advisory — the scanner's own flags from reading the contract. Explicitly labeled so the
-  // trust boundary is clear: verify before acting.
-  if(intel.aiFlags.length){
-    sec.appendChild(subhdr('AI advisory — from the contract scan (verify)', 'var(--accent)'));
-    intel.aiFlags.forEach(function(f){ sec.appendChild(rowFor(f.msg + (f.src?(' — '+f.src):''), 'var(--accent)')); });
+  var reds = active.filter(function(x){ return x.sev==='red'; }).length;
+  sec.appendChild(mkDiv('font-size:14px;text-transform:uppercase;letter-spacing:1.2px;color:var(--danger);font-weight:700;margin-bottom:4px;',
+    '⚠ Risk Review — ' + active.length + ' flag' + (active.length===1?'':'s') + (reds?(' ('+reds+' serious)'):'')));
+
+  // Active flags, grouped in order.
+  ['Computed checks','Document discrepancies','AI advisory — from the contract scan (verify)'].forEach(function(grp){
+    var rows = active.filter(function(x){ return x.grp===grp; });
+    if(!rows.length) return;
+    sec.appendChild(subhdr(grp, rows[0].gc));
+    rows.forEach(function(f){ sec.appendChild(flagRow(f)); });
+  });
+  if(!active.length) sec.appendChild(mkDiv('font-size:14px;color:var(--lead);margin-top:4px;', '✓ All risk items reviewed.'));
+
+  // Reviewed (dismissed) — collapsible, with restore.
+  if(reviewed.length){
+    var wrap=document.createElement('div'); wrap.style.cssText='margin-top:12px;border-top:1px dashed var(--border);padding-top:8px;';
+    var toggle=mkDiv('font-size:13px;color:var(--text3);cursor:pointer;user-select:none;', 'Reviewed ('+reviewed.length+') — show');
+    var list=document.createElement('div'); list.style.display='none';
+    toggle.addEventListener('click', function(){ var open=(list.style.display==='none'); list.style.display=open?'':'none'; toggle.textContent='Reviewed ('+reviewed.length+') — '+(open?'hide':'show'); });
+    reviewed.forEach(function(f){
+      var row=document.createElement('div');
+      row.style.cssText='display:flex;gap:8px;align-items:flex-start;padding:4px 0;font-size:14px;color:var(--text3);';
+      row.appendChild(mkDiv('flex:1;text-decoration:line-through;', f.msg));
+      var rb=document.createElement('button');
+      rb.textContent='Restore';
+      rb.style.cssText='flex:0 0 auto;background:none;border:1px solid var(--border);border-radius:5px;padding:2px 9px;font-size:12px;color:var(--text2);cursor:pointer;font-family:DM Sans,sans-serif;';
+      (function(k){ rb.addEventListener('click', function(){ restoreRisk(tx.id, k); }); })(f.key);
+      row.appendChild(rb); list.appendChild(row);
+    });
+    wrap.appendChild(toggle); wrap.appendChild(list); sec.appendChild(wrap);
   }
   return sec;
 }
@@ -3277,16 +3314,16 @@ function computePriorities(){
   var txById = {}; activeTx.forEach(function(t){ txById[String(t.id)] = t; });
   function who(tx, c){ return (tx && tx.address) ? tx.address : (c ? fn(c) : 'Transaction'); }
 
-  // 1. Serious (red) risk flags on active deals.
+  // 1. Serious (red) risk flags on active deals. Dismissed ("reviewed") flags are excluded.
   activeTx.forEach(function(tx){
-    computeTxRisks(tx).filter(function(r){ return r.sev==='red'; }).forEach(function(r){
+    computeTxRisks(tx).filter(function(r){ return r.sev==='red' && !isRiskDismissed(tx, r.key); }).forEach(function(r){
       items.push({ score:1000, sev:'red', tx:tx, contactId:tx.contactId, who:who(tx, gc(tx.contactId)), reason:r.msg });
     });
   });
   // 1b. Serious document discrepancies (e.g. an addendum change never applied to the deal).
-  //     Deterministic; keeps chasing you until the transaction is reconciled.
+  //     Deterministic; keeps chasing you until the transaction is reconciled (or reviewed).
   activeTx.forEach(function(tx){
-    computeTxIntel(tx).discrepancies.filter(function(r){ return r.sev==='red'; }).forEach(function(r){
+    computeTxIntel(tx).discrepancies.filter(function(r){ return r.sev==='red' && !isRiskDismissed(tx, r.key); }).forEach(function(r){
       items.push({ score:980, sev:'red', tx:tx, contactId:tx.contactId, who:who(tx, gc(tx.contactId)), reason:r.msg });
     });
   });
