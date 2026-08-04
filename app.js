@@ -3074,6 +3074,9 @@ function _riskFieldLabel(f){
 function computeTxRisks(tx){
   var risks = [];
   if(!tx || tx.status === 'closed') return risks;   // closed deals aren't live risk
+  // These checks are residential-purchase specific (closing, earnest, financing, appraisal). A
+  // commercial lease has none of those, so skip them - lease-specific risk checks are a later add.
+  if(tx.category === 'commercial_lease') return risks;
   function add(sev, msg){ risks.push({sev: sev, msg: msg}); }
   var today = tod();
   var cd = tx.contractDate, close = tx.closingDate;
@@ -3723,6 +3726,49 @@ function commitPastSalesImport(){
   renderTC(); rd(); if(curDet) vc(curDet);
 }
 
+// Read-only panel of a commercial lease's key terms, shown on the transaction detail.
+function renderLeasePanel(tx){
+  var L = tx.details || {};
+  var basis = function(b){ return {per_sqft_month:'/SF/mo', per_sqft_year:'/SF/yr', monthly:'/mo', annual:'/yr'}[b] || ''; };
+  var money = function(v){ return (v===''||v==null) ? '' : (isNaN(v) ? String(v) : '$'+Number(v).toLocaleString()); };
+  var sec = document.createElement('div');
+  sec.style.cssText = 'padding:14px 20px;border-bottom:1px solid var(--border);';
+  var hd = mkDiv('font-size:14px;text-transform:uppercase;letter-spacing:1.2px;color:var(--seller);font-weight:700;margin-bottom:10px;', 'Commercial Lease Terms');
+  sec.appendChild(hd);
+  var grid = document.createElement('div');
+  grid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:11px 20px;';
+  var rows = [
+    ['Landlord', L.landlord],
+    ['Tenant', L.tenant],
+    ['Rentable SF', (L.rentableSqft!==''&&L.rentableSqft!=null) ? Number(L.rentableSqft).toLocaleString()+' SF' : ''],
+    ['Base Rent', (L.baseRent!==''&&L.baseRent!=null) ? (money(L.baseRent)+' '+basis(L.rentBasis)) : ''],
+    ['Lease Type', L.leaseType],
+    ['CAM', (L.camAmount!==''&&L.camAmount!=null) ? (money(L.camAmount)+' '+basis(L.camBasis)) : ''],
+    ['Term', (L.leaseTermMonths!==''&&L.leaseTermMonths!=null) ? (L.leaseTermMonths+' months') : ''],
+    ['Commencement', L.commencementDate ? fd(L.commencementDate) : ''],
+    ['Rent Commencement', L.rentCommencementDate ? fd(L.rentCommencementDate) : ''],
+    ['Expiration', L.expirationDate ? fd(L.expirationDate) : ''],
+    ['Escalation', L.escalation],
+    ['TI Allowance', L.tiAllowance],
+    ['Security Deposit', L.securityDeposit],
+    ['Renewal Options', L.renewalOptions],
+    ['Option Deadline', L.renewalOptionDeadline ? fd(L.renewalOptionDeadline) : ''],
+    ['Guaranty', L.guaranty]
+  ];
+  var any = false;
+  rows.forEach(function(rw){
+    if(rw[1]===''||rw[1]==null) return;
+    any = true;
+    var cell = document.createElement('div');
+    cell.appendChild(mkDiv('font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text3);', rw[0]));
+    cell.appendChild(mkDiv('font-size:16px;color:var(--text);margin-top:2px;', String(rw[1])));
+    grid.appendChild(cell);
+  });
+  if(!any) grid.appendChild(mkDiv('font-size:15px;color:var(--text3);', 'No lease terms captured yet.'));
+  sec.appendChild(grid);
+  return sec;
+}
+
 function openTCDetail(id){
   curTx = id;
   var tx = TX.find(function(t){ return t.id === id; });
@@ -3730,7 +3776,17 @@ function openTCDetail(id){
   var c = gc(tx.contactId);
 
   ge('tcDetTitle').textContent = tx.address || 'Transaction';
-  ge('tcDetSub').textContent = (tx.price ? tx.price + ' | ' : '') + tx.type.toUpperCase() + (tx.closingDate ? ' | Close: ' + fd(tx.closingDate) : '');
+  if(tx.category === 'commercial_lease'){
+    var _L = tx.details || {};
+    var _basis = {per_sqft_month:'/SF/mo', per_sqft_year:'/SF/yr', monthly:'/mo', annual:'/yr'}[_L.rentBasis] || '';
+    var _rent = (_L.baseRent!=='' && _L.baseRent!=null) ? ('$'+Number(_L.baseRent).toLocaleString()+' '+_basis) : '';
+    ge('tcDetSub').textContent = 'COMMERCIAL LEASE'
+      + (_L.leaseType ? ' · '+_L.leaseType : '')
+      + (_rent ? ' · '+_rent : '')
+      + (_L.expirationDate ? ' · Exp: '+fd(_L.expirationDate) : '');
+  } else {
+    ge('tcDetSub').textContent = (tx.price ? tx.price + ' | ' : '') + tx.type.toUpperCase() + (tx.closingDate ? ' | Close: ' + fd(tx.closingDate) : '');
+  }
 
   var body = ge('tcDetBody');
   body.innerHTML = '';
@@ -3779,6 +3835,9 @@ function openTCDetail(id){
   // Contract Risk Review - prominent, right under the status.
   var riskSec = renderRiskReview(tx);
   if(riskSec) body.appendChild(riskSec);
+
+  // Commercial lease terms panel (only for lease transactions).
+  if(tx.category === 'commercial_lease'){ body.appendChild(renderLeasePanel(tx)); }
 
   // Contact reassign row at top of detail body
   var cRow = document.createElement('div');
@@ -4855,7 +4914,8 @@ function buildScannerPrompt(hint){
     'Analyze this document carefully and extract all available information.',
     'Return ONLY a valid JSON object (no markdown, no explanation) with these fields:',
     '{',
-    '  "docType": "REPC|Addendum|Inspection Report|Title Commitment|HOA Docs|Other",',
+    '  "docType": "REPC|Addendum|Inspection Report|Title Commitment|HOA Docs|Commercial Lease|Commercial Purchase|Other",',
+    '  "dealCategory": "residential_purchase|commercial_lease|commercial_purchase|other",',
     '  "summary": "3-5 sentence plain English summary of what this document is and its key points",',
     '  "address": "full property address",',
     '  "buyerName": "buyer name(s)",',
@@ -4881,8 +4941,33 @@ function buildScannerPrompt(hint){
     '  "addendumNumber": "for addenda only - the addendum number if stated, digits only e.g. 3 (empty string if not stated)",',
     '  "effectiveDate": "for addenda only - the effective or signature date of this addendum, YYYY-MM-DD or empty string",',
     '  "inspectionItems": ["for inspection reports - major items found"],',
+    '  "lease": {',
+    '    "landlord": "landlord/lessor name",',
+    '    "tenant": "tenant/lessee name",',
+    '    "premises": "premises address including suite/unit",',
+    '    "rentableSqft": "rentable square footage, number only",',
+    '    "baseRent": "base rent amount, number only e.g. 25 or 4500",',
+    '    "rentBasis": "per_sqft_month|per_sqft_year|monthly|annual",',
+    '    "leaseType": "NNN|gross|modified_gross|other",',
+    '    "camAmount": "CAM / operating-expense amount if stated, number only",',
+    '    "camBasis": "per_sqft_month|per_sqft_year|monthly|annual (empty if none)",',
+    '    "leaseTermMonths": "total lease term in months, number only",',
+    '    "commencementDate": "lease commencement date YYYY-MM-DD",',
+    '    "rentCommencementDate": "rent commencement date YYYY-MM-DD",',
+    '    "expirationDate": "lease expiration date YYYY-MM-DD",',
+    '    "escalation": "rent escalation e.g. 3%/yr or CPI",',
+    '    "tiAllowance": "tenant improvement allowance if stated",',
+    '    "securityDeposit": "security deposit amount",',
+    '    "renewalOptions": "renewal options e.g. two 5-year options",',
+    '    "renewalOptionDeadline": "option-exercise deadline YYYY-MM-DD if stated",',
+    '    "guaranty": "personal/corporate guaranty details if any"',
+    '  },',
     '  "spanishSummary": "same summary in Spanish"',
     '}',
+    'dealCategory classifies the transaction. Fill the "lease" object ONLY when this is a commercial',
+    'lease; for a residential purchase leave every "lease" field an empty string and fill the',
+    'residential fields above instead. Numbers (rentableSqft, baseRent, camAmount, leaseTermMonths)',
+    'must be digits only, no units or symbols.',
     'If a field is not found use an empty string.',
     'For dates always use YYYY-MM-DD format.',
     'Be thorough - this data will be imported into a real estate CRM.'
@@ -5512,6 +5597,23 @@ async function saveScanDocument(r, btn){
   }
 }
 
+// Normalize the AI's raw lease object into a clean, typed details bag for storage/display.
+function normalizeLease(L){
+  L = L || {};
+  function s(v){ return (v==null?'':String(v)).trim(); }
+  function num(v){ var x=parseFloat(String(v==null?'':v).replace(/[^0-9.]/g,'')); return isNaN(x)?'':x; }
+  return {
+    landlord:s(L.landlord), tenant:s(L.tenant), premises:s(L.premises),
+    rentableSqft:num(L.rentableSqft), baseRent:num(L.baseRent),
+    rentBasis:s(L.rentBasis)||'per_sqft_month', leaseType:s(L.leaseType)||'NNN',
+    camAmount:num(L.camAmount), camBasis:s(L.camBasis), leaseTermMonths:num(L.leaseTermMonths),
+    commencementDate:s(L.commencementDate), rentCommencementDate:s(L.rentCommencementDate),
+    expirationDate:s(L.expirationDate), escalation:s(L.escalation), tiAllowance:s(L.tiAllowance),
+    securityDeposit:s(L.securityDeposit), renewalOptions:s(L.renewalOptions),
+    renewalOptionDeadline:s(L.renewalOptionDeadline), guaranty:s(L.guaranty)
+  };
+}
+
 async function commitScanImport(r, btn){
   // ---- Resolve contact (required) ----
   var newCb = ge('sc_new_contact_toggle');
@@ -5558,6 +5660,10 @@ async function commitScanImport(r, btn){
   var listCommPct = ge('sc_list_comm') ? ge('sc_list_comm').value : (r.listingCommissionPct||'');
   var buyerCommPct = ge('sc_buyer_comm') ? ge('sc_buyer_comm').value : (r.buyerCommissionPct||'');
   var address = ge('sc_address') ? ge('sc_address').value.trim() : (r.address||'');
+
+  // A commercial lease is a different transaction shape - detect it so we store lease terms and
+  // lease milestones instead of the residential purchase fields.
+  var isLease = (r.dealCategory === 'commercial_lease') || (r.docType && /lease/i.test(r.docType));
 
   // ---- Resolve transaction choice ----
   var choiceEl = document.querySelector('input[name="sc_tx_choice"]:checked');
@@ -5617,6 +5723,22 @@ async function commitScanImport(r, btn){
     }
     // Fill in a blank address from the scanned doc - never overwrite one that's already set.
     if(!tx.address && address) tx.address = address;
+  } else if(isLease){
+    // ---- New commercial lease transaction ----
+    var Ld = normalizeLease(r.lease);
+    var leaseSide = (ge('sc_client_side') && ge('sc_client_side').value === 'seller') ? 'landlord' : 'tenant';
+    tx = {
+      id: Date.now() + Math.floor(Math.random()*100000),
+      contactId: contactId,
+      type: leaseSide,
+      category: 'commercial_lease',
+      address: Ld.premises || address,
+      status: 'active',
+      steps: {},
+      notes: 'Imported from lease scan: ' + (r.docType||'Commercial Lease') + '. ' + (r.summary||''),
+      details: Ld
+    };
+    TX.push(tx);
   } else {
     var txType = (ge('sc_client_side') && ge('sc_client_side').value) ? ge('sc_client_side').value : ((r.docType && r.docType.toLowerCase().indexOf('list') >= 0) ? 'seller' : 'buyer');
     tx = {
@@ -5645,46 +5767,51 @@ async function commitScanImport(r, btn){
     TX.push(tx);
   }
 
-  // ---- Gap B: auto-check date-tracked checklist steps ----
-  var template = TC_TEMPLATES[tx.type] || TC_TEMPLATES['buyer'];
-  if(!tx.steps) tx.steps = {};
-  template.forEach(function(phase){
-    phase.steps.forEach(function(step){
-      if(step.hasDate && step.dateField && tx[step.dateField] && !tx.steps[step.key]){
-        tx.steps[step.key] = true;
-      }
+  // Residential checklist auto-completion doesn't apply to commercial leases (different lifecycle).
+  if(!isLease){
+    // ---- Gap B: auto-check date-tracked checklist steps ----
+    var template = TC_TEMPLATES[tx.type] || TC_TEMPLATES['buyer'];
+    if(!tx.steps) tx.steps = {};
+    template.forEach(function(phase){
+      phase.steps.forEach(function(step){
+        if(step.hasDate && step.dateField && tx[step.dateField] && !tx.steps[step.key]){
+          tx.steps[step.key] = true;
+        }
+      });
     });
-  });
-
-  // ---- A REPC means the deal is under contract, so the pre-contract work is done. Mark the
-  // first two phases (intake + search/go-live) complete and the "offer submitted" step. The
-  // date-driven Phase 3 steps (due diligence, financing, appraisal, earnest) are handled above -
-  // checked only when their date is present, left unchecked when it isn't. Everything else stays
-  // unchecked. Only ADDS checks; never unchecks anything you may have set by hand.
-  var scIsREPC = r.docType && r.docType.toLowerCase().indexOf('repc') >= 0;
-  if(scIsREPC){
-    template.forEach(function(phase, pi){
-      if(pi <= 1){
-        phase.steps.forEach(function(step){ tx.steps[step.key] = true; });        // Phase 1 & 2: all done
-      } else if(pi === 2){
-        phase.steps.forEach(function(step){ if(/_offer$/.test(step.key)) tx.steps[step.key] = true; }); // offer submitted
-      }
-    });
+    // ---- A REPC means the deal is under contract, so the pre-contract work is done. Mark the
+    // first two phases (intake + search/go-live) complete and the "offer submitted" step. The
+    // date-driven Phase 3 steps (due diligence, financing, appraisal, earnest) are handled above -
+    // checked only when their date is present, left unchecked when it isn't. Everything else stays
+    // unchecked. Only ADDS checks; never unchecks anything you may have set by hand.
+    var scIsREPC = r.docType && r.docType.toLowerCase().indexOf('repc') >= 0;
+    if(scIsREPC){
+      template.forEach(function(phase, pi){
+        if(pi <= 1){
+          phase.steps.forEach(function(step){ tx.steps[step.key] = true; });        // Phase 1 & 2: all done
+        } else if(pi === 2){
+          phase.steps.forEach(function(step){ if(/_offer$/.test(step.key)) tx.steps[step.key] = true; }); // offer submitted
+        }
+      });
+    }
   }
   saveTX(tx);
 
-  // ---- Auto-advance contact to "Under Contract" (a scanned transaction means under contract).
-  //      Skip if already Under Contract or Closed: avoids duplicate activity log / drip re-enroll
-  //      and never revives a closed deal. ss() mirrors the manual pipeline-stage change exactly.
+  // ---- Auto-advance contact to "Under Contract" (a scanned purchase means under contract; a
+  //      scanned lease means an active, executed deal). Skip if already Under Contract or Closed.
   var _ucC = gc(contactId);
-  if(tx.contractDate && _ucC && _ucC.stage !== 'Under Contract' && _ucC.stage !== 'Closed'){
+  if((isLease || tx.contractDate) && _ucC && _ucC.stage !== 'Under Contract' && _ucC.stage !== 'Closed'){
     ss(contactId, 'Under Contract');
   }
 
-  // ---- Deadlines (tagged with transactionId) ----
-  // Derive deadlines from the transaction's actual values (post-review), never from raw
-  // extracted values - otherwise a change you rejected would still create a deadline.
-  var dlMap = [
+  // ---- Deadlines / milestones (tagged with transactionId) ----
+  // Lease deals track lease milestones; purchases track the residential contract deadlines.
+  var dlMap = isLease ? [
+    {type:'Lease Commencement',      val:(tx.details&&tx.details.commencementDate)||''},
+    {type:'Rent Commencement',       val:(tx.details&&tx.details.rentCommencementDate)||''},
+    {type:'Lease Expiration',        val:(tx.details&&tx.details.expirationDate)||''},
+    {type:'Renewal Option Deadline', val:(tx.details&&tx.details.renewalOptionDeadline)||''}
+  ] : [
     {type:'Earnest Money Due', val:tx.earnestDate},
     {type:'Due Diligence Deadline', val:tx.dueDiligDate},
     {type:'Financing Deadline', val:tx.financingDate},
