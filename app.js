@@ -5147,6 +5147,29 @@ function showScannerResults(r){
     card.appendChild(spDiv);
   }
 
+  // ---- Document type toggle (Residential vs Commercial Lease) ----
+  // The AI classifies automatically, but this lets you override a misclassification so the
+  // right fields always show and import correctly.
+  var scIsLease = scanIsLease(r);
+  var typeBar = document.createElement('div');
+  typeBar.style.cssText = 'display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap;';
+  var typeLbl = mkDiv('font-size:13px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;', 'Document type:');
+  typeBar.appendChild(typeLbl);
+  [['Residential',false],['Commercial Lease',true]].forEach(function(opt){
+    var b = document.createElement('button');
+    var on = (scIsLease === opt[1]);
+    b.className = 'btn ' + (on ? 'btn-p' : 'btn-g');
+    b.style.cssText = 'padding:5px 14px;font-size:14px;';
+    b.textContent = opt[0];
+    b.addEventListener('click', function(){ r._forceLease = opt[1]; showScannerResults(r); });
+    typeBar.appendChild(b);
+  });
+  card.appendChild(typeBar);
+
+  // Commercial lease: show the lease field set instead of the residential grid/deadlines.
+  if(scIsLease){ renderLeaseScanFields(card, r); }
+
+  if(!scIsLease){
   // Key fields grid - editable
   var fieldsLabel = document.createElement('div');
   fieldsLabel.style.cssText = 'font-size:18px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);margin-bottom:8px;';
@@ -5226,6 +5249,7 @@ function showScannerResults(r){
     dlDiv.appendChild(row);
   });
   card.appendChild(dlDiv);
+  } // end residential-only (fields grid + deadlines)
 
   // Red flags
   if(r.redFlags && r.redFlags.length){
@@ -5614,6 +5638,89 @@ function normalizeLease(L){
   };
 }
 
+// Single source of truth for "is this scan a commercial lease?" - honors a manual override
+// (_forceLease) set by the preview toggle, else auto-detects from the AI's classification.
+function scanIsLease(r){
+  if(r._forceLease === true) return true;
+  if(r._forceLease === false) return false;
+  return (r.dealCategory === 'commercial_lease') || (r.docType && /lease/i.test(r.docType)) ||
+         !!(r.lease && (r.lease.tenant || r.lease.landlord || r.lease.baseRent || r.lease.premises || r.lease.rentableSqft));
+}
+
+// Read the (editable) lease fields from the scan preview, falling back to the AI's extraction.
+function readLeaseForm(r){
+  var base = normalizeLease(r.lease || {});
+  function g(id, cur){ var el = ge(id); return el ? el.value : cur; }
+  return normalizeLease({
+    landlord:g('sc_lease_landlord',base.landlord), tenant:g('sc_lease_tenant',base.tenant),
+    premises:g('sc_lease_premises',base.premises), rentableSqft:g('sc_lease_sqft',base.rentableSqft),
+    baseRent:g('sc_lease_baserent',base.baseRent), rentBasis:g('sc_lease_rentbasis',base.rentBasis),
+    leaseType:g('sc_lease_type',base.leaseType), camAmount:g('sc_lease_cam',base.camAmount),
+    camBasis:g('sc_lease_cambasis',base.camBasis), leaseTermMonths:g('sc_lease_term',base.leaseTermMonths),
+    commencementDate:g('sc_lease_commencement',base.commencementDate),
+    rentCommencementDate:g('sc_lease_rentcommence',base.rentCommencementDate),
+    expirationDate:g('sc_lease_expiration',base.expirationDate),
+    escalation:g('sc_lease_escalation',base.escalation), tiAllowance:g('sc_lease_ti',base.tiAllowance),
+    securityDeposit:g('sc_lease_deposit',base.securityDeposit), renewalOptions:g('sc_lease_options',base.renewalOptions),
+    renewalOptionDeadline:g('sc_lease_optiondeadline',base.renewalOptionDeadline), guaranty:g('sc_lease_guaranty',base.guaranty)
+  });
+}
+
+// Editable commercial-lease section for the scan preview.
+function renderLeaseScanFields(card, r){
+  var L = normalizeLease(r.lease || {});
+  var lbl = document.createElement('div');
+  lbl.style.cssText = 'font-size:18px;text-transform:uppercase;letter-spacing:1.5px;color:var(--seller);margin-bottom:8px;';
+  lbl.textContent = 'Commercial Lease — Extracted (edit before importing)';
+  card.appendChild(lbl);
+  var grid = document.createElement('div');
+  grid.className = 'scanner-fields';
+  function field(id,label,val){
+    var d=document.createElement('div'); d.className='scanner-field';
+    var l=document.createElement('div'); l.className='scanner-field-label'; l.textContent=label;
+    var i=document.createElement('input'); i.className='scanner-field-val editable'; i.id=id;
+    i.value=(val==null?'':String(val)); i.placeholder='Not found';
+    d.appendChild(l); d.appendChild(i); return d;
+  }
+  [
+    ['sc_lease_landlord','Landlord',L.landlord],
+    ['sc_lease_tenant','Tenant',L.tenant],
+    ['sc_lease_premises','Premises',L.premises],
+    ['sc_lease_sqft','Rentable SF',L.rentableSqft],
+    ['sc_lease_baserent','Base Rent',L.baseRent],
+    ['sc_lease_rentbasis','Rent Basis (per_sqft_month / per_sqft_year / monthly / annual)',L.rentBasis],
+    ['sc_lease_type','Lease Type (NNN / gross / modified_gross)',L.leaseType],
+    ['sc_lease_cam','CAM Amount',L.camAmount],
+    ['sc_lease_cambasis','CAM Basis',L.camBasis],
+    ['sc_lease_term','Term (months)',L.leaseTermMonths],
+    ['sc_lease_escalation','Escalation',L.escalation],
+    ['sc_lease_ti','TI Allowance',L.tiAllowance],
+    ['sc_lease_deposit','Security Deposit',L.securityDeposit],
+    ['sc_lease_options','Renewal Options',L.renewalOptions],
+    ['sc_lease_guaranty','Guaranty',L.guaranty]
+  ].forEach(function(f){ grid.appendChild(field(f[0],f[1],f[2])); });
+  card.appendChild(grid);
+
+  var dLbl=document.createElement('div');
+  dLbl.style.cssText='font-size:18px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);margin:10px 0 8px;';
+  dLbl.textContent='Lease Milestones (edit before importing)';
+  card.appendChild(dLbl);
+  var dwrap=document.createElement('div'); dwrap.style.cssText='background:var(--surface2);border-radius:9px;padding:12px 14px;';
+  function dateRow(id,label,val){
+    var row=document.createElement('div'); row.className='scanner-deadline-row';
+    var dot=document.createElement('div'); dot.className='dot '+(val?'dot-g':'dot-r');
+    var l=document.createElement('div'); l.style.cssText='flex:1;font-size:18px;color:var(--text);'; l.textContent=label;
+    var i=document.createElement('input'); i.id=id; i.type='date'; i.value=val||'';
+    i.style.cssText='background:var(--surface);border:1px solid var(--border);border-radius:5px;padding:4px 8px;font-size:18px;color:var(--text);font-family:DM Sans,sans-serif;outline:none;';
+    row.appendChild(dot); row.appendChild(l); row.appendChild(i); return row;
+  }
+  dwrap.appendChild(dateRow('sc_lease_commencement','Lease Commencement',L.commencementDate));
+  dwrap.appendChild(dateRow('sc_lease_rentcommence','Rent Commencement',L.rentCommencementDate));
+  dwrap.appendChild(dateRow('sc_lease_expiration','Lease Expiration',L.expirationDate));
+  dwrap.appendChild(dateRow('sc_lease_optiondeadline','Renewal Option Deadline',L.renewalOptionDeadline));
+  card.appendChild(dwrap);
+}
+
 async function commitScanImport(r, btn){
   // ---- Resolve contact (required) ----
   var newCb = ge('sc_new_contact_toggle');
@@ -5663,7 +5770,7 @@ async function commitScanImport(r, btn){
 
   // A commercial lease is a different transaction shape - detect it so we store lease terms and
   // lease milestones instead of the residential purchase fields.
-  var isLease = (r.dealCategory === 'commercial_lease') || (r.docType && /lease/i.test(r.docType));
+  var isLease = scanIsLease(r);
 
   // ---- Resolve transaction choice ----
   var choiceEl = document.querySelector('input[name="sc_tx_choice"]:checked');
@@ -5725,7 +5832,7 @@ async function commitScanImport(r, btn){
     if(!tx.address && address) tx.address = address;
   } else if(isLease){
     // ---- New commercial lease transaction ----
-    var Ld = normalizeLease(r.lease);
+    var Ld = readLeaseForm(r);
     var leaseSide = (ge('sc_client_side') && ge('sc_client_side').value === 'seller') ? 'landlord' : 'tenant';
     tx = {
       id: Date.now() + Math.floor(Math.random()*100000),
