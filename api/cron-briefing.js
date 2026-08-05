@@ -118,7 +118,8 @@ module.exports = async function (req, res) {
       'Appraisal Deadline':     ['b3_appraisal','s3_appraisal'],
     };
     const stepDone = d => {
-      if (d.transactionId == null) return false;
+      if (d.transactionId == null || !d.date) return false;
+      if (daysDiff(d.date) >= 0) return false;   // only overdue deadlines auto-hide (steps auto-track)
       const tx = _txById[String(d.transactionId)];
       if (!tx || !tx.steps) return false;
       const keys = _stepKeys[d.type]; if (!keys) return false;

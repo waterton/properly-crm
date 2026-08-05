@@ -2046,10 +2046,13 @@ function _dlTypeToField(type){
            'Financing Deadline':'financingDate','Appraisal Deadline':'appraisalDate',
            'Closing Date':'closingDate','Closing / Settlement Date':'closingDate'})[type] || null;
 }
-// A transaction deadline is "done" once its matching checklist step is checked (e.g. earnest
-// money received). Done deadlines shouldn't keep showing as overdue on the dashboard/priorities.
+// A PAST transaction deadline whose matching checklist step is checked has been handled and
+// shouldn't keep nagging as overdue. Restricted to overdue dates on purpose: the date-tracked
+// steps auto-check on import (they mean "tracking", not "done"), so hiding UPCOMING deadlines by
+// them would wrongly remove live deadlines. Only overdue + checked is safe to hide.
 function dlDoneStep(d){
-  if(!d || d.transactionId==null) return false;
+  if(!d || d.transactionId==null || !d.date) return false;
+  if(du(d.date) >= 0) return false;   // only overdue deadlines can be auto-hidden as done
   var tx = TX.find(function(t){ return String(t.id)===String(d.transactionId); });
   if(!tx) return false;
   var field = _dlTypeToField(d.type); if(!field) return false;
