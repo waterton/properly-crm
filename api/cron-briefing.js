@@ -109,7 +109,22 @@ module.exports = async function (req, res) {
       // passed it has already fired and is "done" - the app hides it, so the email must too.
       return row.date ? daysDiff(row.date) >= 0 : true;
     };
-    const liveDeadlines = (deadlines || []).filter(isLive);
+    // A transaction deadline whose matching checklist step is checked is done - the app hides it,
+    // so the email must too (keeps "earnest money overdue" from nagging after it's received).
+    const _stepKeys = {
+      'Earnest Money Due':      ['b3_earnest','s3_earnest'],
+      'Due Diligence Deadline': ['b3_duedilig','s3_duedilig'],
+      'Financing Deadline':     ['b3_financing','s3_financing'],
+      'Appraisal Deadline':     ['b3_appraisal','s3_appraisal'],
+    };
+    const stepDone = d => {
+      if (d.transactionId == null) return false;
+      const tx = _txById[String(d.transactionId)];
+      if (!tx || !tx.steps) return false;
+      const keys = _stepKeys[d.type]; if (!keys) return false;
+      return keys.some(k => tx.steps[k]);
+    };
+    const liveDeadlines = (deadlines || []).filter(isLive).filter(d => !stepDone(d));
     const liveFollowups = (followups || []).filter(isLive);
 
     // Overdue follow-ups
