@@ -3797,6 +3797,143 @@ function commitPastSalesImport(){
   renderTC(); rd(); if(curDet) vc(curDet);
 }
 
+// ============ INBOUND EMAIL INTELLIGENCE ============
+// On-demand: read a deal's recent Gmail threads and extract a plain-language digest, action items,
+// and a suggested bilingual reply. Human-in-the-loop - nothing is applied automatically.
+function _esc(s){ var d=document.createElement('div'); d.textContent=(s==null?'':String(s)); return d.innerHTML; }
+function _parseJsonLoose(raw){
+  if(!raw) return null;
+  var s = String(raw).replace(/```json/gi,'').replace(/```/g,'').trim();
+  var a = s.indexOf('{'), b = s.lastIndexOf('}');
+  if(a<0 || b<0 || b<=a) return null;
+  try{ return JSON.parse(s.substring(a,b+1)); }catch(e){ return null; }
+}
+function _emailIntelPrompt(corpus, tx){
+  return 'You are an assistant to a real estate transaction coordinator. Below are recent email '
+    + 'threads for ONE deal' + (tx.address ? (' at ' + tx.address) : '') + '. Read them and return ONLY a '
+    + 'JSON object (no markdown) with these fields:\n'
+    + '{\n'
+    + '  "digest": "3-6 sentence plain-English summary of what has happened and where things stand",\n'
+    + '  "digestEs": "the same summary in Spanish",\n'
+    + '  "updates": ["short factual bullet updates worth logging"],\n'
+    + '  "actionItems": [{"text":"a specific next action for the coordinator","due":"YYYY-MM-DD or empty string"}],\n'
+    + '  "draftReply": "a suggested reply to the most recent message if a reply is warranted (else empty string)",\n'
+    + '  "draftReplyEs": "the same reply in Spanish",\n'
+    + '  "urgent": true or false\n'
+    + '}\n'
+    + 'Base everything ONLY on the emails below - do not invent facts, names, dates, or amounts. If '
+    + 'nothing is actionable, use empty arrays and an empty draftReply.\n\nEMAILS:\n' + corpus;
+}
+async function scanDealEmails(txId){
+  var tx = TX.find(function(t){ return t.id === txId; });
+  if(!tx) return;
+  var c = gc(tx.contactId);
+  var email = (c && c.email) ? c.email.trim() : '';
+  if(!email){ alert('This deal\'s contact has no email address on file, so there are no emails to scan.'); return; }
+  var memberId = gmailState.activeMemberId || Object.keys(gmailState.connectedAccounts)[0];
+  if(!memberId){ alert('Connect a Gmail account first (open the Gmail tab), then try again.'); return; }
+
+  ge('emailIntelTitle').textContent = 'Email Intelligence — ' + (tx.address || (c ? fn(c) : 'Deal'));
+  var body = ge('emailIntelBody');
+  body.innerHTML = '<div style="padding:24px;text-align:center;color:var(--text3);font-size:16px;">Reading recent emails…</div>';
+  om('emailIntelModal');
+
+  try{
+    var q = '(from:' + email + ' OR to:' + email + ') newer_than:45d';
+    var listResp = await fetch('/api/gmail-api', { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ action:'inbox', memberId:memberId, query:q }) });
+    var listData = await listResp.json();
+    if(listData.error){ body.innerHTML = '<div style="padding:20px;color:var(--danger);">'+_esc(listData.error)+'</div>'; return; }
+    var msgs = listData.messages || [];
+    if(!msgs.length){ body.innerHTML = '<div style="padding:24px;color:var(--text3);">No emails found for '+_esc(email)+' in the last 45 days.</div>'; return; }
+    var threadIds = []; msgs.forEach(function(m){ if(m.threadId && threadIds.indexOf(m.threadId)<0) threadIds.push(m.threadId); });
+    threadIds = threadIds.slice(0, 6);
+
+    var chunks = [];
+    for(var i=0;i<threadIds.length;i++){
+      try{
+        var tResp = await fetch('/api/gmail-api', { method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ action:'thread', memberId:memberId, threadId:threadIds[i] }) });
+        var tData = await tResp.json();
+        (tData.messages||[]).forEach(function(mm){
+          var t = (mm.bodyText||'').replace(/\r/g,'').trim();
+          if(t) chunks.push('From: '+(mm.from||'')+'\nDate: '+(mm.date||'')+'\nSubject: '+(mm.subject||'')+'\n'+t);
+        });
+      }catch(e){}
+    }
+    var corpus = chunks.join('\n\n---\n\n').slice(0, 15000);
+    if(!corpus){ body.innerHTML = '<div style="padding:24px;color:var(--text3);">Found threads but couldn\'t read their contents.</div>'; return; }
+
+    var aiResp = await fetch('/api/claude', { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ max_tokens:1500, messages:[{ role:'user', content:_emailIntelPrompt(corpus, tx) }] }) });
+    var aiData = await aiResp.json();
+    var raw = (aiData.content && aiData.content[0] && aiData.content[0].text) ? aiData.content[0].text : '';
+    var result = _parseJsonLoose(raw);
+    if(!result){ body.innerHTML = '<div style="padding:20px;color:var(--danger);">Couldn\'t read the AI response. Try again.</div>'; return; }
+    result._email = email; result._threads = threadIds.length;
+    renderEmailIntel(result, tx, c);
+  }catch(e){
+    body.innerHTML = '<div style="padding:20px;color:var(--danger);">Error: '+_esc(e.message)+'</div>';
+  }
+}
+function renderEmailIntel(result, tx, c){
+  var body = ge('emailIntelBody'); body.innerHTML = '';
+  var lang = (c && c.lang==='es') ? 'es' : 'en';
+  body.appendChild(mkDiv('font-size:13px;color:var(--text3);margin-bottom:10px;',
+    'Read '+(result._threads||0)+' recent thread'+((result._threads===1)?'':'s')+' with '+(result._email||'')+(result.urgent?'  ·  ⚠ urgent':'')));
+
+  var dg = result.digest||'', dgEs = result.digestEs||'';
+  if(dg || dgEs){
+    body.appendChild(mkDiv('font-size:13px;text-transform:uppercase;letter-spacing:1px;color:var(--accent);font-weight:700;margin-bottom:6px;','Summary'));
+    var dText = mkDiv('font-size:15px;color:var(--text);line-height:1.5;white-space:pre-wrap;', (lang==='es'&&dgEs)?dgEs:dg);
+    body.appendChild(dText);
+    if(dg && dgEs){
+      var tgl=document.createElement('div'); tgl.style.cssText='margin:6px 0 4px;';
+      [['EN',dg],['ES',dgEs]].forEach(function(p){ var b=document.createElement('button'); b.className='nlang-btn'+(((p[0]==='ES')===(lang==='es'))?' on':''); b.textContent=p[0]; b.style.marginRight='4px';
+        b.addEventListener('click',function(){ dText.textContent=p[1]; tgl.querySelectorAll('.nlang-btn').forEach(function(x){x.classList.remove('on');}); b.classList.add('on'); }); tgl.appendChild(b); });
+      body.appendChild(tgl);
+    }
+    var noteBtn=document.createElement('button'); noteBtn.className='btn btn-g'; noteBtn.style.cssText='font-size:13px;padding:5px 12px;margin:8px 0 14px;'; noteBtn.textContent='Save summary as note';
+    noteBtn.addEventListener('click', function(){
+      var ups=(Array.isArray(result.updates)&&result.updates.length)?('\n\n• '+result.updates.join('\n• ')):'';
+      var nn={id:Date.now()+Math.floor(Math.random()*100000), contactId:tx.contactId, transactionId:tx.id, text:'Email summary: '+dg+ups, date:new Date().toISOString(), category:'General', textEs:(dgEs?('Resumen de correos: '+dgEs):'')};
+      N.push(nn); saveNote(nn); logActivity(tx.contactId,'Email summary saved'); rd();
+      noteBtn.textContent='Saved ✓'; noteBtn.disabled=true;
+    });
+    body.appendChild(noteBtn);
+  }
+
+  var ai = Array.isArray(result.actionItems)?result.actionItems:[];
+  ai = ai.filter(function(it){ return it && it.text; });
+  if(ai.length){
+    body.appendChild(mkDiv('font-size:13px;text-transform:uppercase;letter-spacing:1px;color:var(--warn);font-weight:700;margin-bottom:4px;','Action items'));
+    ai.forEach(function(it){
+      var row=document.createElement('div'); row.style.cssText='display:flex;gap:8px;align-items:flex-start;padding:6px 0;border-bottom:1px solid var(--border);';
+      row.appendChild(mkDiv('flex:1;font-size:15px;color:var(--text);', it.text + (it.due?(' (due '+it.due+')'):'')));
+      var fbtn=document.createElement('button'); fbtn.className='btn btn-g'; fbtn.style.cssText='font-size:12px;padding:3px 9px;flex:0 0 auto;'; fbtn.textContent='+ Follow-up';
+      (function(item,btn){ btn.addEventListener('click', function(){
+        var f={id:Date.now()+Math.floor(Math.random()*100000), contactId:tx.contactId, transactionId:tx.id, label:item.text, date:(item.due||''), pri:'warn', done:false};
+        F.push(f); saveFU(f); rd(); btn.textContent='Added ✓'; btn.disabled=true;
+      }); })(it,fbtn);
+      row.appendChild(fbtn); body.appendChild(row);
+    });
+  }
+
+  var dr = result.draftReply||'', drEs = result.draftReplyEs||'';
+  if(dr || drEs){
+    body.appendChild(mkDiv('font-size:13px;text-transform:uppercase;letter-spacing:1px;color:var(--buyer);font-weight:700;margin:14px 0 6px;','Suggested reply'));
+    body.appendChild(mkDiv('font-size:14px;color:var(--text2);white-space:pre-wrap;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;', (lang==='es'&&drEs)?drEs:dr));
+    var rowb=document.createElement('div'); rowb.style.cssText='display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;';
+    function draftBtn(label, txt){ var b=document.createElement('button'); b.className='btn btn-p'; b.style.cssText='font-size:13px;padding:6px 12px;'; b.textContent=label;
+      b.addEventListener('click', function(){ cm('emailIntelModal'); openCompose({ to:(result._email||''), subject:'Re: your transaction'+(tx.address?(' — '+tx.address):''), body:txt }); }); return b; }
+    if(dr) rowb.appendChild(draftBtn('Reply in English', dr));
+    if(drEs) rowb.appendChild(draftBtn('Reply in Spanish', drEs));
+    body.appendChild(rowb);
+  }
+
+  if(!dg && !ai.length && !dr && !drEs){ body.appendChild(mkDiv('font-size:15px;color:var(--text3);padding:8px 0;','Nothing notable found in the recent emails.')); }
+}
+
 // Read-only panel of a commercial lease's key terms, shown on the transaction detail.
 function renderLeasePanel(tx){
   var L = tx.details || {};
@@ -3899,7 +4036,12 @@ function openTCDetail(id){
   detFuBtn.className = 'btn btn-g'; detFuBtn.style.cssText = 'font-size:15px;padding:6px 12px;';
   detFuBtn.textContent = '+ Follow-up';
   (function(txId){ detFuBtn.addEventListener('click', function(){ ofcTx(txId); }); })(id);
-  stRight.appendChild(detFuBtn); stRight.appendChild(stBtn);
+  var detEmailBtn = document.createElement('button');
+  detEmailBtn.className = 'btn btn-g'; detEmailBtn.style.cssText = 'font-size:15px;padding:6px 12px;';
+  detEmailBtn.textContent = '✉ Scan Emails';
+  detEmailBtn.title = 'Read this deal\'s recent emails and extract updates, action items, and a draft reply';
+  (function(txId){ detEmailBtn.addEventListener('click', function(){ scanDealEmails(txId); }); })(id);
+  stRight.appendChild(detEmailBtn); stRight.appendChild(detFuBtn); stRight.appendChild(stBtn);
   stRow.appendChild(stLbl); stRow.appendChild(stRight);
   body.appendChild(stRow);
 
