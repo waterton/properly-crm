@@ -3806,7 +3806,12 @@ function _parseJsonLoose(raw){
   var s = String(raw).replace(/```json/gi,'').replace(/```/g,'').trim();
   var a = s.indexOf('{'), b = s.lastIndexOf('}');
   if(a<0 || b<0 || b<=a) return null;
-  try{ return JSON.parse(s.substring(a,b+1)); }catch(e){ return null; }
+  var sub = s.substring(a, b+1);
+  try{ return JSON.parse(sub); }catch(e){}
+  // LLMs often emit raw control chars (newlines/tabs) inside JSON strings, which is invalid.
+  // Strip control characters and retry so we still get usable JSON.
+  try{ return JSON.parse(sub.replace(/[\u0000-\u001F]+/g,' ')); }catch(e){}
+  return null;
 }
 function _emailIntelPrompt(corpus, tx){
   return 'You are an assistant to a real estate transaction coordinator. Below are recent email '
@@ -3894,7 +3899,7 @@ async function scanDealEmails(txId){
     if(!corpus){ body.innerHTML = '<div style="padding:24px;color:var(--text3);">Found threads but couldn\'t read their contents.</div>'; return; }
 
     var aiResp = await fetch('/api/claude', { method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ max_tokens:1500, messages:[{ role:'user', content:_emailIntelPrompt(corpus, tx) }] }) });
+      body: JSON.stringify({ max_tokens:3000, messages:[{ role:'user', content:_emailIntelPrompt(corpus, tx) }] }) });
     var aiData = await aiResp.json();
     var raw = (aiData.content && aiData.content[0] && aiData.content[0].text) ? aiData.content[0].text : '';
     var result = _parseJsonLoose(raw);
