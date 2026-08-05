@@ -3899,7 +3899,7 @@ async function scanDealEmails(txId){
     if(!corpus){ body.innerHTML = '<div style="padding:24px;color:var(--text3);">Found threads but couldn\'t read their contents.</div>'; return; }
 
     var aiResp = await fetch('/api/claude', { method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ max_tokens:3000, messages:[{ role:'user', content:_emailIntelPrompt(corpus, tx) }] }) });
+      body: JSON.stringify({ max_tokens:8192, messages:[{ role:'user', content:_emailIntelPrompt(corpus, tx) }] }) });
     var aiData = await aiResp.json();
     if(aiData && aiData.error){ body.innerHTML = '<div style="padding:20px;color:var(--danger);">AI error: '+_esc(aiData.error.message||JSON.stringify(aiData.error))+'</div>'; return; }
     var raw = (aiData.content && aiData.content[0] && aiData.content[0].text) ? aiData.content[0].text : '';
