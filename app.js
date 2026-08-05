@@ -3901,9 +3901,20 @@ async function scanDealEmails(txId){
     var aiResp = await fetch('/api/claude', { method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ max_tokens:3000, messages:[{ role:'user', content:_emailIntelPrompt(corpus, tx) }] }) });
     var aiData = await aiResp.json();
+    if(aiData && aiData.error){ body.innerHTML = '<div style="padding:20px;color:var(--danger);">AI error: '+_esc(aiData.error.message||JSON.stringify(aiData.error))+'</div>'; return; }
     var raw = (aiData.content && aiData.content[0] && aiData.content[0].text) ? aiData.content[0].text : '';
     var result = _parseJsonLoose(raw);
-    if(!result){ body.innerHTML = '<div style="padding:20px;color:var(--danger);">Couldn\'t read the AI response. Try again.</div>'; return; }
+    if(!result){
+      // Show what actually came back so the issue is diagnosable, and fall back to the raw text
+      // as a plain summary so nothing is lost.
+      body.innerHTML = '';
+      body.appendChild(mkDiv('font-size:13px;color:var(--danger);font-weight:700;margin-bottom:6px;','Could not parse the AI response — showing it raw:'));
+      var pre=document.createElement('div');
+      pre.style.cssText='font-size:13px;color:var(--text2);white-space:pre-wrap;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;max-height:50vh;overflow:auto;';
+      pre.textContent = raw ? raw : ('(empty response) — full API payload: '+JSON.stringify(aiData).slice(0,800));
+      body.appendChild(pre);
+      return;
+    }
     result._threads = threadIds.length;
     result._scope = tx.address || (c ? fn(c) : 'this deal');
     result._to = (c && c.email) ? c.email : '';
