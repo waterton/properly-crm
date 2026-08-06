@@ -7,11 +7,27 @@ export const config = {
 };
 
 // Google Calendar API - create, update, delete events
+async function verifyUser(req) {
+  var authHeader = req.headers['authorization'] || '';
+  var token = authHeader.indexOf('Bearer ') === 0 ? authHeader.slice(7) : '';
+  var supaUrl = process.env.SUPA_URL || 'https://fgkilooomlozhwfnvjze.supabase.co';
+  var anon = process.env.SUPA_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZna2lsb29vbWxvemh3Zm52anplIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA3NTc0NTIsImV4cCI6MjA5NjMzMzQ1Mn0.owQk8Vy3Vcs8n8c0sI0fXQYmjpAy14hev8lDt4g5iZE';
+  if (!token || token === anon) return false;
+  try {
+    var r = await fetch(supaUrl + '/auth/v1/user', { headers: { apikey: anon, Authorization: 'Bearer ' + token } });
+    if (!r.ok) return false;
+    var u = await r.json();
+    return !!(u && u.id);
+  } catch (e) { return false; }
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(200).end();
+
+  if (!(await verifyUser(req))) return res.status(401).json({ error: 'Sign in required.' });
 
   if (typeof req.body === 'string') {
     try { req.body = JSON.parse(req.body); } catch(e) {}

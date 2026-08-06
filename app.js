@@ -57,6 +57,11 @@ async function apiHeaders(){
   try{ var sd = await supa.auth.getSession(); if(sd && sd.data && sd.data.session) token = sd.data.session.access_token; }catch(e){}
   return { 'Content-Type':'application/json', 'Authorization':'Bearer ' + (token || SUPA_KEY) };
 }
+// POST to one of our own /api endpoints with the session token attached. Returns the fetch
+// promise, so it works whether the caller awaits it or fires-and-forgets with .catch().
+function postApi(path, bodyObj){
+  return apiHeaders().then(function(h){ return fetch(path, { method:'POST', headers:h, body: JSON.stringify(bodyObj) }); });
+}
 
 var C=[],N=[],F=[],D=[],TX=[],TM=[],A=[],curDet=null,curFilter='all',curPage='dashboard';
 var CAMP=[],ENR=[],SENDLOG=[],DOCS=[];
@@ -6512,11 +6517,7 @@ async function syncToGCal(eventData, memberId){
   if(btn){ btn.textContent = 'Adding...'; btn.disabled = true; }
 
   try{
-    var resp = await fetch('/api/gcal', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({action:'create', memberId:mid, event:eventData})
-    });
+    var resp = await postApi('/api/gcal', {action:'create', memberId:mid, event:eventData});
     var respText = await resp.text();
     var data;
     try{ data = JSON.parse(respText); }
@@ -6635,11 +6636,7 @@ async function fetchGCalEvents(){
   // Fetch from each connected account
   await Promise.all(connected.map(async function(mid){
     try{
-      var resp = await fetch('/api/gcal', {
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({action:'list', memberId:mid})
-      });
+      var resp = await postApi('/api/gcal', {action:'list', memberId:mid});
       var text = await resp.text();
       var data;
       try{ data = JSON.parse(text); }catch(e){
@@ -7294,15 +7291,13 @@ function saveCalEvent(){
       var evDataE = { title:ev.title, date:ev.date, time:ev.time, endTime:ev.endTime, type:ev.type, clientName:_cE?fn(_cE):'', notes:ev.notes||'' };
       if(wantSyncE && gmapE && gmapE.gcalId){
         // Update the existing Google event.
-        fetch('/api/gcal', { method:'POST', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({ action:'update', memberId:gmapE.mid, eventId:gmapE.gcalId, event:evDataE }) }).catch(function(){});
+        postApi('/api/gcal', { action:'update', memberId:gmapE.mid, eventId:gmapE.gcalId, event:evDataE }).catch(function(){});
       } else if(wantSyncE){
         // Wasn't on Google yet - add it now.
         syncToGCal(evDataE, ev.memberId).then(function(res){ if(res && res.gcalId){ _gcalMap[String(editId)] = { gcalId:res.gcalId, mid:res.mid }; saveGcalMap(); } });
       } else if(!wantSyncE && gmapE && gmapE.gcalId){
         // Unticked - remove it from Google.
-        fetch('/api/gcal', { method:'POST', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({ action:'delete', memberId:gmapE.mid, eventId:gmapE.gcalId }) }).catch(function(){});
+        postApi('/api/gcal', { action:'delete', memberId:gmapE.mid, eventId:gmapE.gcalId }).catch(function(){});
         delete _gcalMap[String(editId)]; saveGcalMap();
       }
     }
@@ -7349,9 +7344,7 @@ function deleteCalEvent(){
   renderCalendar();
   // Remove the matching Google Calendar event, if we created one.
   if(gmap && gmap.gcalId){
-    fetch('/api/gcal', { method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ action:'delete', memberId: gmap.mid, eventId: gmap.gcalId }) })
-      .catch(function(){});
+    postApi('/api/gcal', { action:'delete', memberId: gmap.mid, eventId: gmap.gcalId }).catch(function(){});
     delete _gcalMap[String(editId)]; saveGcalMap();
   }
 }
