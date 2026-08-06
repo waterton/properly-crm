@@ -6523,7 +6523,7 @@ function syncEventToGCal(ev){
 
 // -- CALENDAR ---
 var CAL = {
-  view: 'month',
+  view: 'agenda',
   year: new Date().getFullYear(),
   month: new Date().getMonth(),
   selectedDate: null,
