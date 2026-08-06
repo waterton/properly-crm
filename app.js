@@ -6499,11 +6499,19 @@ async function syncToGCal(eventData, memberId){
       if(openLink) window.open(data.link, '_blank');
     }
 
+    return { gcalId: data.gcalId, mid: mid };   // so the caller can remember it for delete-sync
+
   }catch(e){
     alert('Sync error: ' + e.message);
     if(btn){ btn.textContent=origText; btn.disabled=false; }
   }
 }
+// Local map: CRM event id -> {gcalId, mid}. Kept in localStorage (not the synced event object) so
+// we can delete the matching Google Calendar event without touching the cal_events table schema.
+var _gcalMap = {};
+function loadGcalMap(){ try{ _gcalMap = JSON.parse(localStorage.getItem('crm_gcal_map')||'{}') || {}; }catch(e){ _gcalMap = {}; } }
+function saveGcalMap(){ try{ localStorage.setItem('crm_gcal_map', JSON.stringify(_gcalMap)); }catch(e){} }
+loadGcalMap();
 
 function syncEventToGCal(ev){
   // Convert CRM event to syncable format
@@ -7258,7 +7266,9 @@ function saveCalEvent(){
       syncToGCal({
         title: newEv.title, date: newEv.date, time: newEv.time, endTime: newEv.endTime,
         type: newEv.type, clientName: _c ? fn(_c) : '', notes: newEv.notes || ''
-      }, newEv.memberId);
+      }, newEv.memberId).then(function(res){
+        if(res && res.gcalId){ _gcalMap[String(newEv.id)] = { gcalId: res.gcalId, mid: res.mid }; saveGcalMap(); }
+      });
     }
     return;
   }
@@ -7269,11 +7279,19 @@ function saveCalEvent(){
 
 function deleteCalEvent(){
   var editId = ge('btnSaveCalEvent').getAttribute('data-edit-id');
-  if(!editId || !confirm('Delete this event?')) return;
+  if(!editId || !confirm('Delete this event? If it was added to Google Calendar, it will be removed there too.')) return;
+  var gmap = _gcalMap[String(editId)];
   CAL.events = CAL.events.filter(function(e){ return String(e.id)!==String(editId); });
   saveCalEvents();
   cm('calEventModal');
   renderCalendar();
+  // Remove the matching Google Calendar event, if we created one.
+  if(gmap && gmap.gcalId){
+    fetch('/api/gcal', { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ action:'delete', memberId: gmap.mid, eventId: gmap.gcalId }) })
+      .catch(function(){});
+    delete _gcalMap[String(editId)]; saveGcalMap();
+  }
 }
 
 // -- TEAM MANAGEMENT ---
