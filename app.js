@@ -821,7 +821,31 @@ function rd(){
   var dlEl=ge('dDeadlines');dlEl.innerHTML='';
   var dl=D.filter(function(d){return !dlIsClosed(d) && !dlDonePersonal(d) && !dlDoneStep(d);}).sort(function(a,b){return new Date(a.date)-new Date(b.date);}).slice(0,5);
   if(!dl.length){dlEl.innerHTML='<div class="empty">No deadlines</div>';}
-  else dl.forEach(function(d){var c=gc(d.contactId);var n=du(d.date);var lbl=n<0?'Overdue':n===0?'Today':n+'d';var row=mkRow('dl-row');row.style.cursor='pointer';row.addEventListener('click',function(){sp('deadlines');});row.appendChild(mkDot(dc(n)));var info=mkDiv('flex:1;');info.appendChild(mkDiv('font-size:18px;',d.type));info.appendChild(mkDiv('font-size:18px;color:var(--text3);',c?fn(c):''));row.appendChild(info);row.appendChild(mkDiv('font-family:monospace;font-size:18px;color:var(--text2);',lbl));dlEl.appendChild(row);});
+  else dl.forEach(function(d){
+    var c=gc(d.contactId);var n=du(d.date);var lbl=n<0?'Overdue':n===0?'Today':n+'d';
+    var row=mkRow('dl-row');row.style.cursor='pointer';row.addEventListener('click',function(){sp('deadlines');});
+    row.appendChild(mkDot(dc(n)));
+    var info=mkDiv('flex:1;');
+    // Deadline type without the trailing "Deadline", plus a small box with the transaction's
+    // street address (first comma-separated part only, no city/state/zip).
+    var typeText = String(d.type||'').replace(/\s*deadline\s*$/i,'').trim();
+    var tx = dlTxFor(d);
+    var street = (tx && tx.address) ? String(tx.address).split(',')[0].trim() : '';
+    var typeDiv = document.createElement('div');
+    typeDiv.style.cssText='font-size:18px;display:flex;align-items:center;gap:7px;flex-wrap:wrap;';
+    typeDiv.appendChild(document.createTextNode(typeText));
+    if(street){
+      var sb=document.createElement('span');
+      sb.style.cssText='font-size:13px;color:var(--accent);background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:1px 8px;white-space:nowrap;';
+      sb.textContent=street;
+      typeDiv.appendChild(sb);
+    }
+    info.appendChild(typeDiv);
+    info.appendChild(mkDiv('font-size:18px;color:var(--text3);',c?fn(c):''));
+    row.appendChild(info);
+    row.appendChild(mkDiv('font-family:monospace;font-size:18px;color:var(--text2);',lbl));
+    dlEl.appendChild(row);
+  });
   var fuEl=ge('dFollowups');fuEl.innerHTML='';
   var pend=F.filter(function(f){return !f.done;}).slice(0,4);
   if(!pend.length){fuEl.innerHTML='<div class="empty">All caught up!</div>';}
