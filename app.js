@@ -84,7 +84,11 @@ var DB_COLS = {
   notes: ['id','contactId','transactionId','text','date','category','textEs'],
   followups: ['id','contactId','transactionId','label','date','pri','done','assignedTo'],
   deadlines: ['id','contactId','transactionId','type','date','assignedTo','time'],
-  transactions: null, // allow all
+  transactions: ['id','contactId','type','category','address','price','mlsNum','lender','titleCo','notes','status','steps','details',
+                 'contractDate','closingDate','earnestDate','dueDiligDate','financingDate','appraisalDate',
+                 'listCommissionPct','buyerCommissionPct','listCommissionAmt','buyerCommissionAmt',
+                 'dismissedRisks','docChecklist','lastAddendumNo','lastAddendumDate',
+                 'added','soldTerms','concessions','buyerAgent','buyerAgentBrokerage'],
   campaigns: null,
   enrollments: null,
   send_log: null,
@@ -318,21 +322,52 @@ function buildDocRow(doc, onChange){
   }); })(doc);
   row.appendChild(name); row.appendChild(meta); row.appendChild(del);
   return row;
-}function dbSave(table, rows){
-  if(!supaReady) return;
+}// Failed cloud saves are queued here so we can surface them and retry, instead of silently
+// diverging from the database (the root cause of "saved locally but not synced" bugs).
+var _saveQueue = [];
+function _postRows(table, cleanRows){
+  return getAuthHeaders({'Prefer':'resolution=merge-duplicates'}).then(function(headers){
+    return fetch(SUPA_URL + '/rest/v1/' + table, { method:'POST', headers:headers, body: JSON.stringify(cleanRows) });
+  });
+}
+function dbSave(table, rows){
+  if(!supaReady) return Promise.resolve();
   var cleanRows = JSON.parse(JSON.stringify(rows)).map(function(r){ return stripForDB(table, r); });
-  getAuthHeaders({'Prefer': 'resolution=merge-duplicates'}).then(function(headers){
-  fetch(SUPA_URL + '/rest/v1/' + table, {
-    method: 'POST',
-    headers: headers,
-    body: JSON.stringify(cleanRows)
-  }).then(function(r){
-    if(!r.ok){
-      r.text().then(function(t){ console.log('DB save error on ' + table + ':', t); });
-      showSyncStatus('error');
-    }
-  }).catch(function(e){ console.log('DB save fetch error:', e.message); });
-  }); // end getAuthHeaders
+  return _postRows(table, cleanRows).then(function(r){
+    if(!r.ok){ return r.text().then(function(t){ _onSaveFail(table, cleanRows, r.status + ' ' + String(t).slice(0,160)); }); }
+    _onSaveOk();
+  }).catch(function(e){ _onSaveFail(table, cleanRows, e.message); });
+}
+function _onSaveOk(){ if(!_saveQueue.length){ showSyncStatus('live'); hideSaveError(); } }
+function _onSaveFail(table, cleanRows, detail){
+  console.log('DB SAVE FAILED on ' + table + ': ' + detail);
+  _saveQueue.push({ table: table, rows: cleanRows });
+  showSyncStatus('error');
+  showSaveError(detail);
+}
+function showSaveError(detail){
+  var bar = document.getElementById('syncBar'); if(!bar) return;
+  bar.style.cssText = 'padding:8px 20px;border-bottom:1px solid var(--danger);display:flex;align-items:center;gap:10px;flex-shrink:0;background:rgba(201,76,76,0.12);';
+  bar.innerHTML = '';
+  var msg = document.createElement('div');
+  msg.style.cssText = 'flex:1;font-size:14px;color:var(--danger);font-weight:600;';
+  msg.textContent = '⚠ ' + _saveQueue.length + ' unsaved change' + (_saveQueue.length===1?'':'s') + ' — saved on this device but not the cloud.' + (detail ? (' (' + detail + ')') : '');
+  var retry = document.createElement('button');
+  retry.className = 'btn btn-p'; retry.style.cssText = 'font-size:13px;padding:4px 12px;flex:0 0 auto;'; retry.textContent = 'Retry sync';
+  retry.addEventListener('click', retrySaves);
+  bar.appendChild(msg); bar.appendChild(retry);
+}
+function hideSaveError(){ var bar = document.getElementById('syncBar'); if(bar){ bar.style.display = 'none'; bar.innerHTML = ''; } }
+function retrySaves(){
+  if(!supaReady || !_saveQueue.length){ hideSaveError(); return; }
+  var pending = _saveQueue.slice(); _saveQueue = []; hideSaveError(); showSyncStatus('loading');
+  (function next(i){
+    if(i >= pending.length){ _onSaveOk(); return; }
+    _postRows(pending[i].table, pending[i].rows).then(function(r){
+      if(!r.ok){ return r.text().then(function(t){ _onSaveFail(pending[i].table, pending[i].rows, r.status + ' ' + String(t).slice(0,160)); next(i+1); }); }
+      next(i+1);
+    }).catch(function(e){ _onSaveFail(pending[i].table, pending[i].rows, e.message); next(i+1); });
+  })(0);
 }
 
 function dbDelete(table, id){ dbDeleteBy(table, 'id', id); }
