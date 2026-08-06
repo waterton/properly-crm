@@ -7215,8 +7215,9 @@ function openAddCalEvent(){
 
 function openEditCalEvent(ev){
   ge('calEventModalTitle').textContent = 'Edit Event';
-  // Sync only happens on create; hide the toggle when editing to avoid implying edits re-sync.
-  var _sg2 = ge('calEvSyncGCal'); if(_sg2 && _sg2.parentElement){ _sg2.parentElement.style.display = 'none'; }
+  // Checkbox reflects whether this event is currently on Google Calendar. Ticking/unticking on
+  // save will create/update/remove it accordingly.
+  var _sg2 = ge('calEvSyncGCal'); if(_sg2){ if(_sg2.parentElement) _sg2.parentElement.style.display = ''; _sg2.checked = !!_gcalMap[String(ev.id)]; }
   ge('btnSaveCalEvent').setAttribute('data-edit-id', ev.id);
   ge('btnDeleteCalEvent').style.display = 'inline-flex';
   ge('calEvTitle').value = ev.title||'';
@@ -7243,6 +7244,25 @@ function saveCalEvent(){
       ev.memberId=parseInt(ge('calEvMember').value)||null;
       ev.contactId=parseInt(ge('calEvContact').value)||null;
       ev.notes=ge('calEvNotes').value;
+
+      // ---- Keep Google Calendar in step with the edit ----
+      var wantSyncE = ge('calEvSyncGCal') ? ge('calEvSyncGCal').checked : false;
+      var gmapE = _gcalMap[String(editId)];
+      var _cE = ev.contactId ? gc(ev.contactId) : null;
+      var evDataE = { title:ev.title, date:ev.date, time:ev.time, endTime:ev.endTime, type:ev.type, clientName:_cE?fn(_cE):'', notes:ev.notes||'' };
+      if(wantSyncE && gmapE && gmapE.gcalId){
+        // Update the existing Google event.
+        fetch('/api/gcal', { method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ action:'update', memberId:gmapE.mid, eventId:gmapE.gcalId, event:evDataE }) }).catch(function(){});
+      } else if(wantSyncE){
+        // Wasn't on Google yet - add it now.
+        syncToGCal(evDataE, ev.memberId).then(function(res){ if(res && res.gcalId){ _gcalMap[String(editId)] = { gcalId:res.gcalId, mid:res.mid }; saveGcalMap(); } });
+      } else if(!wantSyncE && gmapE && gmapE.gcalId){
+        // Unticked - remove it from Google.
+        fetch('/api/gcal', { method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ action:'delete', memberId:gmapE.mid, eventId:gmapE.gcalId }) }).catch(function(){});
+        delete _gcalMap[String(editId)]; saveGcalMap();
+      }
     }
   } else {
     var newEv = {
