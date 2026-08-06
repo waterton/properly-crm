@@ -49,7 +49,14 @@ async function getAuthHeaders(extra) {
   return h;
 }
 
-// Auth disabled for testing
+// Session-aware headers for our own /api/* endpoints that require a logged-in user.
+// Carries the Supabase session token so the server can verify the caller; falls back to the anon
+// key (which the server rejects) when there's no session.
+async function apiHeaders(){
+  var token = null;
+  try{ var sd = await supa.auth.getSession(); if(sd && sd.data && sd.data.session) token = sd.data.session.access_token; }catch(e){}
+  return { 'Content-Type':'application/json', 'Authorization':'Bearer ' + (token || SUPA_KEY) };
+}
 
 var C=[],N=[],F=[],D=[],TX=[],TM=[],A=[],curDet=null,curFilter='all',curPage='dashboard';
 var CAMP=[],ENR=[],SENDLOG=[],DOCS=[];
@@ -3457,7 +3464,7 @@ async function generateRundown(items){
     + 'Write ONE warm, natural sentence (about 25-30 words max) that summarizes the most important 1-3 items so they know their day at a glance. '
     + 'Be specific with names and timeframes. Do NOT invent anything that is not in the list.\n\nLIST:\n' + lines;
   try{
-    var resp = await fetch('/api/claude', { method:'POST', headers:{'Content-Type':'application/json'},
+    var resp = await fetch('/api/claude', { method:'POST', headers: await apiHeaders(),
       body: JSON.stringify({ max_tokens:120, messages:[{ role:'user', content: prompt }] }) });
     var data = await resp.json();
     var txt = (data.content && data.content[0] && data.content[0].text) ? data.content[0].text.trim() : '';
@@ -3670,7 +3677,7 @@ async function askCrm(question){
 
   try{
     var resp = await fetch('/api/claude', {
-      method: 'POST', headers: {'Content-Type':'application/json'},
+      method: 'POST', headers: await apiHeaders(),
       body: JSON.stringify({ max_tokens: 600, messages: [{ role:'user', content: prompt }] })
     });
     var data = await resp.json();
@@ -3940,7 +3947,7 @@ async function scanDealEmails(txId){
     var corpus = chunks.join('\n\n---\n\n').slice(0, 15000);
     if(!corpus){ body.innerHTML = '<div style="padding:24px;color:var(--text3);">Found threads but couldn\'t read their contents.</div>'; return; }
 
-    var aiResp = await fetch('/api/claude', { method:'POST', headers:{'Content-Type':'application/json'},
+    var aiResp = await fetch('/api/claude', { method:'POST', headers: await apiHeaders(),
       body: JSON.stringify({ max_tokens:8192, messages:[{ role:'user', content:_emailIntelPrompt(corpus, tx) }] }) });
     var aiData = await aiResp.json();
     if(aiData && aiData.error){ body.innerHTML = '<div style="padding:20px;color:var(--danger);">AI error: '+_esc(aiData.error.message||JSON.stringify(aiData.error))+'</div>'; return; }
@@ -4549,7 +4556,7 @@ async function askTCQuestion(){
   try{
     var resp = await fetch('/api/claude', {
       method: 'POST',
-      headers: {'Content-Type':'application/json'},
+      headers: await apiHeaders(),
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 1500,
@@ -4764,7 +4771,7 @@ async function analyzeBusinessCard(base64, mediaType){
   try{
     var resp = await fetch('/api/claude', {
       method:'POST',
-      headers:{'Content-Type':'application/json'},
+      headers: await apiHeaders(),
       body: JSON.stringify({
         model:'claude-sonnet-4-20250514',
         max_tokens:1500,
@@ -5127,7 +5134,7 @@ async function analyzeQRText(text){
   try{
     var resp = await fetch('/api/claude', {
       method:'POST',
-      headers:{'Content-Type':'application/json'},
+      headers: await apiHeaders(),
       body: JSON.stringify({
         model:'claude-sonnet-4-20250514',
         max_tokens:800,
@@ -5232,7 +5239,7 @@ function startScan(file){
   var mediaType = file.type || (isPDF ? 'application/pdf' : 'image/jpeg');
   var scanPath = 'scans/' + Date.now() + '_' + String(file.name||'scan').replace(/[^a-zA-Z0-9._-]/g,'_');
   var cleanupScan = function(){ deleteDocFile(scanPath).catch(function(){}); };
-  uploadDocFile(file, scanPath).then(function(){
+  uploadDocFile(file, scanPath).then(async function(){
     var msgContent;
     if(isPDF){
       msgContent = [
@@ -5247,7 +5254,7 @@ function startScan(file){
     }
     return fetch('/api/claude', {
       method:'POST',
-      headers:{'Content-Type':'application/json'},
+      headers: await apiHeaders(),
       body: JSON.stringify({
         model:'claude-sonnet-4-20250514',
         max_tokens:8192,
