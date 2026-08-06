@@ -18,7 +18,7 @@ const CLIENT_SECRET    = process.env.GOOGLE_CLIENT_SECRET;
 const APP_URL          = process.env.APP_URL || 'https://properly-crm.vercel.app';
 // Token-signing secret. Prefer a dedicated PORTAL_SECRET; fall back to CRON_SECRET so the portal
 // still works if only that is set.
-const SECRET           = process.env.PORTAL_SECRET || process.env.CRON_SECRET || 'pb-portal-fallback';
+const SECRET           = process.env.PORTAL_SECRET || process.env.CRON_SECRET || '';  // fail closed if unset (no hardcoded default)
 const TOKEN_TTL_DAYS   = 7;
 
 module.exports = async function (req, res) {
@@ -26,6 +26,8 @@ module.exports = async function (req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(200).end();
+  // Fail closed: never sign/verify tokens without a real secret configured.
+  if (!SECRET) return res.status(500).json({ ok: false, error: 'server_misconfigured' });
 
   if (req.method === 'POST' && typeof req.body === 'string') {
     try { req.body = JSON.parse(req.body); } catch (e) {}

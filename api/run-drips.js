@@ -511,7 +511,7 @@ async function authorized(req) {
   //    secret as a query param, a raw Authorization header, a Bearer token, or x-cron-secret -
   //    matching how /api/cron-briefing already validates it.
   if (secret && (qs === secret || hdr === secret || auth === secret || auth === ('Bearer ' + secret))) return true;
-  if (!secret) return true;   // no secret configured: unchanged behaviour
+  if (!secret) return false;   // fail closed: no CRON_SECRET configured -> reject (was a public hole)
 
   // 2. A signed-in CRM user. Lets the in-app "Send Reminders Now" button trigger a run
   //    without CRON_SECRET ever reaching the browser. The anon key is NOT a user.
