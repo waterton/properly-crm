@@ -108,7 +108,8 @@ var DB_COLS = {
   documents: ['id','contact_id','transaction_id','file_path','file_name','doc_type','summary','mime_type','size','created_at'],
   tx_changes: ['id','transactionId','contactId','field','oldValue','newValue','docType','addendumNo','effectiveDate','documentId','appliedAt'],
   reminder_settings: ['id','deadlineType','daysBefore','enabled','updatedAt','subjectEn','bodyEn','subjectEs','bodyEs'],
-  team: ['id','first','last','role','email','phone','color','calLink']
+  team: ['id','first','last','role','email','phone','color','calLink'],
+  cal_events: ['id','title','date','time','endTime','type','memberId','contactId','notes']
 };
 function stripForDB(table, row){
   var cols = DB_COLS[table];
