@@ -9049,50 +9049,72 @@ function renderDocsPage(){
   listEl.appendChild(bar);
   refreshBulkUI();
 
+  // ---- Group documents by deal (transaction / street address), then by contact ----
+  var groups = {}, groupOrder = [];
   filtered.forEach(function(d){
-    var row = document.createElement('div');
-    row.style.cssText = 'display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);flex-wrap:wrap;';
-    var cbx = document.createElement('input');
-    cbx.type = 'checkbox';
-    cbx.checked = selectedDocs.has(d.id);
-    cbx.style.cssText = 'accent-color:var(--accent);flex:0 0 auto;cursor:pointer;';
-    (function(doc){ cbx.addEventListener('change', function(){
-      if(cbx.checked) selectedDocs.add(doc.id); else selectedDocs.delete(doc.id);
-      refreshBulkUI();
-    }); })(d);
-    row.appendChild(cbx);
-    var nameWrap = mkDiv('flex:1;min-width:180px;');
-    var name = mkDiv('font-size:18px;color:var(--accent);cursor:pointer;text-decoration:underline;word-break:break-word;', d.file_name||'Document');
-    (function(doc){ name.addEventListener('click', function(){ openDocument(doc); }); })(d);
-    nameWrap.appendChild(name);
-    var subBits = [];
-    if(d.doc_type) subBits.push(d.doc_type);
-    if(d.size) subBits.push(Math.round(d.size/1024)+' KB');
-    if(d.created_at) subBits.push(fd(d.created_at));
-    nameWrap.appendChild(mkDiv('font-size:15px;color:var(--text3);margin-top:2px;', subBits.join(' - ')));
-    row.appendChild(nameWrap);
-    var linkWrap = mkDiv('display:flex;gap:6px;flex-wrap:wrap;');
-    var contact = d.contact_id ? gc(d.contact_id) : null;
     var tx = d.transaction_id ? TX.find(function(t){ return t.id===d.transaction_id; }) : null;
-    if(contact){
-      var cBtn = mkBtn('btn btn-g','Contact: '+fn(contact),'font-size:14px;padding:4px 10px;');
-      (function(cid){ cBtn.addEventListener('click', function(){ sp('contacts'); vc(cid); }); })(contact.id);
-      linkWrap.appendChild(cBtn);
-    }
+    var contact = d.contact_id ? gc(d.contact_id) : (tx && tx.contactId ? gc(tx.contactId) : null);
+    var key, kind, label, sub, txId=null, cId=null, sortKey;
     if(tx){
-      var tBtn = mkBtn('btn btn-g','Deal: '+(tx.address||'Transaction'),'font-size:14px;padding:4px 10px;');
-      (function(txId){ tBtn.addEventListener('click', function(){ openTCDetail(txId); }); })(tx.id);
-      linkWrap.appendChild(tBtn);
+      key='tx_'+tx.id; kind='tx'; txId=tx.id;
+      label=(String(tx.address||'').split(',')[0].trim()) || 'Transaction';
+      sub=contact ? fn(contact) : '';
+      sortKey='0_'+label.toLowerCase();
+    } else if(contact){
+      key='c_'+contact.id; kind='contact'; cId=contact.id;
+      label=fn(contact); sub='No deal attached';
+      sortKey='1_'+label.toLowerCase();
+    } else {
+      key='unfiled'; kind='unfiled'; label='Unfiled'; sub='Not linked to a deal or contact';
+      sortKey='2_zzzz';
     }
-    if(!contact && !tx){ linkWrap.appendChild(mkDiv('font-size:15px;color:var(--text3);','Unfiled')); }
-    row.appendChild(linkWrap);
-    var del = mkBtn('btn btn-d','Delete','font-size:14px;padding:4px 10px;');
-    (function(doc){ del.addEventListener('click', function(){
-      if(!confirm('Delete "'+(doc.file_name||'this document')+'"? The file will be permanently removed.')) return;
-      deleteDocument(doc).then(function(){ renderDocsPage(); }).catch(function(e){ alert('Delete failed: '+e.message); });
-    }); })(d);
-    row.appendChild(del);
-    listEl.appendChild(row);
+    if(!groups[key]){ groups[key]={kind:kind,label:label,sub:sub,txId:txId,cId:cId,sortKey:sortKey,docs:[]}; groupOrder.push(key); }
+    groups[key].docs.push(d);
+  });
+  groupOrder.sort(function(a,b){ return groups[a].sortKey.localeCompare(groups[b].sortKey); });
+
+  groupOrder.forEach(function(key){
+    var g = groups[key];
+    // Group header: deal street address (or contact), the client name, and a doc count.
+    var hdr = document.createElement('div');
+    hdr.style.cssText = 'display:flex;align-items:center;gap:10px;padding:11px 8px 8px;margin-top:14px;border-bottom:2px solid var(--border);'+(g.kind==='unfiled'?'':'cursor:pointer;');
+    hdr.appendChild(mkDiv('font-size:16px;flex:0 0 auto;', g.kind==='tx'?'🏠':(g.kind==='contact'?'👤':'📄')));
+    var titleWrap = mkDiv('flex:1;min-width:0;');
+    titleWrap.appendChild(mkDiv('font-size:17px;font-weight:700;color:var(--text);word-break:break-word;', g.label));
+    if(g.sub) titleWrap.appendChild(mkDiv('font-size:14px;color:var(--text3);margin-top:1px;', g.sub));
+    hdr.appendChild(titleWrap);
+    hdr.appendChild(mkDiv('flex:0 0 auto;font-size:13px;color:var(--text2);background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:2px 11px;', g.docs.length+' doc'+(g.docs.length===1?'':'s')));
+    if(g.kind==='tx'){ (function(id){ hdr.addEventListener('click', function(){ sp('tc'); openTCDetail(id); }); })(g.txId); }
+    else if(g.kind==='contact'){ (function(id){ hdr.addEventListener('click', function(){ sp('contacts'); vc(id); }); })(g.cId); }
+    listEl.appendChild(hdr);
+
+    // Documents under this deal.
+    g.docs.slice().sort(function(a,b){ return (b.id||0)-(a.id||0); }).forEach(function(d){
+      var row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;gap:12px;padding:9px 12px 9px 30px;border-bottom:1px solid var(--border);flex-wrap:wrap;';
+      var cbx = document.createElement('input');
+      cbx.type = 'checkbox'; cbx.checked = selectedDocs.has(d.id);
+      cbx.style.cssText = 'accent-color:var(--accent);flex:0 0 auto;cursor:pointer;';
+      (function(doc){ cbx.addEventListener('change', function(){ if(cbx.checked) selectedDocs.add(doc.id); else selectedDocs.delete(doc.id); refreshBulkUI(); }); })(d);
+      row.appendChild(cbx);
+      var nameWrap = mkDiv('flex:1;min-width:180px;');
+      var name = mkDiv('font-size:18px;color:var(--accent);cursor:pointer;text-decoration:underline;word-break:break-word;', d.file_name||'Document');
+      (function(doc){ name.addEventListener('click', function(){ openDocument(doc); }); })(d);
+      nameWrap.appendChild(name);
+      var subBits = [];
+      if(d.doc_type) subBits.push(d.doc_type);
+      if(d.size) subBits.push(Math.round(d.size/1024)+' KB');
+      if(d.created_at) subBits.push(fd(d.created_at));
+      nameWrap.appendChild(mkDiv('font-size:15px;color:var(--text3);margin-top:2px;', subBits.join(' - ')));
+      row.appendChild(nameWrap);
+      var del = mkBtn('btn btn-d','Delete','font-size:14px;padding:4px 10px;flex:0 0 auto;');
+      (function(doc){ del.addEventListener('click', function(){
+        if(!confirm('Delete "'+(doc.file_name||'this document')+'"? The file will be permanently removed.')) return;
+        deleteDocument(doc).then(function(){ renderDocsPage(); }).catch(function(e){ alert('Delete failed: '+e.message); });
+      }); })(d);
+      row.appendChild(del);
+      listEl.appendChild(row);
+    });
   });
 }
 ge('sortByLast').addEventListener('click',function(){
