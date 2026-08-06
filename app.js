@@ -6996,9 +6996,8 @@ function renderAgendaView(){
   var months3 = ['January','February','March','April','May','June','July','August','September','October','November','December'];
   var todayStr = tod();
 
-  // Show 60 days from today
+  // Show 90 days starting from today - no past days in the agenda.
   var startDate = new Date();
-  startDate.setDate(startDate.getDate() - 7); // 7 days back
 
   var hasAny = false;
   for(var i = 0; i < 90; i++){
