@@ -3841,24 +3841,6 @@ function _dealEmailQuery(tx, c){
   if(!terms.length) return null;
   return '(' + terms.join(' OR ') + ') newer_than:90d';
 }
-// Gmail-tab entry point: pick a deal, then run the deal-scoped scan.
-function openDealEmailPicker(){
-  ge('emailIntelTitle').textContent = 'Scan a Deal\'s Emails';
-  var body = ge('emailIntelBody'); body.innerHTML = '';
-  var active = TX.filter(function(t){ return t.status!=='closed'; });
-  if(!active.length){ body.appendChild(mkDiv('font-size:15px;color:var(--text3);padding:8px 0;','No active transactions to scan.')); om('emailIntelModal'); return; }
-  body.appendChild(mkDiv('font-size:15px;color:var(--text2);margin-bottom:10px;','Pick a transaction and I\'ll read its recent emails (matched by property, client name, and MLS number).'));
-  var sel = document.createElement('select'); sel.className='fsel'; sel.style.cssText='width:100%;margin-bottom:12px;font-size:16px;';
-  active.sort(function(a,b){ return (a.address||'').localeCompare(b.address||''); }).forEach(function(t){
-    var c=gc(t.contactId); var o=document.createElement('option'); o.value=t.id;
-    o.textContent=(t.address||'Transaction')+(c?(' — '+fn(c)):''); sel.appendChild(o);
-  });
-  body.appendChild(sel);
-  var go=document.createElement('button'); go.className='btn btn-p'; go.style.cssText='font-size:15px;padding:8px 18px;'; go.textContent='Scan emails';
-  go.addEventListener('click', function(){ var id=parseInt(sel.value); if(id) scanDealEmails(id); });
-  body.appendChild(go);
-  om('emailIntelModal');
-}
 async function scanDealEmails(txId){
   var tx = TX.find(function(t){ return t.id === txId; });
   if(!tx) return;
