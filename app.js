@@ -2221,6 +2221,7 @@ function rdl(){
     var tx=dlDeal(d);
     if(tx && tx.status==='closed') return;        // closed deal: nothing left to track
     if(!tx && d.contactId==null) return;          // personal reminder -> its own subtab
+    if(dlDoneStep(d)) return;                       // overdue + its checklist step complete -> handled
     var key = tx ? ('tx_'+tx.id) : ('c_'+d.contactId);
     ensureGroup(key, tx, tx?null:d.contactId).dated.push(d);
   });
