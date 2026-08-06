@@ -3963,6 +3963,97 @@ function renderEmailIntel(result, tx, c){
   if(!dg && !ai.length && !dr && !drEs){ body.appendChild(mkDiv('font-size:15px;color:var(--text3);padding:8px 0;','Nothing notable found in the recent emails.')); }
 }
 
+// ============ DOCUMENT COMPLETENESS CHECKER ============
+// Deterministic: each deal type has a required-documents list. A requirement is satisfied when a
+// scanned document matches its type keywords, or when the user manually marks it present. The user
+// can mark anything N/A. No AI at render time - the scanner already classified the docs on import.
+function requiredDocs(tx){
+  if(tx.category === 'commercial_lease'){
+    return [
+      {key:'lease',    label:'Signed Lease',              kw:['lease']},
+      {key:'guaranty', label:'Guaranty (if required)',    kw:['guaranty','guarantee']},
+      {key:'estoppel', label:'Estoppel Certificate',      kw:['estoppel']},
+      {key:'coi',      label:'Certificate of Insurance',  kw:['insurance','coi']},
+      {key:'snda',     label:'SNDA (if lender requires)', kw:['snda','subordination']}
+    ];
+  }
+  var isBuyer = (tx.type === 'buyer');
+  var list = [
+    {key:'repc',       label:'Purchase Contract (REPC)',                kw:['repc','purchase contract','real estate purchase']},
+    {key:'agency',     label:'Agency / Brokerage Agreement',           kw:['agency','brokerage agreement','buyer-broker','buyer broker','listing agreement']},
+    {key:'spcd',       label:'Seller Property Condition Disclosure',   kw:['seller disclosure','property condition','spcd']},
+    {key:'lead',       label:'Lead-Based Paint Disclosure (pre-1978)', kw:['lead']},
+    {key:'title',      label:'Title Commitment',                       kw:['title']},
+    {key:'appraisal',  label:'Appraisal',                              kw:['appraisal']},
+    {key:'settlement', label:'Settlement Statement / Closing Disclosure', kw:['settlement','closing disclosure']}
+  ];
+  if(isBuyer) list.splice(4, 0, {key:'inspection', label:'Inspection Report', kw:['inspection']});
+  return list;
+}
+// True if any document on this transaction matches the requirement's keywords (by classified type).
+function _docPresentFor(tx, kw){
+  var docs = DOCS.filter(function(d){ return String(d.transaction_id)===String(tx.id); });
+  for(var i=0;i<docs.length;i++){
+    var d = docs[i];
+    var hay = ((d.doc_type||'') + ' ' + ((d.extracted && d.extracted.docType)||'') + ' ' + (d.file_name||'')).toLowerCase();
+    for(var j=0;j<kw.length;j++){ if(hay.indexOf(kw[j]) >= 0) return true; }
+  }
+  return false;
+}
+function computeDocChecklist(tx){
+  var over = tx.docChecklist || {};
+  return requiredDocs(tx).map(function(r){
+    var status, how='';
+    if(over[r.key] === 'na'){ status='na'; }
+    else if(_docPresentFor(tx, r.kw)){ status='present'; how='scanned'; }
+    else if(over[r.key] === 'present'){ status='present'; how='added'; }
+    else { status='missing'; }
+    return { key:r.key, label:r.label, status:status, how:how };
+  });
+}
+function setDocCheck(txId, key, status){
+  var tx = TX.find(function(t){ return t.id === txId; }); if(!tx) return;
+  tx.docChecklist = tx.docChecklist || {};
+  if(status === null){ delete tx.docChecklist[key]; } else { tx.docChecklist[key] = status; }
+  saveTX(tx); openTCDetail(txId); rd();
+}
+function renderDocChecklist(tx){
+  var items = computeDocChecklist(tx);
+  var present = items.filter(function(x){ return x.status==='present'; }).length;
+  var missing = items.filter(function(x){ return x.status==='missing'; }).length;
+  var na = items.filter(function(x){ return x.status==='na'; }).length;
+  var relevant = items.length - na;
+
+  var sec = document.createElement('div');
+  sec.style.cssText = 'padding:14px 20px;border-bottom:1px solid var(--border);';
+  var hdColor = missing ? 'var(--warn)' : 'var(--lead)';
+  sec.appendChild(mkDiv('font-size:14px;text-transform:uppercase;letter-spacing:1.2px;color:'+hdColor+';font-weight:700;margin-bottom:10px;',
+    '📁 Document Checklist — ' + present + '/' + relevant + ' present' + (missing ? (' · ' + missing + ' missing') : ' · complete ✓')));
+
+  items.forEach(function(it){
+    var row = document.createElement('div');
+    row.style.cssText = 'display:flex;gap:10px;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);flex-wrap:wrap;';
+    var color = it.status==='present' ? 'var(--lead)' : (it.status==='na' ? 'var(--text3)' : 'var(--danger)');
+    row.appendChild(mkDiv('flex:0 0 auto;width:11px;height:11px;border-radius:50%;background:'+color+';',''));
+    var lbl = mkDiv('flex:1;font-size:15px;color:'+(it.status==='na'?'var(--text3)':'var(--text)')+';', it.label + (it.how==='scanned'?'  (scanned)':(it.how==='added'?'  (marked)':'')));
+    if(it.status==='na') lbl.style.textDecoration='line-through';
+    row.appendChild(lbl);
+    var acts = document.createElement('div'); acts.style.cssText='display:flex;gap:6px;flex-shrink:0;';
+    function btn(text, fn){ var b=document.createElement('button'); b.textContent=text; b.style.cssText='background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:2px 9px;font-size:12px;color:var(--text2);cursor:pointer;font-family:DM Sans,sans-serif;'; b.addEventListener('click',fn); return b; }
+    if(it.status==='missing'){
+      acts.appendChild(btn('Mark present', function(){ setDocCheck(tx.id, it.key, 'present'); }));
+      acts.appendChild(btn('N/A', function(){ setDocCheck(tx.id, it.key, 'na'); }));
+    } else if(it.status==='present' && it.how==='added'){
+      acts.appendChild(btn('Undo', function(){ setDocCheck(tx.id, it.key, null); }));
+    } else if(it.status==='na'){
+      acts.appendChild(btn('Restore', function(){ setDocCheck(tx.id, it.key, null); }));
+    }
+    row.appendChild(acts);
+    sec.appendChild(row);
+  });
+  return sec;
+}
+
 // Read-only panel of a commercial lease's key terms, shown on the transaction detail.
 function renderLeasePanel(tx){
   var L = tx.details || {};
@@ -4080,6 +4171,9 @@ function openTCDetail(id){
 
   // Commercial lease terms panel (only for lease transactions).
   if(tx.category === 'commercial_lease'){ body.appendChild(renderLeasePanel(tx)); }
+
+  // Document completeness checklist (deterministic - required docs per deal type).
+  if(tx.status !== 'closed'){ body.appendChild(renderDocChecklist(tx)); }
 
   // Contact reassign row at top of detail body
   var cRow = document.createElement('div');
@@ -5156,7 +5250,7 @@ function buildScannerPrompt(hint){
     'Analyze this document carefully and extract all available information.',
     'Return ONLY a valid JSON object (no markdown, no explanation) with these fields:',
     '{',
-    '  "docType": "REPC|Addendum|Inspection Report|Title Commitment|HOA Docs|Commercial Lease|Commercial Purchase|Other",',
+    '  "docType": "REPC|Addendum|Inspection Report|Title Commitment|HOA Docs|Commercial Lease|Commercial Purchase|Agency Disclosure|Seller Disclosure|Lead-Based Paint|Settlement Statement|Appraisal|Loan Approval|Guaranty|Estoppel|Certificate of Insurance|Other",',
     '  "dealCategory": "residential_purchase|commercial_lease|commercial_purchase|other",',
     '  "summary": "3-5 sentence plain English summary of what this document is and its key points",',
     '  "address": "full property address",',
