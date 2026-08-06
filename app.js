@@ -7201,12 +7201,15 @@ function openAddCalEvent(){
   ge('calEvEndTime').value = '';
   ge('calEvType').value = 'custom';
   ge('calEvNotes').value = '';
+  var _sg = ge('calEvSyncGCal'); if(_sg){ _sg.checked = true; _sg.parentElement.style.display = ''; }
   populateCalModal();
   om('calEventModal');
 }
 
 function openEditCalEvent(ev){
   ge('calEventModalTitle').textContent = 'Edit Event';
+  // Sync only happens on create; hide the toggle when editing to avoid implying edits re-sync.
+  var _sg2 = ge('calEvSyncGCal'); if(_sg2 && _sg2.parentElement){ _sg2.parentElement.style.display = 'none'; }
   ge('btnSaveCalEvent').setAttribute('data-edit-id', ev.id);
   ge('btnDeleteCalEvent').style.display = 'inline-flex';
   ge('calEvTitle').value = ev.title||'';
@@ -7235,7 +7238,7 @@ function saveCalEvent(){
       ev.notes=ge('calEvNotes').value;
     }
   } else {
-    CAL.events.push({
+    var newEv = {
       id: Date.now(),
       title: title,
       date: ge('calEvDate').value,
@@ -7245,7 +7248,20 @@ function saveCalEvent(){
       memberId: parseInt(ge('calEvMember').value)||null,
       contactId: parseInt(ge('calEvContact').value)||null,
       notes: ge('calEvNotes').value
-    });
+    };
+    CAL.events.push(newEv);
+    saveCalEvents();
+    cm('calEventModal');
+    renderCalendar();
+    // Sync the new event to Google Calendar (only on create - editing would create a duplicate).
+    if(ge('calEvSyncGCal') ? ge('calEvSyncGCal').checked : true){
+      var _c = newEv.contactId ? gc(newEv.contactId) : null;
+      syncToGCal({
+        title: newEv.title, date: newEv.date, time: newEv.time, endTime: newEv.endTime,
+        type: newEv.type, clientName: _c ? fn(_c) : '', notes: newEv.notes || ''
+      }, newEv.memberId);
+    }
+    return;
   }
   saveCalEvents();
   cm('calEventModal');
