@@ -6814,9 +6814,24 @@ function getEventsForDate(dateStr){
     }
   });
 
-  // Google Calendar events are intentionally NOT mirrored back into the CRM calendar. CRM events
-  // already sync OUT to Google; pulling them back showed each event twice as a read-only "Google"
-  // copy (wrong edit/delete buttons, timezone-shifted times). The CRM is the source of truth.
+  // Google Calendar events. Skip any that are copies of CRM events we synced out (matched by the
+  // Google event id we recorded), so a CRM event doesn't also appear as a read-only Google duplicate.
+  var _mineG = {};
+  try{ Object.keys(_gcalMap||{}).forEach(function(k){ var g=_gcalMap[k]; if(g && g.gcalId) _mineG[g.gcalId] = true; }); }catch(e){}
+  CAL.gcalEvents.forEach(function(ev){
+    if(ev.date === dateStr && !_mineG[ev.gcalId]){
+      events.push({
+        type: 'ev-gcal',
+        label: ev.title,
+        time: ev.time || '',
+        data: ev,
+        dataType: 'gcal',
+        memberId: ev.memberId || null,
+        color: '#a78bfa',
+        gcalLink: ev.link
+      });
+    }
+  });
 
   // Filter by member
   var anyActive = Object.values(CAL.filterMembers).some(function(v){ return v; });
@@ -7181,17 +7196,8 @@ function openCalEventDetail(ev){
       + (gcalEv.location ? '<div style="margin-bottom:8px;"><b style="color:var(--text);">Location:</b> ' + gcalEv.location + '</div>' : '')
       + (gcalEv.description ? '<div style="margin-bottom:8px;"><b style="color:var(--text);">Description:</b> ' + gcalEv.description.substring(0,200) + '</div>' : '')
       + (memberInfo ? '<div style="margin-bottom:8px;"><b style="color:var(--text);">Calendar:</b> ' + memberInfo + (gcalEv.gcalMemberEmail ? ' (' + gcalEv.gcalMemberEmail + ')' : '') + '</div>' : '')
-      + '<div style="margin-top:8px;font-size:13px;color:var(--text3);">From Google Calendar</div>'
+      + '<div style="margin-top:8px;font-size:13px;color:var(--text3);">From Google Calendar - edit this on Google.</div>'
       + '</div>';
-    if(gcalEv.link){
-      var openGcalBtn = document.createElement('a');
-      openGcalBtn.href = gcalEv.link;
-      openGcalBtn.target = '_blank';
-      openGcalBtn.className = 'btn btn-p';
-      openGcalBtn.style.cssText += 'text-decoration:none;';
-      openGcalBtn.textContent = 'Open in Google Calendar';
-      actions.appendChild(openGcalBtn);
-    }
 
   } else if(ev.dataType === 'transaction' || ev.dataType === 'txdate'){
     var c4 = gc(ev.data.contactId);
@@ -7207,13 +7213,16 @@ function openCalEventDetail(ev){
     actions.appendChild(goBtn3);
   }
 
-  // Google Calendar sync button for all event types
-  var gcalBtn = document.createElement('button');
-  gcalBtn.className = 'btn btn-g';
-  gcalBtn.style.cssText += 'display:flex;align-items:center;gap:6px;';
-  gcalBtn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> Add to Google Cal';
-  (function(e){ gcalBtn.addEventListener('click', function(){ syncEventToGCal(e); }); })(ev);
-  actions.appendChild(gcalBtn);
+  // "Add to Google Cal" only for CRM items that aren't already synced: deadlines, follow-ups, and
+  // transaction dates. Custom events sync automatically on save; Google events are already there.
+  if(ev.dataType === 'deadline' || ev.dataType === 'followup' || ev.dataType === 'transaction' || ev.dataType === 'txdate'){
+    var gcalBtn = document.createElement('button');
+    gcalBtn.className = 'btn btn-g';
+    gcalBtn.style.cssText += 'display:flex;align-items:center;gap:6px;';
+    gcalBtn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> Add to Google Cal';
+    (function(e){ gcalBtn.addEventListener('click', function(){ syncEventToGCal(e); }); })(ev);
+    actions.appendChild(gcalBtn);
+  }
 
   var closeBtn = document.createElement('button');
   closeBtn.className = 'btn btn-g';
