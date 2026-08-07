@@ -5125,12 +5125,12 @@ function parseQRData(text){
   // Check if it's a URL - fetch and parse
   if(text.startsWith('http://') || text.startsWith('https://')){
     // Send to AI to parse the URL/page info
-    analyzeQRText('This QR code contains this URL: ' + text + '. Extract any contact information visible or implied by this URL (LinkedIn profile, website contact page, etc). The URL itself might be a social media profile or contact page.');
+    analyzeQRText('This QR code contains this URL: ' + text + '. Extract any contact information visible or implied by this URL (LinkedIn profile, website contact page, etc). The URL itself might be a social media profile or contact page.', text);
     return;
   }
 
   // Plain text - send to AI
-  analyzeQRText(text);
+  analyzeQRText(text, text);
 }
 
 function parseVCard(vcardText){
@@ -5186,7 +5186,7 @@ function parseVCard(vcardText){
   return r;
 }
 
-async function analyzeQRText(text){
+async function analyzeQRText(text, rawForFallback){
   var prompt = [
     'Extract contact information from this text/URL from a QR code.',
     'Return ONLY a valid JSON object with these fields (empty string if not found):',
@@ -5206,16 +5206,30 @@ async function analyzeQRText(text){
       })
     });
     var data = await resp.json();
-    if(!data.content || !data.content[0]){ showCardError('Could not parse QR data.'); return; }
-    var responseText = data.content[0].text;
+    if(data && data.error){ showCardError('AI error: ' + String(data.error.message || JSON.stringify(data.error)).slice(0,200)); return; }
+    var responseText = (data.content && data.content[0] && data.content[0].text) ? data.content[0].text : '';
+    if(!responseText){ showCardError('The AI returned an empty response for this QR code.' + (rawForFallback ? ' Saved the raw value instead.' : '')); if(rawForFallback) showCardResult(_qrFallback(rawForFallback)); return; }
     try{
       var clean = responseText.replace(/```json/g,'').replace(/```/g,'').trim();
       var fb = clean.indexOf('{'); var lb = clean.lastIndexOf('}');
       if(fb !== -1 && lb > fb) clean = clean.substring(fb, lb+1);
       var result = JSON.parse(clean);
       showCardResult(result);
-    }catch(e){ showCardError('Could not parse QR response.'); }
+    }catch(e){
+      // AI replied but not as JSON - fall back to a raw contact so nothing is lost.
+      if(rawForFallback) showCardResult(_qrFallback(rawForFallback));
+      else showCardError('Could not read the AI response: ' + responseText.slice(0,140));
+    }
   }catch(e){ showCardError('QR parse error: ' + e.message); }
+}
+// Build a minimal contact from a raw QR value (URL or text) when AI extraction fails.
+function _qrFallback(raw){
+  raw = String(raw||'');
+  var isUrl = /^https?:\/\//i.test(raw);
+  return { firstName:'', lastName:'', fullName:'', title:'', company:'', phone:'', mobile:'', phone2:'',
+    email:'', email2:'', website: isUrl ? raw : '', address:'', linkedin: /linkedin/i.test(raw)?raw:'',
+    instagram: /instagram/i.test(raw)?raw:'', facebook: /facebook/i.test(raw)?raw:'', twitter:'', tiktok:'',
+    whatsapp:'', notes: isUrl ? '' : raw, cardType:'business' };
 }
 
 // -- DOCUMENT SCANNER ---
