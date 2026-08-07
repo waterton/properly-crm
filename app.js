@@ -4127,6 +4127,61 @@ function renderDocChecklist(tx){
   return sec;
 }
 
+// ============ PER-DEAL ACTIVITY TIMELINE ============
+// One chronological view of everything that happened on a transaction, aggregated from the data
+// already stored: notes, document field changes (addenda), documents added, follow-ups, deadlines,
+// and the deal's creation. Deterministic - no new storage.
+function _tlTs(d){ if(d==null) return 0; var t = new Date(d).getTime(); if(!isNaN(t)) return t; if(typeof d==='number') return d; return 0; }
+function _tlDate(t){ if(!t) return ''; try{ return fd(new Date(t).toISOString().slice(0,10)); }catch(e){ return ''; } }
+function computeTxTimeline(tx){
+  var items = [];
+  N.filter(function(n){ return String(n.transactionId)===String(tx.id); }).forEach(function(n){
+    items.push({ t:_tlTs(n.date), icon:'📝', label:'Note', text:String(n.text||'').slice(0,220) });
+  });
+  CH.filter(function(h){ return String(h.transactionId)===String(tx.id); }).forEach(function(h){
+    var by = (h.addendumNo!=null) ? (' · Addendum #'+h.addendumNo) : '';
+    items.push({ t:_tlTs(h.appliedAt), icon:'🔀', label:'Change', text:_riskFieldLabel(h.field)+': '+(h.oldValue||'—')+' → '+(h.newValue||'—')+by });
+  });
+  DOCS.filter(function(d){ return String(d.transaction_id)===String(tx.id); }).forEach(function(d){
+    items.push({ t:_tlTs(d.created_at || (typeof d.id==='number'?d.id:null)), icon:'📄', label:'Document', text:(d.file_name||'Document')+(d.doc_type?(' ('+d.doc_type+')'):'') });
+  });
+  F.filter(function(f){ return String(f.transactionId)===String(tx.id); }).forEach(function(f){
+    items.push({ t:_tlTs(f.date), icon:(f.done?'✅':'⬜'), label:'Follow-up', text:(f.label||'Follow-up')+(f.done?' — done':'') });
+  });
+  D.filter(function(d){ return String(d.transactionId)===String(tx.id); }).forEach(function(d){
+    items.push({ t:_tlTs(d.date), icon:'⏰', label:'Deadline', text:d.type });
+  });
+  var createdT = tx.added ? _tlTs(tx.added) : (typeof tx.id==='number' ? tx.id : 0);
+  if(createdT) items.push({ t:createdT, icon:'➕', label:'Created', text:'Transaction created'+(tx.address?(' — '+tx.address):'') });
+  items.sort(function(a,b){ return b.t - a.t; });   // newest first
+  return items;
+}
+function renderTxTimeline(tx){
+  var items = computeTxTimeline(tx);
+  var sec = document.createElement('div');
+  sec.style.cssText = 'padding:14px 20px;border-bottom:1px solid var(--border);';
+  sec.appendChild(mkDiv('font-size:14px;text-transform:uppercase;letter-spacing:1.2px;color:var(--text2);font-weight:700;margin-bottom:10px;', '🕑 Activity Timeline'));
+  if(!items.length){ sec.appendChild(mkDiv('font-size:15px;color:var(--text3);', 'No activity yet.')); return sec; }
+  var SHOW = 8;
+  items.forEach(function(it, i){
+    var row = document.createElement('div');
+    row.style.cssText = 'display:flex;gap:10px;align-items:flex-start;padding:7px 0;border-bottom:1px solid var(--border);';
+    if(i >= SHOW){ row.className = 'tl-more'; row.style.display = 'none'; }
+    row.appendChild(mkDiv('flex:0 0 auto;font-size:16px;line-height:1.3;', it.icon));
+    var mid = mkDiv('flex:1;min-width:0;');
+    mid.appendChild(mkDiv('font-size:15px;color:var(--text);word-break:break-word;white-space:pre-wrap;', it.text));
+    mid.appendChild(mkDiv('font-size:12px;color:var(--text3);margin-top:1px;', it.label + (it.t ? (' · ' + _tlDate(it.t)) : '')));
+    row.appendChild(mid);
+    sec.appendChild(row);
+  });
+  if(items.length > SHOW){
+    var more = mkDiv('font-size:13px;color:var(--accent);cursor:pointer;margin-top:9px;user-select:none;', 'Show all ' + items.length + ' activities');
+    more.addEventListener('click', function(){ sec.querySelectorAll('.tl-more').forEach(function(r){ r.style.display = ''; }); more.style.display = 'none'; });
+    sec.appendChild(more);
+  }
+  return sec;
+}
+
 // Read-only panel of a commercial lease's key terms, shown on the transaction detail.
 function renderLeasePanel(tx){
   var L = tx.details || {};
@@ -4247,6 +4302,9 @@ function openTCDetail(id){
 
   // Document completeness checklist (deterministic - required docs per deal type).
   if(tx.status !== 'closed'){ body.appendChild(renderDocChecklist(tx)); }
+
+  // Per-deal activity timeline (shown for all deals, including closed - it's the history).
+  body.appendChild(renderTxTimeline(tx));
 
   // Contact reassign row at top of detail body
   var cRow = document.createElement('div');
