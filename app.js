@@ -7222,11 +7222,17 @@ function openCalEventDetail(ev){
     delBtn.style.cssText = 'background:rgba(201,76,76,0.15);color:var(--danger);border:1px solid rgba(201,76,76,0.3);border-radius:7px;padding:8px 14px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:14px;';
     delBtn.textContent = 'Delete';
     (function(evId){ delBtn.addEventListener('click', function(){
-      if(!confirm('Delete this event?')) return;
+      if(!confirm('Delete this event? If it was added to Google Calendar, it will be removed there too.')) return;
+      var gmap = _gcalMap[String(evId)];
       CAL.events = CAL.events.filter(function(e){ return e.id !== evId; });
       saveCalEvents();
       ge('calDetOv').classList.remove('open');
       renderCalendar();
+      // Remove the matching Google Calendar event, if we created one.
+      if(gmap && gmap.gcalId){
+        postApi('/api/gcal', { action:'delete', memberId: gmap.mid, eventId: gmap.gcalId }).catch(function(){});
+        delete _gcalMap[String(evId)]; saveGcalMap();
+      }
     }); })(ev.data.id);
     actions.appendChild(delBtn);
 
