@@ -7,11 +7,27 @@ export const config = {
 };
 
 // Gmail API proxy v2.1 - handles inbox, threads, send, attachments
+async function verifyUser(req) {
+  var authHeader = req.headers['authorization'] || '';
+  var token = authHeader.indexOf('Bearer ') === 0 ? authHeader.slice(7) : '';
+  var url = process.env.SUPA_URL || 'https://fgkilooomlozhwfnvjze.supabase.co';
+  var anon = process.env.SUPA_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZna2lsb29vbWxvemh3Zm52anplIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA3NTc0NTIsImV4cCI6MjA5NjMzMzQ1Mn0.owQk8Vy3Vcs8n8c0sI0fXQYmjpAy14hev8lDt4g5iZE';
+  if (!token || token === anon) return false;
+  try {
+    var r = await fetch(url + '/auth/v1/user', { headers: { apikey: anon, Authorization: 'Bearer ' + token } });
+    if (!r.ok) return false;
+    var u = await r.json();
+    return !!(u && u.id);
+  } catch (e) { return false; }
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(200).end();
+
+  if (!(await verifyUser(req))) return res.status(401).json({ error: 'Sign in required.' });
 
   // Parse body if string
   if (typeof req.body === 'string') {

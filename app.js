@@ -3929,7 +3929,7 @@ async function scanDealEmails(txId){
   om('emailIntelModal');
 
   try{
-    var listResp = await fetch('/api/gmail-api', { method:'POST', headers:{'Content-Type':'application/json'},
+    var listResp = await fetch('/api/gmail-api', { method:'POST', headers: await apiHeaders(),
       body: JSON.stringify({ action:'inbox', memberId:memberId, query:q }) });
     var listData = await listResp.json();
     if(listData.error){ body.innerHTML = '<div style="padding:20px;color:var(--danger);">'+_esc(listData.error)+'</div>'; return; }
@@ -3941,7 +3941,7 @@ async function scanDealEmails(txId){
     var chunks = [];
     for(var i=0;i<threadIds.length;i++){
       try{
-        var tResp = await fetch('/api/gmail-api', { method:'POST', headers:{'Content-Type':'application/json'},
+        var tResp = await fetch('/api/gmail-api', { method:'POST', headers: await apiHeaders(),
           body: JSON.stringify({ action:'thread', memberId:memberId, threadId:threadIds[i] }) });
         var tData = await tResp.json();
         (tData.messages||[]).forEach(function(mm){
@@ -7937,7 +7937,7 @@ async function loadGmailInbox(searchTerm){
   if(!gmailState.silentRefresh) ge('gmailMsgList').innerHTML = '<div style="padding:20px;text-align:center;color:var(--text3);font-size:18px;">Loading...</div>';
   try{
     var resp = await fetch('/api/gmail-api', {
-      method:'POST', headers:{'Content-Type':'application/json'},
+      method:'POST', headers: await apiHeaders(),
       body: JSON.stringify({action:'inbox', memberId:gmailState.activeMemberId, query:filter})
     });
     var respText = await resp.text();
@@ -8030,7 +8030,7 @@ async function loadThread(threadId, messageId){
 
   try{
     var resp = await fetch('/api/gmail-api', {
-      method:'POST', headers:{'Content-Type':'application/json'},
+      method:'POST', headers: await apiHeaders(),
       body: JSON.stringify({action:'thread', memberId:gmailState.activeMemberId, threadId:threadId})
     });
     var respText2 = await resp.text();
@@ -8047,7 +8047,7 @@ async function gmailThreadAction(action, threadId){
   var thread = ge('gmailThread');
   try{
     var resp = await fetch('/api/gmail-api', {
-      method:'POST', headers:{'Content-Type':'application/json'},
+      method:'POST', headers: await apiHeaders(),
       body: JSON.stringify({action:action, memberId:gmailState.activeMemberId, threadId:threadId})
     });
     var data = await resp.json();
@@ -8068,7 +8068,7 @@ async function gmailLoadLabels(){
   if(gmailState.labelCache) return gmailState.labelCache;
   try{
     var resp = await fetch('/api/gmail-api', {
-      method:'POST', headers:{'Content-Type':'application/json'},
+      method:'POST', headers: await apiHeaders(),
       body: JSON.stringify({action:'labels', memberId:gmailState.activeMemberId})
     });
     var data = await resp.json();
@@ -8080,7 +8080,7 @@ async function gmailLoadLabels(){
 async function gmailToggleLabel(threadId, labelId, add){
   try{
     var resp = await fetch('/api/gmail-api', {
-      method:'POST', headers:{'Content-Type':'application/json'},
+      method:'POST', headers: await apiHeaders(),
       body: JSON.stringify({
         action:'modifyLabels', memberId:gmailState.activeMemberId, threadId:threadId,
         addLabelIds: add ? [labelId] : [],
@@ -8358,7 +8358,7 @@ async function importAttachmentToScanner(messageId, attachmentId, filename, mime
   ge('scannerProcessingMsg').textContent = 'Importing ' + filename + '...';
   try{
     var resp = await fetch('/api/gmail-api', {
-      method:'POST', headers:{'Content-Type':'application/json'},
+      method:'POST', headers: await apiHeaders(),
       body: JSON.stringify({action:'attachment', memberId:gmailState.activeMemberId, messageId:messageId, attachmentId:attachmentId})
     });
     var data = await resp.json();
@@ -8428,7 +8428,7 @@ async function sendEmail(opts, callback){
   if(!memberId){ alert('Please select a Gmail account to send from.'); return; }
   try{
     var resp = await fetch('/api/gmail-api', {
-      method:'POST', headers:{'Content-Type':'application/json'},
+      method:'POST', headers: await apiHeaders(),
       body: JSON.stringify({
         action:'send', memberId:memberId,
         to:opts.to, subject:opts.subject,
