@@ -6537,12 +6537,6 @@ async function syncToGCal(eventData, memberId){
     if(btn){ btn.textContent = 'Added!'; btn.style.background='rgba(107,201,122,0.2)'; btn.style.color='var(--lead)'; btn.style.borderColor='var(--lead)'; }
     setTimeout(function(){ if(btn){ btn.textContent=origText; btn.disabled=false; btn.style.background=''; btn.style.color=''; btn.style.borderColor=''; } }, 3000);
 
-    // Show link to Google Calendar event
-    if(data.link){
-      var openLink = confirm('Event added to Google Calendar! Open it now?');
-      if(openLink) window.open(data.link, '_blank');
-    }
-
     return { gcalId: data.gcalId, mid: mid };   // so the caller can remember it for delete-sync
 
   }catch(e){
@@ -6718,6 +6712,18 @@ function renderCalMemberFilters(){
   });
 }
 
+// Format a 24h "HH:MM" time string as 12h with AM/PM (e.g. "14:30" -> "2:30 PM").
+function fmtTime12(t){
+  if(!t || String(t).indexOf(':') < 0) return t || '';
+  var p = String(t).split(':');
+  var h = parseInt(p[0], 10);
+  var m = (p[1] || '00').slice(0,2);
+  if(isNaN(h)) return t;
+  var ap = h < 12 ? 'AM' : 'PM';
+  var h12 = h % 12; if(h12 === 0) h12 = 12;
+  return h12 + ':' + m + ' ' + ap;
+}
+
 // Get all events for a given date string YYYY-MM-DD
 function getEventsForDate(dateStr){
   var events = [];
@@ -6808,22 +6814,9 @@ function getEventsForDate(dateStr){
     }
   });
 
-  // Google Calendar events
-  CAL.gcalEvents.forEach(function(ev){
-    if(ev.date === dateStr){
-      var m = TM.find(function(x){ return String(x.id)===String(ev.memberId); });
-      events.push({
-        type: 'ev-gcal',
-        label: ev.title,
-        time: ev.time || '',
-        data: ev,
-        dataType: 'gcal',
-        memberId: ev.memberId || null,
-        color: '#a78bfa',
-        gcalLink: ev.link
-      });
-    }
-  });
+  // Google Calendar events are intentionally NOT mirrored back into the CRM calendar. CRM events
+  // already sync OUT to Google; pulling them back showed each event twice as a read-only "Google"
+  // copy (wrong edit/delete buttons, timezone-shifted times). The CRM is the source of truth.
 
   // Filter by member
   var anyActive = Object.values(CAL.filterMembers).some(function(v){ return v; });
@@ -6918,7 +6911,7 @@ function renderMonthView(days){
     evs.slice(0, maxShow).forEach(function(ev){
       var evEl = document.createElement('div');
       evEl.className = 'cal-event ' + ev.type;
-      evEl.textContent = (ev.time ? ev.time + ' ' : '') + ev.label;
+      evEl.textContent = (ev.time ? fmtTime12(ev.time) + ' ' : '') + ev.label;
       evEl.title = ev.label;
       (function(e){ evEl.addEventListener('click', function(evt){
         evt.stopPropagation();
@@ -7070,7 +7063,7 @@ function renderAgendaView(){
       dot.style.background = ev.color || '#c9a84c';
       var time = document.createElement('div');
       time.className = 'cal-agenda-time';
-      time.textContent = ev.time || 'All day';
+      time.textContent = ev.time ? fmtTime12(ev.time) : 'All day';
       var info = document.createElement('div');
       info.style.flex = '1';
       var title = document.createElement('div');
@@ -7100,7 +7093,7 @@ function openCalEventDetail(ev){
   ge('calDetTitle').textContent = ev.label;
 
   var sub = '';
-  if(ev.time) sub += ev.time + ' ';
+  if(ev.time) sub += fmtTime12(ev.time) + ' ';
   if(ev.memberId){
     var m = TM.find(function(x){ return x.id == ev.memberId; });
     if(m) sub += '- ' + m.first + ' ' + m.last;
@@ -7116,7 +7109,7 @@ function openCalEventDetail(ev){
     var fields = [
       {label:'Type', val:ev.data.type||'Event'},
       {label:'Date', val:fd(ev.data.date)},
-      {label:'Time', val:ev.data.time || 'Not set'},
+      {label:'Time', val:ev.data.time ? fmtTime12(ev.data.time) : 'Not set'},
       {label:'Notes', val:ev.data.notes || ''}
     ];
     fields.forEach(function(f){
