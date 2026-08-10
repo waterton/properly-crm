@@ -764,6 +764,7 @@ function ck(){var s=document.createElementNS('http://www.w3.org/2000/svg','svg')
 var pn={briefing:'Daily Briefing',dashboard:'Dashboard',pipeline:'Pipeline',contacts:'Contacts',followups:'Follow-ups',notes:'Notes',deadlines:'Deadlines',documents:'Documents',tc:'Transactions',scanner:'Doc Scanner',cardscanner:'Card Scanner',calendar:'Calendar',team:'Team',gmail:'Gmail',mls:'MLS Search',drips:'Drip Campaigns'};
 function sp(id, fromHistory){
   curPage=id;
+  if(typeof hideGlobalSearch==='function') hideGlobalSearch();
   if(!fromHistory){ try{ history.pushState({page:id}, '', '#'+id); }catch(e){} }
   var addBtn=ge('btnAdd'); if(addBtn) addBtn.style.display=(id==='contacts')?'':'none';
   document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');});
@@ -9763,19 +9764,75 @@ ge('btnSaveDL').addEventListener('click',svdl);
 (function(){ var c=ge('dlContact'); if(c) c.addEventListener('change',function(){ fsDeals('dlDeal', c.value, ''); }); })();
 ge('btnSaveDetNote').addEventListener('click',adn);
 ge('detOv').addEventListener('click',function(e){if(e.target===ge('detOv'))cd();});
+// ---- Global search: matches across the whole CRM (contacts, transactions, documents, notes,
+//      follow-ups, deadlines). On the Contacts tab the box filters the contact list as before. ----
+function globalSearch(q){
+  q = String(q||'').trim().toLowerCase();
+  var res = { contacts:[], transactions:[], documents:[], notes:[], followups:[], deadlines:[] };
+  if(!q) return res;
+  function hit(){ for(var i=0;i<arguments.length;i++){ if(String(arguments[i]==null?'':arguments[i]).toLowerCase().indexOf(q) >= 0) return true; } return false; }
+  C.forEach(function(c){ if(hit(fn(c), c.email, c.phone, c.property, c.notes)) res.contacts.push(c); });
+  TX.forEach(function(t){ var c=gc(t.contactId); if(hit(t.address, t.mlsNum, t.notes, t.price, c?fn(c):'')) res.transactions.push(t); });
+  DOCS.forEach(function(d){ if(hit(d.file_name, d.doc_type, d.summary)) res.documents.push(d); });
+  N.forEach(function(n){ if(hit(n.text, n.textEs)) res.notes.push(n); });
+  F.forEach(function(f){ if(hit(f.label)) res.followups.push(f); });
+  D.forEach(function(d){ if(hit(d.type)) res.deadlines.push(d); });
+  return res;
+}
+function hideGlobalSearch(){ var el=ge('globalSearchResults'); if(el){ el.style.display='none'; el.innerHTML=''; } }
+function renderGlobalSearch(q){
+  var el = ge('globalSearchResults'); if(!el) return;
+  q = String(q||'').trim();
+  if(!q){ hideGlobalSearch(); return; }
+  var r = globalSearch(q);
+  el.innerHTML = '';
+  var total = r.contacts.length + r.transactions.length + r.documents.length + r.notes.length + r.followups.length + r.deadlines.length;
+  if(!total){ el.appendChild(mkDiv('padding:14px;color:var(--text3);font-size:15px;', 'No matches for "'+q+'".')); el.style.display='block'; return; }
+  function go(fn){ hideGlobalSearch(); ge('searchBox').value=''; fn(); }
+  function group(title, items, rowText, onClick){
+    if(!items.length) return;
+    el.appendChild(mkDiv('font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--text3);padding:9px 9px 3px;font-weight:700;', title+' ('+items.length+')'));
+    items.slice(0,6).forEach(function(it){
+      var row=document.createElement('div');
+      row.style.cssText='padding:7px 9px;border-radius:7px;cursor:pointer;font-size:15px;color:var(--text);word-break:break-word;';
+      row.addEventListener('mouseenter',function(){ this.style.background='var(--surface2)'; });
+      row.addEventListener('mouseleave',function(){ this.style.background=''; });
+      row.textContent = rowText(it);
+      row.addEventListener('click', function(){ go(function(){ onClick(it); }); });
+      el.appendChild(row);
+    });
+    if(items.length>6) el.appendChild(mkDiv('font-size:12px;color:var(--text3);padding:1px 9px 8px;', '+ '+(items.length-6)+' more'));
+  }
+  var deal = function(txId, contactId, fallback){ if(txId){ sp('tc'); openTCDetail(txId); } else if(contactId){ sp('contacts'); vc(contactId); } else sp(fallback); };
+  group('Contacts', r.contacts, function(c){ return fn(c) + (c.email?(' · '+c.email):(c.phone?(' · '+c.phone):'')); }, function(c){ sp('contacts'); vc(c.id); });
+  group('Transactions', r.transactions, function(t){ var c=gc(t.contactId); return (t.address||'Transaction') + (c?(' · '+fn(c)):''); }, function(t){ sp('tc'); openTCDetail(t.id); });
+  group('Documents', r.documents, function(d){ return (d.file_name||'Document') + (d.doc_type?(' · '+d.doc_type):''); }, function(d){ deal(d.transaction_id, d.contact_id, 'documents'); });
+  group('Notes', r.notes, function(n){ var c=gc(n.contactId); return String(n.text||'').slice(0,64) + (c?(' · '+fn(c)):''); }, function(n){ deal(n.transactionId, n.contactId, 'notes'); });
+  group('Follow-ups', r.followups, function(f){ var c=gc(f.contactId); return (f.label||'Follow-up') + (c?(' · '+fn(c)):''); }, function(f){ deal(f.transactionId, f.contactId, 'followups'); });
+  group('Deadlines', r.deadlines, function(d){ var c=gc(d.contactId); return (d.type||'Deadline') + (c?(' · '+fn(c)):''); }, function(d){ deal(d.transactionId, d.contactId, 'deadlines'); });
+  el.style.display='block';
+}
 ge('searchBox').addEventListener('input',function(){
-  if(curPage==='gmail') return;
-  if(curPage!=='contacts'){ if(this.value.trim()) sp('contacts'); } else rc();
+  if(curPage==='gmail'){ hideGlobalSearch(); return; }
+  if(curPage==='contacts'){ hideGlobalSearch(); rc(); return; }   // Contacts tab: filter the contact list
+  renderGlobalSearch(this.value);                                  // Everywhere else: global results dropdown
 });
 ge('searchBox').addEventListener('keydown',function(e){
+  if(e.key==='Escape'){ hideGlobalSearch(); return; }
   if(e.key!=='Enter') return;
   if(curPage==='gmail'){
     // Mirror into the Gmail search box so the two never disagree about what's being searched.
     if(ge('gmailSearch')) ge('gmailSearch').value = ge('searchBox').value;
     loadGmailInbox(ge('searchBox').value);
   }
-  else if(curPage!=='contacts'){ sp('contacts'); }
-  else { rc(); }
+  else if(curPage==='contacts'){ rc(); }
+  else { renderGlobalSearch(ge('searchBox').value); }
+});
+// Close the global-search dropdown when clicking outside it or the search box.
+document.addEventListener('click', function(e){
+  var el=ge('globalSearchResults'); if(!el || el.style.display==='none') return;
+  if(e.target===ge('searchBox') || (el.contains && el.contains(e.target))) return;
+  hideGlobalSearch();
 });
 
 // ---- Gmail search bar ----
