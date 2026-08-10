@@ -101,7 +101,7 @@
         <input class="sbox" type="text" placeholder="Search..." id="searchBox">
         <div id="globalSearchResults" style="display:none;position:fixed;top:52px;right:12px;width:min(460px,92vw);max-height:74vh;overflow:auto;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:0 10px 34px rgba(0,0,0,0.45);z-index:1200;padding:6px;"></div>
         <button class="btn btn-p" id="btnAdd" style="display:none;">+ Add</button>
-        <div style="font-size:11px;color:var(--text3);margin-right:4px;">v6.8</div>
+        <div style="font-size:11px;color:var(--text3);margin-right:4px;">v6.9</div>
         <div class="topbar-user" id="topbarUser" title="Click to sign out" style="cursor:pointer;position:relative;" id="topbarUserBtn">RE</div>
       </div>
     </div>
@@ -249,7 +249,8 @@
               <button class="btn nchip" data-cat="Meeting">Meeting</button>
               <button class="btn nchip" data-cat="Document">Document</button>
             </div>
-            <button class="btn btn-g" id="nToggleGroups" style="padding:6px 12px;white-space:nowrap;">Collapse all</button>
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);white-space:nowrap;cursor:pointer;"><input type="checkbox" id="nShowArchived" style="width:16px;height:16px;cursor:pointer;">Archived</label>
+            <button class="btn btn-g" id="nToggleGroups" style="padding:6px 12px;white-space:nowrap;">Expand all</button>
           </div>
           <div id="nList"></div>
         </div>
@@ -1147,6 +1148,6 @@
 </div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="app.js?v=20260808o"></script>
+<script src="app.js?v=20260808p"></script>
 </body>
 </html>

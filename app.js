@@ -1827,7 +1827,14 @@ function rfu(){
 function tfu(id){var f=F.find(function(x){return x.id===id;});if(f){f.done=!f.done;sv();if(supaReady) dbSave('followups',[f]);}}
 
 // ---- Notes tab state ----
-var _noteSearch='', _noteCat='all', _noteCollapsed={}, _noteAllCollapsed=false;
+var _noteSearch='', _noteCat='all', _noteCollapsed={}, _noteAllCollapsed=true, _showArchivedNotes=false;
+// A note is "archived" once its transaction is closed - hidden from the Notes tab unless the
+// "Archived" checkbox is on. Computed (no stored flag needed).
+function noteArchived(n){
+  if(n.transactionId==null) return false;
+  var tx = TX.find(function(t){ return String(t.id)===String(n.transactionId); });
+  return !!(tx && tx.status==='closed');
+}
 function ncat(n){ return (n && n.category) || 'General'; }
 function _noteCatColor(cat){
   return cat==='Document' ? 'var(--seller)' : cat==='Call' ? 'var(--buyer)' :
@@ -1885,6 +1892,7 @@ function rn(){
   var q=(_noteSearch||'').trim().toLowerCase();
   // Filter by category + search (text, spanish, client name, category)
   var matched=N.filter(function(n){
+    if(!_showArchivedNotes && noteArchived(n)) return false;   // hide notes from closed deals
     if(_noteCat!=='all' && ncat(n)!==_noteCat) return false;
     if(!q) return true;
     var c=gc(n.contactId);
@@ -1906,7 +1914,7 @@ function rn(){
     var g=groups[key];
     var c=g.contactId?gc(g.contactId):null;
     var name=c?fn(c):'Unassigned / Unknown';
-    var collapsed=!!_noteCollapsed[key];
+    var collapsed=(_noteCollapsed[key]===undefined)?true:!!_noteCollapsed[key];
     var wrap=document.createElement('div');
     wrap.style.cssText='border-bottom:1px solid var(--border);';
     if(collapsed) wrap.className='ngrp-collapsed';
@@ -1920,7 +1928,8 @@ function rn(){
     g.notes.sort(function(a,b){return new Date(b.date)-new Date(a.date);});
     g.notes.forEach(function(n){ body.appendChild(_buildNoteCard(n)); });
     (function(k,bodyEl,wrapEl){ hdr.addEventListener('click',function(){
-      var nowCollapsed=!_noteCollapsed[k]; _noteCollapsed[k]=nowCollapsed;
+      var cur=(_noteCollapsed[k]===undefined)?true:!!_noteCollapsed[k];
+      var nowCollapsed=!cur; _noteCollapsed[k]=nowCollapsed;
       bodyEl.style.display=nowCollapsed?'none':''; wrapEl.classList.toggle('ngrp-collapsed',nowCollapsed);
     }); })(key,body,wrap);
     wrap.appendChild(hdr); wrap.appendChild(body); el.appendChild(wrap);
@@ -9751,6 +9760,8 @@ ge('btnAddNote').addEventListener('click',function(){ge('btnSaveNote')&&ge('btnS
     this.textContent=_noteAllCollapsed?'Expand all':'Collapse all';
     rn();
   });
+  var sa=ge('nShowArchived');
+  if(sa) sa.addEventListener('change',function(){ _showArchivedNotes=this.checked; rn(); });
 })();
 ge('btnAddDL').addEventListener('click',function(){ge('btnSaveDL')&&ge('btnSaveDL').setAttribute('data-edit-id','');fs('dlContact');dlContactAllowNone();ge('dlContact').value='';populateDeadlineTypes('');fsDeals('dlDeal',ge('dlContact').value,'');ge('dlDate').value=tod();if(ge('dlTime'))ge('dlTime').value='';populateAssignDropdowns();om('dlModal');});
 ge('btnViewNotes').addEventListener('click',function(){sp('notes');});
