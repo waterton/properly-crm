@@ -1827,7 +1827,7 @@ function rfu(){
 function tfu(id){var f=F.find(function(x){return x.id===id;});if(f){f.done=!f.done;sv();if(supaReady) dbSave('followups',[f]);}}
 
 // ---- Notes tab state ----
-var _noteSearch='', _noteCat='all', _noteCollapsed={}, _noteAllCollapsed=true, _showArchivedNotes=false;
+var _noteSearch='', _noteCat='all', _noteCollapsed={}, _noteAllCollapsed=true, _showArchivedNotes=false, _noteLang={};
 // A note is "archived" once its transaction is closed - hidden from the Notes tab unless the
 // "Archived" checkbox is on. Computed (no stored flag needed).
 function noteArchived(n){
@@ -1862,12 +1862,14 @@ function _buildNoteCard(note){
   // EN/ES toggle (only when a Spanish version exists)
   var txt=document.createElement('div');
   txt.className='note-text'; txt.style.whiteSpace='pre-wrap'; txt.style.wordBreak='break-word';
-  txt.textContent=note.text;
+  var _showEs=(_noteLang[note.id]==='es');
+  txt.textContent=(_showEs && note.textEs)?note.textEs:note.text;
   if(note.textEs){
-    var enB=document.createElement('button'); enB.className='nlang-btn on'; enB.textContent='EN';
-    var esB=document.createElement('button'); esB.className='nlang-btn'; esB.textContent='ES';
-    enB.addEventListener('click',function(){ txt.textContent=note.text; enB.classList.add('on'); esB.classList.remove('on'); });
-    esB.addEventListener('click',function(){ txt.textContent=note.textEs; esB.classList.add('on'); enB.classList.remove('on'); });
+    var enB=document.createElement('button'); enB.className='nlang-btn'+(_showEs?'':' on'); enB.textContent='EN';
+    var esB=document.createElement('button'); esB.className='nlang-btn'+(_showEs?' on':''); esB.textContent='ES';
+    // Remember the choice so the 30s background sync re-render doesn't revert it to English.
+    enB.addEventListener('click',function(){ _noteLang[note.id]='en'; txt.textContent=note.text; enB.classList.add('on'); esB.classList.remove('on'); });
+    esB.addEventListener('click',function(){ _noteLang[note.id]='es'; txt.textContent=note.textEs; esB.classList.add('on'); enB.classList.remove('on'); });
     acts.appendChild(enB); acts.appendChild(esB);
   }
   var editBtn=document.createElement('button');
