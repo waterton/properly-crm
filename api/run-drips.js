@@ -298,6 +298,11 @@ async function processReminders(result) {
     const n = daysUntil(dl.date);
     if (n === null || n < 0) continue;
 
+    // Generated workflow tasks (they carry a stepKey) are internal coordination items — they show
+    // in-app and in the agent briefing but must never auto-email the client. Party-based routing
+    // (via dl.owner) is a later slice; skip them here.
+    if (dl.stepKey) { result.reminders.skipped++; continue; }
+
     const personal = (dl.contactId == null && dl.transactionId == null);
     const typeSet = byType[dl.type];         // explicit config for THIS type, or undefined
     const set = typeSet || def;              // used for the enabled flag / fallback

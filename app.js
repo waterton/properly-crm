@@ -95,7 +95,7 @@ var DB_COLS = {
   contacts: ['id','first','last','type','phone','email','property','stage','price','notes','added','closeDate','assignedTo','emails','phones','addresses','whatsapp','closedAt','lang'],
   notes: ['id','contactId','transactionId','text','date','category','textEs'],
   followups: ['id','contactId','transactionId','label','date','pri','done','assignedTo'],
-  deadlines: ['id','contactId','transactionId','type','date','assignedTo','time'],
+  deadlines: ['id','contactId','transactionId','type','date','assignedTo','time','stepKey','owner'],
   transactions: ['id','contactId','type','category','address','price','mlsNum','lender','titleCo','notes','status','steps','details',
                  'contractDate','closingDate','earnestDate','dueDiligDate','financingDate','appraisalDate',
                  'listCommissionPct','buyerCommissionPct','listCommissionAmt','buyerCommissionAmt',
@@ -3026,22 +3026,22 @@ var TC_TEMPLATES = {
       {label:'Target property CMA & disclosures reviewed',key:'b2_cma',desc:'Comprehensive market evaluation, history, and property disclosures reviewed prior to offer preparation.'}
     ]},
     {phase:'Phase 3 - Under Contract', steps:[
-      {label:'Offer submitted & docs uploaded in Dotloop',key:'b3_offer',desc:'Executed purchase contract submitted and files organized in compliance repository.'},
+      {label:'Offer submitted & docs uploaded in Dotloop',key:'b3_offer',owner:'tc',due:{anchor:'contractDate',offset:1},desc:'Executed purchase contract submitted and files organized in compliance repository.'},
       {label:'Earnest money delivered',key:'b3_earnest',hasDate:true,dateField:'earnestDate',desc:'Earnest money confirmation received and logged.'},
       {label:'Due diligence deadline tracked',key:'b3_duedilig',hasDate:true,dateField:'dueDiligDate',desc:'Contractual tracking window active.'},
       {label:'Financing deadline tracked',key:'b3_financing',hasDate:true,dateField:'financingDate',desc:'Contractual tracking window active.'},
       {label:'Appraisal deadline tracked',key:'b3_appraisal',hasDate:true,dateField:'appraisalDate',desc:'Contractual tracking window active.'},
-      {label:'Home inspection completed & repairs negotiated',key:'b3_inspection',desc:'Physical inspection performed, report evaluated, and repair addenda executed.'},
-      {label:'Appraisal completed & loan approved',key:'b3_apprloan',desc:'Appraisal report received above contract value and formal loan commitment issued.'},
-      {label:'Title commitment reviewed & confirmed',key:'b3_title',desc:'Preliminary title insurance commitment reviewed for encumbrances.'},
-      {label:'Final walkthrough scheduled & completed',key:'b3_walkthrough',desc:'Final property condition verification completed with buyer.'},
-      {label:'Closing time, utilities, & funds confirmed',key:'b3_closingprep',desc:'Signing window locked, utility transfer reminders sent, and final wire figures verified.'},
-      {label:'Recording & keys confirmed',key:'b3_recording',desc:'Public recordation confirmed and possession transfers completed.'}
+      {label:'Home inspection completed & repairs negotiated',key:'b3_inspection',owner:'agent',due:{anchor:'contractDate',offset:7},desc:'Physical inspection performed, report evaluated, and repair addenda executed.'},
+      {label:'Appraisal completed & loan approved',key:'b3_apprloan',owner:'lender',due:{anchor:'contractDate',offset:21},desc:'Appraisal report received above contract value and formal loan commitment issued.'},
+      {label:'Title commitment reviewed & confirmed',key:'b3_title',owner:'title',due:{anchor:'contractDate',offset:10},desc:'Preliminary title insurance commitment reviewed for encumbrances.'},
+      {label:'Final walkthrough scheduled & completed',key:'b3_walkthrough',owner:'agent',due:{anchor:'closingDate',offset:-1},desc:'Final property condition verification completed with buyer.'},
+      {label:'Closing time, utilities, & funds confirmed',key:'b3_closingprep',owner:'tc',due:{anchor:'closingDate',offset:-3},desc:'Signing window locked, utility transfer reminders sent, and final wire figures verified.'},
+      {label:'Recording & keys confirmed',key:'b3_recording',owner:'tc',due:{anchor:'closingDate',offset:1},desc:'Public recordation confirmed and possession transfers completed.'}
     ]},
     {phase:'Phase 4 - Post-Close Nurture', steps:[
-      {label:'Settlement statement reviewed & uploaded',key:'b4_settlement',desc:'Final ALTA / settlement statement uploaded to long-term storage.'},
+      {label:'Settlement statement reviewed & uploaded',key:'b4_settlement',owner:'tc',due:{anchor:'closingDate',offset:1},desc:'Final ALTA / settlement statement uploaded to long-term storage.'},
       {label:'Closing gift delivered',key:'b4_gift',desc:'Closing appreciation item prepared and delivered.'},
-      {label:'Review & testimonial requested',key:'b4_review',desc:'Digital feedback and testimonial requests sent to client.'},
+      {label:'Review & testimonial requested',key:'b4_review',owner:'agent',due:{anchor:'closingDate',offset:7},desc:'Digital feedback and testimonial requests sent to client.'},
       {label:'CRM updated',key:'b4_crm',desc:'Contact records updated with past client tags, property anniversary date, and birthdays.'},
       {label:'Long-term nurture campaign started',key:'b4_nurture',desc:'Long-term client relationship and marketing sequence initiated.'},
       {label:'Milestone follow-ups',key:'b4_milestones',desc:'Follow-up schedule systematically initiated across standard milestones (7-day, 30-day, 90-day, 1-year).'}
@@ -3062,23 +3062,23 @@ var TC_TEMPLATES = {
       {label:'Open house scheduled & executed',key:'s2_openhouse',desc:'Public or broker open house events coordinated and executed.'}
     ]},
     {phase:'Phase 3 - Under Contract', steps:[
-      {label:'Offer accepted/countered & uploaded',key:'s3_offer',desc:'Ratified purchase contract uploaded to internal CRM compliance track.'},
+      {label:'Offer accepted/countered & uploaded',key:'s3_offer',owner:'tc',due:{anchor:'contractDate',offset:1},desc:'Ratified purchase contract uploaded to internal CRM compliance track.'},
       {label:'Earnest money received',key:'s3_earnest',hasDate:true,dateField:'earnestDate',desc:'Verification of earnest money deposit holding received.'},
       {label:'Due diligence deadline tracked',key:'s3_duedilig',hasDate:true,dateField:'dueDiligDate',desc:'Contractual tracking window active.'},
       {label:'Financing deadline tracked',key:'s3_financing',hasDate:true,dateField:'financingDate',desc:'Contractual tracking window active.'},
       {label:'Appraisal deadline tracked',key:'s3_appraisal',hasDate:true,dateField:'appraisalDate',desc:'Contractual tracking window active.'},
-      {label:'Buyer inspection & repair negotiations completed',key:'s3_inspection',desc:"Buyer's home inspection finalized and resolution addendum successfully executed."},
-      {label:'Buyer appraisal completed',key:'s3_appraisaldone',desc:"Buyer's valuation contingency satisfied."},
-      {label:'Title commitment reviewed',key:'s3_title',desc:'Seller title obligations verified clear for transfer.'},
-      {label:'Signing date set & utilities reminded',key:'s3_signing',desc:'Settlement appointment locked and client reminded to terminate active utility accounts.'},
-      {label:'Final walkthrough & funds verification completed',key:'s3_walkthrough',desc:'Buyer final walkthrough completed and funds availability confirmed.'},
-      {label:'Recording confirmed & proceeds wired',key:'s3_recording',desc:"Title recording confirmed by county and net proceeds wired to seller's account."},
-      {label:'Keys handed over / possession complete',key:'s3_keys',desc:'Property keys relinquished and possession transferred per contract.'}
+      {label:'Buyer inspection & repair negotiations completed',key:'s3_inspection',owner:'agent',due:{anchor:'contractDate',offset:7},desc:"Buyer's home inspection finalized and resolution addendum successfully executed."},
+      {label:'Buyer appraisal completed',key:'s3_appraisaldone',owner:'lender',due:{anchor:'contractDate',offset:21},desc:"Buyer's valuation contingency satisfied."},
+      {label:'Title commitment reviewed',key:'s3_title',owner:'title',due:{anchor:'contractDate',offset:10},desc:'Seller title obligations verified clear for transfer.'},
+      {label:'Signing date set & utilities reminded',key:'s3_signing',owner:'tc',due:{anchor:'closingDate',offset:-3},desc:'Settlement appointment locked and client reminded to terminate active utility accounts.'},
+      {label:'Final walkthrough & funds verification completed',key:'s3_walkthrough',owner:'agent',due:{anchor:'closingDate',offset:-1},desc:'Buyer final walkthrough completed and funds availability confirmed.'},
+      {label:'Recording confirmed & proceeds wired',key:'s3_recording',owner:'tc',due:{anchor:'closingDate',offset:1},desc:"Title recording confirmed by county and net proceeds wired to seller's account."},
+      {label:'Keys handed over / possession complete',key:'s3_keys',owner:'agent',due:{anchor:'closingDate',offset:0},desc:'Property keys relinquished and possession transferred per contract.'}
     ]},
     {phase:'Phase 4 - Post-Close Nurture', steps:[
-      {label:'Settlement statement reviewed & uploaded',key:'s4_settlement',desc:'Final closing statement archived internally.'},
+      {label:'Settlement statement reviewed & uploaded',key:'s4_settlement',owner:'tc',due:{anchor:'closingDate',offset:1},desc:'Final closing statement archived internally.'},
       {label:'Closing gift delivered',key:'s4_gift',desc:'Appreciation gesture delivered to client.'},
-      {label:'Review & testimonial requested',key:'s4_review',desc:'Requests for online performance reviews and testimonials transmitted.'},
+      {label:'Review & testimonial requested',key:'s4_review',owner:'agent',due:{anchor:'closingDate',offset:7},desc:'Requests for online performance reviews and testimonials transmitted.'},
       {label:'CRM updated',key:'s4_crm',desc:'Client dataset updated with past seller tags, transaction data notes, and dates.'},
       {label:'Long-term nurture campaign started',key:'s4_nurture',desc:'Post-sale value-add communication sequence activated.'},
       {label:'Milestone follow-ups',key:'s4_milestones',desc:'Follow-up schedule systematically initiated across standard milestones.'}
@@ -3086,7 +3086,49 @@ var TC_TEMPLATES = {
   ]
 };
 
-function saveTX(tx){ recomputeCommission(tx); sv(); if(supaReady && tx) dbSave('transactions', [tx]); }
+// ── Templated workflow: turn TC_TEMPLATES steps that carry a `due` rule into dated deadline
+//    records so they inherit reminders, priorities, and the portal. Idempotent (deduped by
+//    stepKey per deal). Steps without a `due` rule stay as plain checklist items. ────────────
+var TASK_OWNER_LABEL = { tc:'Coordinator', agent:'Agent', lender:'Lender', title:'Title/Escrow', client:'Client' };
+function _resolveDueDate(tx, due){
+  if(!due || !due.anchor) return '';
+  var base = due.anchor==='open' ? (tx.contractDate || tx.added || '') : (tx[due.anchor] || '');
+  if(!base) return '';
+  var dt = new Date(base); if(isNaN(dt.getTime())) return '';
+  dt.setDate(dt.getDate() + (due.offset||0));
+  return dt.toISOString().slice(0,10);
+}
+// Build/refresh the generated tasks for one deal (or all active deals when tx omitted).
+function materializeWorkflowTasks(txArg){
+  var list = txArg ? [txArg] : TX.filter(function(t){ return t.status!=='closed'; });
+  var changed = false;
+  list.forEach(function(tx){
+    if(!tx || tx.status==='closed') return;
+    var tmpl = TC_TEMPLATES[tx.type] || TC_TEMPLATES['buyer'];
+    tmpl.forEach(function(phase){
+      (phase.steps||[]).forEach(function(step){
+        if(!step.due) return;                                    // only date-drivable steps
+        var already = D.find(function(d){ return d.stepKey===step.key && String(d.transactionId)===String(tx.id); });
+        var stepDone = !!(tx.steps && tx.steps[step.key]);
+        if(stepDone){                                            // step checked off -> retire its task
+          if(already){ D = D.filter(function(d){ return d!==already; }); if(supaReady) dbDeleteBy('deadlines','id',already.id); changed=true; }
+          return;
+        }
+        var date = _resolveDueDate(tx, step.due);
+        if(!date) return;                                        // anchor date not set yet
+        if(already){
+          if(already.date!==date){ already.date=date; saveDL(already); changed=true; }  // anchor moved -> reschedule
+          return;
+        }
+        var nd = { id:Date.now()+Math.floor(Math.random()*100000), contactId:tx.contactId, transactionId:tx.id,
+                   type:step.label, date:date, stepKey:step.key, owner:step.owner||'tc' };
+        D.push(nd); saveDL(nd); changed = true;
+      });
+    });
+  });
+  return changed;
+}
+function saveTX(tx){ recomputeCommission(tx); sv(); if(supaReady && tx) dbSave('transactions', [tx]); try{ materializeWorkflowTasks(tx); }catch(e){} }
 function deleteTX(id){
   var _delTx = TX.find(function(t){ return String(t.id)===String(id); });
   var _delCid = _delTx ? _delTx.contactId : null;
@@ -9543,6 +9585,7 @@ function onAuthSuccess(user){
     subscribeRealtime();
     updateNbTC();
     if(ok) try{ sweepStaleItems(); }catch(e){}   // auto-remove orphaned/fired items so they can't resurface
+    if(ok) try{ materializeWorkflowTasks(); }catch(e){}   // generate dated tasks from workflow templates
     restoreTabFromHash();
     // Email-schedule editor now lives on the dashboard; ensure it populates on first load
     // (restoreTabFromHash only triggers it when a #hash routes through sp()).
