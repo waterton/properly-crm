@@ -100,6 +100,7 @@ var DB_COLS = {
                  'contractDate','closingDate','earnestDate','dueDiligDate','financingDate','appraisalDate',
                  'listCommissionPct','buyerCommissionPct','listCommissionAmt','buyerCommissionAmt',
                  'dismissedRisks','docChecklist','lastAddendumNo','lastAddendumDate',
+                 'financingType',
                  'added','soldTerms','concessions','buyerAgent','buyerAgentBrokerage'],
   campaigns: null,
   enrollments: null,
@@ -225,9 +226,39 @@ function buildDocExtract(r){
     buyerCommissionPct: r.buyerCommissionPct || '',
     mlsNumber: r.mlsNumber || '',
     contingencies: Array.isArray(r.contingencies) ? r.contingencies : [],
-    redFlags: Array.isArray(r.redFlags) ? r.redFlags : []
+    redFlags: Array.isArray(r.redFlags) ? r.redFlags : [],
+    financing: (r.financing && typeof r.financing === 'object') ? r.financing : null
   };
 }
+
+// ── Financing type helpers ──────────────────────────────────────────────────
+// A deal is bank-financed (conventional/FHA/VA), 'cash', or 'seller' (owner-carry). Cash and
+// seller-financed deals have no bank loan, so financing/appraisal contingencies don't apply.
+function normFinancingType(t){
+  t = String(t || '').trim().toLowerCase();
+  if(!t) return '';
+  if(t.indexOf('seller')>=0 || t.indexOf('owner')>=0 || t.indexOf('carry')>=0 || t.indexOf('aitd')>=0 || t.indexOf('wrap')>=0 || t.indexOf('contract for deed')>=0) return 'seller';
+  if(t.indexOf('cash')>=0) return 'cash';
+  if(t.indexOf('conv')>=0 || t.indexOf('fha')>=0 || t.indexOf('va')>=0 || t.indexOf('loan')>=0 || t.indexOf('mortg')>=0 || t.indexOf('bank')>=0) return 'conventional';
+  return '';   // unknown -> leave unset (treated as bank-financed by default)
+}
+// true when there's no bank loan on the deal (cash or seller-financed).
+function noBankLoan(tx){ return tx && (tx.financingType === 'cash' || tx.financingType === 'seller'); }
+function financingTypeLabel(t){ return ({conventional:'Conventional / bank loan', cash:'Cash', seller:'Seller financing'})[t] || ''; }
+// Pull seller-financing note terms out of a scan's financing object; null if none present.
+function sfTermsFromScan(fin){
+  fin = fin || {};
+  var s = function(v){ return v==null ? '' : String(v).trim(); };
+  var sf = {
+    amount: s(fin.sellerAmount), rate: s(fin.sellerRate), termMonths: s(fin.sellerTermMonths),
+    amortMonths: s(fin.sellerAmortizationMonths), balloonDate: s(fin.sellerBalloonDate),
+    payment: s(fin.sellerMonthlyPayment), downPayment: s(fin.sellerDownPayment),
+    lateFee: s(fin.sellerLateFee), dueOnSale: s(fin.sellerDueOnSale)
+  };
+  return Object.keys(sf).some(function(k){ return sf[k] !== ''; }) ? sf : null;
+}
+// The seller-financing terms stored on a transaction (details.sf), or {} if none.
+function txSF(tx){ return (tx && tx.details && tx.details.sf) ? tx.details.sf : {}; }
 
 async function saveDocument(file, meta){
   meta = meta || {};
@@ -2291,6 +2322,9 @@ function rdl(){
   TX.filter(function(t){return t.status!=='closed';}).forEach(function(tx){
     if(filterContact && String(tx.contactId)!==String(filterContact)) return;
     REPC_DEADLINES.forEach(function(dl){
+      // Cash / seller-financed deals have no bank loan -> don't nag about a missing financing or
+      // appraisal deadline.
+      if(noBankLoan(tx) && (dl.key==='financingDate' || dl.key==='appraisalDate') && !tx[dl.key]) return;
       var rec = D.find(function(d){
         var owns = (d.transactionId!=null && String(d.transactionId)===String(tx.id)) || (d.transactionId==null && String(d.contactId)===String(tx.contactId));
         return owns && _dlSameSlot(d.type, dl.label);
@@ -3108,6 +3142,11 @@ function materializeWorkflowTasks(txArg){
     tmpl.forEach(function(phase){
       (phase.steps||[]).forEach(function(step){
         if(!step.due) return;                                    // only date-drivable steps
+        if(step.owner==='lender' && noBankLoan(tx)){             // no bank loan -> no lender loan/appraisal task
+          var exL = D.find(function(d){ return d.stepKey===step.key && String(d.transactionId)===String(tx.id); });
+          if(exL){ D = D.filter(function(d){ return d!==exL; }); if(supaReady) dbDeleteBy('deadlines','id',exL.id); changed=true; }
+          return;
+        }
         var already = D.find(function(d){ return d.stepKey===step.key && String(d.transactionId)===String(tx.id); });
         var stepDone = !!(tx.steps && tx.steps[step.key]);
         if(stepDone){                                            // step checked off -> retire its task
@@ -3246,10 +3285,13 @@ function computeTxRisks(tx){
     {k:'financingDate', label:'Financing deadline'},
     {k:'appraisalDate', label:'Appraisal deadline'}
   ];
+  // Cash / seller-financed deals have no bank loan, so financing + appraisal contingencies don't
+  // apply - drop those date checks so they don't false-alarm.
+  if(noBankLoan(tx)) deadlines = deadlines.filter(function(d){ return d.k!=='financingDate' && d.k!=='appraisalDate'; });
 
   // Missing essentials
   if(!close)             add('red',     'No closing / settlement date set.');
-  if(!tx.financingDate)  add('caution', 'No financing deadline set.');
+  if(!noBankLoan(tx) && !tx.financingDate)  add('caution', 'No financing deadline set.');
   if(!tx.dueDiligDate)   add('caution', 'No due diligence deadline set.');
   if(!tx.earnestDate)    add('caution', 'No earnest money deadline set.');
 
@@ -3262,7 +3304,7 @@ function computeTxRisks(tx){
   });
 
   // Tight windows (from contract date)
-  if(cd && tx.financingDate){
+  if(!noBankLoan(tx) && cd && tx.financingDate){
     var fdays = Math.round((pld(tx.financingDate) - pld(cd)) / 864e5);
     if(fdays >= 0 && fdays < 14) add('caution', 'Financing deadline is only ' + fdays + ' day' + (fdays===1?'':'s') + ' after contract - tight.');
   }
@@ -3283,6 +3325,31 @@ function computeTxRisks(tx){
       if(op && np && Math.abs(np - op) / op >= 0.03) add('caution', 'Purchase price changed' + by + ' (' + h.oldValue + ' → ' + h.newValue + ').');
     }
   });
+
+  // Seller financing: the right rules for an owner-carry deal. Instead of chasing a bank loan,
+  // make sure the note is documented and its terms are complete.
+  if(tx.financingType === 'seller'){
+    var sf = txSF(tx);
+    var hasNoteDoc = DOCS.some(function(d){
+      var t = ((d.doc_type||'') + ' ' + ((d.extracted&&d.extracted.docType)||'') + ' ' + (d.file_name||'')).toLowerCase();
+      return /seller financ|promissory|trust deed|deed of trust|owner financ|carry|aitd|land contract|contract for deed/.test(t);
+    });
+    if(!hasNoteDoc)  add('caution', 'Seller-financed: no promissory note / seller-financing addendum on file.');
+    if(!sf.rate)     add('caution', 'Seller financing: interest rate not recorded.');
+    if(!sf.payment)  add('caution', 'Seller financing: monthly payment not recorded.');
+    if(!sf.termMonths && !sf.balloonDate) add('caution', 'Seller financing: loan term / balloon date not recorded.');
+    if(sf.balloonDate){
+      if(close && sf.balloonDate < close){
+        add('red', 'Seller financing: balloon date is BEFORE closing (' + fd(sf.balloonDate) + ').');
+      } else {
+        var _bd = Math.round((pld(sf.balloonDate) - pld(tod())) / 864e5);
+        if(_bd >= 0 && _bd <= 120) add('caution', 'Seller financing: balloon payment due in ' + _bd + ' day' + (_bd===1?'':'s') + ' (' + fd(sf.balloonDate) + ').');
+      }
+    }
+    if(String(sf.dueOnSale||'').trim().toLowerCase().indexOf('no') === 0){
+      add('caution', 'Seller financing: no due-on-sale clause noted - confirm this is intended.');
+    }
+  }
 
   return risks;
 }
@@ -3636,6 +3703,7 @@ function renderTC(){
       if(tx.buyerCommissionAmt!=null){ var bc=document.createElement('div'); bc.style.cssText='font-size:18px;'; bc.innerHTML='<span style="color:var(--text3);">Buyer comm:</span> <b>'+fmtUSD(tx.buyerCommissionAmt)+(tx.buyerCommissionPct!=null?' ('+tx.buyerCommissionPct+'%)':'')+'</b>'; dates.appendChild(bc); }
       if(tx.soldTerms){ var st=document.createElement('div'); st.style.cssText='font-size:18px;'; st.innerHTML='<span style="color:var(--text3);">Terms:</span> <b>'+tx.soldTerms+'</b>'; dates.appendChild(st); }
       if(tx.concessions){ var cn=document.createElement('div'); cn.style.cssText='font-size:18px;'; cn.innerHTML='<span style="color:var(--text3);">Concessions:</span> <b>'+tx.concessions+'</b>'; dates.appendChild(cn); }
+      if(tx.financingType && tx.financingType!=='conventional'){ var ftEl=document.createElement('div'); ftEl.style.cssText='font-size:18px;'; ftEl.innerHTML='<span style="color:var(--text3);">Financing:</span> <b>'+financingTypeLabel(tx.financingType)+'</b>'; dates.appendChild(ftEl); }
       if(tx.buyerAgent){ var ba=document.createElement('div'); ba.style.cssText='font-size:18px;'; ba.innerHTML='<span style="color:var(--text3);">Buyer’s agent:</span> <b>'+tx.buyerAgent+(tx.buyerAgentBrokerage?(' ('+tx.buyerAgentBrokerage+')'):'')+'</b>'; dates.appendChild(ba); }
       if(tx.closingDate){
         var d=document.createElement('div'); d.style.cssText='font-size:18px;';
@@ -4417,13 +4485,17 @@ function openTCDetail(id){
     ['MLS #', tx.mlsNum||'-'],
     ['Lender', tx.lender||'-'],
     ['Title Co', tx.titleCo||'-'],
+    ['Financing Type', financingTypeLabel(tx.financingType) || 'Conventional / bank loan'],
     ['Contract', tx.contractDate ? fd(tx.contractDate) : '-'],
     ['Close', tx.closingDate ? fd(tx.closingDate) : '-'],
     ['Earnest Due', tx.earnestDate ? fd(tx.earnestDate) : '-'],
-    ['Due Diligence', tx.dueDiligDate ? fd(tx.dueDiligDate) : '-'],
-    ['Financing', tx.financingDate ? fd(tx.financingDate) : '-'],
-    ['Appraisal', tx.appraisalDate ? fd(tx.appraisalDate) : '-']
+    ['Due Diligence', tx.dueDiligDate ? fd(tx.dueDiligDate) : '-']
   ];
+  // Bank financing + appraisal deadlines only matter when there's a bank loan.
+  if(!noBankLoan(tx)){
+    fields.push(['Financing', tx.financingDate ? fd(tx.financingDate) : '-']);
+    fields.push(['Appraisal', tx.appraisalDate ? fd(tx.appraisalDate) : '-']);
+  }
   fields.forEach(function(f){
     var d = document.createElement('div');
     d.style.cssText = 'font-size:18px;min-width:120px;';
@@ -4431,6 +4503,39 @@ function openTCDetail(id){
     infoSec.appendChild(d);
   });
   body.appendChild(infoSec);
+
+  // Seller-financing note terms (only when the seller is carrying the financing).
+  if(tx.financingType === 'seller'){
+    var sf = txSF(tx);
+    var sfSec = document.createElement('div');
+    sfSec.style.cssText = 'padding:12px 20px;border-bottom:1px solid var(--border);';
+    var sfHdr = document.createElement('div');
+    sfHdr.style.cssText = 'font-size:14px;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px;';
+    sfHdr.textContent = 'Seller Financing — Note Terms';
+    sfSec.appendChild(sfHdr);
+    var sfGrid = document.createElement('div');
+    sfGrid.style.cssText = 'display:flex;flex-wrap:wrap;gap:10px;';
+    var sfRows = [
+      ['Amount financed', sf.amount],
+      ['Interest rate', sf.rate ? (sf.rate + '%') : ''],
+      ['Term', sf.termMonths ? (sf.termMonths + ' mo') : ''],
+      ['Amortization', sf.amortMonths ? (sf.amortMonths + ' mo') : ''],
+      ['Monthly payment', sf.payment],
+      ['Down payment', sf.downPayment],
+      ['Balloon date', sf.balloonDate ? fd(sf.balloonDate) : ''],
+      ['Late fee', sf.lateFee],
+      ['Due-on-sale', sf.dueOnSale]
+    ];
+    sfRows.forEach(function(r){
+      var val = (r[1]==null || String(r[1]).trim()==='') ? '<span style="color:var(--danger);">not recorded</span>' : ('<b style="color:var(--text);">'+r[1]+'</b>');
+      var d = document.createElement('div');
+      d.style.cssText = 'font-size:18px;min-width:150px;';
+      d.innerHTML = '<span style="color:var(--text3);">' + r[0] + ':</span> ' + val;
+      sfGrid.appendChild(d);
+    });
+    sfSec.appendChild(sfGrid);
+    body.appendChild(sfSec);
+  }
 
   // Assign To for transaction
   var txAssignSec = document.createElement('div');
@@ -4699,6 +4804,7 @@ function openNewTxModal(){
   buildContactPicker(txCP, 'tcContact', 'Search contact by name, email, phone...');
   ['tcAddress','tcPrice','tcMLS','tcLender','tcTitle','tcNotes','tcListCommPct','tcBuyerCommPct','tcListCommAmt','tcBuyerCommAmt'].forEach(function(x){ if(ge(x)) ge(x).value=''; });
   ['tcContractDate','tcClosingDate','tcEarnestDate','tcDueDiligDate','tcFinancingDate','tcAppraisalDate'].forEach(function(x){ ge(x).value=''; });
+  if(ge('tcFinancingType')) ge('tcFinancingType').value='';
   cm('tcModal');
   ge('tcModal').classList.add('open');
 }
@@ -4723,6 +4829,7 @@ function saveTransaction(){
   tx.lender = ge('tcLender').value.trim();
   tx.titleCo = ge('tcTitle').value.trim();
   tx.notes = ge('tcNotes').value.trim();
+  if(ge('tcFinancingType')) tx.financingType = ge('tcFinancingType').value;
   tx.contractDate = ge('tcContractDate').value;
   tx.closingDate = ge('tcClosingDate').value;
   tx.earnestDate = ge('tcEarnestDate').value;
@@ -5497,8 +5604,29 @@ function buildScannerPrompt(hint){
     '    "renewalOptionDeadline": "option-exercise deadline YYYY-MM-DD if stated",',
     '    "guaranty": "personal/corporate guaranty details if any"',
     '  },',
+    '  "financing": {',
+    '    "type": "conventional|cash|seller|fha|va|other",',
+    '    "sellerAmount": "principal amount the SELLER is financing, number only (empty if not seller-financed)",',
+    '    "sellerRate": "annual interest rate percent, number only e.g. 6.5",',
+    '    "sellerTermMonths": "loan term in months, number only e.g. 360",',
+    '    "sellerAmortizationMonths": "amortization period in months if different from the term, number only",',
+    '    "sellerBalloonDate": "balloon / maturity date YYYY-MM-DD if a balloon payment is due",',
+    '    "sellerMonthlyPayment": "scheduled monthly payment amount, number only",',
+    '    "sellerDownPayment": "down payment amount, number only",',
+    '    "sellerLateFee": "late fee terms as stated e.g. 5% after 10 days",',
+    '    "sellerDueOnSale": "yes|no - whether a due-on-sale / due-on-transfer clause is present"',
+    '  },',
     '  "spanishSummary": "same summary in Spanish"',
     '}',
+    'financing.type classifies how the purchase is paid. Set "seller" when the SELLER is carrying',
+    'the financing - look for a Seller Financing Addendum, owner carry / carryback, all-inclusive',
+    'trust deed (AITD), wrap-around mortgage, contract for deed / land contract, or a promissory',
+    'note where the seller is the payee/lender. Set "cash" when there is no loan and no seller',
+    'financing. Set "conventional"/"fha"/"va" for a normal bank/mortgage loan. Fill the seller* note',
+    'terms ONLY when type is "seller"; leave them empty strings otherwise. Numbers must be digits',
+    'only. When the deal is seller-financed, add redFlags for any MISSING or unusual note terms:',
+    'no promissory note/addendum attached, missing interest rate or payment, a balloon due soon,',
+    'no due-on-sale clause, or an unrecorded trust deed.',
     'dealCategory classifies the transaction. Fill the "lease" object ONLY when this is a commercial',
     'lease; for a residential purchase leave every "lease" field an empty string and fill the',
     'residential fields above instead. Numbers (rentableSqft, baseRent, camAmount, leaseTermMonths)',
@@ -6407,6 +6535,17 @@ async function commitScanImport(r, btn){
       buyerCommissionAmt: null
     };
     TX.push(tx);
+  }
+
+  // ---- Financing type + seller-financing note terms (residential purchases only) ----
+  if(!isLease){
+    var _fin = r.financing || {};
+    var _ft = normFinancingType(_fin.type);
+    if(_ft) tx.financingType = _ft;                       // fill/override from the scan when detected
+    if(_ft === 'seller'){
+      var _sf = sfTermsFromScan(_fin);
+      if(_sf){ tx.details = tx.details || {}; tx.details.sf = Object.assign({}, tx.details.sf || {}, _sf); }
+    }
   }
 
   // Residential checklist auto-completion doesn't apply to commercial leases (different lifecycle).
@@ -10062,6 +10201,7 @@ ge('tcDetEdit').addEventListener('click', function(){
   if(ge('tcBuyerCommPct')) ge('tcBuyerCommPct').value = tx.buyerCommissionPct!=null ? tx.buyerCommissionPct : '';
   if(ge('tcListCommAmt'))  ge('tcListCommAmt').value  = tx.listCommissionAmt!=null  ? tx.listCommissionAmt  : '';
   if(ge('tcBuyerCommAmt')) ge('tcBuyerCommAmt').value = tx.buyerCommissionAmt!=null ? tx.buyerCommissionAmt : '';
+  if(ge('tcFinancingType')) ge('tcFinancingType').value = tx.financingType||'';
   ge('tcContractDate').value = tx.contractDate||'';
   ge('tcClosingDate').value = tx.closingDate||'';
   ge('tcEarnestDate').value = tx.earnestDate||'';
