@@ -227,7 +227,8 @@ function buildDocExtract(r){
     mlsNumber: r.mlsNumber || '',
     contingencies: Array.isArray(r.contingencies) ? r.contingencies : [],
     redFlags: Array.isArray(r.redFlags) ? r.redFlags : [],
-    financing: (r.financing && typeof r.financing === 'object') ? r.financing : null
+    financing: (r.financing && typeof r.financing === 'object') ? r.financing : null,
+    repc: (r.repc && typeof r.repc === 'object') ? r.repc : null
   };
 }
 
@@ -259,6 +260,72 @@ function sfTermsFromScan(fin){
 }
 // The seller-financing terms stored on a transaction (details.sf), or {} if none.
 function txSF(tx){ return (tx && tx.details && tx.details.sf) ? tx.details.sf : {}; }
+
+// ── REPC contract facts (details.repc) ──────────────────────────────────────
+function txREPC(tx){ return (tx && tx.details && tx.details.repc) ? tx.details.repc : {}; }
+// Contingency waivers read straight from the REPC's own checkboxes (8.1/8.2/8.3). When a box is
+// marked "is not" / "no", that contingency doesn't apply, so a missing deadline is not a problem.
+function ddWaived(tx){ return txREPC(tx).dueDiligenceApplies === 'is_not'; }
+function appraisalWaived(tx){ return txREPC(tx).appraisalApplies === 'is_not'; }
+function financingWaived(tx){ var f = txREPC(tx).financingRequired; return f === 'no' || f === false; }
+// Merge scanned REPC facts onto a deal additively (a later scan fills blanks, never wipes).
+function mergeREPCFacts(tx, repc){
+  if(!repc || typeof repc !== 'object') return;
+  tx.details = tx.details || {};
+  var cur = tx.details.repc || {};
+  Object.keys(repc).forEach(function(k){
+    var v = repc[k];
+    if(Array.isArray(v)){ if(v.length) cur[k] = v; }
+    else if(v !== '' && v != null){ cur[k] = v; }
+  });
+  tx.details.repc = cur;
+}
+// Human-readable [label, value] rows from stored REPC facts, skipping anything not captured.
+function repcFactRows(rp){
+  rp = rp || {};
+  var rows = [];
+  var who = function(w, o){ var m={seller:'Seller',buyer:'Buyer',split:'Split equally',other:'Other'}; var s=m[w]||''; if(w==='other'&&o) s+=' ('+o+')'; return s; };
+  var party = function(v){ return v==='seller'?'Seller':v==='buyer'?'Buyer':''; };
+  var inc = [];
+  if(Array.isArray(rp.includedItems) && rp.includedItems.length) inc.push(rp.includedItems.join(', '));
+  if(rp.includedItemsOther) inc.push(rp.includedItemsOther);
+  if(inc.length) rows.push(['Included items (1.2)', inc.join('; ')]);
+  if(rp.personalPropertyIncluded === 'are') rows.push(['Personal property (1.2)', rp.personalPropertyList || 'Included']);
+  else if(rp.personalPropertyIncluded === 'are not') rows.push(['Personal property (1.2)', 'None included']);
+  if(rp.excludedItems) rows.push(['Excluded items (1.3)', rp.excludedItems]);
+  if(rp.waterRightsIncluded) rows.push(['Water rights incl. (1.4)', rp.waterRightsIncluded]);
+  if(rp.waterRightsExcluded) rows.push(['Water rights excl. (1.4)', rp.waterRightsExcluded]);
+  if(rp.possessionBasis){
+    var pos = rp.possessionBasis==='upon_recording' ? 'Upon recording'
+            : rp.possessionBasis==='hours_after_recording' ? ((rp.possessionValue||'?')+' hours after recording')
+            : rp.possessionBasis==='days_after_recording' ? ((rp.possessionValue||'?')+' days after recording') : '';
+    if(pos) rows.push(['Possession (3.3)', pos]);
+  }
+  if(rp.specialAssessmentsWho) rows.push(['Special assessments', who(rp.specialAssessmentsWho, rp.specialAssessmentsOther)]);
+  if(rp.hoaTransferFeeWho) rows.push(['HOA transfer fee (4.3c)', who(rp.hoaTransferFeeWho, rp.hoaTransferFeeOther)]);
+  if(rp.dueDiligenceApplies) rows.push(['Due diligence (8.1)', rp.dueDiligenceApplies==='is'?'Applies':'Waived (is not)']);
+  if(rp.appraisalApplies) rows.push(['Appraisal (8.2)', rp.appraisalApplies==='is'?'Applies':'Waived (is not)']);
+  if(rp.financingRequired) rows.push(['Financing (8.3)', rp.financingRequired==='yes'?'Required':'Not required']);
+  if(rp.earnestHardAmount && String(rp.earnestHardAmount).replace(/[^0-9.]/g,'') && parseFloat(rp.earnestHardAmount)>0) rows.push(['Earnest goes hard (8.3b-i)', '$'+rp.earnestHardAmount]);
+  if(rp.sellerPaidCostsWill) rows.push(['Seller-paid costs (8.4)', rp.sellerPaidCostsWill==='will' ? ('Yes'+(rp.sellerPaidCostsAmount?(' — $'+rp.sellerPaidCostsAmount):'')) : 'No']);
+  if(rp.addendaPresent){
+    var ad = rp.addendaPresent==='are' ? 'Yes' : 'No';
+    if(rp.addendaPresent==='are'){
+      if(rp.addendaNumbers) ad += ' (#'+rp.addendaNumbers+')';
+      if(Array.isArray(rp.addendaTypes) && rp.addendaTypes.length){ var tm={seller_financing:'Seller Financing',fha_va:'FHA/VA',other:'Other'}; ad += ' — '+rp.addendaTypes.map(function(t){return tm[t]||t;}).join(', '); }
+    }
+    rows.push(['Addenda (Sec 9)', ad]);
+  }
+  if(rp.homeWarrantyWill === 'will'){
+    var parts=[]; if(party(rp.homeWarrantyPays)) parts.push('pays: '+party(rp.homeWarrantyPays));
+    if(party(rp.homeWarrantyOrders)) parts.push('orders: '+party(rp.homeWarrantyOrders));
+    if(party(rp.homeWarrantySelects)) parts.push('selects: '+party(rp.homeWarrantySelects));
+    var hw = 'Yes'; if(rp.homeWarrantyAmount) hw += ' (~$'+rp.homeWarrantyAmount+')'; if(parts.length) hw += ' — '+parts.join(', ');
+    rows.push(['Home warranty (10.1)', hw]);
+  } else if(rp.homeWarrantyWill === 'will not') rows.push(['Home warranty (10.1)', 'No']);
+  if(rp.mediation) rows.push(['Mediation (Sec 15)', rp.mediation==='shall'?'Shall mediate':'Optional (may)']);
+  return rows;
+}
 
 async function saveDocument(file, meta){
   meta = meta || {};
@@ -2322,9 +2389,13 @@ function rdl(){
   TX.filter(function(t){return t.status!=='closed';}).forEach(function(tx){
     if(filterContact && String(tx.contactId)!==String(filterContact)) return;
     REPC_DEADLINES.forEach(function(dl){
-      // Cash / seller-financed deals have no bank loan -> don't nag about a missing financing or
-      // appraisal deadline.
-      if(noBankLoan(tx) && (dl.key==='financingDate' || dl.key==='appraisalDate') && !tx[dl.key]) return;
+      // Don't nag about a missing deadline the deal doesn't need: no bank loan (cash/seller) or the
+      // REPC waived the contingency (8.3(a) financing, 8.2 appraisal, 8.1 due diligence).
+      if(!tx[dl.key]){
+        if(dl.key==='financingDate' && (noBankLoan(tx) || financingWaived(tx))) return;
+        if(dl.key==='appraisalDate' && (noBankLoan(tx) || appraisalWaived(tx))) return;
+        if(dl.key==='dueDiligDate'  && ddWaived(tx)) return;
+      }
       var rec = D.find(function(d){
         var owns = (d.transactionId!=null && String(d.transactionId)===String(tx.id)) || (d.transactionId==null && String(d.contactId)===String(tx.contactId));
         return owns && _dlSameSlot(d.type, dl.label);
@@ -3142,7 +3213,7 @@ function materializeWorkflowTasks(txArg){
     tmpl.forEach(function(phase){
       (phase.steps||[]).forEach(function(step){
         if(!step.due) return;                                    // only date-drivable steps
-        if(step.owner==='lender' && noBankLoan(tx)){             // no bank loan -> no lender loan/appraisal task
+        if(step.owner==='lender' && (noBankLoan(tx) || financingWaived(tx))){  // no bank loan/financing -> no lender task
           var exL = D.find(function(d){ return d.stepKey===step.key && String(d.transactionId)===String(tx.id); });
           if(exL){ D = D.filter(function(d){ return d!==exL; }); if(supaReady) dbDeleteBy('deadlines','id',exL.id); changed=true; }
           return;
@@ -3285,14 +3356,21 @@ function computeTxRisks(tx){
     {k:'financingDate', label:'Financing deadline'},
     {k:'appraisalDate', label:'Appraisal deadline'}
   ];
-  // Cash / seller-financed deals have no bank loan, so financing + appraisal contingencies don't
-  // apply - drop those date checks so they don't false-alarm.
-  if(noBankLoan(tx)) deadlines = deadlines.filter(function(d){ return d.k!=='financingDate' && d.k!=='appraisalDate'; });
+  // Financing + appraisal contingencies don't apply when there's no bank loan (cash / seller) OR
+  // the REPC itself waived them (8.3(a) no financing required, 8.2 appraisal "is not"). Drop those
+  // date checks so they don't false-alarm.
+  var _dropFin  = noBankLoan(tx) || financingWaived(tx);
+  var _dropAppr = noBankLoan(tx) || appraisalWaived(tx);
+  deadlines = deadlines.filter(function(d){
+    if(d.k==='financingDate' && _dropFin)  return false;
+    if(d.k==='appraisalDate' && _dropAppr) return false;
+    return true;
+  });
 
   // Missing essentials
   if(!close)             add('red',     'No closing / settlement date set.');
-  if(!noBankLoan(tx) && !tx.financingDate)  add('caution', 'No financing deadline set.');
-  if(!tx.dueDiligDate)   add('caution', 'No due diligence deadline set.');
+  if(!_dropFin && !tx.financingDate)     add('caution', 'No financing deadline set.');
+  if(!ddWaived(tx) && !tx.dueDiligDate)  add('caution', 'No due diligence deadline set.');
   if(!tx.earnestDate)    add('caution', 'No earnest money deadline set.');
 
   // Date-order sanity
@@ -3304,7 +3382,7 @@ function computeTxRisks(tx){
   });
 
   // Tight windows (from contract date)
-  if(!noBankLoan(tx) && cd && tx.financingDate){
+  if(!_dropFin && cd && tx.financingDate){
     var fdays = Math.round((pld(tx.financingDate) - pld(cd)) / 864e5);
     if(fdays >= 0 && fdays < 14) add('caution', 'Financing deadline is only ' + fdays + ' day' + (fdays===1?'':'s') + ' after contract - tight.');
   }
@@ -4537,6 +4615,30 @@ function openTCDetail(id){
     body.appendChild(sfSec);
   }
 
+  // Contract Facts (REPC) - a quick-reference of key contract terms pulled from the scan so you
+  // don't have to reopen the document.
+  var _repcRows = repcFactRows(txREPC(tx));
+  if(_repcRows.length){
+    var rpSec = document.createElement('div');
+    rpSec.style.cssText = 'padding:12px 20px;border-bottom:1px solid var(--border);';
+    var rpHdr = document.createElement('div');
+    rpHdr.style.cssText = 'font-size:14px;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px;';
+    rpHdr.textContent = 'Contract Facts (REPC)';
+    rpSec.appendChild(rpHdr);
+    var rpGrid = document.createElement('div');
+    rpGrid.style.cssText = 'display:flex;flex-wrap:wrap;gap:10px;';
+    _repcRows.forEach(function(r){
+      var d = document.createElement('div');
+      d.style.cssText = 'font-size:18px;min-width:180px;max-width:100%;';
+      var lbl = document.createElement('span'); lbl.style.color = 'var(--text3)'; lbl.textContent = r[0] + ': ';
+      var val = document.createElement('b'); val.style.color = 'var(--text)'; val.textContent = r[1];
+      d.appendChild(lbl); d.appendChild(val);
+      rpGrid.appendChild(d);
+    });
+    rpSec.appendChild(rpGrid);
+    body.appendChild(rpSec);
+  }
+
   // Assign To for transaction
   var txAssignSec = document.createElement('div');
   txAssignSec.style.cssText = 'padding:10px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;';
@@ -5616,8 +5718,42 @@ function buildScannerPrompt(hint){
     '    "sellerLateFee": "late fee terms as stated e.g. 5% after 10 days",',
     '    "sellerDueOnSale": "yes|no - whether a due-on-sale / due-on-transfer clause is present"',
     '  },',
+    '  "repc": {',
+    '    "includedItems": ["checked included-items in REPC 1.2 e.g. Refrigerator, Washer, Dryer"],',
+    '    "includedItemsOther": "text typed after the Other blank in 1.2",',
+    '    "personalPropertyIncluded": "are|are not|empty (the ARE / ARE NOT box for personal property in 1.2)",',
+    '    "personalPropertyList": "personal property items listed in 1.2 when ARE is checked",',
+    '    "excludedItems": "items excluded from the sale in REPC 1.3",',
+    '    "waterRightsIncluded": "water rights/shares included per REPC 1.4",',
+    '    "waterRightsExcluded": "water rights/shares excluded per REPC 1.4",',
+    '    "possessionBasis": "upon_recording|hours_after_recording|days_after_recording|empty (REPC 3.3)",',
+    '    "possessionValue": "number of hours or days for possession, digits only (empty if upon_recording)",',
+    '    "specialAssessmentsWho": "seller|buyer|split|other (who pays special assessments)",',
+    '    "specialAssessmentsOther": "explanation when specialAssessmentsWho is other",',
+    '    "hoaTransferFeeWho": "seller|buyer|split|other (REPC 4.3(c) HOA change-of-ownership fees)",',
+    '    "hoaTransferFeeOther": "explanation when hoaTransferFeeWho is other",',
+    '    "dueDiligenceApplies": "is|is_not (REPC 8.1 - which box is checked)",',
+    '    "appraisalApplies": "is|is_not (REPC 8.2 - which box is checked)",',
+    '    "financingRequired": "yes|no (REPC 8.3: (a) checked = no, (b) checked = yes)",',
+    '    "earnestHardAmount": "REPC 8.3(b)(i) earnest money that becomes non-refundable after due diligence, digits only (empty or 0 if none)",',
+    '    "sellerPaidCostsWill": "will|will not (REPC 8.4)",',
+    '    "sellerPaidCostsAmount": "dollar amount when Will is checked in 8.4, digits only",',
+    '    "addendaPresent": "are|are not (REPC Section 9 - are addenda attached)",',
+    '    "addendaNumbers": "addendum number(s) following Addendum No. in Section 9",',
+    '    "addendaTypes": ["seller_financing|fha_va|other as checked in Section 9"],',
+    '    "homeWarrantyWill": "will|will not (REPC 10.1)",',
+    '    "homeWarrantyPays": "buyer|seller (who pays for the home warranty)",',
+    '    "homeWarrantyOrders": "buyer|seller (who orders the home warranty)",',
+    '    "homeWarrantySelects": "buyer|seller (who selects the warranty company)",',
+    '    "homeWarrantyAmount": "estimated home warranty cost, digits only",',
+    '    "mediation": "shall|may (REPC Section 15 - which box is checked)"',
+    '  },',
     '  "spanishSummary": "same summary in Spanish"',
     '}',
+    'Fill the "repc" object ONLY for a Utah REPC (docType REPC / residential purchase); leave every',
+    'repc field an empty string (or empty array) for other documents. A checkbox counts as selected',
+    'if it shows a check mark, an X, or is otherwise filled. For any is/is_not, will/will_not,',
+    'are/are_not, shall/may, or buyer/seller choice, return the option that is actually marked.',
     'financing.type classifies how the purchase is paid. Set "seller" when the SELLER is carrying',
     'the financing - look for a Seller Financing Addendum, owner carry / carryback, all-inclusive',
     'trust deed (AITD), wrap-around mortgage, contract for deed / land contract, or a promissory',
@@ -6558,6 +6694,8 @@ async function commitScanImport(r, btn){
         tx.details.sf = _cur;
       }
     }
+    // REPC contract facts (included items, possession, contingency waivers, home warranty, etc.)
+    if(r.repc) mergeREPCFacts(tx, r.repc);
   }
 
   // Residential checklist auto-completion doesn't apply to commercial leases (different lifecycle).
