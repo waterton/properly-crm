@@ -5627,6 +5627,11 @@ function buildScannerPrompt(hint){
     'only. When the deal is seller-financed, add redFlags for any MISSING or unusual note terms:',
     'no promissory note/addendum attached, missing interest rate or payment, a balloon due soon,',
     'no due-on-sale clause, or an unrecorded trust deed.',
+    'IMPORTANT - Utah REPC: Section 2.1 is the payment-method section. Line 2.1(d) reads "Seller',
+    'Financing (see attached Seller Financing Addendum)" with a dollar amount for the financed',
+    'balance. If that line is checked or has an amount, this deal IS seller-financed: set',
+    'financing.type="seller" and use that dollar amount as financing.sellerAmount, even though the',
+    'full note terms (rate, payment, term, balloon) appear only in the Seller Financing Addendum.',
     'dealCategory classifies the transaction. Fill the "lease" object ONLY when this is a commercial',
     'lease; for a residential purchase leave every "lease" field an empty string and fill the',
     'residential fields above instead. Numbers (rentableSqft, baseRent, camAmount, leaseTermMonths)',
@@ -6544,7 +6549,14 @@ async function commitScanImport(r, btn){
     if(_ft) tx.financingType = _ft;                       // fill/override from the scan when detected
     if(_ft === 'seller'){
       var _sf = sfTermsFromScan(_fin);
-      if(_sf){ tx.details = tx.details || {}; tx.details.sf = Object.assign({}, tx.details.sf || {}, _sf); }
+      if(_sf){
+        // Fill terms additively: a later scan (e.g. the seller-financing addendum) fills blanks
+        // without wiping terms an earlier scan already captured.
+        tx.details = tx.details || {};
+        var _cur = tx.details.sf || {};
+        Object.keys(_sf).forEach(function(k){ if(_sf[k] !== '' && _sf[k] != null) _cur[k] = _sf[k]; });
+        tx.details.sf = _cur;
+      }
     }
   }
 
