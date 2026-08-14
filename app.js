@@ -261,6 +261,32 @@ function sfTermsFromScan(fin){
 // The seller-financing terms stored on a transaction (details.sf), or {} if none.
 function txSF(tx){ return (tx && tx.details && tx.details.sf) ? tx.details.sf : {}; }
 
+// Deterministically classify financing from the transcribed REPC 2.1 payment lines. We trust the
+// scan to READ each line's label + amount, but decide the type in code (matching the label text)
+// rather than trusting the model's own judgment - that's what makes it reliable. Returns
+// {type, sellerAmount, loanAmount} or null when there are no usable lines.
+function classifyFinancingFromLines(lines){
+  if(!Array.isArray(lines) || !lines.length) return null;
+  var num = function(v){ var n = parseFloat(String(v==null?'':v).replace(/[^0-9.]/g,'')); return isNaN(n)?0:n; };
+  var sellerAmt = 0, loanAmt = 0, sawAny = false;
+  lines.forEach(function(l){
+    var lab = String((l && l.label) || '').toLowerCase();
+    var amt = num(l && l.amount);
+    if(!lab) return;
+    sawAny = true;
+    if(amt <= 0) return;
+    if(lab.indexOf('seller financ')>=0 || lab.indexOf('owner financ')>=0 || lab.indexOf('carry')>=0){
+      sellerAmt = Math.max(sellerAmt, amt);
+    } else if(lab.indexOf('assum')<0 && lab.indexOf('balance')<0 && (lab.indexOf('new loan')>=0 || lab.indexOf('loan')>=0)){
+      loanAmt = Math.max(loanAmt, amt);   // a NEW bank loan (exclude "balance..." cash and "assumption")
+    }
+  });
+  if(!sawAny) return null;
+  if(sellerAmt > 0) return { type:'seller',       sellerAmount:String(sellerAmt), loanAmount:'' };
+  if(loanAmt   > 0) return { type:'conventional', sellerAmount:'',                loanAmount:String(loanAmt) };
+  return { type:'cash', sellerAmount:'', loanAmount:'' };
+}
+
 // ── REPC contract facts (details.repc) ──────────────────────────────────────
 function txREPC(tx){ return (tx && tx.details && tx.details.repc) ? tx.details.repc : {}; }
 // Contingency waivers read straight from the REPC's own checkboxes (8.1/8.2/8.3). When a box is
@@ -351,7 +377,17 @@ function repcReferenceGroups(rp){
     hw='Yes'; if(rp.homeWarrantyAmount) hw+=' (~$'+rp.homeWarrantyAmount+')'; if(parts.length) hw+=' — '+parts.join(', ');
   } else if(rp.homeWarrantyWill==='will not') hw='No';
   var med = rp.mediation ? (rp.mediation==='shall'?'Shall mediate':'Optional (may)') : '';
+  var payRows = [];
+  if(Array.isArray(rp.paymentLines)){
+    rp.paymentLines.forEach(function(l){
+      var lab = (l && l.label) ? String(l.label) : ''; if(!lab) return;
+      var amt = (l && l.amount!=null && String(l.amount).trim()!=='' && parseFloat(String(l.amount).replace(/[^0-9.]/g,''))>0) ? ('$'+l.amount) : '';
+      payRows.push([lab, amt]);
+    });
+  }
+  if(!payRows.length) payRows.push(['Section 2.1 lines', '']);
   return [
+    {title:'Payment breakdown (2.1)', rows:payRows},
     {title:'Property & Inclusions', rows:[
       ['Included items (1.2)', inc.join('; ')],
       ['Personal property (1.2)', pp],
@@ -5810,7 +5846,8 @@ function buildScannerPrompt(hint){
     '    "homeWarrantyOrders": "buyer|seller (who orders the home warranty)",',
     '    "homeWarrantySelects": "buyer|seller (who selects the warranty company)",',
     '    "homeWarrantyAmount": "estimated home warranty cost, digits only",',
-    '    "mediation": "shall|may (REPC Section 15 - which box is checked)"',
+    '    "mediation": "shall|may (REPC Section 15 - which box is checked)",',
+    '    "paymentLines": [{"label":"exact printed label of a Section 2.1 line e.g. New Loan / Seller Financing / Balance of Purchase Price in Cash at Settlement","amount":"dollar amount printed on that line, digits only; 0 if blank"}]',
     '  },',
     '  "spanishSummary": "same summary in Spanish"',
     '}',
@@ -5827,22 +5864,19 @@ function buildScannerPrompt(hint){
     'only. When the deal is seller-financed, add redFlags for any MISSING or unusual note terms:',
     'no promissory note/addendum attached, missing interest rate or payment, a balloon due soon,',
     'no due-on-sale clause, or an unrecorded trust deed.',
-    'IMPORTANT - Utah REPC Section 2.1 is the payment breakdown; every line has a dollar blank and',
-    'the lines sum to the Purchase Price. Read the amount written on EACH line by its letter:',
-    '  2.1(a) Earnest Money Deposit;',
-    '  2.1(b) Additional cash paid at Settlement (buyer down payment);',
-    '  2.1(c) New Loan (a NEW bank / mortgage loan the buyer will obtain);',
-    '  2.1(d) Seller Financing (see attached Seller Financing Addendum);',
-    '  2.1(e) Other.',
-    'Decide financing.type ONLY from which 2.1 line carries the loan amount:',
-    '  - If 2.1(d) has a dollar amount (or is checked): type="seller" and set financing.sellerAmount',
-    '    to THAT amount - even if 2.1(c) is blank. A blank 2.1(c) means there is NO new bank loan.',
-    '  - Else if 2.1(c) has a dollar amount: type="conventional" (or fha/va) and put it in loanAmount.',
-    '  - Else if the price is covered by 2.1(a)+(b) only: type="cash".',
-    'Do NOT infer the financing type from prose, the summary, the loanAmount field, or transaction',
-    'notes - decide it from which 2.1 line the amount sits on. An amount on 2.1(d) is SELLER',
-    'FINANCING, not a new loan, no matter what other text says. Never report sellerAmount as 0 when',
-    '2.1(d) shows a figure - read the actual number (e.g. $450,000).',
+    'CRITICAL - Utah REPC Section 2.1 is the payment breakdown: each line has a printed LABEL and a',
+    'dollar blank, and the lines sum to the Purchase Price. Transcribe EVERY 2.1 line into',
+    'repc.paymentLines as {label, amount} exactly as printed. Do NOT go by the (a)-(e) letter order,',
+    'do NOT move an amount from one line to another, and do NOT assume which line is which - read the',
+    'printed label next to each amount. Then set financing.type from the LABELS, never the letters:',
+    '  - amount on the line labeled "Seller Financing" -> financing.sellerAmount and type="seller";',
+    '  - amount on the line labeled "New Loan" -> loanAmount and type="conventional" (or fha/va);',
+    '  - "Balance of Purchase Price in Cash at Settlement" (or any "cash at settlement") is the',
+    "    buyer's CASH portion - it is NOT seller financing and NOT a loan;",
+    '  - if only earnest/cash lines carry amounts, type="cash".',
+    'If the "Seller Financing" line shows an amount, the deal IS seller-financed even when "New Loan"',
+    'is blank. Never place the Seller Financing amount on the New Loan line, or the cash amount on the',
+    'Seller Financing line. Read the actual figures (e.g. Seller Financing $450,000, cash $115,000).',
     'dealCategory classifies the transaction. Fill the "lease" object ONLY when this is a commercial',
     'lease; for a residential purchase leave every "lease" field an empty string and fill the',
     'residential fields above instead. Numbers (rentableSqft, baseRent, camAmount, leaseTermMonths)',
@@ -6756,18 +6790,22 @@ async function commitScanImport(r, btn){
   // ---- Financing type + seller-financing note terms (residential purchases only) ----
   if(!isLease){
     var _fin = r.financing || {};
-    var _ft = normFinancingType(_fin.type);
-    if(_ft) tx.financingType = _ft;                       // fill/override from the scan when detected
+    // Prefer the deterministic classification from the transcribed 2.1 lines; fall back to the
+    // model's own type only when no lines were captured.
+    var _lines = (r.repc && r.repc.paymentLines) || _fin.paymentLines;
+    var _cls = classifyFinancingFromLines(_lines);
+    var _ft = _cls ? _cls.type : normFinancingType(_fin.type);
+    if(_ft) tx.financingType = _ft;
     if(_ft === 'seller'){
-      var _sf = sfTermsFromScan(_fin);
-      if(_sf){
-        // Fill terms additively: a later scan (e.g. the seller-financing addendum) fills blanks
-        // without wiping terms an earlier scan already captured.
-        tx.details = tx.details || {};
-        var _cur = tx.details.sf || {};
-        Object.keys(_sf).forEach(function(k){ if(_sf[k] !== '' && _sf[k] != null) _cur[k] = _sf[k]; });
-        tx.details.sf = _cur;
-      }
+      var _sf = sfTermsFromScan(_fin) || {};
+      // Seed the financed principal from the Seller Financing line if the model didn't fill it.
+      if(_cls && _cls.sellerAmount && !_sf.amount) _sf.amount = _cls.sellerAmount;
+      // Fill terms additively: a later scan (e.g. the seller-financing addendum) fills blanks
+      // without wiping terms an earlier scan already captured.
+      tx.details = tx.details || {};
+      var _cur = tx.details.sf || {};
+      Object.keys(_sf).forEach(function(k){ if(_sf[k] !== '' && _sf[k] != null) _cur[k] = _sf[k]; });
+      if(Object.keys(_cur).length) tx.details.sf = _cur;
     }
     // REPC contract facts (included items, possession, contingency waivers, home warranty, etc.)
     if(r.repc) mergeREPCFacts(tx, r.repc);
