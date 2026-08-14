@@ -5864,19 +5864,28 @@ function buildScannerPrompt(hint){
     'only. When the deal is seller-financed, add redFlags for any MISSING or unusual note terms:',
     'no promissory note/addendum attached, missing interest rate or payment, a balloon due soon,',
     'no due-on-sale clause, or an unrecorded trust deed.',
-    'CRITICAL - Utah REPC Section 2.1 is the payment breakdown: each line has a printed LABEL and a',
-    'dollar blank, and the lines sum to the Purchase Price. Transcribe EVERY 2.1 line into',
-    'repc.paymentLines as {label, amount} exactly as printed. Do NOT go by the (a)-(e) letter order,',
-    'do NOT move an amount from one line to another, and do NOT assume which line is which - read the',
-    'printed label next to each amount. Then set financing.type from the LABELS, never the letters:',
-    '  - amount on the line labeled "Seller Financing" -> financing.sellerAmount and type="seller";',
-    '  - amount on the line labeled "New Loan" -> loanAmount and type="conventional" (or fha/va);',
-    '  - "Balance of Purchase Price in Cash at Settlement" (or any "cash at settlement") is the',
-    "    buyer's CASH portion - it is NOT seller financing and NOT a loan;",
-    '  - if only earnest/cash lines carry amounts, type="cash".',
-    'If the "Seller Financing" line shows an amount, the deal IS seller-financed even when "New Loan"',
-    'is blank. Never place the Seller Financing amount on the New Loan line, or the cash amount on the',
-    'Seller Financing line. Read the actual figures (e.g. Seller Financing $450,000, cash $115,000).',
+    'CRITICAL - Utah REPC Section 2.1 "Payment of Purchase Price": the Purchase Price is shown at the',
+    'top, then FIVE lines. On each line the dollar amount is printed in a column on the LEFT and its',
+    'label is to the RIGHT on the SAME row. Read each amount and pair it with the label on its own',
+    'row. The five lines, in this exact order, are:',
+    '  (a) Earnest Money Deposit',
+    '  (b) Additional Earnest Money Deposit',
+    '  (c) New Loan',
+    '  (d) Seller Financing (see attached Seller Financing Addendum)',
+    '  (e) Balance of Purchase Price in Cash at Settlement',
+    'then PURCHASE PRICE (the total). Transcribe all five into repc.paymentLines as {label, amount},',
+    'using 0 for a blank line. VALIDATION: (a)+(b)+(c)+(d)+(e) MUST equal the Purchase Price - if your',
+    'numbers do not add up to it, you mis-read a row; re-read the left-column amounts and fix them',
+    'before answering. Then set financing.type from the labels, never the letter position:',
+    '  - the amount on the (d) "Seller Financing" row -> financing.sellerAmount and type="seller";',
+    '  - the amount on the (c) "New Loan" row -> loanAmount and type="conventional" (or fha/va if an',
+    '    FHA/VA Loan Addendum is referenced);',
+    '  - the (e) "Balance ... Cash at Settlement" row is the buyer\'s CASH - never financing or a loan;',
+    '  - if only the earnest/cash rows have amounts, type="cash".',
+    'Never swap the (c) New Loan and (d) Seller Financing amounts. If the (d) Seller Financing row has',
+    'an amount, OR a Seller Financing Addendum is checked in Section 9, the deal IS seller-financed:',
+    'report it as seller financing in the summary and redFlags - do NOT describe it as a new loan and',
+    'do NOT report Seller Financing as $0.',
     'dealCategory classifies the transaction. Fill the "lease" object ONLY when this is a commercial',
     'lease; for a residential purchase leave every "lease" field an empty string and fill the',
     'residential fields above instead. Numbers (rentableSqft, baseRent, camAmount, leaseTermMonths)',
@@ -6790,11 +6799,19 @@ async function commitScanImport(r, btn){
   // ---- Financing type + seller-financing note terms (residential purchases only) ----
   if(!isLease){
     var _fin = r.financing || {};
-    // Prefer the deterministic classification from the transcribed 2.1 lines; fall back to the
-    // model's own type only when no lines were captured.
+    // Determine financing from several independent signals so one mis-read can't flip it:
+    //  1. a Seller Financing Addendum checked in Section 9 (the scan reads this section reliably),
+    //  2. the deterministic classification of the transcribed 2.1 payment lines,
+    //  3. the model's own financing.type.
+    // Any seller signal wins (a seller-financing addendum being attached is definitive).
     var _lines = (r.repc && r.repc.paymentLines) || _fin.paymentLines;
     var _cls = classifyFinancingFromLines(_lines);
-    var _ft = _cls ? _cls.type : normFinancingType(_fin.type);
+    var _sellerAddendum = !!(r.repc && Array.isArray(r.repc.addendaTypes) && r.repc.addendaTypes.indexOf('seller_financing') >= 0);
+    var _modelType = normFinancingType(_fin.type);
+    var _ft;
+    if(_sellerAddendum || (_cls && _cls.type === 'seller') || _modelType === 'seller') _ft = 'seller';
+    else if(_cls) _ft = _cls.type;
+    else _ft = _modelType;
     if(_ft) tx.financingType = _ft;
     if(_ft === 'seller'){
       var _sf = sfTermsFromScan(_fin) || {};
