@@ -326,6 +326,58 @@ function repcFactRows(rp){
   if(rp.mediation) rows.push(['Mediation (Sec 15)', rp.mediation==='shall'?'Shall mediate':'Optional (may)']);
   return rows;
 }
+// Full grouped reference of every tracked REPC fact (value '' when not captured yet).
+function repcReferenceGroups(rp){
+  rp = rp || {};
+  var who = function(w,o){ if(!w) return ''; var m={seller:'Seller',buyer:'Buyer',split:'Split equally',other:'Other'}; var s=m[w]||''; if(w==='other'&&o) s+=' ('+o+')'; return s; };
+  var party = function(v){ return v==='seller'?'Seller':v==='buyer'?'Buyer':''; };
+  var inc=[]; if(Array.isArray(rp.includedItems)&&rp.includedItems.length) inc.push(rp.includedItems.join(', ')); if(rp.includedItemsOther) inc.push(rp.includedItemsOther);
+  var pp = rp.personalPropertyIncluded==='are' ? (rp.personalPropertyList||'Included') : rp.personalPropertyIncluded==='are not' ? 'None included' : '';
+  var pos = rp.possessionBasis==='upon_recording' ? 'Upon recording'
+          : rp.possessionBasis==='hours_after_recording' ? ((rp.possessionValue||'?')+' hours after recording')
+          : rp.possessionBasis==='days_after_recording' ? ((rp.possessionValue||'?')+' days after recording') : '';
+  var dd  = rp.dueDiligenceApplies ? (rp.dueDiligenceApplies==='is'?'Applies':'Waived (is not)') : '';
+  var ap  = rp.appraisalApplies ? (rp.appraisalApplies==='is'?'Applies':'Waived (is not)') : '';
+  var fin = rp.financingRequired ? (rp.financingRequired==='yes'?'Required':'Not required') : '';
+  var hard = (rp.earnestHardAmount && parseFloat(String(rp.earnestHardAmount).replace(/[^0-9.]/g,''))>0) ? ('$'+rp.earnestHardAmount) : '';
+  var spc = rp.sellerPaidCostsWill ? (rp.sellerPaidCostsWill==='will' ? ('Yes'+(rp.sellerPaidCostsAmount?(' — $'+rp.sellerPaidCostsAmount):'')) : 'No') : '';
+  var addenda=''; if(rp.addendaPresent){ addenda = rp.addendaPresent==='are'?'Yes':'No';
+    if(rp.addendaPresent==='are'){ if(rp.addendaNumbers) addenda+=' (#'+rp.addendaNumbers+')';
+      if(Array.isArray(rp.addendaTypes)&&rp.addendaTypes.length){ var tm={seller_financing:'Seller Financing',fha_va:'FHA/VA',other:'Other'}; addenda+=' — '+rp.addendaTypes.map(function(t){return tm[t]||t;}).join(', '); } } }
+  var hw=''; if(rp.homeWarrantyWill==='will'){ var parts=[];
+    if(party(rp.homeWarrantyPays)) parts.push('pays: '+party(rp.homeWarrantyPays));
+    if(party(rp.homeWarrantyOrders)) parts.push('orders: '+party(rp.homeWarrantyOrders));
+    if(party(rp.homeWarrantySelects)) parts.push('selects: '+party(rp.homeWarrantySelects));
+    hw='Yes'; if(rp.homeWarrantyAmount) hw+=' (~$'+rp.homeWarrantyAmount+')'; if(parts.length) hw+=' — '+parts.join(', ');
+  } else if(rp.homeWarrantyWill==='will not') hw='No';
+  var med = rp.mediation ? (rp.mediation==='shall'?'Shall mediate':'Optional (may)') : '';
+  return [
+    {title:'Property & Inclusions', rows:[
+      ['Included items (1.2)', inc.join('; ')],
+      ['Personal property (1.2)', pp],
+      ['Excluded items (1.3)', rp.excludedItems||''],
+      ['Water rights incl. (1.4)', rp.waterRightsIncluded||''],
+      ['Water rights excl. (1.4)', rp.waterRightsExcluded||''],
+      ['Possession (3.3)', pos]
+    ]},
+    {title:'Contingencies (Sec 8)', rows:[
+      ['Due diligence (8.1)', dd],
+      ['Appraisal (8.2)', ap],
+      ['Financing (8.3)', fin],
+      ['Earnest goes hard (8.3b-i)', hard]
+    ]},
+    {title:'Costs & Fees', rows:[
+      ['Special assessments', who(rp.specialAssessmentsWho, rp.specialAssessmentsOther)],
+      ['HOA transfer fee (4.3c)', who(rp.hoaTransferFeeWho, rp.hoaTransferFeeOther)],
+      ['Seller-paid costs (8.4)', spc],
+      ['Home warranty (10.1)', hw]
+    ]},
+    {title:'Addenda & Other', rows:[
+      ['Addenda (Sec 9)', addenda],
+      ['Mediation (Sec 15)', med]
+    ]}
+  ];
+}
 
 async function saveDocument(file, meta){
   meta = meta || {};
@@ -4615,27 +4667,39 @@ function openTCDetail(id){
     body.appendChild(sfSec);
   }
 
-  // Contract Facts (REPC) - a quick-reference of key contract terms pulled from the scan so you
-  // don't have to reopen the document.
-  var _repcRows = repcFactRows(txREPC(tx));
-  if(_repcRows.length){
+  // Contract Facts (REPC) - a complete quick-reference of the terms the scan captures, grouped so
+  // you can look up any of them without reopening the document. Shown for every residential
+  // purchase; items not captured yet read "-" so you can see what's missing at a glance.
+  if(tx.category !== 'commercial_lease' && (tx.type === 'buyer' || tx.type === 'seller')){
+    var rpGroups = repcReferenceGroups(txREPC(tx));
+    var rpCaptured = 0, rpTotal = 0;
+    rpGroups.forEach(function(g){ g.rows.forEach(function(r){ rpTotal++; if(r[1] !== '') rpCaptured++; }); });
+    var rpStartOpen = rpCaptured > 0;
     var rpSec = document.createElement('div');
     rpSec.style.cssText = 'padding:12px 20px;border-bottom:1px solid var(--border);';
     var rpHdr = document.createElement('div');
-    rpHdr.style.cssText = 'font-size:14px;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px;';
-    rpHdr.textContent = 'Contract Facts (REPC)';
+    rpHdr.style.cssText = 'font-size:14px;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px;cursor:pointer;display:flex;align-items:center;gap:8px;';
+    var rpCaret = document.createElement('span'); rpCaret.style.cssText = 'font-size:12px;'; rpCaret.textContent = rpStartOpen ? '▾' : '▸';
+    var rpTitle = document.createElement('span'); rpTitle.textContent = 'Contract Facts (REPC)';
+    var rpCount = document.createElement('span'); rpCount.style.cssText = 'color:var(--text3);font-weight:400;text-transform:none;letter-spacing:0;'; rpCount.textContent = '· ' + rpCaptured + '/' + rpTotal + ' captured';
+    rpHdr.appendChild(rpCaret); rpHdr.appendChild(rpTitle); rpHdr.appendChild(rpCount);
     rpSec.appendChild(rpHdr);
-    var rpGrid = document.createElement('div');
-    rpGrid.style.cssText = 'display:flex;flex-wrap:wrap;gap:10px;';
-    _repcRows.forEach(function(r){
-      var d = document.createElement('div');
-      d.style.cssText = 'font-size:18px;min-width:180px;max-width:100%;';
-      var lbl = document.createElement('span'); lbl.style.color = 'var(--text3)'; lbl.textContent = r[0] + ': ';
-      var val = document.createElement('b'); val.style.color = 'var(--text)'; val.textContent = r[1];
-      d.appendChild(lbl); d.appendChild(val);
-      rpGrid.appendChild(d);
+    var rpBody = document.createElement('div'); rpBody.style.display = rpStartOpen ? '' : 'none';
+    rpGroups.forEach(function(g){
+      var gh = document.createElement('div'); gh.style.cssText = 'font-size:13px;color:var(--accent);font-weight:700;margin:8px 0 4px;'; gh.textContent = g.title; rpBody.appendChild(gh);
+      var grid = document.createElement('div'); grid.style.cssText = 'display:flex;flex-wrap:wrap;gap:10px;';
+      g.rows.forEach(function(r){
+        var d = document.createElement('div'); d.style.cssText = 'font-size:18px;min-width:180px;max-width:100%;';
+        var lbl = document.createElement('span'); lbl.style.color = 'var(--text3)'; lbl.textContent = r[0] + ': ';
+        var val = document.createElement('b');
+        if(r[1] === ''){ val.style.color = 'var(--text3)'; val.style.fontWeight = '400'; val.textContent = '—'; }
+        else { val.style.color = 'var(--text)'; val.textContent = r[1]; }
+        d.appendChild(lbl); d.appendChild(val); grid.appendChild(d);
+      });
+      rpBody.appendChild(grid);
     });
-    rpSec.appendChild(rpGrid);
+    rpSec.appendChild(rpBody);
+    rpHdr.addEventListener('click', function(){ var open = rpBody.style.display !== 'none'; rpBody.style.display = open ? 'none' : ''; rpCaret.textContent = open ? '▸' : '▾'; });
     body.appendChild(rpSec);
   }
 
