@@ -11231,8 +11231,7 @@ function invYtd(){
   return inc-exp;
 }
 var _invLedgerFilter='';   // property_id filter for the ledger table ('' = all)
-var _invDetailMonths=[], _invDetailPid=null;   // month filter inside a property detail view ([] = all months)
-function _invMonLabel(mk){ var p=String(mk).split('-'); if(p.length<2) return mk; return new Date(+p[0],+p[1]-1,1).toLocaleDateString('en-US',{month:'short'})+" '"+String(p[0]).slice(2); }
+var _invDetailFrom='', _invDetailTo='', _invDetailPid=null;   // date-range filter inside a property detail view ('' = open end)
 // Dark "money page" palette (this page is intentionally dark to stand apart from the rest of the CRM).
 var IVC={ bg:'#0e1118', card:'#161b24', tile:'#1b2230', bord:'#29313f', txt:'#e7eaf0', mut:'#98a2b3',
   grn:'#46c05f', red:'#f0776c', warn:'#e3a93c', warnbg:'rgba(227,169,60,0.12)', grnbg:'rgba(70,192,95,0.13)', redbg:'rgba(240,119,108,0.12)', accent:'#3a4a63' };
@@ -11405,7 +11404,7 @@ function openInvPropertyDetail(pid){
   _ivStyle();
   var root=ge('invRoot'); if(!root) return; root.innerHTML='';
   var p=invProp(pid); if(!p){ renderInvestments(); return; }
-  if(_invDetailPid!==String(pid)){ _invDetailMonths=[]; _invDetailPid=String(pid); }   // reset month picker when switching property
+  if(_invDetailPid!==String(pid)){ _invDetailFrom=''; _invDetailTo=''; _invDetailPid=String(pid); }   // reset range when switching property
   function ivb(label,cls,fn){ var b=document.createElement('button'); b.className='ivbtn'+(cls?(' '+cls):''); b.textContent=label; b.addEventListener('click',fn); return b; }
 
   // Back + title row
@@ -11447,20 +11446,22 @@ function openInvPropertyDetail(pid){
     });
   }
 
-  // Month picker: choose one / several / all months present for this property.
+  // Date-range picker (blank ends = open). Quick presets + From/To.
   var mine=ILED.filter(function(l){ return String(l.property_id)===String(p.id); });
-  var allMonths=[]; mine.forEach(function(l){ var mk=String(l.date||'').slice(0,7); if(mk && allMonths.indexOf(mk)<0) allMonths.push(mk); });
-  allMonths.sort().reverse();
-  if(allMonths.length){
-    var mc=document.createElement('div'); mc.style.cssText='display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:16px 0 4px;';
-    mc.appendChild(mkDivSafe('font-size:13px;color:'+IVC.mut+';margin-right:2px;','Months'));
-    function chip(label,active,fn){ var b=document.createElement('button'); b.className='ivbtn sm'; b.textContent=label; if(active){ b.style.background=IVC.accent; b.style.borderColor=IVC.accent; } b.addEventListener('click',fn); return b; }
-    mc.appendChild(chip('All', _invDetailMonths.length===0, function(){ _invDetailMonths=[]; openInvPropertyDetail(pid); }));
-    allMonths.forEach(function(mk){ var on=_invDetailMonths.indexOf(mk)>=0; mc.appendChild(chip(_invMonLabel(mk), on, function(){ var i=_invDetailMonths.indexOf(mk); if(i>=0) _invDetailMonths.splice(i,1); else _invDetailMonths.push(mk); openInvPropertyDetail(pid); })); });
-    root.appendChild(mc);
-  }
-  var fmine = _invDetailMonths.length ? mine.filter(function(l){ return _invDetailMonths.indexOf(String(l.date||'').slice(0,7))>=0; }) : mine;
-  var selLabel = _invDetailMonths.length ? (_invDetailMonths.slice().sort().map(_invMonLabel).join(', ')) : 'all time';
+  var rp=document.createElement('div'); rp.style.cssText='display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:16px 0 6px;';
+  rp.appendChild(mkDivSafe('font-size:13px;color:'+IVC.mut+';','From'));
+  var fromI=document.createElement('input'); fromI.type='date'; fromI.value=_invDetailFrom||''; rp.appendChild(fromI);
+  rp.appendChild(mkDivSafe('font-size:13px;color:'+IVC.mut+';','to'));
+  var toI=document.createElement('input'); toI.type='date'; toI.value=_invDetailTo||''; rp.appendChild(toI);
+  fromI.addEventListener('change',function(){ _invDetailFrom=fromI.value; openInvPropertyDetail(pid); });
+  toI.addEventListener('change',function(){ _invDetailTo=toI.value; openInvPropertyDetail(pid); });
+  var yr=new Date().getFullYear();
+  rp.appendChild(ivb('This month','sm',function(){ var m=new Date(); _invDetailFrom=m.getFullYear()+'-'+String(m.getMonth()+1).padStart(2,'0')+'-01'; _invDetailTo=''; openInvPropertyDetail(pid); }));
+  rp.appendChild(ivb('YTD','sm',function(){ _invDetailFrom=yr+'-01-01'; _invDetailTo=''; openInvPropertyDetail(pid); }));
+  rp.appendChild(ivb('Clear','sm',function(){ _invDetailFrom=''; _invDetailTo=''; openInvPropertyDetail(pid); }));
+  root.appendChild(rp);
+  var fmine = mine.filter(function(l){ var dt=String(l.date||'').slice(0,10); if(_invDetailFrom && dt<_invDetailFrom) return false; if(_invDetailTo && dt>_invDetailTo) return false; return true; });
+  var selLabel = (_invDetailFrom||_invDetailTo) ? ((_invDetailFrom?fd(_invDetailFrom):'start')+' – '+(_invDetailTo?fd(_invDetailTo):'now')) : 'all time';
 
   // Category totals (for the selected months)
   var byCat={}, inc=0, exp=0;
