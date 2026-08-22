@@ -11047,14 +11047,16 @@ function invActual(ym){
   return { income:income, expenses:expenses };
 }
 // Late / missing detection for a month: expected charges with no matching ledger entry.
+// Expected monthly rent for a property = sum of its occupied units' rent.
+function propExpectedRent(pid){ return unitsForProp(pid).reduce(function(s,u){ return s + ((u.status||'occupied')==='vacant'?0:invNum(u.rent_amount)); }, 0); }
 function invFlags(ym){
   var flags=[];
   function paid(pred){ return ILED.some(function(l){ return ledInMonth(l,ym) && pred(l); }); }
-  IUNIT.forEach(function(u){
-    if(invNum(u.rent_amount)<=0) return;
-    if((u.status||'occupied')==='vacant') return;
-    var got = paid(function(l){ return l.category==='Rent' && String(l.unit_id)===String(u.id); });
-    if(!got){ var p=invProp(u.property_id); flags.push({level:'red', text:'Rent not received — '+(p?p.name||p.address:'?')+(u.label?(' · '+u.label):'')+' ('+invMoney(u.rent_amount)+')'}); }
+  // Rent is checked per PROPERTY (rent may be logged at the property level, not per unit).
+  IPROP.forEach(function(p){
+    if(propExpectedRent(p.id) <= 0) return;
+    var got = paid(function(l){ return l.category==='Rent' && String(l.property_id)===String(p.id); });
+    if(!got) flags.push({level:'red', text:'Rent not received — '+(p.name||p.address)+' ('+invMoney(propExpectedRent(p.id))+')'});
   });
   IPROP.forEach(function(p){
     if(invNum(p.mortgage_payment)<=0) return;
@@ -11201,132 +11203,177 @@ function openInvLedgerForm(entry, preset){
   });
 }
 
+// Per-property income/expense/net for a month.
+function propMonthIO(pid, ym){
+  var inc=0, exp=0;
+  ILED.forEach(function(l){ if(String(l.property_id)!==String(pid) || !ledInMonth(l,ym)) return; if((l.direction||invDirFor(l.category))==='income') inc+=invNum(l.amount); else exp+=invNum(l.amount); });
+  return { inc:inc, exp:exp, net:inc-exp };
+}
+function invYtd(){
+  var yr=String(new Date().getFullYear()), inc=0, exp=0;
+  ILED.forEach(function(l){ if((l.date||'').slice(0,4)!==yr) return; if((l.direction||invDirFor(l.category))==='income') inc+=invNum(l.amount); else exp+=invNum(l.amount); });
+  return inc-exp;
+}
+var _invLedgerFilter='';   // property_id filter for the ledger table ('' = all)
+// Dark "money page" palette (this page is intentionally dark to stand apart from the rest of the CRM).
+var IVC={ bg:'#0e1118', card:'#161b24', tile:'#1b2230', bord:'#29313f', txt:'#e7eaf0', mut:'#98a2b3',
+  grn:'#46c05f', red:'#f0776c', warn:'#e3a93c', warnbg:'rgba(227,169,60,0.12)', grnbg:'rgba(70,192,95,0.13)', redbg:'rgba(240,119,108,0.12)', accent:'#3a4a63' };
+function _ivStyle(){
+  if(ge('invDarkCss')) return;
+  var s=document.createElement('style'); s.id='invDarkCss';
+  s.textContent='#page-investments{background:'+IVC.bg+';}'
+    + '#invRoot{background:'+IVC.bg+';color:'+IVC.txt+';padding:16px;border-radius:12px;min-height:70vh;}'
+    + '#invRoot .ivbtn{background:transparent;border:1px solid '+IVC.bord+';color:'+IVC.txt+';border-radius:7px;padding:6px 12px;font-size:14px;font-family:inherit;cursor:pointer;white-space:nowrap;}'
+    + '#invRoot .ivbtn:hover{background:'+IVC.tile+';}'
+    + '#invRoot .ivbtn.pri{background:'+IVC.accent+';border-color:'+IVC.accent+';}'
+    + '#invRoot .ivbtn.sm{padding:3px 9px;font-size:12px;}'
+    + '#invRoot .ivbtn.danger:hover{border-color:'+IVC.red+';color:'+IVC.red+';}'
+    + '#invRoot input,#invRoot select{background:'+IVC.tile+';border:1px solid '+IVC.bord+';color:'+IVC.txt+';border-radius:7px;padding:5px 8px;font-family:inherit;font-size:14px;}'
+    + '#invRoot table{width:100%;border-collapse:collapse;font-size:14px;}'
+    + '#invRoot th{color:'+IVC.mut+';font-weight:500;text-align:left;padding:7px 8px;font-size:13px;}'
+    + '#invRoot td{padding:7px 8px;border-top:1px solid '+IVC.bord+';}'
+    + '#invRoot tbody tr:nth-child(even){background:'+IVC.tile+';}'
+    + '#invRoot tbody tr:hover{background:#212a38;}';
+  document.head.appendChild(s);
+}
 function renderInvestments(){
+  _ivStyle();
   var root=ge('invRoot'); if(!root) return; root.innerHTML='';
   var ym=invCurMonth();
-  // Toolbar
-  var bar=document.createElement('div'); bar.style.cssText='display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px;';
-  var mnav=document.createElement('div'); mnav.style.cssText='display:flex;align-items:center;gap:6px;margin-right:auto;';
-  var prev=document.createElement('button'); prev.className='btn btn-g'; prev.textContent='‹'; prev.addEventListener('click',function(){invShiftMonth(-1);});
-  var mlab=document.createElement('div'); mlab.style.cssText='font-weight:700;min-width:150px;text-align:center;'; mlab.textContent=invMonthLabel(ym);
-  var next=document.createElement('button'); next.className='btn btn-g'; next.textContent='›'; next.addEventListener('click',function(){invShiftMonth(1);});
+
+  // ---- Toolbar: month nav + primary actions ----
+  var bar=document.createElement('div'); bar.style.cssText='display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-bottom:14px;';
+  var mnav=document.createElement('div'); mnav.style.cssText='display:flex;align-items:center;gap:8px;';
+  var prev=document.createElement('button'); prev.className='ivbtn'; prev.innerHTML='‹'; prev.style.cssText='padding:5px 11px;'; prev.addEventListener('click',function(){invShiftMonth(-1);});
+  var mlab=document.createElement('div'); mlab.style.cssText='font-weight:500;font-size:17px;min-width:150px;text-align:center;'; mlab.textContent=invMonthLabel(ym);
+  var next=document.createElement('button'); next.className='ivbtn'; next.innerHTML='›'; next.style.cssText='padding:5px 11px;'; next.addEventListener('click',function(){invShiftMonth(1);});
   mnav.appendChild(prev); mnav.appendChild(mlab); mnav.appendChild(next);
-  bar.appendChild(mnav);
-  function tbtn(label,cls,fn){ var b=document.createElement('button'); b.className='btn '+(cls||'btn-g'); b.textContent=label; b.style.whiteSpace='nowrap'; b.addEventListener('click',fn); return b; }
-  bar.appendChild(tbtn('+ Log entry','btn-p',function(){ openInvLedgerForm(); }));
-  // "Scan since" bookmark: defaults to the last scan date (or Jan 1 for the first, deep pull).
-  var _sinceWrap=document.createElement('label'); _sinceWrap.style.cssText='display:flex;align-items:center;gap:5px;font-size:13px;color:var(--text3);white-space:nowrap;';
-  _sinceWrap.appendChild(document.createTextNode('Scan since'));
-  var _sinceInput=document.createElement('input'); _sinceInput.type='date'; _sinceInput.className='fi'; _sinceInput.style.cssText='width:150px;padding:4px 8px;';
-  try{ _sinceInput.value = localStorage.getItem('invLastScan') || (new Date().getFullYear()+'-01-01'); }catch(e){ _sinceInput.value = new Date().getFullYear()+'-01-01'; }
-  _sinceWrap.appendChild(_sinceInput); bar.appendChild(_sinceWrap);
-  bar.appendChild(tbtn('Scan finance emails','btn-g',function(){ scanFinanceEmails(_sinceInput.value); }));
-  bar.appendChild(tbtn('Import CSV','btn-g',function(){ invImportCsv(); }));
-  bar.appendChild(tbtn('+ Property','btn-g',function(){ openInvPropertyForm(); }));
-  bar.appendChild(tbtn('+ HOA','btn-g',function(){ openInvHoaForm(); }));
+  var acts=document.createElement('div'); acts.style.cssText='display:flex;gap:8px;flex-wrap:wrap;';
+  function ivb(label,cls,fn){ var b=document.createElement('button'); b.className='ivbtn'+(cls?(' '+cls):''); b.textContent=label; b.addEventListener('click',fn); return b; }
+  acts.appendChild(ivb('+ Log entry','pri',function(){ openInvLedgerForm(); }));
+  var sinceVal; try{ sinceVal = localStorage.getItem('invLastScan') || (new Date().getFullYear()+'-01-01'); }catch(e){ sinceVal = new Date().getFullYear()+'-01-01'; }
+  acts.appendChild(ivb('Scan email','',function(){ scanFinanceEmails(sinceVal); }));
+  bar.appendChild(mnav); bar.appendChild(acts);
   root.appendChild(bar);
 
-  // Empty state
   if(!IPROP.length){
-    var empty=document.createElement('div'); empty.style.cssText='padding:40px;text-align:center;color:var(--text3);';
-    empty.innerHTML='No properties yet. Click <b>+ Property</b> to add your first one, add its units, then log entries or scan your finance emails.';
+    var empty=document.createElement('div'); empty.style.cssText='padding:44px;text-align:center;color:'+IVC.mut+';';
+    empty.innerHTML='No properties yet. Add your first one to get started.';
+    var addP=ivb('+ Property','pri',function(){ openInvPropertyForm(); }); addP.style.marginTop='14px';
+    empty.appendChild(document.createElement('br')); empty.appendChild(addP);
     root.appendChild(empty); updateInvBadge(); return;
   }
 
-  // Summary cards
-  var exp=invExpected(ym), act=invActual(ym);
-  var net=act.income-act.expenses;
-  var grid=document.createElement('div'); grid.style.cssText='display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px;';
-  function card(lbl,val,color,sub){ var d=document.createElement('div'); d.style.cssText='background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;';
-    d.innerHTML='<div style="font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;">'+lbl+'</div><div style="font-size:20px;font-weight:700;margin-top:4px;color:'+(color||'var(--text)')+';">'+val+'</div>'+(sub?('<div style="font-size:12px;color:var(--text3);margin-top:2px;">'+sub+'</div>'):''); return d; }
-  grid.appendChild(card('Income (actual)', invMoney(act.income), 'var(--lead)', 'expected '+invMoney(exp.income)));
-  grid.appendChild(card('Expenses (actual)', invMoney(act.expenses), 'var(--danger)', 'expected '+invMoney(exp.expenses)));
-  grid.appendChild(card('Net this month', invMoney(net), net>=0?'var(--lead)':'var(--danger)'));
-  grid.appendChild(card('Properties / units', IPROP.length+' / '+IUNIT.length, 'var(--text)'));
+  // ---- Summary tiles ----
+  var act=invActual(ym); var net=act.income-act.expenses; var ytd=invYtd();
+  var grid=document.createElement('div'); grid.style.cssText='display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:16px;';
+  function tile(lbl,val,color){ var d=document.createElement('div'); d.style.cssText='background:'+IVC.tile+';border-radius:10px;padding:14px 16px;';
+    d.innerHTML='<div style="font-size:13px;color:'+IVC.mut+';">'+lbl+'</div><div style="font-size:24px;font-weight:500;margin-top:3px;color:'+(color||IVC.txt)+';">'+val+'</div>'; return d; }
+  grid.appendChild(tile('Income', invMoney(act.income), IVC.grn));
+  grid.appendChild(tile('Expenses', invMoney(act.expenses), IVC.red));
+  grid.appendChild(tile('Net this month', invMoney(net), net>=0?IVC.txt:IVC.red));
+  grid.appendChild(tile('Net year to date', invMoney(ytd), ytd>=0?IVC.txt:IVC.red));
   root.appendChild(grid);
 
-  // Flags
+  // ---- Attention banner ----
   var flags=invFlags(ym);
   if(flags.length){
-    var fbox=document.createElement('div'); fbox.style.cssText='background:rgba(201,76,76,0.08);border:1px solid rgba(201,76,76,0.3);border-radius:10px;padding:10px 14px;margin-bottom:14px;';
-    fbox.appendChild(mkDivSafe('font-weight:700;margin-bottom:6px;color:var(--danger);', 'Needs attention this month ('+flags.length+')'));
-    flags.forEach(function(fl){ var r=document.createElement('div'); r.style.cssText='font-size:14px;padding:2px 0;color:var(--text2);'; r.textContent=(fl.level==='red'?'● ':'○ ')+fl.text; fbox.appendChild(r); });
-    root.appendChild(fbox);
+    var fb=document.createElement('div'); fb.style.cssText='display:flex;gap:10px;align-items:flex-start;background:'+IVC.warnbg+';border:1px solid rgba(227,169,60,0.35);border-radius:10px;padding:10px 14px;margin-bottom:16px;';
+    fb.innerHTML='<span style="color:'+IVC.warn+';font-size:18px;line-height:1;">&#9650;</span>';
+    var ftxt=document.createElement('div'); ftxt.style.cssText='font-size:14px;color:'+IVC.warn+';';
+    ftxt.innerHTML='<b>'+flags.length+(flags.length===1?' item needs':' items need')+' attention</b><br>'+flags.map(function(f){return _esc(f.text);}).join('<br>');
+    fb.appendChild(ftxt); root.appendChild(fb);
   }
 
-  // Property cards
+  // ---- Property cards ----
+  root.appendChild(mkDivSafe('font-size:13px;color:'+IVC.mut+';margin:2px 0 8px;','Properties'));
+  var pgrid=document.createElement('div'); pgrid.style.cssText='display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;margin-bottom:20px;';
   IPROP.forEach(function(p){
-    var pc=document.createElement('div'); pc.style.cssText='background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:12px;';
-    var hd=document.createElement('div'); hd.style.cssText='display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;';
-    var nm=document.createElement('div'); nm.innerHTML='<div style="font-weight:700;font-size:16px;">'+_esc(p.name||p.address||'Property')+'</div>'+(p.address&&p.name?('<div style="font-size:13px;color:var(--text3);">'+_esc(p.address)+'</div>'):'');
-    hd.appendChild(nm);
-    var pn2=propNet(p.id, ym);
-    var meta=document.createElement('div'); meta.style.cssText='text-align:right;'; meta.innerHTML='<div style="font-weight:700;color:'+(pn2>=0?'var(--lead)':'var(--danger)')+';">'+invMoney(pn2)+'</div><div style="font-size:12px;color:var(--text3);">net this month</div>';
-    hd.appendChild(meta); pc.appendChild(hd);
-    // mortgage + hoa line
-    var sub=[]; if(invNum(p.mortgage_payment)>0) sub.push('Mortgage '+invMoney(p.mortgage_payment)+(p.mortgage_lender?(' · '+_esc(p.mortgage_lender)):''));
-    var hoa=p.hoa_id?invHoa(p.hoa_id):null; if(hoa) sub.push('HOA '+_esc(hoa.name||'')+' '+invMoney(hoa.dues_amount)+'/'+(hoa.dues_frequency||'mo'));
-    if(sub.length){ var sl=document.createElement('div'); sl.style.cssText='font-size:13px;color:var(--text3);margin-top:6px;'; sl.innerHTML=sub.join('  ·  '); pc.appendChild(sl); }
-    // units
-    var uwrap=document.createElement('div'); uwrap.style.cssText='margin-top:8px;display:flex;flex-direction:column;gap:4px;';
-    unitsForProp(p.id).forEach(function(u){
-      var ur=document.createElement('div'); ur.style.cssText='display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:14px;border-top:1px solid var(--border);padding:6px 0;';
-      var left=document.createElement('div'); left.innerHTML='<b>'+_esc(u.label)+'</b> — '+invMoney(u.rent_amount)+'/mo '+(u.status==='vacant'?'<span style="color:var(--danger);">(vacant)</span>':('· '+_esc(u.tenant_name||'occupied')));
-      var uacts=document.createElement('div'); uacts.style.cssText='display:flex;gap:6px;flex-shrink:0;';
-      var logRent=document.createElement('button'); logRent.className='btn btn-g'; logRent.textContent='Log rent'; logRent.style.cssText='padding:3px 8px;font-size:13px;'; (function(u2,p2){ logRent.addEventListener('click',function(){ openInvLedgerForm(null,{property_id:String(p2.id),unit_id:String(u2.id),category:'Rent',amount:u2.rent_amount}); }); })(u,p);
-      var uEdit=document.createElement('button'); uEdit.className='btn btn-g'; uEdit.textContent='Edit'; uEdit.style.cssText='padding:3px 8px;font-size:13px;'; (function(u2){ uEdit.addEventListener('click',function(){ openInvUnitForm(u2.property_id,u2); }); })(u);
-      var uDel=document.createElement('button'); uDel.className='btn btn-g'; uDel.textContent='Del'; uDel.style.cssText='padding:3px 8px;font-size:13px;color:var(--danger);'; (function(u2){ uDel.addEventListener('click',function(){ if(confirm('Delete unit "'+u2.label+'"?')){ delInvUnit(u2.id); renderInvestments(); } }); })(u);
-      uacts.appendChild(logRent); uacts.appendChild(uEdit); uacts.appendChild(uDel);
-      ur.appendChild(left); ur.appendChild(uacts); uwrap.appendChild(ur);
-    });
-    pc.appendChild(uwrap);
-    // property actions
-    var pacts=document.createElement('div'); pacts.style.cssText='display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;';
-    var aUnit=document.createElement('button'); aUnit.className='btn btn-g'; aUnit.textContent='+ Unit'; (function(p2){ aUnit.addEventListener('click',function(){ openInvUnitForm(p2.id); }); })(p);
-    var aLog=document.createElement('button'); aLog.className='btn btn-g'; aLog.textContent='Log expense'; (function(p2){ aLog.addEventListener('click',function(){ openInvLedgerForm(null,{property_id:String(p2.id),category:'Repairs'}); }); })(p);
-    var aEdit=document.createElement('button'); aEdit.className='btn btn-g'; aEdit.textContent='Edit'; (function(p2){ aEdit.addEventListener('click',function(){ openInvPropertyForm(p2); }); })(p);
-    var aDel=document.createElement('button'); aDel.className='btn btn-g'; aDel.style.color='var(--danger)'; aDel.textContent='Delete'; (function(p2){ aDel.addEventListener('click',function(){ if(confirm('Delete "'+(p2.name||p2.address)+'" and all its units + ledger entries?')){ delInvProp(p2.id); renderInvestments(); } }); })(p);
-    pacts.appendChild(aUnit); pacts.appendChild(aLog); pacts.appendChild(aEdit); pacts.appendChild(aDel);
-    pc.appendChild(pacts);
-    root.appendChild(pc);
+    var io=propMonthIO(p.id, ym);
+    var pc=document.createElement('div'); pc.style.cssText='background:'+IVC.card+';border:1px solid '+IVC.bord+';border-radius:12px;padding:14px 16px;';
+    // header + status pill
+    var hd=document.createElement('div'); hd.style.cssText='display:flex;justify-content:space-between;align-items:flex-start;gap:8px;';
+    hd.innerHTML='<div><div style="font-weight:500;font-size:16px;">'+_esc(p.name||p.address||'Property')+'</div>'+(p.address?('<div style="font-size:13px;color:'+IVC.mut+';">'+_esc(p.address)+'</div>'):'')+'</div>';
+    var units=unitsForProp(p.id);
+    var anyVacant=units.some(function(u){return (u.status||'occupied')==='vacant';});
+    var rentDue=propExpectedRent(p.id)>0 && !ILED.some(function(l){ return ledInMonth(l,ym) && l.category==='Rent' && String(l.property_id)===String(p.id); });
+    var st = rentDue ? {t:'Rent due',c:IVC.warn,b:IVC.warnbg} : anyVacant ? {t:'Vacant',c:IVC.red,b:IVC.redbg} : {t:'Occupied',c:IVC.grn,b:IVC.grnbg};
+    var pill=document.createElement('span'); pill.style.cssText='font-size:12px;color:'+st.c+';background:'+st.b+';padding:2px 9px;border-radius:7px;white-space:nowrap;flex-shrink:0;'; pill.textContent=st.t;
+    hd.appendChild(pill); pc.appendChild(hd);
+    // In / Out / Net
+    var ion=document.createElement('div'); ion.style.cssText='display:flex;gap:18px;margin:12px 0 10px;';
+    function stat(lbl,val,color){ return '<div><div style="font-size:12px;color:'+IVC.mut+';">'+lbl+'</div><div style="font-weight:500;color:'+color+';">'+val+'</div></div>'; }
+    ion.innerHTML=stat('In',invMoney(io.inc),IVC.grn)+stat('Out',invMoney(io.exp),IVC.red)+stat('Net',invMoney(io.net),IVC.txt);
+    pc.appendChild(ion);
+    // footer meta
+    var meta=[]; if(propExpectedRent(p.id)>0) meta.push('Rent '+invMoney(propExpectedRent(p.id)));
+    var hoa=p.hoa_id?invHoa(p.hoa_id):null; if(hoa) meta.push('HOA '+_esc(hoa.name||'')+' '+invMoney(hoa.dues_amount));
+    if(invNum(p.mortgage_payment)>0) meta.push('Mortgage '+invMoney(p.mortgage_payment));
+    var occTenant=units.filter(function(u){return u.tenant_name;}).map(function(u){return _esc(u.tenant_name);});
+    if(occTenant.length) meta.push('Tenant '+occTenant.join(', '));
+    var mf=document.createElement('div'); mf.style.cssText='font-size:13px;color:'+IVC.mut+';border-top:1px solid '+IVC.bord+';padding-top:8px;'; mf.innerHTML=meta.join(' &middot; ')||'No rent/HOA set';
+    pc.appendChild(mf);
+    // per-unit lines (only when >1 unit) - click to edit
+    if(units.length>1){
+      units.forEach(function(u){
+        var ul=document.createElement('div'); ul.style.cssText='font-size:13px;color:'+IVC.mut+';margin-top:4px;cursor:pointer;';
+        ul.innerHTML='&bull; '+_esc(u.label)+' — '+invMoney(u.rent_amount)+(u.status==='vacant'?' <span style="color:'+IVC.red+';">(vacant)</span>':(u.tenant_name?(' · '+_esc(u.tenant_name)):''));
+        (function(u2){ ul.addEventListener('click',function(){ openInvUnitForm(u2.property_id,u2); }); })(u);
+        pc.appendChild(ul);
+      });
+    }
+    // actions
+    var pa=document.createElement('div'); pa.style.cssText='display:flex;gap:6px;flex-wrap:wrap;margin-top:12px;';
+    pa.appendChild(ivb('Log','sm',(function(p2){return function(){ openInvLedgerForm(null,{property_id:String(p2.id)}); };})(p)));
+    pa.appendChild(ivb('+ Unit','sm',(function(p2){return function(){ openInvUnitForm(p2.id); };})(p)));
+    pa.appendChild(ivb('Edit','sm',(function(p2){return function(){ openInvPropertyForm(p2); };})(p)));
+    var pdel=ivb('Delete','sm danger',(function(p2){return function(){ if(confirm('Delete "'+(p2.name||p2.address)+'" and all its units + ledger entries?')){ delInvProp(p2.id); renderInvestments(); } };})(p));
+    pa.appendChild(pdel);
+    pc.appendChild(pa);
+    pgrid.appendChild(pc);
   });
+  root.appendChild(pgrid);
 
-  // HOA accounts (compact list, editable)
-  if(IHOA.length){
-    var hsec=document.createElement('div'); hsec.style.cssText='margin-top:6px;margin-bottom:12px;';
-    hsec.appendChild(mkDivSafe('font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;','HOA accounts'));
-    IHOA.forEach(function(h){
-      var hr=document.createElement('div'); hr.style.cssText='display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;margin-bottom:6px;';
-      hr.appendChild(mkDivSafe('','')); hr.firstChild.innerHTML='<b>'+_esc(h.name||'HOA')+'</b> — '+invMoney(h.dues_amount)+' '+(h.dues_frequency||'monthly')+(h.account_number?(' · #'+_esc(h.account_number)):'');
-      var ha=document.createElement('div'); ha.style.cssText='display:flex;gap:6px;';
-      var hLog=document.createElement('button'); hLog.className='btn btn-g'; hLog.textContent='Log dues'; hLog.style.cssText='padding:3px 8px;font-size:13px;';
-      (function(h2){ hLog.addEventListener('click',function(){ var props=IPROP.filter(function(p){return String(p.hoa_id)===String(h2.id);}); openInvLedgerForm(null,{property_id:props[0]?String(props[0].id):'',category:'HOA',amount:h2.dues_amount}); }); })(h);
-      var hEdit=document.createElement('button'); hEdit.className='btn btn-g'; hEdit.textContent='Edit'; hEdit.style.cssText='padding:3px 8px;font-size:13px;'; (function(h2){ hEdit.addEventListener('click',function(){ openInvHoaForm(h2); }); })(h);
-      var hDel=document.createElement('button'); hDel.className='btn btn-g'; hDel.textContent='Del'; hDel.style.cssText='padding:3px 8px;font-size:13px;color:var(--danger);'; (function(h2){ hDel.addEventListener('click',function(){ if(confirm('Delete HOA "'+(h2.name||'')+'"?')){ delInvHoa(h2.id); renderInvestments(); } }); })(h);
-      ha.appendChild(hLog); ha.appendChild(hEdit); ha.appendChild(hDel);
-      hr.appendChild(ha); hsec.appendChild(hr);
-    });
-    root.appendChild(hsec);
-  }
+  // ---- Ledger table ----
+  var lhd=document.createElement('div'); lhd.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 8px;';
+  lhd.appendChild(mkDivSafe('font-size:13px;color:'+IVC.mut+';','Ledger — '+invMonthLabel(ym)));
+  var fsel=document.createElement('select'); fsel.style.cssText='width:auto;';
+  var oAll=document.createElement('option'); oAll.value=''; oAll.textContent='All properties'; fsel.appendChild(oAll);
+  IPROP.forEach(function(p){ var o=document.createElement('option'); o.value=String(p.id); o.textContent=(p.name||p.address); if(String(p.id)===String(_invLedgerFilter)) o.selected=true; fsel.appendChild(o); });
+  fsel.addEventListener('change',function(){ _invLedgerFilter=fsel.value; renderInvestments(); });
+  lhd.appendChild(fsel); root.appendChild(lhd);
 
-  // Ledger for the month
-  var lsec=document.createElement('div');
-  lsec.appendChild(mkDivSafe('font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin:6px 0;','Ledger — '+invMonthLabel(ym)));
-  var rows=ILED.filter(function(l){ return ledInMonth(l,ym); }).sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
-  if(!rows.length){ lsec.appendChild(mkDivSafe('color:var(--text3);font-size:14px;padding:6px 0;','No entries logged this month yet.')); }
+  var rows=ILED.filter(function(l){ return ledInMonth(l,ym) && (!_invLedgerFilter || String(l.property_id)===String(_invLedgerFilter)); })
+                .sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
+  var tbl=document.createElement('table');
+  tbl.innerHTML='<thead><tr><th style="width:62px;">Date</th><th>Property</th><th>Category</th><th style="text-align:right;width:96px;">Amount</th><th style="width:26px;"></th></tr></thead>';
+  var tb=document.createElement('tbody');
+  if(!rows.length){ var tr0=document.createElement('tr'); tr0.innerHTML='<td colspan="5" style="color:'+IVC.mut+';">No entries this month.</td>'; tb.appendChild(tr0); }
   rows.forEach(function(l){
-    var r=document.createElement('div'); r.style.cssText='display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:14px;border-top:1px solid var(--border);padding:6px 0;';
-    var pnm=l.property_id?(invProp(l.property_id)||{}).name||'':''; var unm=l.unit_id?(invUnit(l.unit_id)||{}).label||'':'';
-    var dir=(l.direction||invDirFor(l.category));
-    var left=document.createElement('div'); left.innerHTML='<b>'+_esc(fd(l.date))+'</b> · '+_esc(l.category)+(pnm?(' · '+_esc(pnm)):'')+(unm?(' / '+_esc(unm)):'')+(l.payee?(' · '+_esc(l.payee)):'')+(l.source==='email'?' <span style="font-size:11px;color:var(--text3);">(email)</span>':'');
-    var right=document.createElement('div'); right.style.cssText='display:flex;align-items:center;gap:8px;flex-shrink:0;';
-    var amt=document.createElement('div'); amt.style.cssText='font-weight:700;color:'+(dir==='income'?'var(--lead)':'var(--danger)')+';'; amt.textContent=(dir==='income'?'+':'-')+invMoney(l.amount).replace('-','');
-    var ed=document.createElement('button'); ed.className='btn btn-g'; ed.textContent='Edit'; ed.style.cssText='padding:2px 7px;font-size:12px;'; (function(l2){ ed.addEventListener('click',function(){ openInvLedgerForm(l2); }); })(l);
-    var dl=document.createElement('button'); dl.className='btn btn-g'; dl.textContent='Del'; dl.style.cssText='padding:2px 7px;font-size:12px;color:var(--danger);'; (function(l2){ dl.addEventListener('click',function(){ if(confirm('Delete this entry?')){ delInvLedger(l2.id); renderInvestments(); } }); })(l);
-    right.appendChild(amt); right.appendChild(ed); right.appendChild(dl);
-    r.appendChild(left); r.appendChild(right); lsec.appendChild(r);
+    var pnm=l.property_id?((invProp(l.property_id)||{}).name||(invProp(l.property_id)||{}).address||''):'—';
+    var dir=(l.direction||invDirFor(l.category)); var amtColor=dir==='income'?IVC.grn:IVC.red; var sign=dir==='income'?'+':'−';
+    var tr=document.createElement('tr'); tr.style.cursor='pointer';
+    var tag=(l.source==='email'||l.source==='auto')?' <span style="font-size:11px;color:'+IVC.mut+';">('+_esc(l.source)+')</span>':'';
+    tr.innerHTML='<td>'+_esc(fd(l.date))+'</td><td>'+_esc(pnm)+'</td><td>'+_esc(l.category)+tag+'</td>'
+      + '<td style="text-align:right;color:'+amtColor+';">'+sign+invMoney(l.amount).replace('-','')+'</td>';
+    var tdx=document.createElement('td'); tdx.style.textAlign='center';
+    var xb=document.createElement('span'); xb.textContent='×'; xb.title='Delete'; xb.style.cssText='color:'+IVC.mut+';cursor:pointer;font-size:16px;';
+    (function(l2){ xb.addEventListener('click',function(e){ e.stopPropagation(); if(confirm('Delete this entry?')){ delInvLedger(l2.id); renderInvestments(); } }); })(l);
+    tdx.appendChild(xb); tr.appendChild(tdx);
+    (function(l2){ tr.addEventListener('click',function(){ openInvLedgerForm(l2); }); })(l);
+    tb.appendChild(tr);
   });
-  root.appendChild(lsec);
+  tbl.appendChild(tb); root.appendChild(tbl);
+
+  // ---- Manage row (secondary) ----
+  var mrow=document.createElement('div'); mrow.style.cssText='display:flex;gap:8px;flex-wrap:wrap;margin-top:18px;padding-top:12px;border-top:1px solid '+IVC.bord+';';
+  mrow.appendChild(ivb('+ Property','sm',function(){ openInvPropertyForm(); }));
+  mrow.appendChild(ivb('+ HOA account','sm',function(){ openInvHoaForm(); }));
+  mrow.appendChild(ivb('Import CSV','sm',function(){ invImportCsv(); }));
+  // HOA quick-manage (edit dues / log)
+  IHOA.forEach(function(h){ mrow.appendChild(ivb('HOA: '+((h.name||'account').slice(0,18)),'sm',(function(h2){return function(){ openInvHoaForm(h2); };})(h))); });
+  root.appendChild(mrow);
+
   updateInvBadge();
 }
 function mkDivSafe(style, html){ var d=document.createElement('div'); if(style) d.style.cssText=style; if(html) d.innerHTML=html; return d; }
