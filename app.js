@@ -11305,6 +11305,9 @@ function renderInvestments(){
     function stat(lbl,val,color){ return '<div><div style="font-size:12px;color:'+IVC.mut+';">'+lbl+'</div><div style="font-weight:500;color:'+color+';">'+val+'</div></div>'; }
     ion.innerHTML=stat('In',invMoney(io.inc),IVC.grn)+stat('Out',invMoney(io.exp),IVC.red)+stat('Net',invMoney(io.net),IVC.txt);
     pc.appendChild(ion);
+    // Header + summary open the property detail view.
+    hd.style.cursor='pointer'; ion.style.cursor='pointer';
+    (function(pid){ hd.addEventListener('click',function(){ openInvPropertyDetail(pid); }); ion.addEventListener('click',function(){ openInvPropertyDetail(pid); }); })(p.id);
     // footer meta
     var meta=[]; if(propExpectedRent(p.id)>0) meta.push('Rent '+invMoney(propExpectedRent(p.id)));
     var hoa=p.hoa_id?invHoa(p.hoa_id):null; if(hoa) meta.push('HOA '+_esc(hoa.name||'')+' '+invMoney(hoa.dues_amount));
@@ -11377,6 +11380,90 @@ function renderInvestments(){
   updateInvBadge();
 }
 function mkDivSafe(style, html){ var d=document.createElement('div'); if(style) d.style.cssText=style; if(html) d.innerHTML=html; return d; }
+
+// Property detail view (click a property card). Shows facts, units, category totals, and the
+// full ledger history for that one property.
+function openInvPropertyDetail(pid){
+  _ivStyle();
+  var root=ge('invRoot'); if(!root) return; root.innerHTML='';
+  var p=invProp(pid); if(!p){ renderInvestments(); return; }
+  function ivb(label,cls,fn){ var b=document.createElement('button'); b.className='ivbtn'+(cls?(' '+cls):''); b.textContent=label; b.addEventListener('click',fn); return b; }
+
+  // Back + title row
+  var top=document.createElement('div'); top.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:14px;';
+  var back=ivb('‹ Back','',function(){ renderInvestments(); });
+  var tacts=document.createElement('div'); tacts.style.cssText='display:flex;gap:6px;flex-wrap:wrap;';
+  tacts.appendChild(ivb('Log entry','pri sm',function(){ openInvLedgerForm(null,{property_id:String(p.id)}); openInvPropertyDetail(pid); }));
+  tacts.appendChild(ivb('+ Unit','sm',function(){ openInvUnitForm(p.id); }));
+  tacts.appendChild(ivb('Edit','sm',function(){ openInvPropertyForm(p); }));
+  top.appendChild(back); top.appendChild(tacts); root.appendChild(top);
+
+  root.appendChild(mkDivSafe('font-size:22px;font-weight:500;', _esc(p.name||p.address||'Property')));
+  if(p.address) root.appendChild(mkDivSafe('font-size:14px;color:'+IVC.mut+';margin-bottom:14px;', _esc(p.address)));
+
+  // Facts grid
+  var facts=[];
+  var hoa=p.hoa_id?invHoa(p.hoa_id):null;
+  if(hoa) facts.push(['HOA', _esc(hoa.name||'')+' — '+invMoney(hoa.dues_amount)+'/'+(hoa.dues_frequency||'mo')+(hoa.account_number?(' · #'+_esc(hoa.account_number)):'')]);
+  if(invNum(p.mortgage_payment)>0 || p.mortgage_lender) facts.push(['Mortgage', (p.mortgage_lender?_esc(p.mortgage_lender)+' — ':'')+(invNum(p.mortgage_payment)>0?invMoney(p.mortgage_payment)+'/mo':'')+(invNum(p.mortgage_balance)>0?(' · balance '+invMoney(p.mortgage_balance)):'')]);
+  if(invNum(p.purchase_price)>0) facts.push(['Purchase', invMoney(p.purchase_price)+(p.purchase_date?(' · '+_esc(p.purchase_date)):'')]);
+  if(p.notes) facts.push(['Notes / manager / warranty', _esc(p.notes)]);
+  if(facts.length){
+    var fg=document.createElement('div'); fg.style.cssText='background:'+IVC.card+';border:1px solid '+IVC.bord+';border-radius:12px;padding:12px 16px;margin-bottom:16px;';
+    facts.forEach(function(f,i){ var r=document.createElement('div'); r.style.cssText='padding:6px 0;'+(i?'border-top:1px solid '+IVC.bord+';':''); r.innerHTML='<span style="color:'+IVC.mut+';font-size:13px;">'+f[0]+'</span><div style="margin-top:2px;">'+f[1]+'</div>'; fg.appendChild(r); });
+    root.appendChild(fg);
+  }
+
+  // Units
+  var units=unitsForProp(p.id);
+  if(units.length){
+    root.appendChild(mkDivSafe('font-size:13px;color:'+IVC.mut+';margin:2px 0 6px;','Units'));
+    units.forEach(function(u){
+      var ur=document.createElement('div'); ur.style.cssText='display:flex;justify-content:space-between;align-items:center;gap:8px;background:'+IVC.card+';border:1px solid '+IVC.bord+';border-radius:8px;padding:9px 12px;margin-bottom:6px;';
+      ur.innerHTML='<div><b>'+_esc(u.label)+'</b> — '+invMoney(u.rent_amount)+'/mo'+(u.status==='vacant'?' <span style="color:'+IVC.red+';">(vacant)</span>':(u.tenant_name?(' · '+_esc(u.tenant_name)):''))+(u.lease_end?('<div style="font-size:12px;color:'+IVC.mut+';">Lease ends '+_esc(u.lease_end)+'</div>'):'')+'</div>';
+      var ua=document.createElement('div'); ua.style.cssText='display:flex;gap:6px;';
+      ua.appendChild(ivb('Edit','sm',(function(u2){return function(){ openInvUnitForm(u2.property_id,u2); };})(u)));
+      ua.appendChild(ivb('Del','sm danger',(function(u2){return function(){ if(confirm('Delete unit "'+u2.label+'"?')){ delInvUnit(u2.id); openInvPropertyDetail(pid); } };})(u)));
+      ur.appendChild(ua); root.appendChild(ur);
+    });
+  }
+
+  // Category totals (all-time for this property)
+  var byCat={}, inc=0, exp=0;
+  var mine=ILED.filter(function(l){ return String(l.property_id)===String(p.id); });
+  mine.forEach(function(l){ var d=(l.direction||invDirFor(l.category)); var a=invNum(l.amount); byCat[l.category]=(byCat[l.category]||0)+(d==='income'?a:-a); if(d==='income') inc+=a; else exp+=a; });
+  var cats=Object.keys(byCat);
+  if(cats.length){
+    root.appendChild(mkDivSafe('font-size:13px;color:'+IVC.mut+';margin:14px 0 6px;','Totals by category (all time)'));
+    var cg=document.createElement('div'); cg.style.cssText='background:'+IVC.card+';border:1px solid '+IVC.bord+';border-radius:12px;padding:6px 14px;margin-bottom:6px;';
+    cats.sort(function(a,b){ return Math.abs(byCat[b])-Math.abs(byCat[a]); }).forEach(function(c,i){
+      var v=byCat[c]; var r=document.createElement('div'); r.style.cssText='display:flex;justify-content:space-between;padding:6px 0;'+(i?'border-top:1px solid '+IVC.bord+';':'');
+      r.innerHTML='<span>'+_esc(c)+'</span><span style="color:'+(v>=0?IVC.grn:IVC.red)+';">'+(v>=0?'+':'−')+invMoney(v).replace('-','')+'</span>'; cg.appendChild(r);
+    });
+    var nr=document.createElement('div'); nr.style.cssText='display:flex;justify-content:space-between;padding:8px 0;border-top:1px solid '+IVC.bord+';font-weight:500;';
+    nr.innerHTML='<span>Net</span><span style="color:'+((inc-exp)>=0?IVC.grn:IVC.red)+';">'+invMoney(inc-exp)+'</span>'; cg.appendChild(nr);
+    root.appendChild(cg);
+  }
+
+  // Full ledger for this property
+  root.appendChild(mkDivSafe('font-size:13px;color:'+IVC.mut+';margin:14px 0 6px;','Ledger — all entries'));
+  var rows=mine.slice().sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
+  var tbl=document.createElement('table');
+  tbl.innerHTML='<thead><tr><th style="width:62px;">Date</th><th>Category</th><th>Note</th><th style="text-align:right;width:96px;">Amount</th><th style="width:26px;"></th></tr></thead>';
+  var tb=document.createElement('tbody');
+  if(!rows.length){ var e0=document.createElement('tr'); e0.innerHTML='<td colspan="5" style="color:'+IVC.mut+';">No entries yet.</td>'; tb.appendChild(e0); }
+  rows.forEach(function(l){
+    var dir=(l.direction||invDirFor(l.category)); var col=dir==='income'?IVC.grn:IVC.red; var sign=dir==='income'?'+':'−';
+    var tr=document.createElement('tr'); tr.style.cursor='pointer';
+    tr.innerHTML='<td>'+_esc(fd(l.date))+'</td><td>'+_esc(l.category)+'</td><td style="color:'+IVC.mut+';font-size:13px;">'+_esc(l.notes||l.payee||'')+'</td><td style="text-align:right;color:'+col+';">'+sign+invMoney(l.amount).replace('-','')+'</td>';
+    var tdx=document.createElement('td'); tdx.style.textAlign='center'; var xb=document.createElement('span'); xb.textContent='×'; xb.style.cssText='color:'+IVC.mut+';cursor:pointer;font-size:16px;';
+    (function(l2){ xb.addEventListener('click',function(e){ e.stopPropagation(); if(confirm('Delete this entry?')){ delInvLedger(l2.id); openInvPropertyDetail(pid); } }); })(l);
+    tdx.appendChild(xb); tr.appendChild(tdx);
+    (function(l2){ tr.addEventListener('click',function(){ openInvLedgerForm(l2); }); })(l);
+    tb.appendChild(tr);
+  });
+  tbl.appendChild(tb); root.appendChild(tbl);
+}
 
 // ---- CSV backfill: date,property,category,amount,payee,notes ----
 function invImportCsv(){
@@ -11512,6 +11599,9 @@ async function scanFinanceEmails(sinceDate){
     // Dedupe against EVERY existing ledger row by content (date+amount+category+property) - not just
     // email-sourced rows - so entries added manually or via SQL/CSV are recognized too.
     var existingRefs={}; ILED.forEach(function(l){ if(l.email_ref) existingRefs[l.email_ref]=true; existingRefs[_invEref(l)]=true; });
+    // "Loose" key (date+amount+category, ignoring property) of money already tied to a property -
+    // used to reject a blank/unattributed duplicate of an entry that's already attributed.
+    var existingLoose={}; ILED.forEach(function(l){ if(l.property_id!=null) existingLoose[[(l.date||''),invNum(l.amount),(l.category||'')].join('|')]=true; });
     var batchSeen={};
     body.innerHTML=''; body.appendChild(mkDivSafe('color:var(--text3);font-size:13px;margin-bottom:10px;','Review the entries the scan found, adjust anything, and add the ones you want. Already-imported items are skipped automatically.'));
     var rowsWrap=document.createElement('div'); rowsWrap.style.cssText='display:flex;flex-direction:column;gap:8px;'; body.appendChild(rowsWrap);
@@ -11520,6 +11610,7 @@ async function scanFinanceEmails(sinceDate){
       var cat=_invNormCat(it.category); var amt=invNum(it.amount); if(amt<=0) return;
       var dir=(String(it.direction||'').toLowerCase()==='income'||cat==='Rent'||cat==='Other income')?'income':'expense';
       var prop=_invMatchProp(it.property);
+      if(!prop && existingLoose[[(it.date||''),amt,cat].join('|')]) return;   // blank duplicate of already-attributed money
       var eref=_invEref({date:(it.date||''), amount:amt, category:cat, property_id:(prop?prop.id:''), payee:it.payee});
       if(existingRefs[eref] || batchSeen[eref]) return;   // dedupe: already imported, or same charge from the other mailbox
       batchSeen[eref]=true;

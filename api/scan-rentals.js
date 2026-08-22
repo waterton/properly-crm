@@ -122,6 +122,8 @@ export default async function handler(req, res) {
     const ledger = await supaGet('inv_ledger?select=id,date,amount,category,property_id,email_ref');
     const seen = {};
     (ledger || []).forEach(l => { if (l.email_ref) seen[l.email_ref] = true; seen[eref(l)] = true; });
+    const seenLoose = {};   // date+amount+category of money already tied to a property (reject blank dupes)
+    (ledger || []).forEach(l => { if (l.property_id != null) seenLoose[[(l.date || ''), num(l.amount), (l.category || '')].join('|')] = true; });
 
     const tokens = await supaGet('gmail_tokens?select=*');
     if (!Array.isArray(tokens) || !tokens.length) return res.status(200).json({ ok: true, note: 'no gmail connected', ...result });
@@ -170,6 +172,7 @@ export default async function handler(req, res) {
       const amt = num(it.amount);
       if (amt <= 0) continue;
       const prop = matchProp(it.property, props);
+      if (!prop && seenLoose[[(it.date || ''), amt, cat].join('|')]) { result.skipped++; continue; }   // blank dupe of attributed money
       const key = eref({ date: it.date || '', amount: amt, category: cat, property_id: prop ? prop.id : '' });
       if (seen[key]) { result.skipped++; continue; }
       seen[key] = true;
