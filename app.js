@@ -11402,8 +11402,10 @@ async function scanFinanceEmails(){
   if(!IPROP.length){ alert('Add at least one property first so I know what to match emails against.'); return; }
   var members = _invConnectedMembers();
   if(!members.length){ alert('Connect a Gmail account first (open the Gmail tab), then try again.'); return; }
-  var label = null; try{ label = localStorage.getItem('invGmailLabel'); }catch(e){}
-  if(label===null){ label=(prompt('Optional: the Gmail label you use for property / finance emails (leave blank to match by keywords + your property addresses only):','')||'').trim(); try{ localStorage.setItem('invGmailLabel', label); }catch(e){} }
+  var label=''; try{ label = localStorage.getItem('invGmailLabel') || ''; }catch(e){}
+  // (No prompt() here - it's unavailable in the app's embedded runtime. The scan matches by your
+  //  property addresses + finance keywords across all connected accounts, which is enough; a label
+  //  filter can be set later via the input in the scan window if we add one.)
   var ov=document.createElement('div'); ov.className='modal-ov open'; ov.style.zIndex='1300';
   var m=document.createElement('div'); m.className='modal'; m.style.maxWidth='720px';
   m.innerHTML='<div style="padding:16px 20px;border-bottom:1px solid var(--border);font-weight:700;font-size:17px;">Scan finance emails</div>';
