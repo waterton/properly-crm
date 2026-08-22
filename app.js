@@ -11230,6 +11230,27 @@ function invYtd(){
   ILED.forEach(function(l){ if((l.date||'').slice(0,4)!==yr) return; if((l.direction||invDirFor(l.category))==='income') inc+=invNum(l.amount); else exp+=invNum(l.amount); });
   return inc-exp;
 }
+// Auto-post each property's fixed monthly mortgage payment as a ledger expense (Jan of the current
+// year through the current month), so entering the amount once makes it subtract every month.
+// Deduped: skipped for any month that already has a Mortgage entry for the property (manual/scanned).
+function materializeMortgage(){
+  var now=new Date(); var y0=now.getFullYear(); var changed=false;
+  IPROP.forEach(function(p){
+    var amt=invNum(p.mortgage_payment); if(amt<=0) return;
+    var day=parseInt(p.mortgage_due_day)||1; if(day<1) day=1; if(day>28) day=28;
+    for(var mi=0; mi<=now.getMonth(); mi++){
+      var ym=y0+'-'+String(mi+1).padStart(2,'0');
+      var has=ILED.some(function(l){ return l.category==='Mortgage' && String(l.property_id)===String(p.id) && String(l.date||'').slice(0,7)===ym; });
+      if(has) continue;
+      var dstr=ym+'-'+String(day).padStart(2,'0');
+      var rec={ id:Date.now()+Math.floor(Math.random()*100000)+mi, date:dstr, property_id:p.id, unit_id:null, hoa_id:null,
+        category:'Mortgage', direction:'expense', amount:amt, payee:(p.mortgage_lender||''), method:null,
+        source:'recurring', email_ref:dstr+'|'+amt+'|Mortgage|'+p.id, notes:'Auto-posted monthly mortgage' };
+      ILED.push(rec); saveInvLedger(rec); changed=true;
+    }
+  });
+  return changed;
+}
 var _invLedgerFilter='';   // property_id filter for the ledger table ('' = all)
 var _invDetailFrom='', _invDetailTo='', _invDetailPid=null;   // date-range filter inside a property detail view ('' = open end)
 // Dark "money page" palette (this page is intentionally dark to stand apart from the rest of the CRM).
@@ -11255,6 +11276,7 @@ function _ivStyle(){
 }
 function renderInvestments(){
   _ivStyle();
+  try{ materializeMortgage(); }catch(e){}   // ensure monthly mortgage expenses exist before totals
   var root=ge('invRoot'); if(!root) return; root.innerHTML='';
   var ym=invCurMonth();
 
@@ -11373,7 +11395,7 @@ function renderInvestments(){
     var pnm=l.property_id?((invProp(l.property_id)||{}).name||(invProp(l.property_id)||{}).address||''):'—';
     var dir=(l.direction||invDirFor(l.category)); var amtColor=dir==='income'?IVC.grn:IVC.red; var sign=dir==='income'?'+':'−';
     var tr=document.createElement('tr'); tr.style.cursor='pointer';
-    var tag=(l.source==='email'||l.source==='auto')?' <span style="font-size:11px;color:'+IVC.mut+';">('+_esc(l.source)+')</span>':'';
+    var tag=(l.source==='email'||l.source==='auto'||l.source==='recurring')?' <span style="font-size:11px;color:'+IVC.mut+';">('+_esc(l.source)+')</span>':'';
     tr.innerHTML='<td>'+_esc(fd(l.date))+'</td><td>'+_esc(pnm)+'</td><td>'+_esc(l.category)+tag+'</td>'
       + '<td style="text-align:right;color:'+amtColor+';">'+sign+invMoney(l.amount).replace('-','')+'</td>';
     var tdx=document.createElement('td'); tdx.style.textAlign='center';
@@ -11402,6 +11424,7 @@ function mkDivSafe(style, html){ var d=document.createElement('div'); if(style) 
 // full ledger history for that one property.
 function openInvPropertyDetail(pid){
   _ivStyle();
+  try{ materializeMortgage(); }catch(e){}
   var root=ge('invRoot'); if(!root) return; root.innerHTML='';
   var p=invProp(pid); if(!p){ renderInvestments(); return; }
   if(_invDetailPid!==String(pid)){ _invDetailFrom=''; _invDetailTo=''; _invDetailPid=String(pid); }   // reset range when switching property
