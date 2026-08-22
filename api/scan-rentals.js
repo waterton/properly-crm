@@ -149,6 +149,7 @@ export default async function handler(req, res) {
     const propList = props.map(p => (p.name || '') + (p.address ? (' (' + p.address + ')') : '')).join('; ');
     const prompt = 'You are a bookkeeping assistant for a small rental-property owner. From the emails below, extract EVERY concrete money event (rent received, HOA dues, mortgage payment, utility/insurance/tax bill, repair, management fee). '
       + 'Return ONLY a JSON array, no prose. Each item: {"date":"YYYY-MM-DD","amount": number (no symbols),"direction":"income|expense","category":"Rent|Other income|Mortgage|HOA|Utilities|Insurance|Property Tax|Repairs|Management|Other","property":"which property (address or name text, best guess, empty if unsure)","payee":"who paid or was paid","description":"short"}. '
+      + 'IMPORTANT EXCLUSION: do NOT include net owner disbursements / "Payment Confirmation" / "Owner Draw" / "electronic payment ... has been issued" emails from Fresh Start Management or managebuilding.com - that rent is recorded separately, per property, from the monthly owner statements. DO still include HOA auto-drafts, mortgage payments, utility/insurance/tax bills, repairs, and Sun Key Realty rental payments. '
       + 'Only include events with a clear dollar amount and date. Rent is income; everything else is an expense. Known properties: ' + propList + '.\n\nEMAILS:\n' + corpus;
 
     let items = null;
