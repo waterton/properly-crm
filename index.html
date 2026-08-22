@@ -88,6 +88,7 @@
       <button class="ni" id="nav-drips"><svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/><circle cx="19" cy="5" r="3" fill="var(--accent)" stroke="none"/></svg>Drip Campaigns<span class="nbadge" id="nbDrips">0</span></button>
       <div class="nav-sec">Investments</div>
       <button class="ni" id="nav-investments"><svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 21v-6h6v6"/></svg>Properties<span class="nbadge" id="nbInv">0</span></button>
+      <button class="ni" id="nav-hardmoney"><svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M14.5 9.5a2.5 2.5 0 0 0-2.5-1.5c-1.5 0-2.5.8-2.5 2s1 1.7 2.5 2 2.5.8 2.5 2-1 2-2.5 2a2.5 2.5 0 0 1-2.5-1.5M12 6.5v11"/></svg>Hard Money</button>
     </nav>
   </aside>
   <div class="main">
@@ -103,7 +104,7 @@
         <input class="sbox" type="text" placeholder="Search..." id="searchBox">
         <div id="globalSearchResults" style="display:none;position:fixed;top:52px;right:12px;width:min(460px,92vw);max-height:74vh;overflow:auto;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:0 10px 34px rgba(0,0,0,0.45);z-index:1200;padding:6px;"></div>
         <button class="btn btn-p" id="btnAdd" style="display:none;">+ Add</button>
-        <div style="font-size:11px;color:var(--text3);margin-right:4px;">v8.7</div>
+        <div style="font-size:11px;color:var(--text3);margin-right:4px;">v8.8</div>
         <div class="topbar-user" id="topbarUser" title="Click to sign out" style="cursor:pointer;position:relative;" id="topbarUserBtn">RE</div>
       </div>
     </div>
@@ -889,6 +890,7 @@
         </div>
       </div>
       <div class="page" id="page-investments"><div id="invRoot"></div></div>
+      <div class="page" id="page-hardmoney"><div id="hmRoot"></div></div>
     </div>
   </div>
 </div>
@@ -1152,6 +1154,6 @@
 </div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="app.js?v=20260814h"></script>
+<script src="app.js?v=20260814i"></script>
 </body>
 </html>
