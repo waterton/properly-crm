@@ -11231,6 +11231,8 @@ function invYtd(){
   return inc-exp;
 }
 var _invLedgerFilter='';   // property_id filter for the ledger table ('' = all)
+var _invDetailMonths=[], _invDetailPid=null;   // month filter inside a property detail view ([] = all months)
+function _invMonLabel(mk){ var p=String(mk).split('-'); if(p.length<2) return mk; return new Date(+p[0],+p[1]-1,1).toLocaleDateString('en-US',{month:'short'})+" '"+String(p[0]).slice(2); }
 // Dark "money page" palette (this page is intentionally dark to stand apart from the rest of the CRM).
 var IVC={ bg:'#0e1118', card:'#161b24', tile:'#1b2230', bord:'#29313f', txt:'#e7eaf0', mut:'#98a2b3',
   grn:'#46c05f', red:'#f0776c', warn:'#e3a93c', warnbg:'rgba(227,169,60,0.12)', grnbg:'rgba(70,192,95,0.13)', redbg:'rgba(240,119,108,0.12)', accent:'#3a4a63' };
@@ -11403,6 +11405,7 @@ function openInvPropertyDetail(pid){
   _ivStyle();
   var root=ge('invRoot'); if(!root) return; root.innerHTML='';
   var p=invProp(pid); if(!p){ renderInvestments(); return; }
+  if(_invDetailPid!==String(pid)){ _invDetailMonths=[]; _invDetailPid=String(pid); }   // reset month picker when switching property
   function ivb(label,cls,fn){ var b=document.createElement('button'); b.className='ivbtn'+(cls?(' '+cls):''); b.textContent=label; b.addEventListener('click',fn); return b; }
 
   // Back + title row
@@ -11444,13 +11447,27 @@ function openInvPropertyDetail(pid){
     });
   }
 
-  // Category totals (all-time for this property)
-  var byCat={}, inc=0, exp=0;
+  // Month picker: choose one / several / all months present for this property.
   var mine=ILED.filter(function(l){ return String(l.property_id)===String(p.id); });
-  mine.forEach(function(l){ var d=(l.direction||invDirFor(l.category)); var a=invNum(l.amount); byCat[l.category]=(byCat[l.category]||0)+(d==='income'?a:-a); if(d==='income') inc+=a; else exp+=a; });
+  var allMonths=[]; mine.forEach(function(l){ var mk=String(l.date||'').slice(0,7); if(mk && allMonths.indexOf(mk)<0) allMonths.push(mk); });
+  allMonths.sort().reverse();
+  if(allMonths.length){
+    var mc=document.createElement('div'); mc.style.cssText='display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:16px 0 4px;';
+    mc.appendChild(mkDivSafe('font-size:13px;color:'+IVC.mut+';margin-right:2px;','Months'));
+    function chip(label,active,fn){ var b=document.createElement('button'); b.className='ivbtn sm'; b.textContent=label; if(active){ b.style.background=IVC.accent; b.style.borderColor=IVC.accent; } b.addEventListener('click',fn); return b; }
+    mc.appendChild(chip('All', _invDetailMonths.length===0, function(){ _invDetailMonths=[]; openInvPropertyDetail(pid); }));
+    allMonths.forEach(function(mk){ var on=_invDetailMonths.indexOf(mk)>=0; mc.appendChild(chip(_invMonLabel(mk), on, function(){ var i=_invDetailMonths.indexOf(mk); if(i>=0) _invDetailMonths.splice(i,1); else _invDetailMonths.push(mk); openInvPropertyDetail(pid); })); });
+    root.appendChild(mc);
+  }
+  var fmine = _invDetailMonths.length ? mine.filter(function(l){ return _invDetailMonths.indexOf(String(l.date||'').slice(0,7))>=0; }) : mine;
+  var selLabel = _invDetailMonths.length ? (_invDetailMonths.slice().sort().map(_invMonLabel).join(', ')) : 'all time';
+
+  // Category totals (for the selected months)
+  var byCat={}, inc=0, exp=0;
+  fmine.forEach(function(l){ var d=(l.direction||invDirFor(l.category)); var a=invNum(l.amount); byCat[l.category]=(byCat[l.category]||0)+(d==='income'?a:-a); if(d==='income') inc+=a; else exp+=a; });
   var cats=Object.keys(byCat);
   if(cats.length){
-    root.appendChild(mkDivSafe('font-size:13px;color:'+IVC.mut+';margin:14px 0 6px;','Totals by category (all time)'));
+    root.appendChild(mkDivSafe('font-size:13px;color:'+IVC.mut+';margin:14px 0 6px;','Totals by category — '+_esc(selLabel)));
     var cg=document.createElement('div'); cg.style.cssText='background:'+IVC.card+';border:1px solid '+IVC.bord+';border-radius:12px;padding:6px 14px;margin-bottom:6px;';
     cats.sort(function(a,b){ return Math.abs(byCat[b])-Math.abs(byCat[a]); }).forEach(function(c,i){
       var v=byCat[c]; var r=document.createElement('div'); r.style.cssText='display:flex;justify-content:space-between;padding:6px 0;'+(i?'border-top:1px solid '+IVC.bord+';':'');
@@ -11461,9 +11478,9 @@ function openInvPropertyDetail(pid){
     root.appendChild(cg);
   }
 
-  // Full ledger for this property
-  root.appendChild(mkDivSafe('font-size:13px;color:'+IVC.mut+';margin:14px 0 6px;','Ledger — all entries'));
-  var rows=mine.slice().sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
+  // Ledger for this property (selected months)
+  root.appendChild(mkDivSafe('font-size:13px;color:'+IVC.mut+';margin:14px 0 6px;','Ledger — '+_esc(selLabel)));
+  var rows=fmine.slice().sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
   var tbl=document.createElement('table');
   tbl.innerHTML='<thead><tr><th style="width:62px;">Date</th><th>Category</th><th>Note</th><th style="text-align:right;width:96px;">Amount</th><th style="width:26px;"></th></tr></thead>';
   var tb=document.createElement('tbody');
