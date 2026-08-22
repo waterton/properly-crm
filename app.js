@@ -11214,7 +11214,13 @@ function renderInvestments(){
   bar.appendChild(mnav);
   function tbtn(label,cls,fn){ var b=document.createElement('button'); b.className='btn '+(cls||'btn-g'); b.textContent=label; b.style.whiteSpace='nowrap'; b.addEventListener('click',fn); return b; }
   bar.appendChild(tbtn('+ Log entry','btn-p',function(){ openInvLedgerForm(); }));
-  bar.appendChild(tbtn('Scan finance emails','btn-g',function(){ scanFinanceEmails(); }));
+  // "Scan since" bookmark: defaults to the last scan date (or Jan 1 for the first, deep pull).
+  var _sinceWrap=document.createElement('label'); _sinceWrap.style.cssText='display:flex;align-items:center;gap:5px;font-size:13px;color:var(--text3);white-space:nowrap;';
+  _sinceWrap.appendChild(document.createTextNode('Scan since'));
+  var _sinceInput=document.createElement('input'); _sinceInput.type='date'; _sinceInput.className='fi'; _sinceInput.style.cssText='width:150px;padding:4px 8px;';
+  try{ _sinceInput.value = localStorage.getItem('invLastScan') || (new Date().getFullYear()+'-01-01'); }catch(e){ _sinceInput.value = new Date().getFullYear()+'-01-01'; }
+  _sinceWrap.appendChild(_sinceInput); bar.appendChild(_sinceWrap);
+  bar.appendChild(tbtn('Scan finance emails','btn-g',function(){ scanFinanceEmails(_sinceInput.value); }));
   bar.appendChild(tbtn('Import CSV','btn-g',function(){ invImportCsv(); }));
   bar.appendChild(tbtn('+ Property','btn-g',function(){ openInvPropertyForm(); }));
   bar.appendChild(tbtn('+ HOA','btn-g',function(){ openInvHoaForm(); }));
@@ -11354,14 +11360,16 @@ function invImportCsv(){
   input.click();
 }
 // ---- AI finance-email extraction ----
-function _invFinanceQuery(label){
+function _invFinanceQuery(label, since){
   var terms = ['rent','HOA','"homeowners association"','mortgage','"mortgage statement"','statement','payment','invoice','utility','utilities','insurance','escrow','"property tax"'];
   IPROP.forEach(function(p){ if(p.address) terms.push('"'+p.address.replace(/"/g,'')+'"'); if(p.name) terms.push('"'+p.name.replace(/"/g,'')+'"'); });
   if(label && label.trim()) terms.push('label:'+label.trim().replace(/\s+/g,'-'));
-  return '(' + terms.join(' OR ') + ') newer_than:365d';
+  // Only look back as far as the bookmark ("since") so repeat scans don't re-read the whole year.
+  var range = (since && /^\d{4}-\d{2}-\d{2}$/.test(since)) ? ('after:'+since.replace(/-/g,'/')) : 'newer_than:365d';
+  return '(' + terms.join(' OR ') + ') ' + range;
 }
 // Content-based dedupe key: the same charge arriving in two mailboxes (or re-scanned) collapses.
-function _invEref(o){ return [(o.date||''), invNum(o.amount), (o.category||''), (o.property_id||''), String(o.payee||'').trim().toLowerCase()].join('|'); }
+function _invEref(o){ return [(o.date||''), invNum(o.amount), (o.category||''), (o.property_id||'')].join('|'); }
 function _invConnectedMembers(){
   if(typeof gmailState==='undefined' || !gmailState.connectedAccounts) return [];
   return Object.keys(gmailState.connectedAccounts).map(function(mid){
@@ -11398,7 +11406,7 @@ function _invParseArr(txt){
   if(a>=0 && b>a){ try{ return JSON.parse(txt.slice(a,b+1)); }catch(e){} }
   return null;
 }
-async function scanFinanceEmails(){
+async function scanFinanceEmails(sinceDate){
   if(!IPROP.length){ alert('Add at least one property first so I know what to match emails against.'); return; }
   var members = _invConnectedMembers();
   if(!members.length){ alert('Connect a Gmail account first (open the Gmail tab), then try again.'); return; }
@@ -11415,7 +11423,7 @@ async function scanFinanceEmails(){
   var closeBtn=document.createElement('button'); closeBtn.className='btn btn-g'; closeBtn.textContent='Close'; closeBtn.addEventListener('click',function(){ try{document.body.removeChild(ov);}catch(e){} }); ft.appendChild(closeBtn);
   body.innerHTML='<div style="text-align:center;color:var(--text3);padding:20px;">Reading finance emails across '+members.length+' account'+(members.length===1?'':'s')+'…</div>';
   try{
-    var q=_invFinanceQuery(label);
+    var q=_invFinanceQuery(label, sinceDate);
     var chunks=[];
     for(var a=0;a<members.length;a++){
       var mid=members[a].id;
@@ -11440,7 +11448,9 @@ async function scanFinanceEmails(){
       }catch(e){}
     }
     var corpus=chunks.join('\n\n---\n\n').slice(0,20000);
-    if(!corpus){ body.innerHTML='<div style="color:var(--text3);padding:16px;">No finance emails found across your connected account'+(members.length===1?'':'s')+'. The scan matches by your property addresses/names, common finance keywords, and your Gmail label (if set).</div>'; return; }
+    if(!corpus){ body.innerHTML='<div style="color:var(--text3);padding:16px;">No new finance emails since '+_esc(sinceDate||'a year ago')+' across your connected account'+(members.length===1?'':'s')+'.</div>'; try{ localStorage.setItem('invLastScan', tod()); }catch(e){} return; }
+    // Scan reached "now" - advance the bookmark so the next scan only reads what's newer.
+    try{ localStorage.setItem('invLastScan', tod()); }catch(e){}
     var propList=IPROP.map(function(p){ return (p.name||'')+(p.address?(' ('+p.address+')'):''); }).join('; ');
     var prompt='You are a bookkeeping assistant for a small rental-property owner. From the emails below, extract EVERY concrete money event (rent received, HOA dues, mortgage payment, utility/insurance/tax bill, repair, management fee). '
       + 'Return ONLY a JSON array, no prose. Each item: {"ref": the [#n] number of the source email, "date":"YYYY-MM-DD", "amount": number (no symbols), "direction":"income|expense", "category":"Rent|Other income|Mortgage|HOA|Utilities|Insurance|Property Tax|Repairs|Management|Other", "property":"which property it concerns (address or name text, best guess)", "payee":"who paid or was paid", "description":"short"}. '
@@ -11451,7 +11461,9 @@ async function scanFinanceEmails(){
     var items=_invParseArr(txt);
     if(!Array.isArray(items) || !items.length){ body.innerHTML='<div style="color:var(--text3);padding:16px;">No clear financial entries were found in those emails.</div>'; return; }
     // Build review rows
-    var existingRefs={}; ILED.forEach(function(l){ if(l.email_ref) existingRefs[l.email_ref]=true; });
+    // Dedupe against EVERY existing ledger row by content (date+amount+category+property) - not just
+    // email-sourced rows - so entries added manually or via SQL/CSV are recognized too.
+    var existingRefs={}; ILED.forEach(function(l){ if(l.email_ref) existingRefs[l.email_ref]=true; existingRefs[_invEref(l)]=true; });
     var batchSeen={};
     body.innerHTML=''; body.appendChild(mkDivSafe('color:var(--text3);font-size:13px;margin-bottom:10px;','Review the entries the scan found, adjust anything, and add the ones you want. Already-imported items are skipped automatically.'));
     var rowsWrap=document.createElement('div'); rowsWrap.style.cssText='display:flex;flex-direction:column;gap:8px;'; body.appendChild(rowsWrap);
