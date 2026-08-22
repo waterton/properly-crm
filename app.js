@@ -68,6 +68,7 @@ var CAMP=[],ENR=[],SENDLOG=[],DOCS=[];
 var CH=[]; // tx_changes: audit trail of field changes applied from scanned documents
 var RS=[]; // reminder_settings: how many days before each deadline type to remind (cron reads these)
 var RL=[]; // reminder_log: which reminders the cron has already sent (used to hide sent personal reminders)
+var IHOA=[], IPROP=[], IUNIT=[], ILED=[]; // Investments: HOA accounts, properties, units, money ledger
 var curSort='last'; // 'last' or 'first'
 var selectedContacts = new Set();
 // TM = Team Members: [{id, first, last, role, email, phone, color, calLink}]
@@ -110,7 +111,11 @@ var DB_COLS = {
   tx_changes: ['id','transactionId','contactId','field','oldValue','newValue','docType','addendumNo','effectiveDate','documentId','appliedAt'],
   reminder_settings: ['id','deadlineType','daysBefore','enabled','updatedAt','subjectEn','bodyEn','subjectEs','bodyEs'],
   team: ['id','first','last','role','email','phone','color','calLink'],
-  cal_events: ['id','title','date','time','endTime','type','memberId','contactId','notes']
+  cal_events: ['id','title','date','time','endTime','type','memberId','contactId','notes'],
+  inv_hoa: ['id','name','account_number','dues_amount','dues_frequency','due_day','notes'],
+  inv_properties: ['id','name','address','hoa_id','purchase_price','purchase_date','mortgage_lender','mortgage_balance','mortgage_payment','mortgage_due_day','notes'],
+  inv_units: ['id','property_id','label','rent_amount','rent_due_day','tenant_name','lease_start','lease_end','status','notes'],
+  inv_ledger: ['id','date','property_id','unit_id','hoa_id','direction','category','amount','payee','method','source','email_ref','notes']
 };
 function stripForDB(table, row){
   var cols = DB_COLS[table];
@@ -642,7 +647,11 @@ async function loadFromDB(){
       fetchAllRows(base, 'tx_changes?order=id.asc', headers).catch(function(){return []; }),
       fetchAllRows(base, 'reminder_settings?order=id.asc', headers).catch(function(){return []; }),
       fetchAllRows(base, 'team?order=id.asc', headers).catch(function(){return []; }),
-      fetchAllRows(base, 'reminder_log?order=id.desc', headers).catch(function(){return []; })
+      fetchAllRows(base, 'reminder_log?order=id.desc', headers).catch(function(){return []; }),
+      fetchAllRows(base, 'inv_hoa?order=id.asc', headers).catch(function(){return []; }),
+      fetchAllRows(base, 'inv_properties?order=id.asc', headers).catch(function(){return []; }),
+      fetchAllRows(base, 'inv_units?order=id.asc', headers).catch(function(){return []; }),
+      fetchAllRows(base, 'inv_ledger?order=date.asc,id.asc', headers).catch(function(){return []; })
     ]);
     var rc = results[0], rn = results[1], rf = results[2], rd = results[3], rtx = results[4];
 
@@ -672,6 +681,10 @@ async function loadFromDB(){
     if(Array.isArray(rtm) && rtm.length) TM = rtm;
     var rrl = results[12];
     if(Array.isArray(rrl)) RL = rrl;
+    if(Array.isArray(results[13])) IHOA = results[13];
+    if(Array.isArray(results[14])) IPROP = results[14];
+    if(Array.isArray(results[15])) IUNIT = results[15];
+    if(Array.isArray(results[16])) ILED = results[16];
     DOCS.forEach(function(d){
       d.id = typeof d.id === 'string' ? parseInt(d.id)||d.id : d.id;
       if(d.contact_id != null) d.contact_id = typeof d.contact_id === 'string' ? parseInt(d.contact_id) : d.contact_id;
@@ -710,6 +723,27 @@ function saveNote(n){ sv(); if(supaReady) dbSave('notes', [n]); }
 function logActivity(contactId,type){A.unshift({contactId:contactId,type:type,date:new Date().toISOString()});if(A.length>30)A=A.slice(0,30);sv();}
 function saveFU(f){ sv(); if(supaReady) dbSave('followups', [f]); }
 function saveDL(d){ sv(); if(supaReady) dbSave('deadlines', [d]); }
+// ---- Investments (rental/investment property tracking) ----
+function saveInvHoa(x){ sv(); if(supaReady) dbSave('inv_hoa', [x]); }
+function saveInvProp(x){ sv(); if(supaReady) dbSave('inv_properties', [x]); }
+function saveInvUnit(x){ sv(); if(supaReady) dbSave('inv_units', [x]); }
+function saveInvLedger(x){ sv(); if(supaReady) dbSave('inv_ledger', [x]); }
+function delInvHoa(id){ IHOA = IHOA.filter(function(x){return String(x.id)!==String(id);}); IPROP.forEach(function(p){ if(String(p.hoa_id)===String(id)){ p.hoa_id=null; saveInvProp(p); } }); sv(); if(supaReady) dbDeleteBy('inv_hoa','id',id); }
+function delInvProp(id){
+  var units = IUNIT.filter(function(u){return String(u.property_id)===String(id);});
+  IUNIT = IUNIT.filter(function(u){return String(u.property_id)!==String(id);});
+  ILED = ILED.filter(function(l){return String(l.property_id)!==String(id);});
+  IPROP = IPROP.filter(function(x){return String(x.id)!==String(id);});
+  sv();
+  if(supaReady){ dbDeleteBy('inv_units','property_id',id); dbDeleteBy('inv_ledger','property_id',id); dbDeleteBy('inv_properties','id',id); }
+}
+function delInvUnit(id){ IUNIT = IUNIT.filter(function(x){return String(x.id)!==String(id);}); ILED.forEach(function(l){ if(String(l.unit_id)===String(id)){ l.unit_id=null; saveInvLedger(l); } }); sv(); if(supaReady) dbDeleteBy('inv_units','id',id); }
+function delInvLedger(id){ ILED = ILED.filter(function(x){return String(x.id)!==String(id);}); sv(); if(supaReady) dbDeleteBy('inv_ledger','id',id); }
+// lookups
+function invProp(id){ return IPROP.find(function(p){return String(p.id)===String(id);}) || null; }
+function invUnit(id){ return IUNIT.find(function(u){return String(u.id)===String(id);}) || null; }
+function invHoa(id){ return IHOA.find(function(h){return String(h.id)===String(id);}) || null; }
+function unitsForProp(id){ return IUNIT.filter(function(u){return String(u.property_id)===String(id);}); }
 function saveCH(x){ sv(); if(supaReady) dbSave('tx_changes', [x]); }
 function saveRS(x){ if(supaReady) dbSave('reminder_settings', [x]); }
 function deleteRSfromDB(id){
@@ -947,7 +981,7 @@ function pl(p){return p==='hot'?'HOT':p==='warn'?'SOON':'OK';}
 function pb(p){return p==='hot'?'b-hot':p==='warn'?'b-warn':'b-ok';}
 function ge(id){return document.getElementById(id);}
 function ck(){var s=document.createElementNS('http://www.w3.org/2000/svg','svg');s.setAttribute('width','9');s.setAttribute('height','9');s.setAttribute('fill','none');s.setAttribute('stroke','#0d0f14');s.setAttribute('stroke-width','3');s.setAttribute('viewBox','0 0 24 24');var p=document.createElementNS('http://www.w3.org/2000/svg','polyline');p.setAttribute('points','20,6 9,17 4,12');s.appendChild(p);return s;}
-var pn={briefing:'Daily Briefing',dashboard:'Dashboard',pipeline:'Pipeline',contacts:'Contacts',followups:'Follow-ups',notes:'Notes',deadlines:'Deadlines',documents:'Documents',tc:'Transactions',scanner:'Doc Scanner',cardscanner:'Card Scanner',calendar:'Calendar',team:'Team',gmail:'Gmail',mls:'MLS Search',drips:'Drip Campaigns'};
+var pn={briefing:'Daily Briefing',dashboard:'Dashboard',pipeline:'Pipeline',contacts:'Contacts',followups:'Follow-ups',notes:'Notes',deadlines:'Deadlines',documents:'Documents',tc:'Transactions',scanner:'Doc Scanner',cardscanner:'Card Scanner',calendar:'Calendar',team:'Team',gmail:'Gmail',mls:'MLS Search',drips:'Drip Campaigns',investments:'Properties'};
 function sp(id, fromHistory){
   curPage=id;
   if(typeof hideGlobalSearch==='function') hideGlobalSearch();
@@ -965,6 +999,7 @@ function sp(id, fromHistory){
   else if(id==='contacts'){ selectedContacts.clear(); updateBulkBar(); rc(); }
   else if(id==='followups')rfu();
   else if(id==='notes')rn();
+  else if(id==='investments'){ if(typeof renderInvestments==='function') renderInvestments(); }
   else if(id==='documents')renderDocsPage();
 
   else if(id==='deadlines'){
@@ -9536,6 +9571,7 @@ function gmailAutoRefresh(){
 setInterval(gmailAutoRefresh, 120000);
 window.addEventListener('focus', gmailAutoRefresh);
 ge('nav-drips').addEventListener('click',function(){sp('drips');});
+(function(){ var ni=ge('nav-investments'); if(ni) ni.addEventListener('click',function(){sp('investments');}); })();
 
 ge('nav-documents').addEventListener('click',function(){sp('documents');});
 if(ge('docSearch')) ge('docSearch').addEventListener('input', renderDocsPage);
@@ -10003,6 +10039,7 @@ function onAuthSuccess(user){
     rd();
     subscribeRealtime();
     updateNbTC();
+    try{ updateInvBadge(); }catch(e){}   // investments "needs attention" count on the sidebar
     if(ok) try{ sweepStaleItems(); }catch(e){}   // auto-remove orphaned/fired items so they can't resurface
     if(ok) try{ materializeWorkflowTasks(); }catch(e){}   // generate dated tasks from workflow templates
     restoreTabFromHash();
@@ -10976,4 +11013,485 @@ ge('nav-drips') && (function(){
 // Run a processing pass shortly after load and on the existing poll cycle
 setTimeout(function(){ try{ processDrips(); updateDripBadges(); }catch(e){ console.log('drip init', e); } }, 4000);
 // ===================== END DRIP CAMPAIGNS MODULE =====================
+
+// ============================================================================
+// INVESTMENTS — rental / investment property tracking
+// ============================================================================
+var INV_INCOME_CATS = ['Rent','Other income'];
+var INV_EXPENSE_CATS = ['Mortgage','HOA','Utilities','Insurance','Property Tax','Repairs','Management','Other'];
+var _invMonth = null;   // 'YYYY-MM' selected dashboard month; null = current month
+
+function invNum(v){ var n=parseFloat(String(v==null?'':v).replace(/[^0-9.\-]/g,'')); return isNaN(n)?0:n; }
+function invMoney(n){ n=invNum(n); return (n<0?'-$':'$')+Math.abs(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function invMonthKeyOf(d){ d=d?new Date(d):new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
+function invCurMonth(){ return _invMonth || invMonthKeyOf(); }
+function invMonthLabel(ym){ var p=ym.split('-'); return new Date(+p[0],+p[1]-1,1).toLocaleDateString('en-US',{month:'long',year:'numeric'}); }
+function invShiftMonth(delta){ var p=invCurMonth().split('-'); var d=new Date(+p[0],+p[1]-1+delta,1); _invMonth=invMonthKeyOf(d); renderInvestments(); }
+function invDirFor(cat){ return INV_INCOME_CATS.indexOf(cat)>=0 ? 'income' : 'expense'; }
+function ledInMonth(l,ym){ return (l.date||'').slice(0,7)===ym; }
+
+function hoaMonthlyEquiv(h){ var a=invNum(h.dues_amount); var f=(h.dues_frequency||'monthly'); return f==='annual'?a/12 : f==='quarterly'?a/3 : a; }
+function hoaDueThisMonth(h,ym){ var m=+ym.split('-')[1]; var f=(h.dues_frequency||'monthly'); if(f==='monthly')return true; if(f==='quarterly')return (m%3===1); if(f==='annual')return (m===1); return true; }
+
+// Expected income/expenses for a month (monthly-equivalent).
+function invExpected(ym){
+  var income=0, expenses=0;
+  IUNIT.forEach(function(u){ income += invNum(u.rent_amount); });
+  IPROP.forEach(function(p){ expenses += invNum(p.mortgage_payment); });
+  IHOA.forEach(function(h){ expenses += hoaMonthlyEquiv(h); });
+  return { income:income, expenses:expenses };
+}
+function invActual(ym){
+  var income=0, expenses=0;
+  ILED.forEach(function(l){ if(!ledInMonth(l,ym)) return; if((l.direction||invDirFor(l.category))==='income') income+=invNum(l.amount); else expenses+=invNum(l.amount); });
+  return { income:income, expenses:expenses };
+}
+// Late / missing detection for a month: expected charges with no matching ledger entry.
+function invFlags(ym){
+  var flags=[];
+  function paid(pred){ return ILED.some(function(l){ return ledInMonth(l,ym) && pred(l); }); }
+  IUNIT.forEach(function(u){
+    if(invNum(u.rent_amount)<=0) return;
+    if((u.status||'occupied')==='vacant') return;
+    var got = paid(function(l){ return l.category==='Rent' && String(l.unit_id)===String(u.id); });
+    if(!got){ var p=invProp(u.property_id); flags.push({level:'red', text:'Rent not received — '+(p?p.name||p.address:'?')+(u.label?(' · '+u.label):'')+' ('+invMoney(u.rent_amount)+')'}); }
+  });
+  IPROP.forEach(function(p){
+    if(invNum(p.mortgage_payment)<=0) return;
+    var got = paid(function(l){ return l.category==='Mortgage' && String(l.property_id)===String(p.id); });
+    if(!got) flags.push({level:'warn', text:'Mortgage not logged — '+(p.name||p.address)+' ('+invMoney(p.mortgage_payment)+')'});
+  });
+  IHOA.forEach(function(h){
+    if(invNum(h.dues_amount)<=0 || !hoaDueThisMonth(h,ym)) return;
+    var got = paid(function(l){ return l.category==='HOA' && String(l.hoa_id)===String(h.id); });
+    if(!got) flags.push({level:'warn', text:'HOA not logged — '+(h.name||('account '+(h.account_number||'')))+' ('+invMoney(h.dues_amount)+')'});
+  });
+  return flags;
+}
+function propNet(pid, ym){
+  var net=0;
+  ILED.forEach(function(l){ if(String(l.property_id)!==String(pid) || !ledInMonth(l,ym)) return; net += ((l.direction||invDirFor(l.category))==='income'?1:-1)*invNum(l.amount); });
+  return net;
+}
+function updateInvBadge(){ var el=ge('nbInv'); if(el) el.textContent = invFlags(invCurMonth()).length; }
+
+// ---- Generic form modal (built on the fly) ----
+function invOpenForm(title, fields, initial, onSubmit){
+  initial = initial || {};
+  var ov=document.createElement('div'); ov.className='modal-ov open'; ov.style.zIndex='1300';
+  var m=document.createElement('div'); m.className='modal'; m.style.maxWidth='560px';
+  var h=document.createElement('div'); h.style.cssText='display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--border);';
+  h.innerHTML='<div style="font-weight:700;font-size:17px;">'+_esc(title)+'</div>';
+  var x=document.createElement('button'); x.textContent='✕'; x.style.cssText='background:none;border:none;font-size:18px;color:var(--text3);cursor:pointer;'; x.addEventListener('click',function(){ document.body.removeChild(ov); });
+  h.appendChild(x); m.appendChild(h);
+  var body=document.createElement('div'); body.style.cssText='padding:16px 20px;display:flex;flex-direction:column;gap:12px;max-height:70vh;overflow:auto;';
+  var inputs={};
+  fields.forEach(function(f){
+    var wrap=document.createElement('div'); wrap.style.cssText='display:flex;flex-direction:column;gap:4px;';
+    var lb=document.createElement('label'); lb.className='fl'; lb.textContent=f.label+(f.required?' *':''); wrap.appendChild(lb);
+    var el;
+    if(f.type==='select'){
+      el=document.createElement('select'); el.className='fsel';
+      (f.options||[]).forEach(function(o){ var op=document.createElement('option'); op.value=o.value; op.textContent=o.label; el.appendChild(op); });
+      el.value = (initial[f.key]!=null?initial[f.key]:(f.def!=null?f.def:''));
+    } else if(f.type==='textarea'){
+      el=document.createElement('textarea'); el.className='fi'; el.rows=2; el.value=initial[f.key]!=null?initial[f.key]:'';
+    } else {
+      el=document.createElement('input'); el.className='fi'; el.type=(f.type||'text'); if(f.placeholder) el.placeholder=f.placeholder;
+      el.value=initial[f.key]!=null?initial[f.key]:'';
+    }
+    if(f.onChange) el.addEventListener('change', function(){ f.onChange(el.value, inputs); });
+    inputs[f.key]=el; wrap.appendChild(el); body.appendChild(wrap);
+  });
+  m.appendChild(body);
+  var ft=document.createElement('div'); ft.style.cssText='display:flex;justify-content:flex-end;gap:8px;padding:14px 20px;border-top:1px solid var(--border);';
+  var save=document.createElement('button'); save.className='btn btn-p'; save.textContent='Save';
+  save.addEventListener('click', function(){
+    var vals={}; Object.keys(inputs).forEach(function(k){ vals[k]=inputs[k].value; });
+    var ok = onSubmit(vals, inputs, ov);
+    if(ok!==false){ try{ document.body.removeChild(ov); }catch(e){} }
+  });
+  ft.appendChild(save); m.appendChild(ft);
+  ov.appendChild(m); ov.addEventListener('click', function(e){ if(e.target===ov) document.body.removeChild(ov); });
+  document.body.appendChild(ov);
+  return inputs;
+}
+function invPropOptions(){ return [{value:'',label:'— none —'}].concat(IPROP.map(function(p){ return {value:String(p.id), label:(p.name||p.address||('Property '+p.id))}; })); }
+function invHoaOptions(){ return [{value:'',label:'— none —'}].concat(IHOA.map(function(h){ return {value:String(h.id), label:(h.name||('HOA '+(h.account_number||h.id)))}; })); }
+
+function openInvHoaForm(h){
+  invOpenForm(h?'Edit HOA account':'Add HOA account', [
+    {key:'name',label:'HOA name',required:true,placeholder:'e.g. Maple Ridge HOA'},
+    {key:'account_number',label:'Account #'},
+    {key:'dues_amount',label:'Dues amount',type:'number',placeholder:'e.g. 250'},
+    {key:'dues_frequency',label:'Frequency',type:'select',options:[{value:'monthly',label:'Monthly'},{value:'quarterly',label:'Quarterly'},{value:'annual',label:'Annual'}],def:'monthly'},
+    {key:'due_day',label:'Due day (1-31)',type:'number'},
+    {key:'notes',label:'Notes',type:'textarea'}
+  ], h, function(v){
+    if(!v.name.trim()){ alert('Enter an HOA name.'); return false; }
+    var rec = h || { id: Date.now()+Math.floor(Math.random()*100000) };
+    rec.name=v.name.trim(); rec.account_number=v.account_number.trim(); rec.dues_amount=invNum(v.dues_amount);
+    rec.dues_frequency=v.dues_frequency; rec.due_day=v.due_day?parseInt(v.due_day):null; rec.notes=v.notes.trim();
+    if(!h) IHOA.push(rec); saveInvHoa(rec); renderInvestments();
+  });
+}
+function openInvPropertyForm(p){
+  invOpenForm(p?'Edit property':'Add property', [
+    {key:'name',label:'Property name/label',required:true,placeholder:'e.g. 123 Main'},
+    {key:'address',label:'Address'},
+    {key:'hoa_id',label:'HOA account',type:'select',options:invHoaOptions()},
+    {key:'purchase_price',label:'Purchase price',type:'number'},
+    {key:'purchase_date',label:'Purchase date',type:'date'},
+    {key:'mortgage_lender',label:'Mortgage lender'},
+    {key:'mortgage_balance',label:'Mortgage balance',type:'number'},
+    {key:'mortgage_payment',label:'Monthly mortgage payment (P&I)',type:'number'},
+    {key:'mortgage_due_day',label:'Mortgage due day (1-31)',type:'number'},
+    {key:'notes',label:'Notes',type:'textarea'}
+  ], p, function(v){
+    if(!v.name.trim()){ alert('Enter a property name.'); return false; }
+    var rec = p || { id: Date.now()+Math.floor(Math.random()*100000) };
+    rec.name=v.name.trim(); rec.address=v.address.trim(); rec.hoa_id=v.hoa_id?parseInt(v.hoa_id):null;
+    rec.purchase_price=invNum(v.purchase_price); rec.purchase_date=v.purchase_date;
+    rec.mortgage_lender=v.mortgage_lender.trim(); rec.mortgage_balance=invNum(v.mortgage_balance);
+    rec.mortgage_payment=invNum(v.mortgage_payment); rec.mortgage_due_day=v.mortgage_due_day?parseInt(v.mortgage_due_day):null;
+    rec.notes=v.notes.trim();
+    if(!p) IPROP.push(rec); saveInvProp(rec); renderInvestments();
+  });
+}
+function openInvUnitForm(propId, u){
+  invOpenForm(u?'Edit unit':'Add unit', [
+    {key:'label',label:'Unit label',required:true,placeholder:'Whole home / Upstairs / Downstairs'},
+    {key:'rent_amount',label:'Monthly rent',type:'number'},
+    {key:'rent_due_day',label:'Rent due day (1-31)',type:'number'},
+    {key:'tenant_name',label:'Tenant name'},
+    {key:'status',label:'Status',type:'select',options:[{value:'occupied',label:'Occupied'},{value:'vacant',label:'Vacant'}],def:'occupied'},
+    {key:'lease_start',label:'Lease start',type:'date'},
+    {key:'lease_end',label:'Lease end',type:'date'},
+    {key:'notes',label:'Notes',type:'textarea'}
+  ], u, function(v){
+    if(!v.label.trim()){ alert('Enter a unit label.'); return false; }
+    var rec = u || { id: Date.now()+Math.floor(Math.random()*100000), property_id: propId };
+    rec.property_id = u ? u.property_id : propId;
+    rec.label=v.label.trim(); rec.rent_amount=invNum(v.rent_amount); rec.rent_due_day=v.rent_due_day?parseInt(v.rent_due_day):null;
+    rec.tenant_name=v.tenant_name.trim(); rec.status=v.status; rec.lease_start=v.lease_start; rec.lease_end=v.lease_end; rec.notes=v.notes.trim();
+    if(!u) IUNIT.push(rec); saveInvUnit(rec); renderInvestments();
+  });
+}
+function unitOptionsFor(propId){ var o=[{value:'',label:'— whole property —'}]; unitsForProp(propId).forEach(function(u){ o.push({value:String(u.id),label:u.label}); }); return o; }
+function openInvLedgerForm(entry, preset){
+  preset = preset || {};
+  var allCats = INV_INCOME_CATS.concat(INV_EXPENSE_CATS);
+  var init = entry || { date: tod(), property_id: preset.property_id||'', category: preset.category||'Rent', unit_id: preset.unit_id||'', amount: preset.amount||'' };
+  invOpenForm(entry?'Edit entry':'Log entry', [
+    {key:'date',label:'Date',type:'date',required:true},
+    {key:'property_id',label:'Property',type:'select',options:invPropOptions()},
+    {key:'unit_id',label:'Unit (for rent)',type:'select',options:unitOptionsFor(init.property_id)},
+    {key:'category',label:'Category',type:'select',options:allCats.map(function(c){return {value:c,label:c};})},
+    {key:'amount',label:'Amount',type:'number',required:true},
+    {key:'payee',label:'Payer / Payee'},
+    {key:'notes',label:'Notes',type:'textarea'}
+  ], init, function(v){
+    if(invNum(v.amount)<=0){ alert('Enter an amount greater than 0.'); return false; }
+    var rec = entry || { id: Date.now()+Math.floor(Math.random()*100000), source:'manual' };
+    rec.date=v.date||tod(); rec.property_id=v.property_id?parseInt(v.property_id):null; rec.unit_id=v.unit_id?parseInt(v.unit_id):null;
+    rec.category=v.category; rec.direction=invDirFor(v.category); rec.amount=invNum(v.amount); rec.payee=v.payee.trim(); rec.notes=v.notes.trim();
+    // HOA entries link to the property's HOA account when available
+    if(v.category==='HOA' && rec.property_id){ var pp=invProp(rec.property_id); rec.hoa_id = pp?pp.hoa_id:null; } else if(!entry){ rec.hoa_id=null; }
+    if(!entry) ILED.push(rec); saveInvLedger(rec); renderInvestments();
+  });
+}
+
+function renderInvestments(){
+  var root=ge('invRoot'); if(!root) return; root.innerHTML='';
+  var ym=invCurMonth();
+  // Toolbar
+  var bar=document.createElement('div'); bar.style.cssText='display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px;';
+  var mnav=document.createElement('div'); mnav.style.cssText='display:flex;align-items:center;gap:6px;margin-right:auto;';
+  var prev=document.createElement('button'); prev.className='btn btn-g'; prev.textContent='‹'; prev.addEventListener('click',function(){invShiftMonth(-1);});
+  var mlab=document.createElement('div'); mlab.style.cssText='font-weight:700;min-width:150px;text-align:center;'; mlab.textContent=invMonthLabel(ym);
+  var next=document.createElement('button'); next.className='btn btn-g'; next.textContent='›'; next.addEventListener('click',function(){invShiftMonth(1);});
+  mnav.appendChild(prev); mnav.appendChild(mlab); mnav.appendChild(next);
+  bar.appendChild(mnav);
+  function tbtn(label,cls,fn){ var b=document.createElement('button'); b.className='btn '+(cls||'btn-g'); b.textContent=label; b.style.whiteSpace='nowrap'; b.addEventListener('click',fn); return b; }
+  bar.appendChild(tbtn('+ Log entry','btn-p',function(){ openInvLedgerForm(); }));
+  bar.appendChild(tbtn('Scan finance emails','btn-g',function(){ scanFinanceEmails(); }));
+  bar.appendChild(tbtn('Import CSV','btn-g',function(){ invImportCsv(); }));
+  bar.appendChild(tbtn('+ Property','btn-g',function(){ openInvPropertyForm(); }));
+  bar.appendChild(tbtn('+ HOA','btn-g',function(){ openInvHoaForm(); }));
+  root.appendChild(bar);
+
+  // Empty state
+  if(!IPROP.length){
+    var empty=document.createElement('div'); empty.style.cssText='padding:40px;text-align:center;color:var(--text3);';
+    empty.innerHTML='No properties yet. Click <b>+ Property</b> to add your first one, add its units, then log entries or scan your finance emails.';
+    root.appendChild(empty); updateInvBadge(); return;
+  }
+
+  // Summary cards
+  var exp=invExpected(ym), act=invActual(ym);
+  var net=act.income-act.expenses;
+  var grid=document.createElement('div'); grid.style.cssText='display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px;';
+  function card(lbl,val,color,sub){ var d=document.createElement('div'); d.style.cssText='background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;';
+    d.innerHTML='<div style="font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;">'+lbl+'</div><div style="font-size:20px;font-weight:700;margin-top:4px;color:'+(color||'var(--text)')+';">'+val+'</div>'+(sub?('<div style="font-size:12px;color:var(--text3);margin-top:2px;">'+sub+'</div>'):''); return d; }
+  grid.appendChild(card('Income (actual)', invMoney(act.income), 'var(--lead)', 'expected '+invMoney(exp.income)));
+  grid.appendChild(card('Expenses (actual)', invMoney(act.expenses), 'var(--danger)', 'expected '+invMoney(exp.expenses)));
+  grid.appendChild(card('Net this month', invMoney(net), net>=0?'var(--lead)':'var(--danger)'));
+  grid.appendChild(card('Properties / units', IPROP.length+' / '+IUNIT.length, 'var(--text)'));
+  root.appendChild(grid);
+
+  // Flags
+  var flags=invFlags(ym);
+  if(flags.length){
+    var fbox=document.createElement('div'); fbox.style.cssText='background:rgba(201,76,76,0.08);border:1px solid rgba(201,76,76,0.3);border-radius:10px;padding:10px 14px;margin-bottom:14px;';
+    fbox.appendChild(mkDivSafe('font-weight:700;margin-bottom:6px;color:var(--danger);', 'Needs attention this month ('+flags.length+')'));
+    flags.forEach(function(fl){ var r=document.createElement('div'); r.style.cssText='font-size:14px;padding:2px 0;color:var(--text2);'; r.textContent=(fl.level==='red'?'● ':'○ ')+fl.text; fbox.appendChild(r); });
+    root.appendChild(fbox);
+  }
+
+  // Property cards
+  IPROP.forEach(function(p){
+    var pc=document.createElement('div'); pc.style.cssText='background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:12px;';
+    var hd=document.createElement('div'); hd.style.cssText='display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;';
+    var nm=document.createElement('div'); nm.innerHTML='<div style="font-weight:700;font-size:16px;">'+_esc(p.name||p.address||'Property')+'</div>'+(p.address&&p.name?('<div style="font-size:13px;color:var(--text3);">'+_esc(p.address)+'</div>'):'');
+    hd.appendChild(nm);
+    var pn2=propNet(p.id, ym);
+    var meta=document.createElement('div'); meta.style.cssText='text-align:right;'; meta.innerHTML='<div style="font-weight:700;color:'+(pn2>=0?'var(--lead)':'var(--danger)')+';">'+invMoney(pn2)+'</div><div style="font-size:12px;color:var(--text3);">net this month</div>';
+    hd.appendChild(meta); pc.appendChild(hd);
+    // mortgage + hoa line
+    var sub=[]; if(invNum(p.mortgage_payment)>0) sub.push('Mortgage '+invMoney(p.mortgage_payment)+(p.mortgage_lender?(' · '+_esc(p.mortgage_lender)):''));
+    var hoa=p.hoa_id?invHoa(p.hoa_id):null; if(hoa) sub.push('HOA '+_esc(hoa.name||'')+' '+invMoney(hoa.dues_amount)+'/'+(hoa.dues_frequency||'mo'));
+    if(sub.length){ var sl=document.createElement('div'); sl.style.cssText='font-size:13px;color:var(--text3);margin-top:6px;'; sl.innerHTML=sub.join('  ·  '); pc.appendChild(sl); }
+    // units
+    var uwrap=document.createElement('div'); uwrap.style.cssText='margin-top:8px;display:flex;flex-direction:column;gap:4px;';
+    unitsForProp(p.id).forEach(function(u){
+      var ur=document.createElement('div'); ur.style.cssText='display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:14px;border-top:1px solid var(--border);padding:6px 0;';
+      var left=document.createElement('div'); left.innerHTML='<b>'+_esc(u.label)+'</b> — '+invMoney(u.rent_amount)+'/mo '+(u.status==='vacant'?'<span style="color:var(--danger);">(vacant)</span>':('· '+_esc(u.tenant_name||'occupied')));
+      var uacts=document.createElement('div'); uacts.style.cssText='display:flex;gap:6px;flex-shrink:0;';
+      var logRent=document.createElement('button'); logRent.className='btn btn-g'; logRent.textContent='Log rent'; logRent.style.cssText='padding:3px 8px;font-size:13px;'; (function(u2,p2){ logRent.addEventListener('click',function(){ openInvLedgerForm(null,{property_id:String(p2.id),unit_id:String(u2.id),category:'Rent',amount:u2.rent_amount}); }); })(u,p);
+      var uEdit=document.createElement('button'); uEdit.className='btn btn-g'; uEdit.textContent='Edit'; uEdit.style.cssText='padding:3px 8px;font-size:13px;'; (function(u2){ uEdit.addEventListener('click',function(){ openInvUnitForm(u2.property_id,u2); }); })(u);
+      var uDel=document.createElement('button'); uDel.className='btn btn-g'; uDel.textContent='Del'; uDel.style.cssText='padding:3px 8px;font-size:13px;color:var(--danger);'; (function(u2){ uDel.addEventListener('click',function(){ if(confirm('Delete unit "'+u2.label+'"?')){ delInvUnit(u2.id); renderInvestments(); } }); })(u);
+      uacts.appendChild(logRent); uacts.appendChild(uEdit); uacts.appendChild(uDel);
+      ur.appendChild(left); ur.appendChild(uacts); uwrap.appendChild(ur);
+    });
+    pc.appendChild(uwrap);
+    // property actions
+    var pacts=document.createElement('div'); pacts.style.cssText='display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;';
+    var aUnit=document.createElement('button'); aUnit.className='btn btn-g'; aUnit.textContent='+ Unit'; (function(p2){ aUnit.addEventListener('click',function(){ openInvUnitForm(p2.id); }); })(p);
+    var aLog=document.createElement('button'); aLog.className='btn btn-g'; aLog.textContent='Log expense'; (function(p2){ aLog.addEventListener('click',function(){ openInvLedgerForm(null,{property_id:String(p2.id),category:'Repairs'}); }); })(p);
+    var aEdit=document.createElement('button'); aEdit.className='btn btn-g'; aEdit.textContent='Edit'; (function(p2){ aEdit.addEventListener('click',function(){ openInvPropertyForm(p2); }); })(p);
+    var aDel=document.createElement('button'); aDel.className='btn btn-g'; aDel.style.color='var(--danger)'; aDel.textContent='Delete'; (function(p2){ aDel.addEventListener('click',function(){ if(confirm('Delete "'+(p2.name||p2.address)+'" and all its units + ledger entries?')){ delInvProp(p2.id); renderInvestments(); } }); })(p);
+    pacts.appendChild(aUnit); pacts.appendChild(aLog); pacts.appendChild(aEdit); pacts.appendChild(aDel);
+    pc.appendChild(pacts);
+    root.appendChild(pc);
+  });
+
+  // HOA accounts (compact list, editable)
+  if(IHOA.length){
+    var hsec=document.createElement('div'); hsec.style.cssText='margin-top:6px;margin-bottom:12px;';
+    hsec.appendChild(mkDivSafe('font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;','HOA accounts'));
+    IHOA.forEach(function(h){
+      var hr=document.createElement('div'); hr.style.cssText='display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;margin-bottom:6px;';
+      hr.appendChild(mkDivSafe('','')); hr.firstChild.innerHTML='<b>'+_esc(h.name||'HOA')+'</b> — '+invMoney(h.dues_amount)+' '+(h.dues_frequency||'monthly')+(h.account_number?(' · #'+_esc(h.account_number)):'');
+      var ha=document.createElement('div'); ha.style.cssText='display:flex;gap:6px;';
+      var hLog=document.createElement('button'); hLog.className='btn btn-g'; hLog.textContent='Log dues'; hLog.style.cssText='padding:3px 8px;font-size:13px;';
+      (function(h2){ hLog.addEventListener('click',function(){ var props=IPROP.filter(function(p){return String(p.hoa_id)===String(h2.id);}); openInvLedgerForm(null,{property_id:props[0]?String(props[0].id):'',category:'HOA',amount:h2.dues_amount}); }); })(h);
+      var hEdit=document.createElement('button'); hEdit.className='btn btn-g'; hEdit.textContent='Edit'; hEdit.style.cssText='padding:3px 8px;font-size:13px;'; (function(h2){ hEdit.addEventListener('click',function(){ openInvHoaForm(h2); }); })(h);
+      var hDel=document.createElement('button'); hDel.className='btn btn-g'; hDel.textContent='Del'; hDel.style.cssText='padding:3px 8px;font-size:13px;color:var(--danger);'; (function(h2){ hDel.addEventListener('click',function(){ if(confirm('Delete HOA "'+(h2.name||'')+'"?')){ delInvHoa(h2.id); renderInvestments(); } }); })(h);
+      ha.appendChild(hLog); ha.appendChild(hEdit); ha.appendChild(hDel);
+      hr.appendChild(ha); hsec.appendChild(hr);
+    });
+    root.appendChild(hsec);
+  }
+
+  // Ledger for the month
+  var lsec=document.createElement('div');
+  lsec.appendChild(mkDivSafe('font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin:6px 0;','Ledger — '+invMonthLabel(ym)));
+  var rows=ILED.filter(function(l){ return ledInMonth(l,ym); }).sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
+  if(!rows.length){ lsec.appendChild(mkDivSafe('color:var(--text3);font-size:14px;padding:6px 0;','No entries logged this month yet.')); }
+  rows.forEach(function(l){
+    var r=document.createElement('div'); r.style.cssText='display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:14px;border-top:1px solid var(--border);padding:6px 0;';
+    var pnm=l.property_id?(invProp(l.property_id)||{}).name||'':''; var unm=l.unit_id?(invUnit(l.unit_id)||{}).label||'':'';
+    var dir=(l.direction||invDirFor(l.category));
+    var left=document.createElement('div'); left.innerHTML='<b>'+_esc(fd(l.date))+'</b> · '+_esc(l.category)+(pnm?(' · '+_esc(pnm)):'')+(unm?(' / '+_esc(unm)):'')+(l.payee?(' · '+_esc(l.payee)):'')+(l.source==='email'?' <span style="font-size:11px;color:var(--text3);">(email)</span>':'');
+    var right=document.createElement('div'); right.style.cssText='display:flex;align-items:center;gap:8px;flex-shrink:0;';
+    var amt=document.createElement('div'); amt.style.cssText='font-weight:700;color:'+(dir==='income'?'var(--lead)':'var(--danger)')+';'; amt.textContent=(dir==='income'?'+':'-')+invMoney(l.amount).replace('-','');
+    var ed=document.createElement('button'); ed.className='btn btn-g'; ed.textContent='Edit'; ed.style.cssText='padding:2px 7px;font-size:12px;'; (function(l2){ ed.addEventListener('click',function(){ openInvLedgerForm(l2); }); })(l);
+    var dl=document.createElement('button'); dl.className='btn btn-g'; dl.textContent='Del'; dl.style.cssText='padding:2px 7px;font-size:12px;color:var(--danger);'; (function(l2){ dl.addEventListener('click',function(){ if(confirm('Delete this entry?')){ delInvLedger(l2.id); renderInvestments(); } }); })(l);
+    right.appendChild(amt); right.appendChild(ed); right.appendChild(dl);
+    r.appendChild(left); r.appendChild(right); lsec.appendChild(r);
+  });
+  root.appendChild(lsec);
+  updateInvBadge();
+}
+function mkDivSafe(style, html){ var d=document.createElement('div'); if(style) d.style.cssText=style; if(html) d.innerHTML=html; return d; }
+
+// ---- CSV backfill: date,property,category,amount,payee,notes ----
+function invImportCsv(){
+  var input=document.createElement('input'); input.type='file'; input.accept='.csv,text/csv'; input.style.display='none'; document.body.appendChild(input);
+  input.addEventListener('change', function(){
+    var f=input.files&&input.files[0]; if(!f){ document.body.removeChild(input); return; }
+    var rd=new FileReader();
+    rd.onload=function(){
+      try{
+        var lines=String(rd.result).split(/\r?\n/).filter(function(x){return x.trim();});
+        if(lines.length<2){ alert('CSV needs a header row and at least one data row.'); return; }
+        var hdr=lines[0].split(',').map(function(s){return s.trim().toLowerCase();});
+        function col(row,name){ var i=hdr.indexOf(name); return i>=0?(row[i]||'').trim():''; }
+        var added=0;
+        for(var i=1;i<lines.length;i++){
+          var row=lines[i].split(',');
+          var cat=col(row,'category')||'Other'; var amt=invNum(col(row,'amount')); if(amt<=0) continue;
+          var pname=col(row,'property'); var prop=IPROP.find(function(p){ return (p.name||'').toLowerCase()===pname.toLowerCase() || (p.address||'').toLowerCase().indexOf(pname.toLowerCase())>=0; });
+          var rec={ id:Date.now()+Math.floor(Math.random()*100000)+i, date:col(row,'date')||tod(), property_id:prop?prop.id:null, unit_id:null, hoa_id:null, category:cat, direction:invDirFor(cat), amount:amt, payee:col(row,'payee'), notes:col(row,'notes'), source:'csv' };
+          ILED.push(rec); saveInvLedger(rec); added++;
+        }
+        alert('Imported '+added+' ledger entries.'); renderInvestments();
+      }catch(e){ alert('Could not read that CSV: '+e.message); }
+      try{ document.body.removeChild(input); }catch(_){}
+    };
+    rd.readAsText(f);
+  });
+  input.click();
+}
+// ---- AI finance-email extraction ----
+function _invFinanceQuery(label){
+  var terms = ['rent','HOA','"homeowners association"','mortgage','"mortgage statement"','statement','payment','invoice','utility','utilities','insurance','escrow','"property tax"'];
+  IPROP.forEach(function(p){ if(p.address) terms.push('"'+p.address.replace(/"/g,'')+'"'); if(p.name) terms.push('"'+p.name.replace(/"/g,'')+'"'); });
+  if(label && label.trim()) terms.push('label:'+label.trim().replace(/\s+/g,'-'));
+  return '(' + terms.join(' OR ') + ') newer_than:365d';
+}
+// Content-based dedupe key: the same charge arriving in two mailboxes (or re-scanned) collapses.
+function _invEref(o){ return [(o.date||''), invNum(o.amount), (o.category||''), (o.property_id||''), String(o.payee||'').trim().toLowerCase()].join('|'); }
+function _invConnectedMembers(){
+  if(typeof gmailState==='undefined' || !gmailState.connectedAccounts) return [];
+  return Object.keys(gmailState.connectedAccounts).map(function(mid){
+    var tm = TM.find(function(t){ return String(t.id)===String(mid); });
+    var acct = gmailState.connectedAccounts[mid] || {};
+    return { id:mid, label:(acct.email || (tm?(tm.first+' '+tm.last):('Account '+mid))) };
+  });
+}
+function _invNormCat(c){
+  c = String(c||'').trim().toLowerCase();
+  var all = INV_INCOME_CATS.concat(INV_EXPENSE_CATS);
+  for(var i=0;i<all.length;i++){ if(all[i].toLowerCase()===c) return all[i]; }
+  if(c.indexOf('rent')>=0) return 'Rent';
+  if(c.indexOf('hoa')>=0||c.indexOf('associ')>=0) return 'HOA';
+  if(c.indexOf('mort')>=0||c.indexOf('loan')>=0) return 'Mortgage';
+  if(c.indexOf('util')>=0||c.indexOf('electric')>=0||c.indexOf('water')>=0||c.indexOf('gas')>=0) return 'Utilities';
+  if(c.indexOf('insur')>=0) return 'Insurance';
+  if(c.indexOf('tax')>=0) return 'Property Tax';
+  if(c.indexOf('repair')>=0||c.indexOf('mainten')>=0) return 'Repairs';
+  if(c.indexOf('manage')>=0) return 'Management';
+  return 'Other';
+}
+function _invMatchProp(text){
+  text = String(text||'').toLowerCase(); if(!text) return null;
+  for(var i=0;i<IPROP.length;i++){ var p=IPROP[i];
+    if(p.name && text.indexOf(String(p.name).toLowerCase())>=0) return p;
+    if(p.address && (text.indexOf(String(p.address).toLowerCase())>=0 || String(p.address).toLowerCase().indexOf(text)>=0)) return p;
+  }
+  return null;
+}
+function _invParseArr(txt){
+  try{ return JSON.parse(txt); }catch(e){}
+  var a=txt.indexOf('['), b=txt.lastIndexOf(']');
+  if(a>=0 && b>a){ try{ return JSON.parse(txt.slice(a,b+1)); }catch(e){} }
+  return null;
+}
+async function scanFinanceEmails(){
+  if(!IPROP.length){ alert('Add at least one property first so I know what to match emails against.'); return; }
+  var members = _invConnectedMembers();
+  if(!members.length){ alert('Connect a Gmail account first (open the Gmail tab), then try again.'); return; }
+  var label = null; try{ label = localStorage.getItem('invGmailLabel'); }catch(e){}
+  if(label===null){ label=(prompt('Optional: the Gmail label you use for property / finance emails (leave blank to match by keywords + your property addresses only):','')||'').trim(); try{ localStorage.setItem('invGmailLabel', label); }catch(e){} }
+  var ov=document.createElement('div'); ov.className='modal-ov open'; ov.style.zIndex='1300';
+  var m=document.createElement('div'); m.className='modal'; m.style.maxWidth='720px';
+  m.innerHTML='<div style="padding:16px 20px;border-bottom:1px solid var(--border);font-weight:700;font-size:17px;">Scan finance emails</div>';
+  var body=document.createElement('div'); body.style.cssText='padding:16px 20px;max-height:72vh;overflow:auto;'; m.appendChild(body);
+  var ft=document.createElement('div'); ft.style.cssText='display:flex;justify-content:flex-end;gap:8px;padding:14px 20px;border-top:1px solid var(--border);'; m.appendChild(ft);
+  ov.appendChild(m); document.body.appendChild(ov);
+  var closeBtn=document.createElement('button'); closeBtn.className='btn btn-g'; closeBtn.textContent='Close'; closeBtn.addEventListener('click',function(){ try{document.body.removeChild(ov);}catch(e){} }); ft.appendChild(closeBtn);
+  body.innerHTML='<div style="text-align:center;color:var(--text3);padding:20px;">Reading finance emails across '+members.length+' account'+(members.length===1?'':'s')+'…</div>';
+  try{
+    var q=_invFinanceQuery(label);
+    var chunks=[];
+    for(var a=0;a<members.length;a++){
+      var mid=members[a].id;
+      try{
+        var listResp=await fetch('/api/gmail-api',{ method:'POST', headers:await apiHeaders(), body:JSON.stringify({ action:'inbox', memberId:mid, query:q }) });
+        var listData=await listResp.json();
+        if(listData.error) continue;
+        var msgs=listData.messages||[];
+        var tids=[]; msgs.forEach(function(mm){ if(mm.threadId && tids.indexOf(mm.threadId)<0) tids.push(mm.threadId); });
+        tids=tids.slice(0,12);
+        for(var i=0;i<tids.length;i++){
+          try{
+            var tr=await fetch('/api/gmail-api',{ method:'POST', headers:await apiHeaders(), body:JSON.stringify({ action:'thread', memberId:mid, threadId:tids[i] }) });
+            var td=await tr.json();
+            (td.messages||[]).forEach(function(mm){
+              var t=(mm.bodyText||'').replace(/\r/g,'').trim(); if(!t) return;
+              var idx=chunks.length;
+              chunks.push('[#'+idx+'] From: '+(mm.from||'')+' | Date: '+(mm.date||'')+' | Subject: '+(mm.subject||'')+'\n'+t.slice(0,1500));
+            });
+          }catch(e){}
+        }
+      }catch(e){}
+    }
+    var corpus=chunks.join('\n\n---\n\n').slice(0,20000);
+    if(!corpus){ body.innerHTML='<div style="color:var(--text3);padding:16px;">No finance emails found across your connected account'+(members.length===1?'':'s')+'. The scan matches by your property addresses/names, common finance keywords, and your Gmail label (if set).</div>'; return; }
+    var propList=IPROP.map(function(p){ return (p.name||'')+(p.address?(' ('+p.address+')'):''); }).join('; ');
+    var prompt='You are a bookkeeping assistant for a small rental-property owner. From the emails below, extract EVERY concrete money event (rent received, HOA dues, mortgage payment, utility/insurance/tax bill, repair, management fee). '
+      + 'Return ONLY a JSON array, no prose. Each item: {"ref": the [#n] number of the source email, "date":"YYYY-MM-DD", "amount": number (no symbols), "direction":"income|expense", "category":"Rent|Other income|Mortgage|HOA|Utilities|Insurance|Property Tax|Repairs|Management|Other", "property":"which property it concerns (address or name text, best guess)", "payee":"who paid or was paid", "description":"short"}. '
+      + 'Only include events with a clear dollar amount and date. Rent is income; everything else is an expense. Known properties: '+propList+'. If unsure which property, leave "property" empty.\n\nEMAILS:\n'+corpus;
+    var aiResp=await fetch('/api/claude',{ method:'POST', headers:await apiHeaders(), body:JSON.stringify({ max_tokens:8192, messages:[{ role:'user', content:prompt }] }) });
+    var aiData=await aiResp.json();
+    var txt=(aiData && aiData.content && aiData.content[0] && aiData.content[0].text) ? aiData.content[0].text : (typeof aiData==='string'?aiData:'');
+    var items=_invParseArr(txt);
+    if(!Array.isArray(items) || !items.length){ body.innerHTML='<div style="color:var(--text3);padding:16px;">No clear financial entries were found in those emails.</div>'; return; }
+    // Build review rows
+    var existingRefs={}; ILED.forEach(function(l){ if(l.email_ref) existingRefs[l.email_ref]=true; });
+    var batchSeen={};
+    body.innerHTML=''; body.appendChild(mkDivSafe('color:var(--text3);font-size:13px;margin-bottom:10px;','Review the entries the scan found, adjust anything, and add the ones you want. Already-imported items are skipped automatically.'));
+    var rowsWrap=document.createElement('div'); rowsWrap.style.cssText='display:flex;flex-direction:column;gap:8px;'; body.appendChild(rowsWrap);
+    var proposals=[];
+    items.forEach(function(it){
+      var cat=_invNormCat(it.category); var amt=invNum(it.amount); if(amt<=0) return;
+      var dir=(String(it.direction||'').toLowerCase()==='income'||cat==='Rent'||cat==='Other income')?'income':'expense';
+      var prop=_invMatchProp(it.property);
+      var eref=_invEref({date:(it.date||''), amount:amt, category:cat, property_id:(prop?prop.id:''), payee:it.payee});
+      if(existingRefs[eref] || batchSeen[eref]) return;   // dedupe: already imported, or same charge from the other mailbox
+      batchSeen[eref]=true;
+      var row=document.createElement('div'); row.style.cssText='display:flex;flex-wrap:wrap;gap:6px;align-items:center;border:1px solid var(--border);border-radius:8px;padding:8px;';
+      var cb=document.createElement('input'); cb.type='checkbox'; cb.checked=true; cb.style.cssText='width:18px;height:18px;';
+      var dEl=document.createElement('input'); dEl.className='fi'; dEl.type='date'; dEl.value=(it.date||tod()); dEl.style.cssText='width:135px;';
+      var pSel=document.createElement('select'); pSel.className='fsel'; pSel.style.width='150px'; invPropOptions().forEach(function(o){ var op=document.createElement('option'); op.value=o.value; op.textContent=o.label; pSel.appendChild(op); }); pSel.value=prop?String(prop.id):'';
+      var cSel=document.createElement('select'); cSel.className='fsel'; cSel.style.width='130px'; INV_INCOME_CATS.concat(INV_EXPENSE_CATS).forEach(function(c){ var op=document.createElement('option'); op.value=c; op.textContent=c; cSel.appendChild(op); }); cSel.value=cat;
+      var aEl=document.createElement('input'); aEl.className='fi'; aEl.type='number'; aEl.value=amt; aEl.style.cssText='width:100px;';
+      var pay=document.createElement('input'); pay.className='fi'; pay.placeholder='payer/payee'; pay.value=it.payee||''; pay.style.cssText='flex:1;min-width:120px;';
+      row.appendChild(cb); row.appendChild(dEl); row.appendChild(pSel); row.appendChild(cSel); row.appendChild(aEl); row.appendChild(pay);
+      var desc=mkDivSafe('font-size:12px;color:var(--text3);width:100%;', _esc(it.description||'')); row.appendChild(desc);
+      rowsWrap.appendChild(row);
+      proposals.push({ cb:cb, dEl:dEl, pSel:pSel, cSel:cSel, aEl:aEl, pay:pay, eref:eref });
+    });
+    if(!proposals.length){ body.innerHTML='<div style="color:var(--text3);padding:16px;">Everything found was already imported. Nothing new to add.</div>'; return; }
+    var addBtn=document.createElement('button'); addBtn.className='btn btn-p'; addBtn.textContent='Add selected';
+    addBtn.addEventListener('click', function(){
+      var n=0;
+      proposals.forEach(function(pr){
+        if(!pr.cb.checked) return; var amt=invNum(pr.aEl.value); if(amt<=0) return;
+        var cat=pr.cSel.value; var pid=pr.pSel.value?parseInt(pr.pSel.value):null;
+        var eref=_invEref({date:pr.dEl.value, amount:amt, category:cat, property_id:(pid||''), payee:pr.pay.value});
+        if(existingRefs[eref]) return; existingRefs[eref]=true;   // guard against an edit that now matches an existing entry
+        var rec={ id:Date.now()+Math.floor(Math.random()*100000)+n, date:pr.dEl.value||tod(), property_id:pid, unit_id:null, hoa_id:null, category:cat, direction:invDirFor(cat), amount:amt, payee:pr.pay.value.trim(), notes:'', source:'email', email_ref:eref };
+        if(cat==='HOA' && pid){ var pp=invProp(pid); rec.hoa_id=pp?pp.hoa_id:null; }
+        ILED.push(rec); saveInvLedger(rec); n++;
+      });
+      try{ document.body.removeChild(ov); }catch(e){}
+      renderInvestments();
+      alert('Added '+n+' entr'+(n===1?'y':'ies')+' to the ledger.');
+    });
+    ft.insertBefore(addBtn, closeBtn);
+  }catch(e){ body.innerHTML='<div style="color:var(--danger);padding:16px;">Scan failed: '+_esc(e.message||String(e))+'</div>'; }
+}
+// ===================== END INVESTMENTS MODULE =====================
 })();
