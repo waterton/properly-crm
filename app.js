@@ -11292,6 +11292,7 @@ function renderInvestments(){
   acts.appendChild(ivb('+ Log entry','pri',function(){ openInvLedgerForm(); }));
   var sinceVal; try{ sinceVal = localStorage.getItem('invLastScan') || (new Date().getFullYear()+'-01-01'); }catch(e){ sinceVal = new Date().getFullYear()+'-01-01'; }
   acts.appendChild(ivb('Scan email','',function(){ scanFinanceEmails(sinceVal); }));
+  acts.appendChild(ivb('Export','',function(){ invExportModal('properties'); }));
   bar.appendChild(mnav); bar.appendChild(acts);
   root.appendChild(bar);
 
@@ -11732,7 +11733,10 @@ function renderHardMoney(){
   fsel.addEventListener('change',function(){ _hmFilter=fsel.value; renderHardMoney(); });
   lft.appendChild(fsel);
   bar.appendChild(lft);
-  bar.appendChild(ivbtn('+ Loan','pri',function(){ openLoanForm(); }));
+  var hmr=document.createElement('div'); hmr.style.cssText='display:flex;gap:8px;flex-wrap:wrap;';
+  hmr.appendChild(ivbtn('Export','',function(){ invExportModal('loans'); }));
+  hmr.appendChild(ivbtn('+ Loan','pri',function(){ openLoanForm(); }));
+  bar.appendChild(hmr);
   root.appendChild(bar);
 
   if(!ILOAN.length){
@@ -11881,6 +11885,78 @@ function openLoanDetail(id){
       r.appendChild(x); root.appendChild(r);
     });
   }
+}
+// ---- On-demand export / email (properties + hard money) ----
+function _csvCell(v){ v=(v==null?'':String(v)); return /[",\n]/.test(v)?('"'+v.replace(/"/g,'""')+'"'):v; }
+function _downloadFile(name, content, mime){
+  try{
+    var blob=new Blob([content],{type:mime||'text/csv;charset=utf-8'});
+    var url=URL.createObjectURL(blob); var a=document.createElement('a'); a.href=url; a.download=name; document.body.appendChild(a); a.click();
+    setTimeout(function(){ try{ URL.revokeObjectURL(url); document.body.removeChild(a); }catch(e){} }, 200); return true;
+  }catch(e){ alert('Download not supported here — use Email instead. ('+e.message+')'); return false; }
+}
+function _inRange(dstr, from, to){ dstr=String(dstr||'').slice(0,10); if(from && dstr<from) return false; if(to && dstr>to) return false; return true; }
+function buildPropCsv(from, to, pids){
+  var rows=[['Date','Property','Unit','HOA','Category','Direction','Amount','Payee','Source','Notes'].join(',')];
+  ILED.filter(function(l){ return _inRange(l.date,from,to) && (!pids.length || pids.indexOf(String(l.property_id))>=0); })
+      .sort(function(a,b){ return String(a.date).localeCompare(String(b.date)); })
+      .forEach(function(l){
+        var p=l.property_id?invProp(l.property_id):null, u=l.unit_id?invUnit(l.unit_id):null, h=l.hoa_id?invHoa(l.hoa_id):null;
+        rows.push([_csvCell(l.date), _csvCell(p?(p.name||p.address):''), _csvCell(u?u.label:''), _csvCell(h?h.name:''), _csvCell(l.category), _csvCell(l.direction||invDirFor(l.category)), invNum(l.amount).toFixed(2), _csvCell(l.payee), _csvCell(l.source), _csvCell(l.notes)].join(','));
+      });
+  return rows.join('\r\n');
+}
+function buildLoanCsv(from, to, ids){
+  var rows=[['Borrower','Address','Principal','Rate %','Term (mo)','Start','Maturity','Monthly','Status','Received (range)','Notes'].join(',')];
+  ILOAN.filter(function(l){ return !ids.length || ids.indexOf(String(l.id))>=0; }).forEach(function(l){
+    var rec=paymentsForLoan(l.id).filter(function(p){ return _inRange(p.date,from,to); }).reduce(function(s,p){ return s+invNum(p.amount); },0);
+    rows.push([_csvCell(l.borrower), _csvCell(l.address), invNum(l.principal).toFixed(2), _csvCell(l.interest_rate||''), _csvCell(l.term_months||''), _csvCell(l.start_date||''), _csvCell(l.end_date||''), invNum(l.monthly_payment).toFixed(2), _csvCell(l.status||'active'), rec.toFixed(2), _csvCell(l.notes)].join(','));
+  });
+  return rows.join('\r\n');
+}
+function invExportModal(kind){
+  var isLoan = kind==='loans';
+  var ov=document.createElement('div'); ov.className='modal-ov open'; ov.style.zIndex='1300';
+  var m=document.createElement('div'); m.className='modal'; m.style.cssText='max-width:560px;background:'+IVC.card+';color:'+IVC.txt+';border:1px solid '+IVC.bord+';';
+  m.innerHTML='<div style="padding:16px 20px;border-bottom:1px solid '+IVC.bord+';font-weight:500;font-size:17px;">Export '+(isLoan?'hard money':'properties')+'</div>';
+  var body=document.createElement('div'); body.style.cssText='padding:16px 20px;max-height:66vh;overflow:auto;display:flex;flex-direction:column;gap:12px;'; m.appendChild(body);
+  var inStyle='background:'+IVC.tile+';border:1px solid '+IVC.bord+';color:'+IVC.txt+';border-radius:7px;padding:6px 9px;font-family:inherit;font-size:14px;';
+  var rr=document.createElement('div'); rr.style.cssText='display:flex;gap:8px;align-items:center;flex-wrap:wrap;';
+  rr.appendChild(mkDivSafe('font-size:13px;color:'+IVC.mut+';', isLoan?'Payments from':'From'));
+  var fI=document.createElement('input'); fI.type='date'; fI.style.cssText=inStyle; rr.appendChild(fI);
+  rr.appendChild(mkDivSafe('font-size:13px;color:'+IVC.mut+';','to'));
+  var tI=document.createElement('input'); tI.type='date'; tI.style.cssText=inStyle; rr.appendChild(tI);
+  body.appendChild(rr);
+  body.appendChild(mkDivSafe('font-size:13px;color:'+IVC.mut+';', isLoan?'Loans (leave all unchecked = all)':'Properties (leave all unchecked = all)'));
+  var selWrap=document.createElement('div'); selWrap.style.cssText='display:flex;flex-direction:column;gap:5px;max-height:170px;overflow:auto;';
+  var items = isLoan ? ILOAN.map(function(l){return {id:String(l.id), label:l.borrower};}) : IPROP.map(function(p){return {id:String(p.id), label:(p.name||p.address)};});
+  var checks={};
+  items.forEach(function(it){ var lb=document.createElement('label'); lb.style.cssText='display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer;'; var cb=document.createElement('input'); cb.type='checkbox'; cb.style.cssText='width:16px;height:16px;'; checks[it.id]=cb; lb.appendChild(cb); lb.appendChild(document.createTextNode(it.label||'?')); selWrap.appendChild(lb); });
+  body.appendChild(selWrap);
+  body.appendChild(mkDivSafe('font-size:13px;color:'+IVC.mut+';','Email to'));
+  var toIn=document.createElement('input'); toIn.type='text'; toIn.value='banff1997@gmail.com, eldarealtor@gmail.com'; toIn.style.cssText=inStyle; body.appendChild(toIn);
+  var ft=document.createElement('div'); ft.style.cssText='display:flex;justify-content:flex-end;gap:8px;padding:14px 20px;border-top:1px solid '+IVC.bord+';';
+  function mb(label,primary){ var b=document.createElement('button'); b.textContent=label; b.style.cssText='background:'+(primary?IVC.accent:'transparent')+';border:1px solid '+(primary?IVC.accent:IVC.bord)+';color:'+IVC.txt+';border-radius:7px;padding:7px 14px;font-size:14px;cursor:pointer;font-family:inherit;'; return b; }
+  function selIds(){ return Object.keys(checks).filter(function(k){return checks[k].checked;}); }
+  function csv(){ return isLoan ? buildLoanCsv(fI.value,tI.value,selIds()) : buildPropCsv(fI.value,tI.value,selIds()); }
+  function fname(){ return (isLoan?'hard-money':'properties')+'-'+(new Date().toISOString().slice(0,10))+'.csv'; }
+  var dl=mb('Download CSV'); dl.addEventListener('click',function(){ _downloadFile(fname(), csv()); });
+  var em=mb('Email now', true);
+  em.addEventListener('click',async function(){
+    var recips=toIn.value.split(/[,;]/).map(function(s){return s.trim();}).filter(function(s){return s.indexOf('@')>0;});
+    if(!recips.length){ alert('Enter at least one email address.'); return; }
+    em.textContent='Sending…'; em.disabled=true;
+    try{
+      var resp=await fetch('/api/send-csv',{ method:'POST', headers:await apiHeaders(), body:JSON.stringify({ to:recips, subject:(isLoan?'Hard money export':'Properties export')+' — '+fname(), filename:fname(), csv:csv() }) });
+      var d=await resp.json();
+      if(d.ok){ alert('Sent to '+recips.join(', ')); try{document.body.removeChild(ov);}catch(e){} }
+      else { alert('Could not send: '+(d.error||'unknown')); em.textContent='Email now'; em.disabled=false; }
+    }catch(e){ alert('Send failed: '+e.message); em.textContent='Email now'; em.disabled=false; }
+  });
+  var cl=mb('Close'); cl.addEventListener('click',function(){ try{document.body.removeChild(ov);}catch(e){} });
+  ft.appendChild(dl); ft.appendChild(em); ft.appendChild(cl); m.appendChild(ft);
+  ov.appendChild(m); ov.addEventListener('click',function(e){ if(e.target===ov) try{document.body.removeChild(ov);}catch(_){} });
+  document.body.appendChild(ov);
 }
 // ===================== END INVESTMENTS MODULE =====================
 })();
