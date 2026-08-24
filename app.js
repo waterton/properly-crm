@@ -2174,9 +2174,19 @@ function rn(){
   });
 }
 
+// Searchable contact picker for the Note modal (built once, reused). Its hidden input keeps the
+// id 'nContact', so the save code reads the selected id exactly as before.
+var _notePicker=null;
+function ensureNotePicker(){
+  if(_notePicker) return _notePicker;
+  var wrap=ge('nContactWrap'); if(!wrap) return null;
+  wrap.innerHTML='';
+  _notePicker=buildContactPicker(wrap, 'nContact', 'Search contact by name, email, phone...', function(c){ fsDeals('nDeal', c?c.id:'', ''); });
+  return _notePicker;
+}
 function openEditNote(note){
   // Pre-fill the note modal
-  fs('nContact'); ge('nContact').value=note.contactId;
+  var _np=ensureNotePicker(); if(_np) _np.setContact(gc(note.contactId));
   fsDeals('nDeal', note.contactId, note.transactionId);
   if(ge('nCategory')) ge('nCategory').value=note.category||'General';
   ge('nText').value=note.text;
@@ -10259,7 +10269,7 @@ ge('fPhonesAdd') && ge('fPhonesAdd').addEventListener('click',function(){mvAddRo
 ge('fEmailsAdd') && ge('fEmailsAdd').addEventListener('click',function(){mvAddRow('fEmails','','');});
 ge('fAddressesAdd') && ge('fAddressesAdd').addEventListener('click',function(){mvAddRow('fAddresses','','');});
 ge('btnAddFU').addEventListener('click',function(){ge('btnSaveFU')&&ge('btnSaveFU').setAttribute('data-edit-id','');ge('fuLabel').value='';fs('fuContact');fsDeals('fuDeal',ge('fuContact').value,'');ge('fuDate').value=tod();om('fuModal');});
-ge('btnAddNote').addEventListener('click',function(){ge('btnSaveNote')&&ge('btnSaveNote').setAttribute('data-edit-id','');ge('nText').value='';if(ge('nCategory'))ge('nCategory').value='General';fs('nContact');fsDeals('nDeal',ge('nContact').value,'');om('noteModal');});
+ge('btnAddNote').addEventListener('click',function(){ge('btnSaveNote')&&ge('btnSaveNote').setAttribute('data-edit-id','');ge('nText').value='';if(ge('nCategory'))ge('nCategory').value='General';var _np=ensureNotePicker();if(_np)_np.setContact(null);fsDeals('nDeal','','');om('noteModal');});
 // Notes tab: search, category chips, collapse-all
 (function(){
   var s=ge('nSearch'); if(s) s.addEventListener('input',function(){ _noteSearch=this.value; rn(); });
