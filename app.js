@@ -8052,7 +8052,10 @@ function renderTeamCards(){
     (function(mid){ delBtn.addEventListener('click', function(){
       if(!confirm('Remove this team member?')) return;
       TM = TM.filter(function(x){ return x.id !== mid; });
-      sv(); renderTeamCards(); renderTeamAssignments();
+      if(typeof gmailState!=='undefined' && gmailState.connectedAccounts) delete gmailState.connectedAccounts[String(mid)];
+      sv();
+      if(supaReady){ dbDeleteBy('team','id',mid); dbDeleteBy('gmail_tokens','member_id',mid); }   // persist the removal + drop their mailbox
+      renderTeamCards(); renderTeamAssignments();
     }); })(m.id);
     btnRow.appendChild(editBtn); btnRow.appendChild(delBtn);
     actions.appendChild(btnRow);
