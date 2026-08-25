@@ -9940,10 +9940,11 @@ showSyncStatus(supaReady ? 'live' : 'off');
 // -- AUTH SYSTEM --
 var currentUser = null;
 // ---- Access control (UI-level) ----
-// Owners get full access. Anyone else who signs in is a LIMITED user: the Investments tabs
-// (Properties + Hard Money) are hidden, and all deletions are blocked. To add an owner, add their
-// email (lowercase) here.
-var OWNER_EMAILS = ['banff1997@gmail.com','eldarealtor@gmail.com'];
+// Owners (below) get full access. ANYONE ELSE who signs in is automatically a LIMITED user: the
+// Investments tabs (Properties + Hard Money) are hidden and all deletions are blocked. So a
+// temporary helper just needs a Supabase login that isn't on this list - no code change needed.
+// To grant a new permanent owner, add their login email (lowercase) here.
+var OWNER_EMAILS = ['banff1997@gmail.com','eldarealtor@gmail.com','randyknowsutah@gmail.com'];
 var IS_RESTRICTED = false;
 var _noDelAlertT = 0;
 function _notifyNoDelete(){ var n=Date.now(); if(n-_noDelAlertT>1500){ _noDelAlertT=n; try{ alert("You don't have permission to delete items."); }catch(e){} } }
