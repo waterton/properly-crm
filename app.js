@@ -997,6 +997,7 @@ function ge(id){return document.getElementById(id);}
 function ck(){var s=document.createElementNS('http://www.w3.org/2000/svg','svg');s.setAttribute('width','9');s.setAttribute('height','9');s.setAttribute('fill','none');s.setAttribute('stroke','#0d0f14');s.setAttribute('stroke-width','3');s.setAttribute('viewBox','0 0 24 24');var p=document.createElementNS('http://www.w3.org/2000/svg','polyline');p.setAttribute('points','20,6 9,17 4,12');s.appendChild(p);return s;}
 var pn={briefing:'Daily Briefing',dashboard:'Dashboard',pipeline:'Pipeline',contacts:'Contacts',followups:'Follow-ups',notes:'Notes',deadlines:'Deadlines',documents:'Documents',tc:'Transactions',scanner:'Doc Scanner',cardscanner:'Card Scanner',calendar:'Calendar',team:'Team',gmail:'Gmail',mls:'MLS Search',drips:'Drip Campaigns',investments:'Properties',hardmoney:'Hard Money'};
 function sp(id, fromHistory){
+  if(IS_RESTRICTED && (id==='investments'||id==='hardmoney')) id='dashboard';   // limited users can't open Investments
   curPage=id;
   if(typeof hideGlobalSearch==='function') hideGlobalSearch();
   if(!fromHistory){ try{ history.pushState({page:id}, '', '#'+id); }catch(e){} }
@@ -9938,6 +9939,35 @@ showSyncStatus(supaReady ? 'live' : 'off');
 // -- STARTUP ----------------------------------------------------------
 // -- AUTH SYSTEM --
 var currentUser = null;
+// ---- Access control (UI-level) ----
+// Owners get full access. Anyone else who signs in is a LIMITED user: the Investments tabs
+// (Properties + Hard Money) are hidden, and all deletions are blocked. To add an owner, add their
+// email (lowercase) here.
+var OWNER_EMAILS = ['banff1997@gmail.com','eldarealtor@gmail.com'];
+var IS_RESTRICTED = false;
+var _noDelAlertT = 0;
+function _notifyNoDelete(){ var n=Date.now(); if(n-_noDelAlertT>1500){ _noDelAlertT=n; try{ alert("You don't have permission to delete items."); }catch(e){} } }
+function computeRestricted(){ var e=(currentUser&&currentUser.email)?currentUser.email.toLowerCase():''; IS_RESTRICTED = !!e && OWNER_EMAILS.indexOf(e)<0; return IS_RESTRICTED; }
+function applyRestrictions(){
+  computeRestricted();
+  ['nav-investments','nav-hardmoney'].forEach(function(id){ var el=ge(id); if(el) el.style.display = IS_RESTRICTED ? 'none' : ''; });
+  var ni=ge('nav-investments'); if(ni && ni.previousElementSibling && ni.previousElementSibling.classList && ni.previousElementSibling.classList.contains('nav-sec')) ni.previousElementSibling.style.display = IS_RESTRICTED ? 'none' : '';
+  if(IS_RESTRICTED && (curPage==='investments'||curPage==='hardmoney')){ try{ sp('dashboard'); }catch(e){} }
+}
+// Block every Supabase DELETE for a limited user at one choke point (covers all delete code paths).
+(function(){
+  if(typeof window==='undefined' || !window.fetch) return;
+  var _of = window.fetch;
+  window.fetch = function(url, opts){
+    try{
+      if(IS_RESTRICTED && opts && String(opts.method||'').toUpperCase()==='DELETE' && String(url||'').indexOf('/rest/v1/')>=0){
+        _notifyNoDelete();
+        return Promise.resolve(new Response('{"error":"forbidden"}', { status:403, headers:{'Content-Type':'application/json'} }));
+      }
+    }catch(e){}
+    return _of.apply(this, arguments);
+  };
+})();
 var myMemberId = null; // team member id matching whoever is signed into the CRM right now
 
 function showLoginScreen(){
@@ -9968,6 +9998,7 @@ function showApp(user){
   if(tm) initials = (tm.first.charAt(0) + tm.last.charAt(0)).toUpperCase();
   ge('topbarUser').textContent = initials;
   ge('topbarUser').title = user.email + ' (click to sign out)';
+  applyRestrictions();
 }
 
 function clearLoginMessages(){
