@@ -6420,6 +6420,7 @@ function showScannerResults(r){
     return s;
   }
   function renderDiff(){
+    if(!diffWrap) return;   // guard against an early call before the UI is built
     diffWrap.innerHTML='';
     var dtx=scSelectedTx();
     if(!dtx) return;
@@ -6479,6 +6480,7 @@ function showScannerResults(r){
   }
 
   function renderTxChoice(){
+    if(!txChoice || !newCb) return;   // an auto-link during setup can fire this before the UI exists
     txChoice.innerHTML = '';
     var cid = newCb.checked ? null : (scPicker.hidden.value ? parseInt(scPicker.hidden.value) : null);
     var existing = cid ? TX.filter(function(t){ return String(t.contactId)===String(cid) && t.status!=='closed'; }) : [];
