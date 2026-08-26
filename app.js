@@ -6292,7 +6292,7 @@ function showScannerResults(r){
   imp.appendChild(cLbl);
   var cWrap = document.createElement('div'); cWrap.style.marginBottom = '4px';
   imp.appendChild(cWrap);
-  var scPicker = buildContactPicker(cWrap, 'sc_import_contact', 'Search existing contact by name, email, phone...');
+  var scPicker = buildContactPicker(cWrap, 'sc_import_contact', 'Search existing contact by name, email, phone...', function(){ if(typeof renderTxChoice==='function') renderTxChoice(); });
 
   // Pre-seed + client-side selector (buyer vs seller) with smart default
   function normName(x){ return String(x||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9 ]/g,'').replace(/\s+/g,' ').trim(); }
@@ -6423,6 +6423,11 @@ function showScannerResults(r){
     diffWrap.innerHTML='';
     var dtx=scSelectedTx();
     if(!dtx) return;
+    // Contract terms (title company, dates, price, lender, commission, MLS) are amended ONLY by an
+    // ADDENDUM. A title-insurance commitment, inspection report, disclosure, etc. — even one from a
+    // company with "title" in its name — must never change the deal's fields. The document still
+    // attaches to the transaction; it just doesn't propose field changes.
+    if(String(r.docType||'').toLowerCase().indexOf('addendum')<0) return;
     var inNo=scIncomingNo();
     var rows=[];
     SC_DIFF_FIELDS.forEach(function(f){
