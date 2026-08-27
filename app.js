@@ -2381,12 +2381,28 @@ function _dlTypeToField(type){
 // shouldn't keep nagging as overdue. Restricted to overdue dates on purpose: the date-tracked
 // steps auto-check on import (they mean "tracking", not "done"), so hiding UPCOMING deadlines by
 // them would wrongly remove live deadlines. Only overdue + checked is safe to hide.
+function _stepForField(tx, field){
+  var tmpl = (typeof TC_TEMPLATES !== 'undefined') ? (TC_TEMPLATES[tx.type] || TC_TEMPLATES['buyer']) : null;
+  if(!tmpl) return null;
+  for(var i=0;i<tmpl.length;i++){ var st=tmpl[i].steps||[]; for(var j=0;j<st.length;j++){ if(st[j].dateField===field) return st[j]; } }
+  return null;
+}
 function dlDoneStep(d){
   if(!d || d.transactionId==null || !d.date) return false;
-  if(du(d.date) >= 0) return false;   // only overdue deadlines can be auto-hidden as done
   var tx = TX.find(function(t){ return String(t.id)===String(d.transactionId); });
   if(!tx) return false;
   var field = _dlTypeToField(d.type); if(!field) return false;
+  var step = _stepForField(tx, field);
+  // A COMPLETION step (e.g. Appraisal) is a real "done" checkbox: once checked - or once the
+  // contingency is waived (N/A) - the deadline is finished and hides regardless of its date.
+  if(step && step.completion){
+    if(tx.steps && tx.steps[step.key]) return true;
+    if(field==='appraisalDate' && typeof appraisalWaived==='function' && appraisalWaived(tx)) return true;
+    return false;
+  }
+  // Tracking steps auto-check on import (they mean "tracking", not "done"), so only an OVERDUE
+  // date is safe to auto-hide when checked - hiding upcoming ones would drop live deadlines.
+  if(du(d.date) >= 0) return false;
   return _dateHandled(tx, field);
 }
 
@@ -3284,9 +3300,8 @@ var TC_TEMPLATES = {
       {label:'Earnest money delivered',key:'b3_earnest',hasDate:true,dateField:'earnestDate',desc:'Earnest money confirmation received and logged.'},
       {label:'Due diligence deadline tracked',key:'b3_duedilig',hasDate:true,dateField:'dueDiligDate',desc:'Contractual tracking window active.'},
       {label:'Financing deadline tracked',key:'b3_financing',hasDate:true,dateField:'financingDate',desc:'Contractual tracking window active.'},
-      {label:'Appraisal deadline tracked',key:'b3_appraisal',hasDate:true,dateField:'appraisalDate',desc:'Contractual tracking window active.'},
+      {label:'Appraisal',key:'b3_appr',hasDate:true,dateField:'appraisalDate',completion:true,desc:'Appraisal received and reviewed. Check when complete (or when waived / N/A).'},
       {label:'Home inspection completed & repairs negotiated',key:'b3_inspection',owner:'agent',due:{anchor:'contractDate',offset:7},desc:'Physical inspection performed, report evaluated, and repair addenda executed.'},
-      {label:'Appraisal completed & loan approved',key:'b3_apprloan',owner:'lender',due:{anchor:'contractDate',offset:21},desc:'Appraisal report received above contract value and formal loan commitment issued.'},
       {label:'Title commitment reviewed & confirmed',key:'b3_title',owner:'title',due:{anchor:'contractDate',offset:10},desc:'Preliminary title insurance commitment reviewed for encumbrances.'},
       {label:'Final walkthrough scheduled & completed',key:'b3_walkthrough',owner:'agent',due:{anchor:'closingDate',offset:-1},desc:'Final property condition verification completed with buyer.'},
       {label:'Closing time, utilities, & funds confirmed',key:'b3_closingprep',owner:'tc',due:{anchor:'closingDate',offset:-3},desc:'Signing window locked, utility transfer reminders sent, and final wire figures verified.'},
@@ -3320,9 +3335,8 @@ var TC_TEMPLATES = {
       {label:'Earnest money received',key:'s3_earnest',hasDate:true,dateField:'earnestDate',desc:'Verification of earnest money deposit holding received.'},
       {label:'Due diligence deadline tracked',key:'s3_duedilig',hasDate:true,dateField:'dueDiligDate',desc:'Contractual tracking window active.'},
       {label:'Financing deadline tracked',key:'s3_financing',hasDate:true,dateField:'financingDate',desc:'Contractual tracking window active.'},
-      {label:'Appraisal deadline tracked',key:'s3_appraisal',hasDate:true,dateField:'appraisalDate',desc:'Contractual tracking window active.'},
+      {label:'Appraisal',key:'s3_appr',hasDate:true,dateField:'appraisalDate',completion:true,desc:"Buyer's appraisal completed and valuation contingency satisfied. Check when complete (or when waived / N/A)."},
       {label:'Buyer inspection & repair negotiations completed',key:'s3_inspection',owner:'agent',due:{anchor:'contractDate',offset:7},desc:"Buyer's home inspection finalized and resolution addendum successfully executed."},
-      {label:'Buyer appraisal completed',key:'s3_appraisaldone',owner:'lender',due:{anchor:'contractDate',offset:21},desc:"Buyer's valuation contingency satisfied."},
       {label:'Title commitment reviewed',key:'s3_title',owner:'title',due:{anchor:'contractDate',offset:10},desc:'Seller title obligations verified clear for transfer.'},
       {label:'Signing date set & utilities reminded',key:'s3_signing',owner:'tc',due:{anchor:'closingDate',offset:-3},desc:'Settlement appointment locked and client reminded to terminate active utility accounts.'},
       {label:'Final walkthrough & funds verification completed',key:'s3_walkthrough',owner:'agent',due:{anchor:'closingDate',offset:-1},desc:'Buyer final walkthrough completed and funds availability confirmed.'},
@@ -3352,10 +3366,45 @@ function _resolveDueDate(tx, due){
   dt.setDate(dt.getDate() + (due.offset||0));
   return dt.toISOString().slice(0,10);
 }
+// One-time migration: the two appraisal items (auto-tracked + "appraisal & loan approved") were
+// collapsed into a single "Appraisal" completion step (b3_appr / s3_appr). Carry the old real
+// "completed" mark (b3_apprloan / s3_appraisaldone) onto the new key, and drop the legacy keys so
+// nothing lingers. The old auto-tracked b3_appraisal/s3_appraisal was "tracking", not "done", so
+// it is intentionally NOT treated as completion.
+function migrateAppraisalSteps(){
+  (TX||[]).forEach(function(t){
+    if(!t || !t.steps) return;
+    var s = t.steps, dirty = false;
+    if(('b3_apprloan' in s) || ('b3_appraisal' in s)){
+      if(s.b3_apprloan && !s.b3_appr){ s.b3_appr = true; }
+      delete s.b3_apprloan; delete s.b3_appraisal; dirty = true;
+    }
+    if(('s3_appraisaldone' in s) || ('s3_appraisal' in s)){
+      if(s.s3_appraisaldone && !s.s3_appr){ s.s3_appr = true; }
+      delete s.s3_appraisaldone; delete s.s3_appraisal; dirty = true;
+    }
+    if(dirty){ sv(); if(supaReady) dbSave('transactions', [t]); }
+  });
+}
 // Build/refresh the generated tasks for one deal (or all active deals when tx omitted).
 function materializeWorkflowTasks(txArg){
   var list = txArg ? [txArg] : TX.filter(function(t){ return t.status!=='closed'; });
   var changed = false;
+  // Retire generated deadlines whose step no longer exists in the template (e.g. the removed
+  // "Appraisal completed & loan approved" task). Orphaned stepKey deadlines would otherwise linger.
+  (function(){
+    var valid = {};
+    Object.keys(TC_TEMPLATES).forEach(function(ty){
+      (TC_TEMPLATES[ty]||[]).forEach(function(ph){ (ph.steps||[]).forEach(function(s){ valid[s.key]=true; }); });
+    });
+    var orphans = D.filter(function(d){ return d.stepKey && !valid[d.stepKey]; });
+    if(orphans.length){
+      var oids = {}; orphans.forEach(function(d){ oids[d.id]=true; });
+      D = D.filter(function(d){ return !oids[d.id]; });
+      if(supaReady) orphans.forEach(function(d){ dbDeleteBy('deadlines','id',d.id); });
+      changed = true;
+    }
+  })();
   list.forEach(function(tx){
     if(!tx || tx.status==='closed') return;
     var tmpl = TC_TEMPLATES[tx.type] || TC_TEMPLATES['buyer'];
@@ -6903,7 +6952,9 @@ async function commitScanImport(r, btn){
     if(!tx.steps) tx.steps = {};
     template.forEach(function(phase){
       phase.steps.forEach(function(step){
-        if(step.hasDate && step.dateField && tx[step.dateField] && !tx.steps[step.key]){
+        // Tracking steps auto-check when their date is present. A COMPLETION step (Appraisal) is a
+        // real to-do the user checks off when done, so never auto-check it.
+        if(step.hasDate && step.dateField && !step.completion && tx[step.dateField] && !tx.steps[step.key]){
           tx.steps[step.key] = true;
         }
       });
@@ -10121,6 +10172,7 @@ function onAuthSuccess(user){
     updateNbTC();
     try{ updateInvBadge(); }catch(e){}   // investments "needs attention" count on the sidebar
     if(ok) try{ sweepStaleItems(); }catch(e){}   // auto-remove orphaned/fired items so they can't resurface
+    if(ok) try{ migrateAppraisalSteps(); }catch(e){}   // carry legacy appraisal-done marks onto the new single "Appraisal" step
     if(ok) try{ materializeWorkflowTasks(); }catch(e){}   // generate dated tasks from workflow templates
     restoreTabFromHash();
     // Email-schedule editor now lives on the dashboard; ensure it populates on first load

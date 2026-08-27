@@ -115,14 +115,17 @@ module.exports = async function (req, res) {
       'Earnest Money Due':      ['b3_earnest','s3_earnest'],
       'Due Diligence Deadline': ['b3_duedilig','s3_duedilig'],
       'Financing Deadline':     ['b3_financing','s3_financing'],
-      'Appraisal Deadline':     ['b3_appraisal','s3_appraisal'],
+      'Appraisal Deadline':     ['b3_appr','s3_appr'],
     };
+    // Appraisal is a real completion checkbox: once checked it's done and hides regardless of date.
+    // The other date deadlines auto-track on import, so only an OVERDUE one is safe to auto-hide.
+    const _completionTypes = { 'Appraisal Deadline': true };
     const stepDone = d => {
       if (d.transactionId == null || !d.date) return false;
-      if (daysDiff(d.date) >= 0) return false;   // only overdue deadlines auto-hide (steps auto-track)
       const tx = _txById[String(d.transactionId)];
       if (!tx || !tx.steps) return false;
       const keys = _stepKeys[d.type]; if (!keys) return false;
+      if (!_completionTypes[d.type] && daysDiff(d.date) >= 0) return false;  // tracking steps: overdue only
       return keys.some(k => tx.steps[k]);
     };
     const liveDeadlines = (deadlines || []).filter(isLive).filter(d => !stepDone(d));
