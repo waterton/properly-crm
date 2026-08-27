@@ -2396,7 +2396,10 @@ function dlDoneStep(d){
   // A COMPLETION step (e.g. Appraisal) is a real "done" checkbox: once checked - or once the
   // contingency is waived (N/A) - the deadline is finished and hides regardless of its date.
   if(step && step.completion){
-    if(tx.steps && tx.steps[step.key]) return true;
+    // Honor the new key AND the legacy "appraisal completed" keys, so a deal marked done before
+    // the collapse stays hidden even if the one-time migration hasn't run on this device yet.
+    var doneKeys = (field==='appraisalDate') ? [step.key,'b3_apprloan','s3_appraisaldone'] : [step.key];
+    if(tx.steps && doneKeys.some(function(k){ return tx.steps[k]; })) return true;
     if(field==='appraisalDate' && typeof appraisalWaived==='function' && appraisalWaived(tx)) return true;
     return false;
   }
@@ -2569,7 +2572,7 @@ function rdl(){
         if(!rec){
           var nd={id:Date.now()+Math.floor(Math.random()*100000), contactId:tx.contactId, transactionId:tx.id, type:dl.label, date:tx[dl.key]};
           D.push(nd); saveDL(nd);
-          ensureGroup('tx_'+tx.id, tx, null).dated.push(nd);
+          if(!dlDoneStep(nd)) ensureGroup('tx_'+tx.id, tx, null).dated.push(nd);   // a completed/waived slot stays hidden
         }
       } else if(!rec){
         ensureGroup('tx_'+tx.id, tx, null).missing.push({ txId:tx.id, contactId:tx.contactId, label:dl.label, key:dl.key });
@@ -4486,7 +4489,14 @@ function setDocCheck(txId, key, status){
   var tx = TX.find(function(t){ return t.id === txId; }); if(!tx) return;
   tx.docChecklist = tx.docChecklist || {};
   if(status === null){ delete tx.docChecklist[key]; } else { tx.docChecklist[key] = status; }
-  saveTX(tx); openTCDetail(txId); rd();
+  // Marking the Appraisal document present or N/A completes the Appraisal checklist item (and so
+  // clears its deadline). Only auto-checks; a later clear won't uncheck a completed step.
+  if(key === 'appraisal' && (status === 'present' || status === 'na')){
+    tx.steps = tx.steps || {};
+    var _ak = (tx.type === 'seller') ? 's3_appr' : 'b3_appr';
+    tx.steps[_ak] = true;
+  }
+  saveTX(tx); openTCDetail(txId); rd(); if(curPage==='deadlines') rdl();
 }
 function renderDocChecklist(tx){
   var items = computeDocChecklist(tx);
@@ -4936,6 +4946,8 @@ function openTCDetail(id){
           openTCDetail(txId);
           renderTC();
           updateNbTC();
+          rd();                                          // refresh dashboard deadlines
+          if(curPage==='deadlines') rdl();               // and the Deadlines tab, so a completed item clears now
         });
       })(id, step.key, chk);
 
@@ -6978,7 +6990,8 @@ async function commitScanImport(r, btn){
     // step key it satisfies (per side). Only exact 1:1 matches, so nothing is checked early. ----
     var SCAN_DOC_STEPS = {
       'title commitment':     { buyer:'b3_title',      seller:'s3_title' },
-      'settlement statement': { buyer:'b4_settlement', seller:'s4_settlement' }
+      'settlement statement': { buyer:'b4_settlement', seller:'s4_settlement' },
+      'appraisal':            { buyer:'b3_appr',       seller:'s3_appr' }
     };
     var _scDt = String(r.docType||'').toLowerCase().trim();
     var _scMap = SCAN_DOC_STEPS[_scDt];

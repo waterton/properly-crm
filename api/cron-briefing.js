@@ -115,7 +115,8 @@ module.exports = async function (req, res) {
       'Earnest Money Due':      ['b3_earnest','s3_earnest'],
       'Due Diligence Deadline': ['b3_duedilig','s3_duedilig'],
       'Financing Deadline':     ['b3_financing','s3_financing'],
-      'Appraisal Deadline':     ['b3_appr','s3_appr'],
+      // New single key + legacy "appraisal completed" keys so pre-migration deals stay hidden.
+      'Appraisal Deadline':     ['b3_appr','s3_appr','b3_apprloan','s3_appraisaldone'],
     };
     // Appraisal is a real completion checkbox: once checked it's done and hides regardless of date.
     // The other date deadlines auto-track on import, so only an OVERDUE one is safe to auto-hide.
