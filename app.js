@@ -6923,6 +6923,18 @@ async function commitScanImport(r, btn){
         }
       });
     }
+    // ---- Scanning a document is proof its checklist item is done. Map the doc type to the
+    // step key it satisfies (per side). Only exact 1:1 matches, so nothing is checked early. ----
+    var SCAN_DOC_STEPS = {
+      'title commitment':     { buyer:'b3_title',      seller:'s3_title' },
+      'settlement statement': { buyer:'b4_settlement', seller:'s4_settlement' }
+    };
+    var _scDt = String(r.docType||'').toLowerCase().trim();
+    var _scMap = SCAN_DOC_STEPS[_scDt];
+    if(_scMap){
+      var _scKey = _scMap[tx.type] || _scMap.buyer;
+      if(_scKey) tx.steps[_scKey] = true;
+    }
   }
   saveTX(tx);
 
