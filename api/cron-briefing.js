@@ -115,18 +115,29 @@ module.exports = async function (req, res) {
       'Earnest Money Due':      ['b3_earnest','s3_earnest'],
       'Due Diligence Deadline': ['b3_duedilig','s3_duedilig'],
       'Financing Deadline':     ['b3_financing','s3_financing'],
-      // New single key + legacy "appraisal completed" keys so pre-migration deals stay hidden.
-      'Appraisal Deadline':     ['b3_appr','s3_appr','b3_apprloan','s3_appraisaldone'],
     };
-    // Appraisal is a real completion checkbox: once checked it's done and hides regardless of date.
-    // The other date deadlines auto-track on import, so only an OVERDUE one is safe to auto-hide.
-    const _completionTypes = { 'Appraisal Deadline': true };
+    // The appraisal is "done" (and its deadline hides regardless of date) via ANY of: the new/legacy
+    // completion step, the Appraisal document marked present or N/A, or the REPC waiving 8.2.
+    const apprDone = tx => {
+      if (!tx) return false;
+      const s = tx.steps || {};
+      if (s.b3_appr || s.s3_appr || s.b3_apprloan || s.s3_appraisaldone) return true;
+      const dc = tx.docChecklist || {};
+      if (dc.appraisal === 'present' || dc.appraisal === 'na') return true;
+      const repc = (tx.details && tx.details.repc) || {};
+      if (repc.appraisalApplies === 'is_not') return true;   // REPC 8.2 waived (N/A)
+      return false;
+    };
     const stepDone = d => {
       if (d.transactionId == null || !d.date) return false;
       const tx = _txById[String(d.transactionId)];
-      if (!tx || !tx.steps) return false;
+      if (!tx) return false;
+      // Any appraisal-typed deadline (incl. the retired "Appraisal completed & loan approved"): a
+      // completion, so once done it hides no matter the date.
+      if (/appraisal/i.test(d.type || '')) return apprDone(tx);
+      if (!tx.steps) return false;
+      if (daysDiff(d.date) >= 0) return false;   // tracking deadlines: only overdue auto-hide
       const keys = _stepKeys[d.type]; if (!keys) return false;
-      if (!_completionTypes[d.type] && daysDiff(d.date) >= 0) return false;  // tracking steps: overdue only
       return keys.some(k => tx.steps[k]);
     };
     const liveDeadlines = (deadlines || []).filter(isLive).filter(d => !stepDone(d));

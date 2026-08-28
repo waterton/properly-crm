@@ -2400,7 +2400,11 @@ function dlDoneStep(d){
     // the collapse stays hidden even if the one-time migration hasn't run on this device yet.
     var doneKeys = (field==='appraisalDate') ? [step.key,'b3_apprloan','s3_appraisaldone'] : [step.key];
     if(tx.steps && doneKeys.some(function(k){ return tx.steps[k]; })) return true;
-    if(field==='appraisalDate' && typeof appraisalWaived==='function' && appraisalWaived(tx)) return true;
+    if(field==='appraisalDate'){
+      var dc = tx.docChecklist || {};
+      if(dc.appraisal==='present' || dc.appraisal==='na') return true;   // appraisal doc present / N/A
+      if(typeof appraisalWaived==='function' && appraisalWaived(tx)) return true;
+    }
     return false;
   }
   // Tracking steps auto-check on import (they mean "tracking", not "done"), so only an OVERDUE
