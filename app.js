@@ -115,7 +115,7 @@ var DB_COLS = {
   cal_events: ['id','title','date','time','endTime','type','memberId','contactId','notes'],
   inv_hoa: ['id','name','account_number','dues_amount','dues_frequency','due_day','notes'],
   inv_properties: ['id','name','address','hoa_id','purchase_price','purchase_date','mortgage_lender','mortgage_balance','mortgage_payment','mortgage_due_day','notes'],
-  inv_units: ['id','property_id','label','rent_amount','rent_due_day','tenant_name','lease_start','lease_end','status','notes'],
+  inv_units: ['id','property_id','label','rent_amount','rent_due_day','mgmt_fee','passthrough_amount','passthrough_label','tenant_name','lease_start','lease_end','status','notes'],
   inv_ledger: ['id','date','property_id','unit_id','hoa_id','direction','category','amount','payee','method','source','email_ref','notes'],
   inv_loans: ['id','borrower','address','notes','principal','interest_rate','term_months','start_date','end_date','first_payment_date','monthly_payment','status'],
   inv_loan_payments: ['id','loan_id','date','amount','note']
@@ -11313,6 +11313,9 @@ function openInvUnitForm(propId, u){
   invOpenForm(u?'Edit unit':'Add unit', [
     {key:'label',label:'Unit label',required:true,placeholder:'Whole home / Upstairs / Downstairs'},
     {key:'rent_amount',label:'Monthly rent',type:'number'},
+    {key:'mgmt_fee',label:'Management fee (monthly)',type:'number'},
+    {key:'passthrough_amount',label:'Pass-through to HOA (e.g. parking)',type:'number'},
+    {key:'passthrough_label',label:'Pass-through label',placeholder:'Parking'},
     {key:'rent_due_day',label:'Rent due day (1-31)',type:'number'},
     {key:'tenant_name',label:'Tenant name'},
     {key:'status',label:'Status',type:'select',options:[{value:'occupied',label:'Occupied'},{value:'vacant',label:'Vacant'}],def:'occupied'},
@@ -11324,6 +11327,7 @@ function openInvUnitForm(propId, u){
     var rec = u || { id: Date.now()+Math.floor(Math.random()*100000), property_id: propId };
     rec.property_id = u ? u.property_id : propId;
     rec.label=v.label.trim(); rec.rent_amount=invNum(v.rent_amount); rec.rent_due_day=v.rent_due_day?parseInt(v.rent_due_day):null;
+    rec.mgmt_fee=invNum(v.mgmt_fee); rec.passthrough_amount=invNum(v.passthrough_amount); rec.passthrough_label=(v.passthrough_label||'').trim();
     rec.tenant_name=v.tenant_name.trim(); rec.status=v.status; rec.lease_start=v.lease_start; rec.lease_end=v.lease_end; rec.notes=v.notes.trim();
     if(!u) IUNIT.push(rec); saveInvUnit(rec); renderInvestments();
   });
