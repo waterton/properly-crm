@@ -11395,26 +11395,17 @@ function invYtd(){
   ILED.forEach(function(l){ if((l.date||'').slice(0,4)!==yr) return; if((l.direction||invDirFor(l.category))==='income') inc+=invNum(l.amount); else exp+=invNum(l.amount); });
   return inc-exp;
 }
-// Auto-post each property's fixed monthly mortgage payment as a ledger expense (Jan of the current
-// year through the current month), so entering the amount once makes it subtract every month.
-// Deduped: skipped for any month that already has a Mortgage entry for the property (manual/scanned).
-function materializeMortgage(){
-  var now=new Date(); var y0=now.getFullYear(); var changed=false;
-  IPROP.forEach(function(p){
-    var amt=invNum(p.mortgage_payment); if(amt<=0) return;
-    var day=parseInt(p.mortgage_due_day)||1; if(day<1) day=1; if(day>28) day=28;
-    for(var mi=0; mi<=now.getMonth(); mi++){
-      var ym=y0+'-'+String(mi+1).padStart(2,'0');
-      var has=ILED.some(function(l){ return l.category==='Mortgage' && String(l.property_id)===String(p.id) && String(l.date||'').slice(0,7)===ym; });
-      if(has) continue;
-      var dstr=ym+'-'+String(day).padStart(2,'0');
-      var rec={ id:Date.now()+Math.floor(Math.random()*100000)+mi, date:dstr, property_id:p.id, unit_id:null, hoa_id:null,
-        category:'Mortgage', direction:'expense', amount:amt, payee:(p.mortgage_lender||''), method:null,
-        source:'recurring', email_ref:dstr+'|'+amt+'|Mortgage|'+p.id, notes:'Auto-posted monthly mortgage' };
-      ILED.push(rec); saveInvLedger(rec); changed=true;
-    }
-  });
-  return changed;
+// Ledger rows come ONLY from real emails/PDF statements or manual entry - never synthesized. The old
+// build auto-posted monthly mortgage rows (source='recurring'); this removes any that already exist so
+// "actual" numbers reflect real money movement only. Idempotent: after the first pass there are none.
+function purgeSyntheticLedger(){
+  var synthetic=ILED.filter(function(l){ return l.source==='recurring'; });
+  if(!synthetic.length) return false;
+  var ids={}; synthetic.forEach(function(l){ ids[l.id]=true; });
+  ILED=ILED.filter(function(l){ return !ids[l.id]; });
+  sv();
+  if(supaReady) synthetic.forEach(function(l){ dbDeleteBy('inv_ledger','id',l.id); });
+  return true;
 }
 var _invLedgerFilter='';   // property_id filter for the ledger table ('' = all)
 var _invDetailFrom='', _invDetailTo='', _invDetailPid=null;   // date-range filter inside a property detail view ('' = open end)
@@ -11441,7 +11432,7 @@ function _ivStyle(){
 }
 function renderInvestments(){
   _ivStyle();
-  try{ materializeMortgage(); }catch(e){}   // ensure monthly mortgage expenses exist before totals
+  try{ purgeSyntheticLedger(); }catch(e){}   // ledger holds only real rows - drop any synthesized ones
   var root=ge('invRoot'); if(!root) return; root.innerHTML='';
   var ym=invCurMonth();
 
@@ -11606,7 +11597,7 @@ function mkDivSafe(style, html){ var d=document.createElement('div'); if(style) 
 // full ledger history for that one property.
 function openInvPropertyDetail(pid){
   _ivStyle();
-  try{ materializeMortgage(); }catch(e){}
+  try{ purgeSyntheticLedger(); }catch(e){}
   var root=ge('invRoot'); if(!root) return; root.innerHTML='';
   var p=invProp(pid); if(!p){ renderInvestments(); return; }
   if(_invDetailPid!==String(pid)){ _invDetailFrom=''; _invDetailTo=''; _invDetailPid=String(pid); }   // reset range when switching property
