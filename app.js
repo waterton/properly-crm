@@ -11198,6 +11198,34 @@ function invActual(ym){
 // Late / missing detection for a month: expected charges with no matching ledger entry.
 // Expected monthly rent for a property = sum of its occupied units' rent.
 function propExpectedRent(pid){ return unitsForProp(pid).reduce(function(s,u){ return s + ((u.status||'occupied')==='vacant'?0:invNum(u.rent_amount)); }, 0); }
+// ---- Editable per-unit terms -> expected figures. All value-agnostic: the dollar amounts live on
+//      the unit (rent_amount, mgmt_fee, passthrough_amount), so a rent/fee change is data, not code.
+function unitOccupied(u){ return (u.status||'occupied')!=='vacant'; }
+// What should land in the account for this unit: rent - management fee + pass-through (e.g. parking).
+function unitExpectedDeposit(u){ return unitOccupied(u) ? (invNum(u.rent_amount)-invNum(u.mgmt_fee)+invNum(u.passthrough_amount)) : 0; }
+// True profit contribution: the pass-through washes (we hand it to the HOA), so profit = rent - mgmt.
+function unitExpectedProfit(u){ return unitOccupied(u) ? (invNum(u.rent_amount)-invNum(u.mgmt_fee)) : 0; }
+function propExpectedDeposit(pid){ return unitsForProp(pid).reduce(function(s,u){ return s+unitExpectedDeposit(u); },0); }
+function propExpectedProfit(pid){ return unitsForProp(pid).reduce(function(s,u){ return s+unitExpectedProfit(u); },0); }
+// What actually landed for rent in a month = rent-type income minus any management fee booked.
+// Robust whether the manager posts one net deposit, or gross rent plus a separate management line.
+function propRentReceived(pid, ym){
+  var inc=0, mgmt=0;
+  ILED.forEach(function(l){
+    if(String(l.property_id)!==String(pid) || !ledInMonth(l,ym)) return;
+    var cat=l.category||'';
+    if(INV_INCOME_CATS.indexOf(cat)>=0) inc+=invNum(l.amount);
+    else if(cat==='Management') mgmt+=invNum(l.amount);
+  });
+  return inc-mgmt;
+}
+// A deposit below the unit's expected amount is a repair/maintenance deduction - but only once rent
+// has actually come in ($0 means "not received yet", which is a different flag, not a repair).
+function propRentShortfall(pid, ym){
+  var exp=propExpectedDeposit(pid); if(exp<=0) return 0;
+  var got=propRentReceived(pid, ym);
+  return (got>0 && got<exp) ? (exp-got) : 0;
+}
 function invFlags(ym){
   var flags=[];
   function paid(pred){ return ILED.some(function(l){ return ledInMonth(l,ym) && pred(l); }); }
@@ -11482,6 +11510,22 @@ function renderInvestments(){
     function stat(lbl,val,color){ return '<div><div style="font-size:12px;color:'+IVC.mut+';">'+lbl+'</div><div style="font-weight:500;color:'+color+';">'+val+'</div></div>'; }
     ion.innerHTML=stat('In',invMoney(io.inc),IVC.grn)+stat('Out',invMoney(io.exp),IVC.red)+stat('Net',invMoney(io.net),IVC.txt);
     pc.appendChild(ion);
+    // Rent: expected (from the unit's editable terms) vs what actually landed, with the shortfall
+    // called out as a repair. This is the manager-controlled rent side - clear at a glance.
+    var _expDep=propExpectedDeposit(p.id);
+    if(_expDep>0){
+      var _got=propRentReceived(p.id, ym); var _short=propRentShortfall(p.id, ym);
+      var rr=document.createElement('div'); rr.style.cssText='font-size:13px;margin:2px 0 10px;color:'+IVC.mut+';line-height:1.5;';
+      var _line='Rent expected <b style="color:'+IVC.txt+';">'+invMoney(_expDep)+'</b>';
+      if(_got>0){
+        _line += ' · got <b style="color:'+(_short>0?IVC.warn:IVC.grn)+';">'+invMoney(_got)+'</b>';
+        _line += _short>0 ? (' · <span style="color:'+IVC.red+';">'+invMoney(_short)+' short (repair)</span>')
+                          : (' · <span style="color:'+IVC.grn+';">on target</span>');
+      } else {
+        _line += ' · <span style="color:'+IVC.warn+';">not received yet</span>';
+      }
+      rr.innerHTML=_line; pc.appendChild(rr);
+    }
     // Header + summary open the property detail view.
     hd.style.cursor='pointer'; ion.style.cursor='pointer';
     (function(pid){ hd.addEventListener('click',function(){ openInvPropertyDetail(pid); }); ion.addEventListener('click',function(){ openInvPropertyDetail(pid); }); })(p.id);
@@ -11606,6 +11650,21 @@ function openInvPropertyDetail(pid){
       ur.appendChild(ua); root.appendChild(ur);
     });
   }
+
+  // Rent expected vs actual for the current month (the manager-controlled rent side).
+  (function(){
+    var ymC=invCurMonth();
+    var expDep=propExpectedDeposit(p.id); if(expDep<=0) return;
+    var got=propRentReceived(p.id, ymC); var short=propRentShortfall(p.id, ymC); var expProfit=propExpectedProfit(p.id);
+    var box=document.createElement('div'); box.style.cssText='background:'+IVC.card+';border:1px solid '+IVC.bord+';border-radius:12px;padding:12px 16px;margin:16px 0 6px;';
+    box.appendChild(mkDivSafe('font-size:13px;color:'+IVC.mut+';margin-bottom:6px;','Rent — expected vs actual · '+_esc(invMonthLabel(ymC))));
+    function row(l,v,c){ var r=document.createElement('div'); r.style.cssText='display:flex;justify-content:space-between;padding:4px 0;'; r.innerHTML='<span style="color:'+IVC.mut+';">'+l+'</span><span style="color:'+(c||IVC.txt)+';font-weight:500;">'+v+'</span>'; return r; }
+    box.appendChild(row('Expected deposit', invMoney(expDep)));
+    box.appendChild(row('Actually received', got>0?invMoney(got):'not yet', got>0?(short>0?IVC.warn:IVC.grn):IVC.warn));
+    if(short>0) box.appendChild(row('Shortfall booked as repair/maintenance', invMoney(short), IVC.red));
+    box.appendChild(row('Expected profit (rent − mgmt)', invMoney(expProfit)));
+    root.appendChild(box);
+  })();
 
   // Date-range picker (blank ends = open). Quick presets + From/To.
   var mine=ILED.filter(function(l){ return String(l.property_id)===String(p.id); });
