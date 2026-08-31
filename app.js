@@ -11213,17 +11213,19 @@ function unitExpectedDeposit(u){ return unitOccupied(u) ? (invNum(u.rent_amount)
 function unitExpectedProfit(u){ return unitOccupied(u) ? (invNum(u.rent_amount)-invNum(u.mgmt_fee)) : 0; }
 function propExpectedDeposit(pid){ return unitsForProp(pid).reduce(function(s,u){ return s+unitExpectedDeposit(u); },0); }
 function propExpectedProfit(pid){ return unitsForProp(pid).reduce(function(s,u){ return s+unitExpectedProfit(u); },0); }
-// What actually landed for rent in a month = rent-type income minus any management fee booked.
-// Robust whether the manager posts one net deposit, or gross rent plus a separate management line.
+// What actually landed for rent in a month = rent-type income minus the manager's deductions
+// (management fee + any repairs the manager took out of the deposit). This equals the real deposit,
+// so a repair pulls "received" down and the shortfall equals the repair. Robust whether the manager
+// posts one net deposit or gross rent plus separate management/repair lines.
 function propRentReceived(pid, ym){
-  var inc=0, mgmt=0;
+  var inc=0, ded=0;
   ILED.forEach(function(l){
     if(String(l.property_id)!==String(pid) || !ledInMonth(l,ym)) return;
     var cat=l.category||'';
     if(INV_INCOME_CATS.indexOf(cat)>=0) inc+=invNum(l.amount);
-    else if(cat==='Management') mgmt+=invNum(l.amount);
+    else if(cat==='Management' || cat==='Repairs') ded+=invNum(l.amount);
   });
-  return inc-mgmt;
+  return inc-ded;
 }
 // A deposit below the unit's expected amount is a repair/maintenance deduction - but only once rent
 // has actually come in ($0 means "not received yet", which is a different flag, not a repair).
