@@ -106,8 +106,8 @@ async function gmailGetAttachment(token, msgId, attId) {
 // Hand the owner-statement PDF straight to Gemini (reads text-based OR scanned PDFs natively - no
 // separate OCR). Returns one object per property with its figures.
 async function geminiReadStatementPdf(b64pdf, propList) {
-  const prompt = 'This PDF is a monthly rental owner statement covering one or more properties. For EACH property listed, extract its figures. '
-    + 'Return ONLY a JSON array: [{"property":"<address or name exactly as printed>","rent":<gross monthly rent, number>,"management":<management fee, number>,"parking":<parking or other income, number or 0>,"repairs":[{"desc":"<short label>","amount":<number>}],"deposit":<net amount deposited to the owner, number>}]. '
+  const prompt = 'This PDF is a monthly rental owner statement. It may cover one property with multiple units (e.g. Upstairs / Downstairs) and/or several properties. Return ONE object per property-unit line item. '
+    + 'Return ONLY a JSON array: [{"property":"<address or name exactly as printed>","unit":"<unit label if the statement distinguishes one, e.g. Upstairs / Downstairs / a unit number; empty string if it does not>","rent":<gross monthly rent, number>,"management":<management fee, number>,"parking":<parking or other income, number or 0>,"repairs":[{"desc":"<short label>","amount":<number>}],"deposit":<net amount deposited to the owner, number>}]. '
     + 'Use 0 when a value is absent and [] when there are no repair/maintenance line items. Known properties: ' + propList + '.';
   const body = { contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: 'application/pdf', data: b64pdf } }] }], generationConfig: { temperature: 0.1, maxOutputTokens: 4096, responseMimeType: 'application/json' } };
   const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + GEMINI_KEY, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -131,12 +131,32 @@ function normCat(c) {
   return 'Other';
 }
 function dirFor(cat) { return INCOME_CATS.indexOf(cat) >= 0 ? 'income' : 'expense'; }
+function _norm(s) { return String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim(); }
+function _streetNum(s) { const m = _norm(s).match(/\b(\d{2,6})\b/); return m ? m[1] : ''; }
+// Forgiving property match: normalized substring either direction (so "4704 S 700 E #9" matches
+// "4704 South 700 East Unit 9"), else a shared street number when it points to exactly one property.
 function matchProp(text, props) {
-  text = String(text || '').toLowerCase(); if (!text) return null;
+  const t = _norm(text); if (!t) return null;
   for (const p of props) {
-    if (p.address && text.indexOf(String(p.address).toLowerCase()) >= 0) return p;
-    if (p.name && text.indexOf(String(p.name).toLowerCase()) >= 0) return p;
+    const a = _norm(p.address), n = _norm(p.name);
+    if (a && (t.indexOf(a) >= 0 || a.indexOf(t) >= 0)) return p;
+    if (n && (t.indexOf(n) >= 0 || n.indexOf(t) >= 0)) return p;
   }
+  const sn = _streetNum(text);
+  if (sn) { const hits = props.filter(p => _streetNum(p.address) === sn || _streetNum(p.name) === sn); if (hits.length === 1) return hits[0]; }
+  return null;
+}
+// Match a statement line to a unit WITHIN its property. One unit -> unambiguous. Otherwise match the
+// printed unit text against the unit label, with upstairs/downstairs (and unit-number) synonyms.
+function matchUnit(prop, unitText, units) {
+  const mine = units.filter(u => String(u.property_id) === String(prop.id));
+  if (mine.length <= 1) return mine[0] || null;
+  const t = _norm(unitText); if (!t) return null;
+  for (const u of mine) { const lb = _norm(u.label); if (lb && (t.indexOf(lb) >= 0 || lb.indexOf(t) >= 0)) return u; }
+  if (/\bup/.test(t)) { const u = mine.find(x => /up/.test(_norm(x.label))); if (u) return u; }
+  if (/\b(down|lower)/.test(t)) { const u = mine.find(x => /down|lower/.test(_norm(x.label))); if (u) return u; }
+  const un = (t.match(/\b(\d{1,4}[a-z]?)\b/) || [])[1];
+  if (un) { const u = mine.find(x => _norm(x.label).split(' ').indexOf(un) >= 0); if (u) return u; }
   return null;
 }
 // A payee's match field may hold several alternatives separated by commas (or | or newlines), e.g.
@@ -192,8 +212,9 @@ export default async function handler(req, res) {
   if (!GEMINI_KEY) return res.status(500).json({ error: 'GEMINI_API_KEY not set' });
   const result = { mailbox: RENTAL_MAILBOX, scanned: 0, added: 0, skipped: 0, unmatched: 0, freshStartPending: 0, errors: [] };
   try {
-    const [props, payees, ledger, tokens] = await Promise.all([
+    const [props, units, payees, ledger, tokens] = await Promise.all([
       supaGet('inv_properties?select=*'),
+      supaGet('inv_units?select=*'),
       supaGet('inv_payees?select=*'),
       supaGet('inv_ledger?select=id,email_ref,message_id'),
       supaGet('gmail_tokens?select=*')
@@ -296,14 +317,14 @@ export default async function handler(req, res) {
       try { statement = await geminiReadStatementPdf(b64, propList); } catch (e) { result.errors.push('pdf-gemini: ' + e.message); }
       if (!Array.isArray(statement) || !statement.length) { result.freshStartPending++; continue; }
       let slotN = 0;
-      const post = async (pid, hoaId, cat, dir, amt, note, slot) => {
+      const post = async (pid, uid, hoaId, cat, dir, amt, note, slot) => {
         if (num(amt) <= 0) return;
-        const ref = j.msg.messageId + ':' + pid + '|' + slot;
+        const ref = j.msg.messageId + ':' + pid + ':' + (uid || '') + '|' + slot;   // unit in the key so up/down rows don't collide
         if (seen[ref]) { result.skipped++; return; }
         const row = {
           id: Date.now() * 1000 + (slotN++),
           date: j.msg.received || new Date().toISOString().slice(0, 10),
-          property_id: pid, unit_id: null, hoa_id: hoaId || null,
+          property_id: pid, unit_id: uid || null, hoa_id: hoaId || null,
           category: cat, direction: dir, amount: num(amt),
           payee: (j.payee.name || 'Rental manager').slice(0, 200),
           method: null, source: 'email',
@@ -318,14 +339,16 @@ export default async function handler(req, res) {
       for (const sp of statement) {
         const prop = matchProp(sp.property, props);
         if (!prop) { result.unmatched++; continue; }                       // don't post blank/unmatched rows
-        const pid = prop.id, hoaId = prop.hoa_id;
+        const unit = matchUnit(prop, sp.unit, units);
+        const pid = prop.id, uid = unit ? unit.id : null, hoaId = prop.hoa_id;
+        const ul = unit ? (' (' + (unit.label || '') + ')') : '';           // show which unit on the row
         const rent = num(sp.rent), mgmt = num(sp.management), parking = num(sp.parking), deposit = num(sp.deposit);
-        await post(pid, null, 'Rent', 'income', rent, 'Rent — statement', 'rent');
+        await post(pid, uid, null, 'Rent', 'income', rent, 'Rent — statement' + ul, 'rent');
         if (parking > 0) {
-          await post(pid, null, 'Other income', 'income', parking, ((j.payee.name || '') + ' parking'), 'parking');
-          await post(pid, hoaId, 'HOA', 'expense', parking, 'Parking pass-through to HOA', 'hoa_pass');
+          await post(pid, uid, null, 'Other income', 'income', parking, ((j.payee.name || '') + ' parking' + ul), 'parking');
+          await post(pid, uid, hoaId, 'HOA', 'expense', parking, 'Parking pass-through to HOA' + ul, 'hoa_pass');
         }
-        await post(pid, null, 'Management', 'expense', mgmt, 'Management fee — statement', 'mgmt');
+        await post(pid, uid, null, 'Management', 'expense', mgmt, 'Management fee — statement' + ul, 'mgmt');
         // Repairs: prefer the PDF's own line items; otherwise derive the shortfall from the
         // statement's own numbers (rent + parking - mgmt - deposit) so the ledger reconciles.
         const items = Array.isArray(sp.repairs) ? sp.repairs.filter(x => num(x && x.amount) > 0) : [];
@@ -335,7 +358,7 @@ export default async function handler(req, res) {
           const implied = Math.round((rent + parking - mgmt - deposit) * 100) / 100;
           if (implied > 1) { repTotal = implied; repNote = 'Deposit shortfall (unitemized)'; }
         }
-        await post(pid, null, 'Repairs', 'expense', repTotal, repNote || 'Repairs — statement', 'repairs');
+        await post(pid, uid, null, 'Repairs', 'expense', repTotal, (repNote || 'Repairs — statement') + ul, 'repairs');
       }
     }
     return res.status(200).json({ ok: true, ...result });
