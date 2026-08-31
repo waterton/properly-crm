@@ -205,10 +205,21 @@ async function userOk(req) {
     return !!(u && u.id);
   } catch (e) { return false; }
 }
-async function authorized(req) { return (cronOk(req) || (await userOk(req))); }
+// Heartbeat: one row per run so the app can show "last scan" and prove the cron is alive.
+async function logScan(trigger, ok, r, note) {
+  try {
+    await supaInsertOne('inv_scan_log', {
+      id: Date.now() * 1000 + Math.floor(Math.random() * 1000),
+      ran_at: new Date().toISOString(), trigger: trigger, ok: !!ok,
+      added: r.added || 0, skipped: r.skipped || 0, unmatched: r.unmatched || 0, no_pdf: r.freshStartPending || 0,
+      note: String(note || '').slice(0, 300)
+    });
+  } catch (e) { /* logging must never break a scan */ }
+}
 
 export default async function handler(req, res) {
   if (!(await authorized(req))) return res.status(401).json({ error: 'Unauthorized' });
+  const trigger = cronOk(req) ? 'auto' : 'manual';   // cron vs the in-app button
   if (!GEMINI_KEY) return res.status(500).json({ error: 'GEMINI_API_KEY not set' });
   const result = { mailbox: RENTAL_MAILBOX, scanned: 0, added: 0, skipped: 0, unmatched: 0, freshStartPending: 0, errors: [],
     recorded: [], ignored: [], noPdf: [] };   // review details (from/subject) for the in-app triage view
@@ -222,6 +233,7 @@ export default async function handler(req, res) {
       supaGet('gmail_tokens?select=*')
     ]);
     if (!Array.isArray(payees) || !payees.filter(p => p.active !== false).length) {
+      await logScan(trigger, true, result, 'no active approved payees');
       return res.status(200).json({ ok: true, note: 'no active approved payees - nothing is booked until you add some', ...result });
     }
     const seen = {}, processedMsg = {};
@@ -236,7 +248,7 @@ export default async function handler(req, res) {
         if ((await getProfileEmail(at0.accessToken)) === RENTAL_MAILBOX) { rec = t; break; }
       }
     }
-    if (!rec) return res.status(200).json({ ok: true, note: 'mailbox ' + RENTAL_MAILBOX + ' is not connected', ...result });
+    if (!rec) { await logScan(trigger, false, result, 'mailbox not connected'); return res.status(200).json({ ok: true, note: 'mailbox ' + RENTAL_MAILBOX + ' is not connected', ...result }); }
 
     const at = await getAccessToken(rec);
     if (at.error) { result.errors.push(at.error); return res.status(200).json({ ok: false, ...result }); }
@@ -363,8 +375,10 @@ export default async function handler(req, res) {
         await post(pid, uid, null, 'Repairs', 'expense', repTotal, (repNote || 'Repairs — statement') + ul, 'repairs');
       }
     }
+    await logScan(trigger, true, result, (result.errors && result.errors.length) ? result.errors.join(' | ').slice(0, 200) : '');
     return res.status(200).json({ ok: true, ...result });
   } catch (err) {
+    try { await logScan(trigger, false, result, 'error: ' + err.message); } catch (e) {}
     return res.status(500).json({ error: err.message, ...result });
   }
 }

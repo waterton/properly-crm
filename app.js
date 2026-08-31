@@ -70,6 +70,7 @@ var RS=[]; // reminder_settings: how many days before each deadline type to remi
 var RL=[]; // reminder_log: which reminders the cron has already sent (used to hide sent personal reminders)
 var IHOA=[], IPROP=[], IUNIT=[], ILED=[]; // Investments: HOA accounts, properties, units, money ledger
 var IPAYEE=[]; // Approved payees/senders — the editable expense whitelist for email ingestion
+var ISCAN=[]; // inv_scan_log: heartbeat of each rental scan (cron or button)
 var ILOAN=[], ILPAY=[]; // Hard money: loans made, and payments received
 var curSort='last'; // 'last' or 'first'
 var selectedContacts = new Set();
@@ -659,7 +660,8 @@ async function loadFromDB(){
       fetchAllRows(base, 'inv_ledger?order=date.asc,id.asc', headers).catch(function(){return []; }),
       fetchAllRows(base, 'inv_loans?order=id.asc', headers).catch(function(){return []; }),
       fetchAllRows(base, 'inv_loan_payments?order=id.asc', headers).catch(function(){return []; }),
-      fetchAllRows(base, 'inv_payees?order=id.asc', headers).catch(function(){return []; })
+      fetchAllRows(base, 'inv_payees?order=id.asc', headers).catch(function(){return []; }),
+      fetchAllRows(base, 'inv_scan_log?order=ran_at.desc&limit=25', headers).catch(function(){return []; })
     ]);
     var rc = results[0], rn = results[1], rf = results[2], rd = results[3], rtx = results[4];
 
@@ -696,6 +698,7 @@ async function loadFromDB(){
     if(Array.isArray(results[17])) ILOAN = results[17];
     if(Array.isArray(results[18])) ILPAY = results[18];
     if(Array.isArray(results[19])) IPAYEE = results[19];
+    if(Array.isArray(results[20])) ISCAN = results[20];
     DOCS.forEach(function(d){
       d.id = typeof d.id === 'string' ? parseInt(d.id)||d.id : d.id;
       if(d.contact_id != null) d.contact_id = typeof d.contact_id === 'string' ? parseInt(d.contact_id) : d.contact_id;
@@ -11491,6 +11494,34 @@ function _ivStyle(){
     + '#invRoot tbody tr:hover,#hmRoot tbody tr:hover{background:#212a38;}';
   document.head.appendChild(s);
 }
+function _relTime(iso){
+  if(!iso) return ''; var t=new Date(iso).getTime(); if(isNaN(t)) return '';
+  var s=Math.floor((Date.now()-t)/1000); if(s<60) return 'just now';
+  var m=Math.floor(s/60); if(m<60) return m+'m ago';
+  var h=Math.floor(m/60); if(h<24) return h+'h ago';
+  return Math.floor(h/24)+'d ago';
+}
+function lastScan(){ return (ISCAN&&ISCAN.length) ? ISCAN.slice().sort(function(a,b){return String(b.ran_at||'').localeCompare(String(a.ran_at||''));})[0] : null; }
+function openScanLog(){
+  var ov=document.createElement('div'); ov.className='modal-ov open'; ov.style.zIndex='1290';
+  var m=document.createElement('div'); m.className='modal'; m.style.maxWidth='560px';
+  m.innerHTML='<div style="padding:16px 20px;border-bottom:1px solid var(--border);font-weight:700;font-size:17px;">Scan history</div>';
+  var body=document.createElement('div'); body.style.cssText='padding:8px 20px;max-height:60vh;overflow:auto;'; m.appendChild(body);
+  var rows=ISCAN.slice().sort(function(a,b){return String(b.ran_at||'').localeCompare(String(a.ran_at||''));});
+  if(!rows.length) body.appendChild(mkDivSafe('color:var(--text3);padding:12px 0;','No scans recorded yet. The cron writes a row each run (~3×/day); the button does too.'));
+  rows.forEach(function(s){
+    var r=document.createElement('div'); r.style.cssText='padding:8px 0;border-bottom:1px solid var(--border);';
+    var when=s.ran_at?(new Date(s.ran_at).toLocaleString()):'';
+    var meta=(s.trigger==='auto'?'auto (cron)':'manual')+(s.ok===false?' · error':'');
+    var stats=(s.added||0)+' added · '+(s.skipped||0)+' recorded · '+(s.unmatched||0)+' ignored'+(s.no_pdf?(' · '+s.no_pdf+' no-PDF'):'');
+    r.innerHTML='<div style="font-size:13px;">'+_esc(when)+' <span style="color:var(--text3);">('+_esc(meta)+')</span></div><div style="font-size:12px;color:var(--text3);">'+_esc(stats)+(s.note?(' · '+_esc(s.note)):'')+'</div>';
+    body.appendChild(r);
+  });
+  var ft=document.createElement('div'); ft.style.cssText='display:flex;justify-content:flex-end;padding:14px 20px;border-top:1px solid var(--border);';
+  var c=document.createElement('button'); c.className='btn btn-g'; c.textContent='Close'; c.addEventListener('click',function(){document.body.removeChild(ov);}); ft.appendChild(c); m.appendChild(ft);
+  ov.appendChild(m); ov.addEventListener('click',function(e){if(e.target===ov)document.body.removeChild(ov);});
+  document.body.appendChild(ov);
+}
 function renderInvestments(){
   _ivStyle();
   try{ purgeSyntheticLedger(); }catch(e){}   // ledger holds only real rows - drop any synthesized ones
@@ -11513,6 +11544,16 @@ function renderInvestments(){
   acts.appendChild(ivb('Export','',function(){ invExportModal('properties'); }));
   bar.appendChild(mnav); bar.appendChild(acts);
   root.appendChild(bar);
+
+  // Scan heartbeat: proves the cron is alive. Warns (amber) if the last run is stale (>14h).
+  (function(){
+    var ls=lastScan();
+    var stale = !ls || (Date.now()-new Date(ls.ran_at).getTime()) > 14*3600*1000;
+    var txt = ls ? ('Last scan '+_relTime(ls.ran_at)+' · '+(ls.trigger==='auto'?'auto':'manual')+' · '+(ls.added||0)+' added'+((ls.ok===false)?' · error':'')) : 'No scans yet';
+    var wrap=document.createElement('div'); wrap.style.cssText='margin:-4px 0 12px;font-size:12px;';
+    var a=document.createElement('span'); a.style.cssText='color:'+(stale?IVC.warn:IVC.mut)+';cursor:pointer;'; a.textContent=(stale?'⚠ ':'')+txt+' · history';
+    a.addEventListener('click', openScanLog); wrap.appendChild(a); root.appendChild(wrap);
+  })();
 
   if(!IPROP.length){
     var empty=document.createElement('div'); empty.style.cssText='padding:44px;text-align:center;color:'+IVC.mut+';';
