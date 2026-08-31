@@ -11376,7 +11376,7 @@ function openInvPayeeForm(pay, afterSave){
                      property_id:(pay.property_id!=null?String(pay.property_id):''), active:(pay.active===false?'no':'yes'), notes:pay.notes||'' } : null;
   invOpenForm(pay?'Edit approved payee':'Add approved payee', [
     {key:'name',label:'Name',required:true,placeholder:'e.g. Rocky Mountain Power'},
-    {key:'match',label:'Match text (found in sender or body)',required:true,placeholder:'e.g. rockymountainpower  or  @freshstartmgmt.com'},
+    {key:'match',label:'Match text — sender, name, or subject (comma-separated for alternatives)',required:true,placeholder:'e.g. @freshstartmgmt.com, fresh start, owner statement'},
     {key:'kind',label:'Type',type:'select',options:[{value:'expense',label:'Expense (we pay)'},{value:'rent',label:'Rent manager (pays us)'}],def:'expense'},
     {key:'category',label:'Default category',type:'select',options:cats.map(function(c){return{value:c,label:c};}),def:'Utilities'},
     {key:'property_id',label:'Pin to property (optional)',type:'select',options:invPropOptions()},

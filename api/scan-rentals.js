@@ -139,14 +139,16 @@ function matchProp(text, props) {
   }
   return null;
 }
-// The editable whitelist: an email is eligible only if its From or body contains an ACTIVE payee's
-// match text. Returns that payee (so we inherit its category / kind / property pin) or null.
+// A payee's match field may hold several alternatives separated by commas (or | or newlines), e.g.
+// "@freshstartmgmt.com, fresh start, owner statement". Any one hit is enough.
+function matchTerms(p) { return String(p.match || '').toLowerCase().split(/[,\n|]+/).map(s => s.trim()).filter(Boolean); }
+// The editable whitelist: an email is eligible only if its From / subject / body contains one of an
+// ACTIVE payee's match terms. Returns that payee (so we inherit its category / kind / property pin).
 function payeeFor(fromField, bodyText, payees) {
   const hay = ((fromField || '') + ' \n ' + (bodyText || '')).toLowerCase();
   for (const p of payees) {
     if (p.active === false) continue;
-    const m = String(p.match || '').toLowerCase().trim();
-    if (m && hay.indexOf(m) >= 0) return p;
+    if (matchTerms(p).some(t => hay.indexOf(t) >= 0)) return p;
   }
   return null;
 }
@@ -159,7 +161,7 @@ function parseArr(txt) {
 // Build the Gmail search from the whitelist itself, so we only pull mail from approved payees.
 function payeeQuery(payees) {
   const terms = [];
-  payees.forEach(p => { if (p.active !== false && p.match) { const m = String(p.match).replace(/"/g, ''); terms.push('from:"' + m + '"'); terms.push('"' + m + '"'); } });
+  payees.forEach(p => { if (p.active !== false) matchTerms(p).forEach(m0 => { const m = m0.replace(/"/g, ''); terms.push('from:"' + m + '"'); terms.push('"' + m + '"'); }); });
   if (!terms.length) return null;
   return '(' + terms.join(' OR ') + ') newer_than:45d';
 }
@@ -226,7 +228,7 @@ export default async function handler(req, res) {
     for (const mref of msgs.slice(0, 40)) {
       let m; try { m = await gmailGet(at.accessToken, mref.id); } catch (e) { continue; }
       result.scanned++;
-      const payee = payeeFor(m.from, m.text, payees);
+      const payee = payeeFor(m.from, (m.subject || '') + ' \n ' + m.text, payees);
       if (!payee) { result.unmatched++; continue; }                        // not an approved sender -> ignore
       if (payee.kind === 'rent') {
         // Fresh Start rent statement: the money is split per property from the attached PDF.
