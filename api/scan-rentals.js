@@ -1,10 +1,19 @@
 // /api/scan-rentals.js
-// Cron endpoint: reads connected Gmail inboxes for rental/HOA/mortgage emails, extracts money
-// events with Gemini, dedupes against inv_ledger by content, and auto-inserts new ones
-// (source='auto'). No browser needed. Schedule 3x/day via cron-jobs.org with ?secret=CRON_SECRET.
+// Cron endpoint: reads ONE mailbox (RENTAL_MAILBOX, default banff1997@gmail.com) for rental finance
+// emails and books ledger rows ONLY from approved payees (the editable inv_payees whitelist). Every
+// non-manual row persists its Gmail message-id and dedupes on it, so an email can never double-post,
+// and personal receipts (Amazon, Google Play, ...) are ignored because they match no payee.
+//
+// Row rules (bulletproof, value-agnostic):
+//   * A row is created only from an email that matches an ACTIVE approved payee, or by manual entry.
+//   * expense payee  -> one expense row (category from the payee), stamped received_date + due_date.
+//   * rent payee     -> handled by the Fresh Start PDF split (see freshStart* below); a lump rent
+//                       email with no statement is left for manual review rather than guessed.
+//   * dedupe key (email_ref) = message-id for a single-charge email, message-id + ':' + slot for a
+//     multi-row statement, so the same email's several rows coexist but never duplicate on re-scan.
 //
 // Env: SUPA_URL, SUPA_SERVICE_KEY (or SUPA_KEY), GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET,
-//      GEMINI_API_KEY, CRON_SECRET.
+//      GEMINI_API_KEY, CRON_SECRET, RENTAL_MAILBOX (optional).
 
 export const config = { api: { bodyParser: false } };
 
@@ -14,6 +23,7 @@ const SUPA_SERVICE_KEY = process.env.SUPA_SERVICE_KEY || SUPA_KEY;
 const CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
 const GEMINI_KEY = process.env.GEMINI_API_KEY;
+const RENTAL_MAILBOX = (process.env.RENTAL_MAILBOX || 'banff1997@gmail.com').toLowerCase();
 
 const INCOME_CATS = ['Rent', 'Other income'];
 const EXPENSE_CATS = ['Mortgage', 'HOA', 'Utilities', 'Insurance', 'Property Tax', 'Repairs', 'Management', 'Other'];
@@ -29,7 +39,7 @@ async function supaInsertOne(table, row) {
   const r = await fetch(SUPA_URL + '/rest/v1/' + table, { method: 'POST', headers: supaHeaders({ Prefer: 'return=minimal' }), body: JSON.stringify([row]) });
   return r.ok;   // unique index on email_ref rejects a dup with 409 -> ok=false, which we ignore
 }
-async function getAccessToken(memberId, rec) {
+async function getAccessToken(rec) {
   let accessToken = rec.access_token;
   if (!accessToken || Date.now() >= (rec.expires_at - 60000)) {
     if (!rec.refresh_token) return { error: 'no refresh token' };
@@ -56,8 +66,23 @@ function extractText(payload) {
   if (payload.body && payload.body.data) return b64urlDecode(payload.body.data);
   return '';
 }
+function collectAttachments(payload, out) {
+  out = out || [];
+  if (!payload) return out;
+  if (payload.filename && payload.body && payload.body.attachmentId) {
+    out.push({ filename: payload.filename, mimeType: payload.mimeType || '', attachmentId: payload.body.attachmentId, size: payload.body.size || 0 });
+  }
+  if (payload.parts) payload.parts.forEach(p => collectAttachments(p, out));
+  return out;
+}
+async function getProfileEmail(token) {
+  try {
+    const r = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/profile', { headers: { Authorization: 'Bearer ' + token } });
+    const d = await r.json(); return (d.emailAddress || '').toLowerCase();
+  } catch (e) { return ''; }
+}
 async function gmailList(token, query) {
-  const r = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=40&q=' + encodeURIComponent(query), { headers: { Authorization: 'Bearer ' + token } });
+  const r = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=50&q=' + encodeURIComponent(query), { headers: { Authorization: 'Bearer ' + token } });
   const d = await r.json(); return (d.messages || []);
 }
 async function gmailGet(token, id) {
@@ -65,7 +90,13 @@ async function gmailGet(token, id) {
   const d = await r.json();
   const hs = (d.payload && d.payload.headers) || [];
   const h = (n) => { const x = hs.find(z => z.name.toLowerCase() === n.toLowerCase()); return x ? x.value : ''; };
-  return { subject: h('Subject'), from: h('From'), date: h('Date'), text: extractText(d.payload) };
+  const received = d.internalDate ? new Date(parseInt(d.internalDate, 10)).toISOString().slice(0, 10) : (h('Date') ? new Date(h('Date')).toISOString().slice(0, 10) : '');
+  const midHeader = (h('Message-ID') || h('Message-Id') || '').replace(/[<>]/g, '').trim();
+  return {
+    gmailId: id, messageId: midHeader || ('gmail:' + id),
+    subject: h('Subject'), from: h('From'), received: received,
+    text: extractText(d.payload), attachments: collectAttachments(d.payload)
+  };
 }
 function num(v) { const n = parseFloat(String(v == null ? '' : v).replace(/[^0-9.\-]/g, '')); return isNaN(n) ? 0 : n; }
 function normCat(c) {
@@ -75,7 +106,7 @@ function normCat(c) {
   if (c.indexOf('rent') >= 0) return 'Rent';
   if (c.indexOf('hoa') >= 0 || c.indexOf('associ') >= 0) return 'HOA';
   if (c.indexOf('mort') >= 0 || c.indexOf('loan') >= 0) return 'Mortgage';
-  if (c.indexOf('util') >= 0 || c.indexOf('electric') >= 0 || c.indexOf('water') >= 0 || c.indexOf('gas') >= 0) return 'Utilities';
+  if (c.indexOf('util') >= 0 || c.indexOf('electric') >= 0 || c.indexOf('water') >= 0 || c.indexOf('gas') >= 0 || c.indexOf('power') >= 0 || c.indexOf('energy') >= 0) return 'Utilities';
   if (c.indexOf('insur') >= 0) return 'Insurance';
   if (c.indexOf('tax') >= 0) return 'Property Tax';
   if (c.indexOf('repair') >= 0 || c.indexOf('mainten') >= 0) return 'Repairs';
@@ -86,22 +117,34 @@ function dirFor(cat) { return INCOME_CATS.indexOf(cat) >= 0 ? 'income' : 'expens
 function matchProp(text, props) {
   text = String(text || '').toLowerCase(); if (!text) return null;
   for (const p of props) {
+    if (p.address && text.indexOf(String(p.address).toLowerCase()) >= 0) return p;
     if (p.name && text.indexOf(String(p.name).toLowerCase()) >= 0) return p;
-    if (p.address && (text.indexOf(String(p.address).toLowerCase()) >= 0 || String(p.address).toLowerCase().indexOf(text) >= 0)) return p;
   }
   return null;
 }
-function eref(o) { return [(o.date || ''), num(o.amount), (o.category || ''), (o.property_id || '')].join('|'); }
+// The editable whitelist: an email is eligible only if its From or body contains an ACTIVE payee's
+// match text. Returns that payee (so we inherit its category / kind / property pin) or null.
+function payeeFor(fromField, bodyText, payees) {
+  const hay = ((fromField || '') + ' \n ' + (bodyText || '')).toLowerCase();
+  for (const p of payees) {
+    if (p.active === false) continue;
+    const m = String(p.match || '').toLowerCase().trim();
+    if (m && hay.indexOf(m) >= 0) return p;
+  }
+  return null;
+}
 function parseArr(txt) {
   try { return JSON.parse(txt); } catch (e) {}
   const a = txt.indexOf('['), b = txt.lastIndexOf(']');
   if (a >= 0 && b > a) { try { return JSON.parse(txt.slice(a, b + 1)); } catch (e) {} }
   return null;
 }
-function financeQuery(props) {
-  const terms = ['rent', 'HOA', '"homeowners association"', 'mortgage', '"mortgage statement"', 'statement', 'payment', 'invoice', 'utility', 'utilities', 'insurance', 'escrow', '"property tax"'];
-  props.forEach(p => { if (p.address) terms.push('"' + String(p.address).replace(/"/g, '') + '"'); if (p.name) terms.push('"' + String(p.name).replace(/"/g, '') + '"'); });
-  return '(' + terms.join(' OR ') + ') newer_than:14d';   // rolling window; content-dedupe handles overlap
+// Build the Gmail search from the whitelist itself, so we only pull mail from approved payees.
+function payeeQuery(payees) {
+  const terms = [];
+  payees.forEach(p => { if (p.active !== false && p.match) { const m = String(p.match).replace(/"/g, ''); terms.push('from:"' + m + '"'); terms.push('"' + m + '"'); } });
+  if (!terms.length) return null;
+  return '(' + terms.join(' OR ') + ') newer_than:45d';
 }
 async function authorized(req) {
   const secret = process.env.CRON_SECRET;
@@ -115,77 +158,95 @@ async function authorized(req) {
 export default async function handler(req, res) {
   if (!(await authorized(req))) return res.status(401).json({ error: 'Unauthorized' });
   if (!GEMINI_KEY) return res.status(500).json({ error: 'GEMINI_API_KEY not set' });
-  const result = { scanned: 0, added: 0, skipped: 0, errors: [] };
+  const result = { mailbox: RENTAL_MAILBOX, scanned: 0, added: 0, skipped: 0, unmatched: 0, freshStartPending: 0, errors: [] };
   try {
-    const props = await supaGet('inv_properties?select=*');
-    if (!Array.isArray(props) || !props.length) return res.status(200).json({ ok: true, note: 'no properties', ...result });
-    const ledger = await supaGet('inv_ledger?select=id,date,amount,category,property_id,email_ref');
+    const [props, payees, ledger, tokens] = await Promise.all([
+      supaGet('inv_properties?select=*'),
+      supaGet('inv_payees?select=*'),
+      supaGet('inv_ledger?select=id,email_ref,message_id'),
+      supaGet('gmail_tokens?select=*')
+    ]);
+    if (!Array.isArray(payees) || !payees.filter(p => p.active !== false).length) {
+      return res.status(200).json({ ok: true, note: 'no active approved payees - nothing is booked until you add some', ...result });
+    }
     const seen = {};
-    (ledger || []).forEach(l => { if (l.email_ref) seen[l.email_ref] = true; seen[eref(l)] = true; });
-    const seenLoose = {};   // date+amount+category of money already tied to a property (reject blank dupes)
-    (ledger || []).forEach(l => { if (l.property_id != null) seenLoose[[(l.date || ''), num(l.amount), (l.category || '')].join('|')] = true; });
+    (ledger || []).forEach(l => { if (l.email_ref) seen[l.email_ref] = true; });
 
-    const tokens = await supaGet('gmail_tokens?select=*');
-    if (!Array.isArray(tokens) || !tokens.length) return res.status(200).json({ ok: true, note: 'no gmail connected', ...result });
-
-    const query = financeQuery(props);
-    const chunks = [];
-    for (const rec of tokens) {
-      const at = await getAccessToken(rec.member_id, rec);
-      if (at.error) { result.errors.push('member ' + rec.member_id + ': ' + at.error); continue; }
-      let msgs = [];
-      try { msgs = await gmailList(at.accessToken, query); } catch (e) { result.errors.push('list: ' + e.message); continue; }
-      const ids = msgs.slice(0, 25).map(m => m.id);
-      for (const id of ids) {
-        try {
-          const m = await gmailGet(at.accessToken, id);
-          const t = (m.text || '').replace(/\r/g, '').trim(); if (!t) continue;
-          result.scanned++;
-          chunks.push('From: ' + m.from + ' | Date: ' + m.date + ' | Subject: ' + m.subject + '\n' + t.slice(0, 1500));
-        } catch (e) {}
+    // Pick the ONE approved mailbox. Prefer the stored email; fall back to the live profile.
+    let rec = (tokens || []).find(t => String(t.email || '').toLowerCase() === RENTAL_MAILBOX);
+    if (!rec) {
+      for (const t of (tokens || [])) {
+        const at0 = await getAccessToken(t);
+        if (at0.error) continue;
+        if ((await getProfileEmail(at0.accessToken)) === RENTAL_MAILBOX) { rec = t; break; }
       }
     }
-    const corpus = chunks.join('\n\n---\n\n').slice(0, 22000);
-    if (!corpus) return res.status(200).json({ ok: true, note: 'no finance emails in window', ...result });
+    if (!rec) return res.status(200).json({ ok: true, note: 'mailbox ' + RENTAL_MAILBOX + ' is not connected', ...result });
 
-    const propList = props.map(p => (p.name || '') + (p.address ? (' (' + p.address + ')') : '')).join('; ');
-    const prompt = 'You are a bookkeeping assistant for a small rental-property owner. From the emails below, extract EVERY concrete money event (rent received, HOA dues, mortgage payment, utility/insurance/tax bill, repair, management fee). '
-      + 'Return ONLY a JSON array, no prose. Each item: {"date":"YYYY-MM-DD","amount": number (no symbols),"direction":"income|expense","category":"Rent|Other income|Mortgage|HOA|Utilities|Insurance|Property Tax|Repairs|Management|Other","property":"which property (address or name text, best guess, empty if unsure)","payee":"who paid or was paid","description":"short"}. '
-      + 'IMPORTANT EXCLUSION: do NOT include net owner disbursements / "Payment Confirmation" / "Owner Draw" / "electronic payment ... has been issued" emails from Fresh Start Management or managebuilding.com - that rent is recorded separately, per property, from the monthly owner statements. DO still include HOA auto-drafts, mortgage payments, utility/insurance/tax bills, repairs, and Sun Key Realty rental payments. '
-      + 'Only include events with a clear dollar amount and date. Rent is income; everything else is an expense. Known properties: ' + propList + '.\n\nEMAILS:\n' + corpus;
+    const at = await getAccessToken(rec);
+    if (at.error) { result.errors.push(at.error); return res.status(200).json({ ok: false, ...result }); }
 
-    let items = null;
-    try {
-      const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + GEMINI_KEY, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.1, maxOutputTokens: 8192, responseMimeType: 'application/json' } })
-      });
-      const d = await r.json();
-      const txt = d.candidates && d.candidates[0] && d.candidates[0].content && d.candidates[0].content.parts && d.candidates[0].content.parts[0] ? d.candidates[0].content.parts[0].text : '';
-      items = parseArr(txt || '');
-    } catch (e) { result.errors.push('gemini: ' + e.message); }
-    if (!Array.isArray(items)) return res.status(200).json({ ok: true, note: 'no entries extracted', ...result });
+    const query = payeeQuery(payees);
+    if (!query) return res.status(200).json({ ok: true, note: 'no payee match terms', ...result });
+
+    let msgs = [];
+    try { msgs = await gmailList(at.accessToken, query); } catch (e) { result.errors.push('list: ' + e.message); }
+    const expenseJobs = [];   // { msg, payee, prop }
+    for (const mref of msgs.slice(0, 40)) {
+      let m; try { m = await gmailGet(at.accessToken, mref.id); } catch (e) { continue; }
+      result.scanned++;
+      if (seen[m.messageId]) { result.skipped++; continue; }              // already booked this email
+      const payee = payeeFor(m.from, m.text, payees);
+      if (!payee) { result.unmatched++; continue; }                        // not an approved sender -> ignore
+      const prop = payee.property_id != null ? props.find(p => String(p.id) === String(payee.property_id)) : matchProp((m.subject || '') + ' ' + m.text, props);
+      if (payee.kind === 'rent') {
+        // Fresh Start rent statement: the money is split per property from the attached PDF.
+        // That split is handled by the PDF reader (next step); flag it here rather than guess a lump.
+        result.freshStartPending++;
+        continue;
+      }
+      expenseJobs.push({ msg: m, payee: payee, prop: prop });
+    }
+
+    // Extract the primary charge (amount + due date) for the matched expense emails in one Gemini call.
+    let extracted = [];
+    if (expenseJobs.length) {
+      const corpus = expenseJobs.map((j, i) => 'INDEX ' + i + ' | From: ' + j.msg.from + ' | Subject: ' + j.msg.subject + '\n' + (j.msg.text || '').replace(/\r/g, '').slice(0, 1200)).join('\n\n---\n\n').slice(0, 22000);
+      const prompt = 'Each block below is a bill or payment notice from an approved payee. For each INDEX, extract the single primary charge. '
+        + 'Return ONLY a JSON array: [{"i": <index number>, "amount": <number, no symbols>, "dueDate": "YYYY-MM-DD or empty", "category": "Utilities|HOA|Property Tax|Management|Insurance|Mortgage|Repairs|Other"}]. '
+        + 'amount is the total amount due or charged. Omit an index only if there is no dollar amount at all.\n\n' + corpus;
+      try {
+        const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + GEMINI_KEY, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.1, maxOutputTokens: 4096, responseMimeType: 'application/json' } })
+        });
+        const d = await r.json();
+        const txt = d.candidates && d.candidates[0] && d.candidates[0].content && d.candidates[0].content.parts && d.candidates[0].content.parts[0] ? d.candidates[0].content.parts[0].text : '';
+        extracted = parseArr(txt || '') || [];
+      } catch (e) { result.errors.push('gemini: ' + e.message); }
+    }
+    const byIndex = {}; extracted.forEach(x => { if (x && x.i != null) byIndex[x.i] = x; });
 
     let counter = 0;
-    for (const it of items) {
-      const cat = normCat(it.category);
-      const amt = num(it.amount);
-      if (amt <= 0) continue;
-      const prop = matchProp(it.property, props);
-      if (!prop && seenLoose[[(it.date || ''), amt, cat].join('|')]) { result.skipped++; continue; }   // blank dupe of attributed money
-      const key = eref({ date: it.date || '', amount: amt, category: cat, property_id: prop ? prop.id : '' });
-      if (seen[key]) { result.skipped++; continue; }
-      seen[key] = true;
+    for (let i = 0; i < expenseJobs.length; i++) {
+      const j = expenseJobs[i]; const ex = byIndex[i] || {};
+      const amt = num(ex.amount);
+      if (amt <= 0) { result.skipped++; continue; }
+      const cat = ex.category ? normCat(ex.category) : normCat(j.payee.category || 'Other');
       const row = {
         id: Date.now() * 1000 + (counter++),
-        date: (it.date || new Date().toISOString().slice(0, 10)),
-        property_id: prop ? prop.id : null,
+        date: j.msg.received || new Date().toISOString().slice(0, 10),
+        property_id: j.prop ? j.prop.id : null,
         unit_id: null, hoa_id: null,
-        category: cat, direction: dirFor(cat), amount: amt,
-        payee: (it.payee || '').toString().slice(0, 200),
-        method: null, source: 'auto', email_ref: key,
-        notes: (it.description || '').toString().slice(0, 300)
+        category: cat, direction: 'expense', amount: amt,
+        payee: (j.payee.name || '').toString().slice(0, 200),
+        method: null, source: 'email',
+        email_ref: j.msg.messageId, message_id: j.msg.messageId,
+        received_date: j.msg.received || null,
+        due_date: (ex.dueDate && /^\d{4}-\d{2}-\d{2}$/.test(ex.dueDate)) ? ex.dueDate : null,
+        notes: (j.msg.subject || '').toString().slice(0, 300)
       };
+      seen[row.email_ref] = true;
       const ok = await supaInsertOne('inv_ledger', row);
       if (ok) result.added++; else result.skipped++;
     }
