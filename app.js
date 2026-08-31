@@ -11906,8 +11906,13 @@ async function scanFinanceEmails(){
   body.innerHTML='<div style="text-align:center;color:var(--text3);padding:16px;">Reading approved finance emails and splitting statements…</div>';
   try{
     var resp=await fetch('/api/scan-rentals',{ method:'POST', headers:await apiHeaders() });
-    var d={}; try{ d=await resp.json(); }catch(e){}
-    if(!resp.ok || d.error){ body.innerHTML='<div style="color:var(--danger);padding:8px;">'+_esc((d&&d.error)||('Scan failed ('+resp.status+')'))+'</div>'; return; }
+    var raw=''; try{ raw=await resp.text(); }catch(e){}
+    var d={}; try{ d=JSON.parse(raw); }catch(e){}
+    if(!resp.ok || d.error){
+      var detail=(d&&d.error)||(raw?raw.slice(0,300):('HTTP '+resp.status));
+      var hint=(resp.status===504||/timeout|FUNCTION_INVOCATION/i.test(raw))?'<div style="font-size:12px;color:var(--text3);margin-top:6px;">Looks like the scan ran long. It keeps working in the background — try again in a moment; already-booked emails won\'t double-post.</div>':'';
+      body.innerHTML='<div style="color:var(--danger);padding:8px;">Scan failed ('+resp.status+'): '+_esc(detail)+'</div>'+hint; return;
+    }
     await loadFromDB();
     body.innerHTML='';
     body.style.maxHeight='72vh'; body.style.overflow='auto';

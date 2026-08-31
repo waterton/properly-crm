@@ -16,6 +16,7 @@
 //      GEMINI_API_KEY, CRON_SECRET, RENTAL_MAILBOX (optional).
 
 export const config = { api: { bodyParser: false } };
+export const maxDuration = 60;   // this scan fans out to Gmail + Gemini; give it headroom (was timing out)
 
 const SUPA_URL = process.env.SUPA_URL || 'https://fgkilooomlozhwfnvjze.supabase.co';
 const SUPA_KEY = process.env.SUPA_KEY || '';
@@ -260,8 +261,10 @@ export default async function handler(req, res) {
     try { msgs = await gmailList(at.accessToken, query); } catch (e) { result.errors.push('list: ' + e.message); }
     const expenseJobs = [];   // { msg, payee, prop }
     const rentJobs = [];      // { msg, payee, pdf }
-    for (const mref of msgs.slice(0, 40)) {
-      let m; try { m = await gmailGet(at.accessToken, mref.id); } catch (e) { continue; }
+    // Fetch the matched messages in parallel (was sequential - the main cause of slow/timeout scans).
+    const fetched = await Promise.all(msgs.slice(0, 40).map(mref => gmailGet(at.accessToken, mref.id).catch(() => null)));
+    for (const m of fetched) {
+      if (!m) continue;
       result.scanned++;
       const payee = payeeFor(m.from, (m.subject || '') + ' \n ' + m.text, payees);
       if (!payee) { result.unmatched++; if (result.ignored.length < 100) result.ignored.push(brief(m)); continue; }   // not an approved sender
