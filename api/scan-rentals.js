@@ -219,13 +219,14 @@ async function logScan(trigger, ok, r, note) {
 }
 
 export default async function handler(req, res) {
-  if (!(await authorized(req))) return res.status(401).json({ error: 'Unauthorized' });
-  const trigger = cronOk(req) ? 'auto' : 'manual';   // cron vs the in-app button
-  if (!GEMINI_KEY) return res.status(500).json({ error: 'GEMINI_API_KEY not set' });
   const result = { mailbox: RENTAL_MAILBOX, scanned: 0, added: 0, skipped: 0, unmatched: 0, freshStartPending: 0, errors: [],
     recorded: [], ignored: [], noPdf: [] };   // review details (from/subject) for the in-app triage view
   const brief = (m, extra) => Object.assign({ from: m.from || '', subject: m.subject || '', date: m.received || '' }, extra || {});
+  let trigger = 'manual';
   try {
+    if (!(await authorized(req))) return res.status(401).json({ error: 'Unauthorized' });
+    trigger = cronOk(req) ? 'auto' : 'manual';   // cron vs the in-app button
+    if (!GEMINI_KEY) return res.status(500).json({ error: 'GEMINI_API_KEY not set' });
     const [props, units, payees, ledger, tokens] = await Promise.all([
       supaGet('inv_properties?select=*'),
       supaGet('inv_units?select=*'),
@@ -381,7 +382,8 @@ export default async function handler(req, res) {
     await logScan(trigger, true, result, (result.errors && result.errors.length) ? result.errors.join(' | ').slice(0, 200) : '');
     return res.status(200).json({ ok: true, ...result });
   } catch (err) {
-    try { await logScan(trigger, false, result, 'error: ' + err.message); } catch (e) {}
-    return res.status(500).json({ error: err.message, ...result });
+    const detail = (err && err.stack ? String(err.stack).split('\n').slice(0, 4).join(' | ') : String(err && err.message || err));
+    try { await logScan(trigger, false, result, 'error: ' + (err && err.message || err)); } catch (e) {}
+    return res.status(500).json({ error: detail, ...result });
   }
 }
