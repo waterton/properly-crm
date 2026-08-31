@@ -11848,111 +11848,37 @@ function _invParseArr(txt){
   if(a>=0 && b>a){ try{ return JSON.parse(txt.slice(a,b+1)); }catch(e){} }
   return null;
 }
-async function scanFinanceEmails(sinceDate){
-  if(!IPROP.length){ alert('Add at least one property first so I know what to match emails against.'); return; }
-  var members = _invConnectedMembers();
-  if(!members.length){ alert('Connect a Gmail account first (open the Gmail tab), then try again.'); return; }
-  var label=''; try{ label = localStorage.getItem('invGmailLabel') || ''; }catch(e){}
-  // (No prompt() here - it's unavailable in the app's embedded runtime. The scan matches by your
-  //  property addresses + finance keywords across all connected accounts, which is enough; a label
-  //  filter can be set later via the input in the scan window if we add one.)
+async function scanFinanceEmails(){
+  // Trigger the trustworthy server-side pipeline: ONE mailbox, the Payees whitelist, message-id
+  // dedupe, and the Fresh Start PDF split. (The old broad-keyword client scan has been retired.)
+  if(!IPROP.length){ alert('Add at least one property first.'); return; }
+  var activePayees = IPAYEE.filter(function(p){ return p.active!==false; });
+  if(!activePayees.length){ if(!confirm('No approved payees yet, so nothing will be booked.\n\nAdd your manager, HOA, utilities and tax in Payees first. Open Payees now?')){ return; } openInvPayeesModal(); return; }
   var ov=document.createElement('div'); ov.className='modal-ov open'; ov.style.zIndex='1300';
-  var m=document.createElement('div'); m.className='modal'; m.style.maxWidth='720px';
+  var m=document.createElement('div'); m.className='modal'; m.style.maxWidth='520px';
   m.innerHTML='<div style="padding:16px 20px;border-bottom:1px solid var(--border);font-weight:700;font-size:17px;">Scan finance emails</div>';
-  var body=document.createElement('div'); body.style.cssText='padding:16px 20px;max-height:72vh;overflow:auto;'; m.appendChild(body);
+  var body=document.createElement('div'); body.style.cssText='padding:18px 20px;'; m.appendChild(body);
   var ft=document.createElement('div'); ft.style.cssText='display:flex;justify-content:flex-end;gap:8px;padding:14px 20px;border-top:1px solid var(--border);'; m.appendChild(ft);
-  ov.appendChild(m); document.body.appendChild(ov);
   var closeBtn=document.createElement('button'); closeBtn.className='btn btn-g'; closeBtn.textContent='Close'; closeBtn.addEventListener('click',function(){ try{document.body.removeChild(ov);}catch(e){} }); ft.appendChild(closeBtn);
-  body.innerHTML='<div style="text-align:center;color:var(--text3);padding:20px;">Reading finance emails across '+members.length+' account'+(members.length===1?'':'s')+'…</div>';
+  ov.appendChild(m); document.body.appendChild(ov);
+  body.innerHTML='<div style="text-align:center;color:var(--text3);padding:16px;">Reading approved finance emails and splitting statements…</div>';
   try{
-    var q=_invFinanceQuery(label, sinceDate);
-    var chunks=[];
-    for(var a=0;a<members.length;a++){
-      var mid=members[a].id;
-      try{
-        var listResp=await fetch('/api/gmail-api',{ method:'POST', headers:await apiHeaders(), body:JSON.stringify({ action:'inbox', memberId:mid, query:q }) });
-        var listData=await listResp.json();
-        if(listData.error) continue;
-        var msgs=listData.messages||[];
-        var tids=[]; msgs.forEach(function(mm){ if(mm.threadId && tids.indexOf(mm.threadId)<0) tids.push(mm.threadId); });
-        tids=tids.slice(0,12);
-        for(var i=0;i<tids.length;i++){
-          try{
-            var tr=await fetch('/api/gmail-api',{ method:'POST', headers:await apiHeaders(), body:JSON.stringify({ action:'thread', memberId:mid, threadId:tids[i] }) });
-            var td=await tr.json();
-            (td.messages||[]).forEach(function(mm){
-              var t=(mm.bodyText||'').replace(/\r/g,'').trim(); if(!t) return;
-              var idx=chunks.length;
-              chunks.push('[#'+idx+'] From: '+(mm.from||'')+' | Date: '+(mm.date||'')+' | Subject: '+(mm.subject||'')+'\n'+t.slice(0,1500));
-            });
-          }catch(e){}
-        }
-      }catch(e){}
-    }
-    var corpus=chunks.join('\n\n---\n\n').slice(0,20000);
-    if(!corpus){ body.innerHTML='<div style="color:var(--text3);padding:16px;">No new finance emails since '+_esc(sinceDate||'a year ago')+' across your connected account'+(members.length===1?'':'s')+'.</div>'; try{ localStorage.setItem('invLastScan', tod()); }catch(e){} return; }
-    // Scan reached "now" - advance the bookmark so the next scan only reads what's newer.
-    try{ localStorage.setItem('invLastScan', tod()); }catch(e){}
-    var propList=IPROP.map(function(p){ return (p.name||'')+(p.address?(' ('+p.address+')'):''); }).join('; ');
-    var prompt='You are a bookkeeping assistant for a small rental-property owner. From the emails below, extract EVERY concrete money event (rent received, HOA dues, mortgage payment, utility/insurance/tax bill, repair, management fee). '
-      + 'Return ONLY a JSON array, no prose. Each item: {"ref": the [#n] number of the source email, "date":"YYYY-MM-DD", "amount": number (no symbols), "direction":"income|expense", "category":"Rent|Other income|Mortgage|HOA|Utilities|Insurance|Property Tax|Repairs|Management|Other", "property":"which property it concerns (address or name text, best guess)", "payee":"who paid or was paid", "description":"short"}. '
-      + 'IMPORTANT EXCLUSION: do NOT include net owner disbursements / "Payment Confirmation" / "Owner Draw" / "electronic payment ... has been issued" emails from Fresh Start Management or managebuilding.com - that rent is recorded separately, per property, from the monthly owner statements. DO still include HOA auto-drafts, mortgage payments, utility/insurance/tax bills, repairs, and Sun Key Realty rental payments. '
-      + 'Only include events with a clear dollar amount and date. Rent is income; everything else is an expense. Known properties: '+propList+'. If unsure which property, leave "property" empty.\n\nEMAILS:\n'+corpus;
-    var aiResp=await fetch('/api/claude',{ method:'POST', headers:await apiHeaders(), body:JSON.stringify({ max_tokens:8192, messages:[{ role:'user', content:prompt }] }) });
-    var aiData=await aiResp.json();
-    var txt=(aiData && aiData.content && aiData.content[0] && aiData.content[0].text) ? aiData.content[0].text : (typeof aiData==='string'?aiData:'');
-    var items=_invParseArr(txt);
-    if(!Array.isArray(items) || !items.length){ body.innerHTML='<div style="color:var(--text3);padding:16px;">No clear financial entries were found in those emails.</div>'; return; }
-    // Build review rows
-    // Dedupe against EVERY existing ledger row by content (date+amount+category+property) - not just
-    // email-sourced rows - so entries added manually or via SQL/CSV are recognized too.
-    var existingRefs={}; ILED.forEach(function(l){ if(l.email_ref) existingRefs[l.email_ref]=true; existingRefs[_invEref(l)]=true; });
-    // "Loose" key (date+amount+category, ignoring property) of money already tied to a property -
-    // used to reject a blank/unattributed duplicate of an entry that's already attributed.
-    var existingLoose={}; ILED.forEach(function(l){ if(l.property_id!=null) existingLoose[[(l.date||''),invNum(l.amount),(l.category||'')].join('|')]=true; });
-    var batchSeen={};
-    body.innerHTML=''; body.appendChild(mkDivSafe('color:var(--text3);font-size:13px;margin-bottom:10px;','Review the entries the scan found, adjust anything, and add the ones you want. Already-imported items are skipped automatically.'));
-    var rowsWrap=document.createElement('div'); rowsWrap.style.cssText='display:flex;flex-direction:column;gap:8px;'; body.appendChild(rowsWrap);
-    var proposals=[];
-    items.forEach(function(it){
-      var cat=_invNormCat(it.category); var amt=invNum(it.amount); if(amt<=0) return;
-      var dir=(String(it.direction||'').toLowerCase()==='income'||cat==='Rent'||cat==='Other income')?'income':'expense';
-      var prop=_invMatchProp(it.property);
-      if(!prop && existingLoose[[(it.date||''),amt,cat].join('|')]) return;   // blank duplicate of already-attributed money
-      var eref=_invEref({date:(it.date||''), amount:amt, category:cat, property_id:(prop?prop.id:''), payee:it.payee});
-      if(existingRefs[eref] || batchSeen[eref]) return;   // dedupe: already imported, or same charge from the other mailbox
-      batchSeen[eref]=true;
-      var row=document.createElement('div'); row.style.cssText='display:flex;flex-wrap:wrap;gap:6px;align-items:center;border:1px solid var(--border);border-radius:8px;padding:8px;';
-      var cb=document.createElement('input'); cb.type='checkbox'; cb.checked=true; cb.style.cssText='width:18px;height:18px;';
-      var dEl=document.createElement('input'); dEl.className='fi'; dEl.type='date'; dEl.value=(it.date||tod()); dEl.style.cssText='width:135px;';
-      var pSel=document.createElement('select'); pSel.className='fsel'; pSel.style.width='150px'; invPropOptions().forEach(function(o){ var op=document.createElement('option'); op.value=o.value; op.textContent=o.label; pSel.appendChild(op); }); pSel.value=prop?String(prop.id):'';
-      var cSel=document.createElement('select'); cSel.className='fsel'; cSel.style.width='130px'; INV_INCOME_CATS.concat(INV_EXPENSE_CATS).forEach(function(c){ var op=document.createElement('option'); op.value=c; op.textContent=c; cSel.appendChild(op); }); cSel.value=cat;
-      var aEl=document.createElement('input'); aEl.className='fi'; aEl.type='number'; aEl.value=amt; aEl.style.cssText='width:100px;';
-      var pay=document.createElement('input'); pay.className='fi'; pay.placeholder='payer/payee'; pay.value=it.payee||''; pay.style.cssText='flex:1;min-width:120px;';
-      row.appendChild(cb); row.appendChild(dEl); row.appendChild(pSel); row.appendChild(cSel); row.appendChild(aEl); row.appendChild(pay);
-      var desc=mkDivSafe('font-size:12px;color:var(--text3);width:100%;', _esc(it.description||'')); row.appendChild(desc);
-      rowsWrap.appendChild(row);
-      proposals.push({ cb:cb, dEl:dEl, pSel:pSel, cSel:cSel, aEl:aEl, pay:pay, eref:eref });
-    });
-    if(!proposals.length){ body.innerHTML='<div style="color:var(--text3);padding:16px;">Everything found was already imported. Nothing new to add.</div>'; return; }
-    var addBtn=document.createElement('button'); addBtn.className='btn btn-p'; addBtn.textContent='Add selected';
-    addBtn.addEventListener('click', function(){
-      var n=0;
-      proposals.forEach(function(pr){
-        if(!pr.cb.checked) return; var amt=invNum(pr.aEl.value); if(amt<=0) return;
-        var cat=pr.cSel.value; var pid=pr.pSel.value?parseInt(pr.pSel.value):null;
-        var eref=_invEref({date:pr.dEl.value, amount:amt, category:cat, property_id:(pid||''), payee:pr.pay.value});
-        if(existingRefs[eref]) return; existingRefs[eref]=true;   // guard against an edit that now matches an existing entry
-        var rec={ id:Date.now()+Math.floor(Math.random()*100000)+n, date:pr.dEl.value||tod(), property_id:pid, unit_id:null, hoa_id:null, category:cat, direction:invDirFor(cat), amount:amt, payee:pr.pay.value.trim(), notes:'', source:'email', email_ref:eref };
-        if(cat==='HOA' && pid){ var pp=invProp(pid); rec.hoa_id=pp?pp.hoa_id:null; }
-        ILED.push(rec); saveInvLedger(rec); n++;
-      });
-      try{ document.body.removeChild(ov); }catch(e){}
-      renderInvestments();
-      alert('Added '+n+' entr'+(n===1?'y':'ies')+' to the ledger.');
-    });
-    ft.insertBefore(addBtn, closeBtn);
-  }catch(e){ body.innerHTML='<div style="color:var(--danger);padding:16px;">Scan failed: '+_esc(e.message||String(e))+'</div>'; }
+    var resp=await fetch('/api/scan-rentals',{ method:'POST', headers:await apiHeaders() });
+    var d={}; try{ d=await resp.json(); }catch(e){}
+    if(!resp.ok || d.error){ body.innerHTML='<div style="color:var(--danger);padding:8px;">'+_esc((d&&d.error)||('Scan failed ('+resp.status+')'))+'</div>'; return; }
+    await loadFromDB();
+    var lines=[];
+    lines.push('<div style="font-size:15px;margin-bottom:8px;"><b>'+(d.added||0)+'</b> new entr'+((d.added===1)?'y':'ies')+' added.</div>');
+    var bits=[];
+    if(d.skipped) bits.push(d.skipped+' already recorded');
+    if(d.unmatched) bits.push(d.unmatched+' ignored (not an approved payee)');
+    if(d.freshStartPending) bits.push(d.freshStartPending+' statement'+(d.freshStartPending===1?'':'s')+' with no PDF (manual)');
+    if(bits.length) lines.push('<div style="font-size:13px;color:var(--text3);">'+bits.join(' · ')+'</div>');
+    if(d.note) lines.push('<div style="font-size:13px;color:var(--warn);margin-top:8px;">'+_esc(d.note)+'</div>');
+    if(Array.isArray(d.errors)&&d.errors.length) lines.push('<div style="font-size:12px;color:var(--text3);margin-top:8px;">Notes: '+_esc(d.errors.join(' | '))+'</div>');
+    body.innerHTML=lines.join('');
+    renderInvestments();
+  }catch(e){ body.innerHTML='<div style="color:var(--danger);padding:8px;">Scan failed: '+_esc(e.message||String(e))+'</div>'; }
 }
 // ============================================================================
 // HARD MONEY LENDING

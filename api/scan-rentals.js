@@ -163,14 +163,27 @@ function payeeQuery(payees) {
   if (!terms.length) return null;
   return '(' + terms.join(' OR ') + ') newer_than:45d';
 }
-async function authorized(req) {
+const SUPA_ANON = process.env.SUPA_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZna2lsb29vbWxvemh3Zm52anplIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA3NTc0NTIsImV4cCI6MjA5NjMzMzQ1Mn0.owQk8Vy3Vcs8n8c0sI0fXQYmjpAy14hev8lDt4g5iZE';
+function cronOk(req) {
   const secret = process.env.CRON_SECRET;
   const hdr = req.headers['x-cron-secret'];
   const auth = req.headers['authorization'] || '';
   const qs = (req.query && req.query.secret) || '';
-  if (secret && (qs === secret || hdr === secret || auth === secret || auth === ('Bearer ' + secret))) return true;
-  return false;
+  return !!(secret && (qs === secret || hdr === secret || auth === secret || auth === ('Bearer ' + secret)));
 }
+// The in-app "Scan email" button triggers this with the signed-in user's session token.
+async function userOk(req) {
+  const auth = req.headers['authorization'] || '';
+  const token = auth.indexOf('Bearer ') === 0 ? auth.slice(7) : '';
+  if (!token || token === SUPA_ANON || token === process.env.CRON_SECRET) return false;
+  try {
+    const r = await fetch(SUPA_URL + '/auth/v1/user', { headers: { apikey: SUPA_ANON, Authorization: 'Bearer ' + token } });
+    if (!r.ok) return false;
+    const u = await r.json();
+    return !!(u && u.id);
+  } catch (e) { return false; }
+}
+async function authorized(req) { return (cronOk(req) || (await userOk(req))); }
 
 export default async function handler(req, res) {
   if (!(await authorized(req))) return res.status(401).json({ error: 'Unauthorized' });
