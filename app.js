@@ -69,6 +69,7 @@ var CH=[]; // tx_changes: audit trail of field changes applied from scanned docu
 var RS=[]; // reminder_settings: how many days before each deadline type to remind (cron reads these)
 var RL=[]; // reminder_log: which reminders the cron has already sent (used to hide sent personal reminders)
 var IHOA=[], IPROP=[], IUNIT=[], ILED=[]; // Investments: HOA accounts, properties, units, money ledger
+var IPAYEE=[]; // Approved payees/senders — the editable expense whitelist for email ingestion
 var ILOAN=[], ILPAY=[]; // Hard money: loans made, and payments received
 var curSort='last'; // 'last' or 'first'
 var selectedContacts = new Set();
@@ -117,6 +118,7 @@ var DB_COLS = {
   inv_properties: ['id','name','address','hoa_id','purchase_price','purchase_date','mortgage_lender','mortgage_balance','mortgage_payment','mortgage_due_day','notes'],
   inv_units: ['id','property_id','label','rent_amount','rent_due_day','mgmt_fee','passthrough_amount','passthrough_label','tenant_name','lease_start','lease_end','status','notes'],
   inv_ledger: ['id','date','property_id','unit_id','hoa_id','direction','category','amount','payee','method','source','email_ref','message_id','received_date','due_date','notes'],
+  inv_payees: ['id','name','match','category','kind','property_id','active','notes'],
   inv_loans: ['id','borrower','address','notes','principal','interest_rate','term_months','start_date','end_date','first_payment_date','monthly_payment','status'],
   inv_loan_payments: ['id','loan_id','date','amount','note']
 };
@@ -656,7 +658,8 @@ async function loadFromDB(){
       fetchAllRows(base, 'inv_units?order=id.asc', headers).catch(function(){return []; }),
       fetchAllRows(base, 'inv_ledger?order=date.asc,id.asc', headers).catch(function(){return []; }),
       fetchAllRows(base, 'inv_loans?order=id.asc', headers).catch(function(){return []; }),
-      fetchAllRows(base, 'inv_loan_payments?order=id.asc', headers).catch(function(){return []; })
+      fetchAllRows(base, 'inv_loan_payments?order=id.asc', headers).catch(function(){return []; }),
+      fetchAllRows(base, 'inv_payees?order=id.asc', headers).catch(function(){return []; })
     ]);
     var rc = results[0], rn = results[1], rf = results[2], rd = results[3], rtx = results[4];
 
@@ -692,6 +695,7 @@ async function loadFromDB(){
     if(Array.isArray(results[16])) ILED = results[16];
     if(Array.isArray(results[17])) ILOAN = results[17];
     if(Array.isArray(results[18])) ILPAY = results[18];
+    if(Array.isArray(results[19])) IPAYEE = results[19];
     DOCS.forEach(function(d){
       d.id = typeof d.id === 'string' ? parseInt(d.id)||d.id : d.id;
       if(d.contact_id != null) d.contact_id = typeof d.contact_id === 'string' ? parseInt(d.contact_id) : d.contact_id;
@@ -746,6 +750,8 @@ function delInvProp(id){
 }
 function delInvUnit(id){ IUNIT = IUNIT.filter(function(x){return String(x.id)!==String(id);}); ILED.forEach(function(l){ if(String(l.unit_id)===String(id)){ l.unit_id=null; saveInvLedger(l); } }); sv(); if(supaReady) dbDeleteBy('inv_units','id',id); }
 function delInvLedger(id){ ILED = ILED.filter(function(x){return String(x.id)!==String(id);}); sv(); if(supaReady) dbDeleteBy('inv_ledger','id',id); }
+function saveInvPayee(x){ sv(); if(supaReady) dbSave('inv_payees', [x]); }
+function delInvPayee(id){ IPAYEE = IPAYEE.filter(function(x){return String(x.id)!==String(id);}); sv(); if(supaReady) dbDeleteBy('inv_payees','id',id); }
 // lookups
 function invProp(id){ return IPROP.find(function(p){return String(p.id)===String(id);}) || null; }
 function invUnit(id){ return IUNIT.find(function(u){return String(u.id)===String(id);}) || null; }
@@ -11361,6 +11367,58 @@ function openInvUnitForm(propId, u){
   });
 }
 function unitOptionsFor(propId){ var o=[{value:'',label:'— whole property —'}]; unitsForProp(propId).forEach(function(u){ o.push({value:String(u.id),label:u.label}); }); return o; }
+// ---- Approved payees (the editable expense whitelist for email ingestion) ----
+function openInvPayeeForm(pay, afterSave){
+  var cats=['Utilities','HOA','Property Tax','Management','Insurance','Mortgage','Repairs','Other','Rent'];
+  var init = pay ? { name:pay.name, match:pay.match, kind:pay.kind||'expense', category:pay.category||'Utilities',
+                     property_id:(pay.property_id!=null?String(pay.property_id):''), active:(pay.active===false?'no':'yes'), notes:pay.notes||'' } : null;
+  invOpenForm(pay?'Edit approved payee':'Add approved payee', [
+    {key:'name',label:'Name',required:true,placeholder:'e.g. Rocky Mountain Power'},
+    {key:'match',label:'Match text (found in sender or body)',required:true,placeholder:'e.g. rockymountainpower  or  @freshstartmgmt.com'},
+    {key:'kind',label:'Type',type:'select',options:[{value:'expense',label:'Expense (we pay)'},{value:'rent',label:'Rent manager (pays us)'}],def:'expense'},
+    {key:'category',label:'Default category',type:'select',options:cats.map(function(c){return{value:c,label:c};}),def:'Utilities'},
+    {key:'property_id',label:'Pin to property (optional)',type:'select',options:invPropOptions()},
+    {key:'active',label:'Status',type:'select',options:[{value:'yes',label:'Active'},{value:'no',label:'Paused'}],def:'yes'},
+    {key:'notes',label:'Notes',type:'textarea'}
+  ], init, function(v){
+    if(!v.name.trim()||!v.match.trim()){ alert('Enter a name and match text.'); return false; }
+    var rec = pay || { id: Date.now()+Math.floor(Math.random()*100000) };
+    rec.name=v.name.trim(); rec.match=v.match.trim().toLowerCase(); rec.kind=v.kind||'expense'; rec.category=v.category||'Other';
+    rec.property_id=v.property_id?parseInt(v.property_id):null; rec.active=(v.active!=='no'); rec.notes=(v.notes||'').trim();
+    if(!pay) IPAYEE.push(rec); saveInvPayee(rec); if(afterSave) afterSave();
+  });
+}
+function openInvPayeesModal(){
+  var ov=document.createElement('div'); ov.className='modal-ov open'; ov.style.zIndex='1280';
+  var m=document.createElement('div'); m.className='modal'; m.style.maxWidth='640px';
+  var h=document.createElement('div'); h.style.cssText='display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--border);';
+  h.innerHTML='<div><div style="font-weight:700;font-size:17px;">Approved payees</div><div style="font-size:12px;color:var(--text3);margin-top:2px;">Only emails matching an active payee are booked. Personal receipts are ignored.</div></div>';
+  var x=document.createElement('button'); x.textContent='✕'; x.style.cssText='background:none;border:none;font-size:18px;color:var(--text3);cursor:pointer;'; x.addEventListener('click',function(){ document.body.removeChild(ov); }); h.appendChild(x); m.appendChild(h);
+  var body=document.createElement('div'); body.style.cssText='padding:12px 20px;max-height:60vh;overflow:auto;';
+  function redraw(){
+    body.innerHTML='';
+    if(!IPAYEE.length){ body.appendChild(mkDivSafe('color:var(--text3);padding:12px 0;','No approved payees yet. Add your property manager, HOA, utilities, and tax authority.')); }
+    IPAYEE.slice().sort(function(a,b){ return String(a.name||'').localeCompare(String(b.name||'')); }).forEach(function(p){
+      var r=document.createElement('div'); r.style.cssText='display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);';
+      var lab='<b>'+_esc(p.name||'')+'</b> <span style="color:var(--text3);font-size:12px;">· '+_esc(p.kind||'expense')+' · '+_esc(p.category||'')+(p.active===false?' · paused':'')+'</span>'
+             + '<div style="font-size:12px;color:var(--text3);">matches: '+_esc(p.match||'')+(p.property_id!=null?(' · '+_esc((invProp(p.property_id)||{}).name||'')):'')+'</div>';
+      r.innerHTML='<div>'+lab+'</div>';
+      var ra=document.createElement('div'); ra.style.cssText='display:flex;gap:6px;flex-shrink:0;';
+      var eb=document.createElement('button'); eb.className='btn btn-g'; eb.style.cssText='font-size:12px;padding:3px 9px;'; eb.textContent='Edit';
+      eb.addEventListener('click',function(){ openInvPayeeForm(p, redraw); });
+      var db=document.createElement('button'); db.className='btn btn-g'; db.style.cssText='font-size:12px;padding:3px 9px;'; db.textContent='Delete';
+      db.addEventListener('click',function(){ if(confirm('Delete approved payee "'+(p.name||'')+'"?')){ delInvPayee(p.id); redraw(); } });
+      ra.appendChild(eb); ra.appendChild(db); r.appendChild(ra); body.appendChild(r);
+    });
+  }
+  redraw(); m.appendChild(body);
+  var ft=document.createElement('div'); ft.style.cssText='display:flex;justify-content:space-between;gap:8px;padding:14px 20px;border-top:1px solid var(--border);';
+  var add=document.createElement('button'); add.className='btn btn-p'; add.textContent='+ Add payee'; add.addEventListener('click',function(){ openInvPayeeForm(null, redraw); });
+  var done=document.createElement('button'); done.className='btn btn-g'; done.textContent='Done'; done.addEventListener('click',function(){ document.body.removeChild(ov); });
+  ft.appendChild(add); ft.appendChild(done); m.appendChild(ft);
+  ov.appendChild(m); ov.addEventListener('click',function(e){ if(e.target===ov) document.body.removeChild(ov); });
+  document.body.appendChild(ov);
+}
 function openInvLedgerForm(entry, preset){
   preset = preset || {};
   var allCats = INV_INCOME_CATS.concat(INV_EXPENSE_CATS);
@@ -11448,6 +11506,7 @@ function renderInvestments(){
   acts.appendChild(ivb('+ Log entry','pri',function(){ openInvLedgerForm(); }));
   var sinceVal; try{ sinceVal = localStorage.getItem('invLastScan') || (new Date().getFullYear()+'-01-01'); }catch(e){ sinceVal = new Date().getFullYear()+'-01-01'; }
   acts.appendChild(ivb('Scan email','',function(){ scanFinanceEmails(sinceVal); }));
+  acts.appendChild(ivb('Payees','',function(){ openInvPayeesModal(); }));
   acts.appendChild(ivb('Export','',function(){ invExportModal('properties'); }));
   bar.appendChild(mnav); bar.appendChild(acts);
   root.appendChild(bar);
