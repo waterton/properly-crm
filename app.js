@@ -11882,18 +11882,35 @@ async function scanFinanceEmails(){
     function _sndEmail(f){ var m=String(f||'').match(/<([^>]+)>/); return (m?m[1]:String(f||'')).trim(); }
     function _sndName(f){ var m=String(f||'').match(/^\s*"?([^"<]+?)"?\s*</); return m?m[1].trim():''; }
     function _sndDomain(f){ var e=_sndEmail(f); var i=e.indexOf('@'); return i>=0?e.slice(i):e; }
+    // Does this sender already match an active payee? (mirrors the server whitelist)
+    function _payeeForText(txt){
+      var hay=String(txt||'').toLowerCase();
+      for(var i=0;i<IPAYEE.length;i++){ var p=IPAYEE[i]; if(p.active===false) continue;
+        var terms=String(p.match||'').toLowerCase().split(/[,\n|]+/).map(function(s){return s.trim();}).filter(Boolean);
+        if(terms.some(function(t){ return hay.indexOf(t)>=0; })) return p;
+      }
+      return null;
+    }
+    body.appendChild(mkDivSafe('font-size:12px;color:var(--text3);margin:10px 0 2px;','<span style="color:var(--danger);">Red</span> = no matching payee yet · default = we have a payee'));
     function reviewSection(title, arr, kind, color){
       if(!Array.isArray(arr)||!arr.length) return;
       body.appendChild(mkDivSafe('font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:'+color+';font-weight:700;margin:14px 0 4px;', _esc(title)+' ('+arr.length+')'));
       arr.forEach(function(it){
+        var pm=_payeeForText((it.from||'')+' '+(it.subject||''));   // matched payee, or null if missing
         var row=document.createElement('div'); row.style.cssText='display:flex;justify-content:space-between;gap:8px;align-items:flex-start;padding:6px 0;border-bottom:1px solid var(--border);';
         var left=document.createElement('div'); left.style.cssText='min-width:0;flex:1;';
-        left.innerHTML='<div style="font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+_esc(_sndEmail(it.from)||it.from||'(unknown sender)')+'</div>'
+        var sndColor = pm ? 'var(--text)' : 'var(--danger)';
+        left.innerHTML='<div style="font-size:13px;color:'+sndColor+';font-weight:'+(pm?'400':'600')+';overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+_esc(_sndEmail(it.from)||it.from||'(unknown sender)')+'</div>'
                      +'<div style="font-size:12px;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+_esc(it.subject||'(no subject)')+(it.date?(' · '+_esc(it.date)):'')+'</div>';
         row.appendChild(left);
-        var b=document.createElement('button'); b.className='btn btn-g'; b.style.cssText='font-size:12px;padding:3px 9px;flex-shrink:0;'; b.textContent='+ Payee';
-        (function(it2,btn){ btn.addEventListener('click',function(){ openInvPayeeForm(null, function(){ btn.textContent='Added ✓'; btn.disabled=true; }, { name:(_sndName(it2.from)||_sndDomain(it2.from)), match:_sndDomain(it2.from), kind:kind }); }); })(it,b);
-        row.appendChild(b); body.appendChild(row);
+        if(pm){
+          row.appendChild(mkDivSafe('font-size:12px;color:var(--lead,#1a7f37);flex-shrink:0;white-space:nowrap;align-self:center;', '✓ '+_esc(pm.name||'payee')));
+        } else {
+          var b=document.createElement('button'); b.className='btn btn-p'; b.style.cssText='font-size:12px;padding:3px 9px;flex-shrink:0;'; b.textContent='+ Payee';
+          (function(it2,btn){ btn.addEventListener('click',function(){ openInvPayeeForm(null, function(){ btn.textContent='Added ✓'; btn.disabled=true; }, { name:(_sndName(it2.from)||_sndDomain(it2.from)), match:_sndDomain(it2.from), kind:kind }); }); })(it,b);
+          row.appendChild(b);
+        }
+        body.appendChild(row);
       });
     }
     reviewSection('Ignored — not an approved payee', d.ignored, 'expense', 'var(--warn)');
