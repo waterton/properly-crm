@@ -206,6 +206,7 @@ async function userOk(req) {
     return !!(u && u.id);
   } catch (e) { return false; }
 }
+async function authorized(req) { return (cronOk(req) || (await userOk(req))); }
 // Heartbeat: one row per run so the app can show "last scan" and prove the cron is alive.
 async function logScan(trigger, ok, r, note) {
   try {
