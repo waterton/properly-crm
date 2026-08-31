@@ -4646,6 +4646,138 @@ function renderLeasePanel(tx){
   return sec;
 }
 
+// ============ OFFERS — multiple competing offers on a seller's listing ============
+// Offers live on the seller transaction (tx.details.offers[]). They are inert: adding/comparing
+// offers never creates deadlines, follow-ups, or a pipeline move. Only ACCEPTING one promotes it
+// into the contract (deal goes Under Contract, terms copied onto the tx, deadlines generated).
+var OFFER_FIN=[{value:'seller',label:'Seller financing'},{value:'conventional',label:'Conventional'},{value:'fha',label:'FHA'},{value:'va',label:'VA'},{value:'cash',label:'Cash'}];
+var OFFER_STATUS=[{value:'active',label:'Active'},{value:'countered',label:'Countered'},{value:'accepted',label:'Accepted'},{value:'rejected',label:'Rejected'},{value:'withdrawn',label:'Withdrawn'}];
+function _finLabel(v){ var f=OFFER_FIN.find(function(x){return x.value===v;}); return f?f.label:(v||'—'); }
+function txOffers(tx){ return (tx && tx.details && Array.isArray(tx.details.offers)) ? tx.details.offers : []; }
+function saveOffers(tx, offs){ tx.details=tx.details||{}; tx.details.offers=offs; saveTX(tx); }
+function openOfferForm(txId, offer){
+  var tx=TX.find(function(t){return t.id===txId;}); if(!tx) return;
+  var sf=(offer&&offer.sf)||{};
+  var init = offer ? Object.assign({}, offer, {sfDown:sf.down,sfRate:sf.rate,sfTermMonths:sf.termMonths,sfBalloonMonths:sf.balloonMonths,sfMonthly:sf.monthly})
+                   : { status:'active', financingType:'conventional', offerDate: tod() };
+  invOpenForm(offer?'Edit offer':'Add offer', [
+    {key:'buyer',label:'Buyer',placeholder:'Buyer name'},
+    {key:'buyerAgent',label:"Buyer's agent"},
+    {key:'offerDate',label:'Offer date',type:'date'},
+    {key:'price',label:'Offer price',type:'number'},
+    {key:'financingType',label:'Financing',type:'select',options:OFFER_FIN,def:'conventional'},
+    {key:'earnest',label:'Earnest money',type:'number'},
+    {key:'closingDate',label:'Proposed closing',type:'date'},
+    {key:'dueDiligenceDate',label:'Due diligence deadline',type:'date'},
+    {key:'financingDate',label:'Financing deadline',type:'date'},
+    {key:'appraisalDate',label:'Appraisal deadline',type:'date'},
+    {key:'concessions',label:'Seller concessions ($)',type:'number'},
+    {key:'sfDown',label:'Seller-fin: down payment',type:'number'},
+    {key:'sfRate',label:'Seller-fin: interest rate %',type:'number'},
+    {key:'sfTermMonths',label:'Seller-fin: term (months)',type:'number'},
+    {key:'sfBalloonMonths',label:'Seller-fin: balloon (months)',type:'number'},
+    {key:'sfMonthly',label:'Seller-fin: monthly payment',type:'number'},
+    {key:'contingencies',label:'Contingencies',type:'textarea'},
+    {key:'status',label:'Status',type:'select',options:OFFER_STATUS,def:'active'},
+    {key:'notes',label:'Notes',type:'textarea'}
+  ], init, function(v){
+    var rec = offer || { id: Date.now()+Math.floor(Math.random()*100000) };
+    rec.buyer=(v.buyer||'').trim(); rec.buyerAgent=(v.buyerAgent||'').trim(); rec.offerDate=v.offerDate||'';
+    rec.price=v.price; rec.financingType=v.financingType||'conventional'; rec.earnest=v.earnest;
+    rec.closingDate=v.closingDate; rec.dueDiligenceDate=v.dueDiligenceDate; rec.financingDate=v.financingDate; rec.appraisalDate=v.appraisalDate;
+    rec.concessions=v.concessions; rec.contingencies=(v.contingencies||'').trim(); rec.status=v.status||'active'; rec.notes=(v.notes||'').trim();
+    rec.sf={down:v.sfDown,rate:v.sfRate,termMonths:v.sfTermMonths,balloonMonths:v.sfBalloonMonths,monthly:v.sfMonthly};
+    var offs=txOffers(tx).slice(); var i=offs.findIndex(function(o){return String(o.id)===String(rec.id);});
+    if(i>=0) offs[i]=rec; else offs.push(rec);
+    saveOffers(tx, offs); openTCDetail(txId);
+  });
+}
+function deleteOffer(txId, offerId){
+  var tx=TX.find(function(t){return t.id===txId;}); if(!tx) return;
+  if(!confirm('Delete this offer?')) return;
+  saveOffers(tx, txOffers(tx).filter(function(o){return String(o.id)!==String(offerId);}));
+  openTCDetail(txId);
+}
+function setOfferStatus(txId, offerId, status){
+  var tx=TX.find(function(t){return t.id===txId;}); if(!tx) return;
+  var offs=txOffers(tx).slice(); var o=offs.find(function(x){return String(x.id)===String(offerId);}); if(!o) return;
+  o.status=status; saveOffers(tx, offs); openTCDetail(txId);
+}
+function acceptOffer(txId, offerId){
+  var tx=TX.find(function(t){return t.id===txId;}); if(!tx) return;
+  var offs=txOffers(tx).slice(); var o=offs.find(function(x){return String(x.id)===String(offerId);}); if(!o) return;
+  if(!confirm('Accept this offer?\n\nThe deal moves to Under Contract, the offer terms are copied onto the transaction, and deadlines are generated. The other offers are marked Rejected (you can change any status later).')) return;
+  if(o.price) tx.price=o.price;
+  if(o.closingDate) tx.closingDate=o.closingDate;
+  if(o.dueDiligenceDate) tx.dueDiligDate=o.dueDiligenceDate;
+  if(o.financingDate) tx.financingDate=o.financingDate;
+  if(o.appraisalDate) tx.appraisalDate=o.appraisalDate;
+  if(o.financingType) tx.financingType=o.financingType;
+  if(!tx.contractDate) tx.contractDate=o.offerDate||tod();
+  if(o.financingType==='seller'){ var s=o.sf||{}; tx.details=tx.details||{}; tx.details.sf=Object.assign({}, tx.details.sf||{}, {down:s.down,rate:s.rate,term:s.termMonths,balloon:s.balloonMonths,monthly:s.monthly,amount:(invNum(o.price)-invNum(s.down))}); }
+  offs.forEach(function(x){ x.status = (String(x.id)===String(offerId)) ? 'accepted' : (x.status==='withdrawn' ? 'withdrawn' : 'rejected'); });
+  tx.details=tx.details||{}; tx.details.offers=offs; tx.details.acceptedOfferId=offerId;
+  saveTX(tx);   // materializeWorkflowTasks fires here -> deadlines from the copied dates
+  var c=gc(tx.contactId); if(c && c.stage!=='Under Contract' && c.stage!=='Closed') ss(tx.contactId,'Under Contract');
+  renderTC(); rd(); openTCDetail(txId);
+}
+function renderOffersSection(tx){
+  var sec=document.createElement('div'); sec.style.cssText='padding:14px 20px;border-bottom:1px solid var(--border);';
+  var offs=txOffers(tx);
+  var hd=document.createElement('div'); hd.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;';
+  hd.appendChild(mkDivSafe('font-size:14px;text-transform:uppercase;letter-spacing:1px;color:var(--accent);font-weight:700;','📄 Offers'+(offs.length?(' ('+offs.length+')'):'')));
+  var addB=document.createElement('button'); addB.className='btn btn-p'; addB.style.cssText='font-size:13px;padding:5px 12px;'; addB.textContent='+ Add offer';
+  (function(txId){ addB.addEventListener('click',function(){ openOfferForm(txId); }); })(tx.id);
+  hd.appendChild(addB); sec.appendChild(hd);
+  if(!offs.length){ sec.appendChild(mkDivSafe('font-size:14px;color:var(--text3);','No offers yet. Add competing offers here to compare them — this does <b>not</b> put the deal under contract.')); return sec; }
+  var stColors={active:'var(--lead)',accepted:'var(--seller)',countered:'var(--accent)',rejected:'var(--text3)',withdrawn:'var(--text3)'};
+  var wrap=document.createElement('div'); wrap.style.cssText='overflow-x:auto;';
+  var tbl=document.createElement('table'); tbl.style.cssText='border-collapse:collapse;font-size:13px;min-width:100%;';
+  var thead='<tr><th style="text-align:left;padding:6px 10px;color:var(--text3);font-weight:500;min-width:120px;">Offer</th>';
+  offs.forEach(function(o){ thead+='<th style="text-align:left;padding:6px 10px;border-left:1px solid var(--border);min-width:150px;"><div style="font-weight:700;">'+_esc(o.buyer||'(buyer)')+'</div><div style="font-size:11px;color:'+(stColors[o.status]||'var(--text3)')+';">'+_esc(String(o.status||'active').toUpperCase())+'</div></th>'; });
+  thead+='</tr>';
+  var rows=[
+    ["Buyer's agent",function(o){return _esc(o.buyerAgent||'—');}],
+    ['Offer date',function(o){return o.offerDate?_esc(fd(o.offerDate)):'—';}],
+    ['Price',function(o){return o.price?_esc(invMoney(invNum(o.price))):'—';}],
+    ['Financing',function(o){return _esc(_finLabel(o.financingType));}],
+    ['Earnest',function(o){return o.earnest?_esc(invMoney(invNum(o.earnest))):'—';}],
+    ['Concessions',function(o){return o.concessions?_esc(invMoney(invNum(o.concessions))):'—';}],
+    ['Closing',function(o){return o.closingDate?_esc(fd(o.closingDate)):'—';}],
+    ['Due diligence',function(o){return o.dueDiligenceDate?_esc(fd(o.dueDiligenceDate)):'—';}],
+    ['Financing deadline',function(o){return o.financingDate?_esc(fd(o.financingDate)):'—';}],
+    ['Appraisal',function(o){return o.appraisalDate?_esc(fd(o.appraisalDate)):'—';}],
+    ['SF down',function(o){return (o.sf&&o.sf.down)?_esc(invMoney(invNum(o.sf.down))):'—';}],
+    ['SF rate',function(o){return (o.sf&&o.sf.rate)?_esc(o.sf.rate+'%'):'—';}],
+    ['SF term',function(o){return (o.sf&&o.sf.termMonths)?_esc(o.sf.termMonths+' mo'):'—';}],
+    ['SF balloon',function(o){return (o.sf&&o.sf.balloonMonths)?_esc(o.sf.balloonMonths+' mo'):'—';}],
+    ['SF monthly',function(o){return (o.sf&&o.sf.monthly)?_esc(invMoney(invNum(o.sf.monthly))):'—';}],
+    ['Contingencies',function(o){return _esc(o.contingencies||'—');}],
+    ['Notes',function(o){return _esc(o.notes||'—');}]
+  ];
+  var bodyHtml='';
+  rows.forEach(function(r){
+    bodyHtml+='<tr><td style="padding:6px 10px;color:var(--text3);border-top:1px solid var(--border);white-space:nowrap;">'+r[0]+'</td>';
+    offs.forEach(function(o){ bodyHtml+='<td style="padding:6px 10px;border-top:1px solid var(--border);border-left:1px solid var(--border);">'+r[1](o)+'</td>'; });
+    bodyHtml+='</tr>';
+  });
+  tbl.innerHTML='<thead>'+thead+'</thead><tbody>'+bodyHtml+'</tbody>';
+  wrap.appendChild(tbl); sec.appendChild(wrap);
+  var acts=document.createElement('div'); acts.style.cssText='display:flex;flex-wrap:wrap;gap:16px;margin-top:12px;';
+  offs.forEach(function(o){
+    var col=document.createElement('div'); col.style.cssText='display:flex;flex-direction:column;gap:4px;min-width:150px;';
+    col.appendChild(mkDivSafe('font-size:12px;color:var(--text3);', _esc(o.buyer||'(buyer)')));
+    var brow=document.createElement('div'); brow.style.cssText='display:flex;gap:5px;flex-wrap:wrap;';
+    function ob(lbl,cls,fn){ var b=document.createElement('button'); b.className='btn '+cls; b.style.cssText='font-size:12px;padding:3px 9px;'; b.textContent=lbl; b.addEventListener('click',fn); return b; }
+    if(o.status!=='accepted') brow.appendChild(ob('Accept','btn-p',(function(id){return function(){acceptOffer(tx.id,id);};})(o.id)));
+    brow.appendChild(ob('Edit','btn-g',(function(id){return function(){openOfferForm(tx.id,txOffers(tx).find(function(x){return String(x.id)===String(id);}));};})(o.id)));
+    if(o.status!=='rejected') brow.appendChild(ob('Reject','btn-g',(function(id){return function(){setOfferStatus(tx.id,id,'rejected');};})(o.id)));
+    brow.appendChild(ob('Delete','btn-g',(function(id){return function(){deleteOffer(tx.id,id);};})(o.id)));
+    col.appendChild(brow); acts.appendChild(col);
+  });
+  sec.appendChild(acts);
+  return sec;
+}
 function openTCDetail(id){
   curTx = id;
   var tx = TX.find(function(t){ return t.id === id; });
@@ -4713,6 +4845,9 @@ function openTCDetail(id){
   stRight.appendChild(detEmailBtn); stRight.appendChild(detFuBtn); stRight.appendChild(stBtn);
   stRow.appendChild(stLbl); stRow.appendChild(stRight);
   body.appendChild(stRow);
+
+  // Offers panel (seller listings): compare competing offers without going under contract.
+  if(tx.type==='seller' && tx.category!=='commercial_lease'){ try{ body.appendChild(renderOffersSection(tx)); }catch(e){} }
 
   // Contract Risk Review - prominent, right under the status.
   var riskSec = renderRiskReview(tx);
