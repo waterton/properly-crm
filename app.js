@@ -69,6 +69,7 @@ var CH=[]; // tx_changes: audit trail of field changes applied from scanned docu
 var RS=[]; // reminder_settings: how many days before each deadline type to remind (cron reads these)
 var RL=[]; // reminder_log: which reminders the cron has already sent (used to hide sent personal reminders)
 var IHOA=[], IPROP=[], IUNIT=[], ILED=[]; // Investments: HOA accounts, properties, units, money ledger
+var IPAYEE=[]; // Approved payees/senders — the editable expense whitelist for email ingestion
 var ILOAN=[], ILPAY=[]; // Hard money: loans made, and payments received
 var curSort='last'; // 'last' or 'first'
 var selectedContacts = new Set();
@@ -115,8 +116,9 @@ var DB_COLS = {
   cal_events: ['id','title','date','time','endTime','type','memberId','contactId','notes'],
   inv_hoa: ['id','name','account_number','dues_amount','dues_frequency','due_day','notes'],
   inv_properties: ['id','name','address','hoa_id','purchase_price','purchase_date','mortgage_lender','mortgage_balance','mortgage_payment','mortgage_due_day','notes'],
-  inv_units: ['id','property_id','label','rent_amount','rent_due_day','tenant_name','lease_start','lease_end','status','notes'],
-  inv_ledger: ['id','date','property_id','unit_id','hoa_id','direction','category','amount','payee','method','source','email_ref','notes'],
+  inv_units: ['id','property_id','label','rent_amount','rent_due_day','mgmt_fee','passthrough_amount','passthrough_label','tenant_name','lease_start','lease_end','status','notes'],
+  inv_ledger: ['id','date','property_id','unit_id','hoa_id','direction','category','amount','payee','method','source','email_ref','message_id','received_date','due_date','notes'],
+  inv_payees: ['id','name','match','category','kind','property_id','active','notes'],
   inv_loans: ['id','borrower','address','notes','principal','interest_rate','term_months','start_date','end_date','first_payment_date','monthly_payment','status'],
   inv_loan_payments: ['id','loan_id','date','amount','note']
 };
@@ -656,7 +658,8 @@ async function loadFromDB(){
       fetchAllRows(base, 'inv_units?order=id.asc', headers).catch(function(){return []; }),
       fetchAllRows(base, 'inv_ledger?order=date.asc,id.asc', headers).catch(function(){return []; }),
       fetchAllRows(base, 'inv_loans?order=id.asc', headers).catch(function(){return []; }),
-      fetchAllRows(base, 'inv_loan_payments?order=id.asc', headers).catch(function(){return []; })
+      fetchAllRows(base, 'inv_loan_payments?order=id.asc', headers).catch(function(){return []; }),
+      fetchAllRows(base, 'inv_payees?order=id.asc', headers).catch(function(){return []; })
     ]);
     var rc = results[0], rn = results[1], rf = results[2], rd = results[3], rtx = results[4];
 
@@ -692,6 +695,7 @@ async function loadFromDB(){
     if(Array.isArray(results[16])) ILED = results[16];
     if(Array.isArray(results[17])) ILOAN = results[17];
     if(Array.isArray(results[18])) ILPAY = results[18];
+    if(Array.isArray(results[19])) IPAYEE = results[19];
     DOCS.forEach(function(d){
       d.id = typeof d.id === 'string' ? parseInt(d.id)||d.id : d.id;
       if(d.contact_id != null) d.contact_id = typeof d.contact_id === 'string' ? parseInt(d.contact_id) : d.contact_id;
@@ -746,6 +750,8 @@ function delInvProp(id){
 }
 function delInvUnit(id){ IUNIT = IUNIT.filter(function(x){return String(x.id)!==String(id);}); ILED.forEach(function(l){ if(String(l.unit_id)===String(id)){ l.unit_id=null; saveInvLedger(l); } }); sv(); if(supaReady) dbDeleteBy('inv_units','id',id); }
 function delInvLedger(id){ ILED = ILED.filter(function(x){return String(x.id)!==String(id);}); sv(); if(supaReady) dbDeleteBy('inv_ledger','id',id); }
+function saveInvPayee(x){ sv(); if(supaReady) dbSave('inv_payees', [x]); }
+function delInvPayee(id){ IPAYEE = IPAYEE.filter(function(x){return String(x.id)!==String(id);}); sv(); if(supaReady) dbDeleteBy('inv_payees','id',id); }
 // lookups
 function invProp(id){ return IPROP.find(function(p){return String(p.id)===String(id);}) || null; }
 function invUnit(id){ return IUNIT.find(function(u){return String(u.id)===String(id);}) || null; }
@@ -11198,6 +11204,36 @@ function invActual(ym){
 // Late / missing detection for a month: expected charges with no matching ledger entry.
 // Expected monthly rent for a property = sum of its occupied units' rent.
 function propExpectedRent(pid){ return unitsForProp(pid).reduce(function(s,u){ return s + ((u.status||'occupied')==='vacant'?0:invNum(u.rent_amount)); }, 0); }
+// ---- Editable per-unit terms -> expected figures. All value-agnostic: the dollar amounts live on
+//      the unit (rent_amount, mgmt_fee, passthrough_amount), so a rent/fee change is data, not code.
+function unitOccupied(u){ return (u.status||'occupied')!=='vacant'; }
+// What should land in the account for this unit: rent - management fee + pass-through (e.g. parking).
+function unitExpectedDeposit(u){ return unitOccupied(u) ? (invNum(u.rent_amount)-invNum(u.mgmt_fee)+invNum(u.passthrough_amount)) : 0; }
+// True profit contribution: the pass-through washes (we hand it to the HOA), so profit = rent - mgmt.
+function unitExpectedProfit(u){ return unitOccupied(u) ? (invNum(u.rent_amount)-invNum(u.mgmt_fee)) : 0; }
+function propExpectedDeposit(pid){ return unitsForProp(pid).reduce(function(s,u){ return s+unitExpectedDeposit(u); },0); }
+function propExpectedProfit(pid){ return unitsForProp(pid).reduce(function(s,u){ return s+unitExpectedProfit(u); },0); }
+// What actually landed for rent in a month = rent-type income minus the manager's deductions
+// (management fee + any repairs the manager took out of the deposit). This equals the real deposit,
+// so a repair pulls "received" down and the shortfall equals the repair. Robust whether the manager
+// posts one net deposit or gross rent plus separate management/repair lines.
+function propRentReceived(pid, ym){
+  var inc=0, ded=0;
+  ILED.forEach(function(l){
+    if(String(l.property_id)!==String(pid) || !ledInMonth(l,ym)) return;
+    var cat=l.category||'';
+    if(INV_INCOME_CATS.indexOf(cat)>=0) inc+=invNum(l.amount);
+    else if(cat==='Management' || cat==='Repairs') ded+=invNum(l.amount);
+  });
+  return inc-ded;
+}
+// A deposit below the unit's expected amount is a repair/maintenance deduction - but only once rent
+// has actually come in ($0 means "not received yet", which is a different flag, not a repair).
+function propRentShortfall(pid, ym){
+  var exp=propExpectedDeposit(pid); if(exp<=0) return 0;
+  var got=propRentReceived(pid, ym);
+  return (got>0 && got<exp) ? (exp-got) : 0;
+}
 function invFlags(ym){
   var flags=[];
   function paid(pred){ return ILED.some(function(l){ return ledInMonth(l,ym) && pred(l); }); }
@@ -11313,6 +11349,9 @@ function openInvUnitForm(propId, u){
   invOpenForm(u?'Edit unit':'Add unit', [
     {key:'label',label:'Unit label',required:true,placeholder:'Whole home / Upstairs / Downstairs'},
     {key:'rent_amount',label:'Monthly rent',type:'number'},
+    {key:'mgmt_fee',label:'Management fee (monthly)',type:'number'},
+    {key:'passthrough_amount',label:'Pass-through to HOA (e.g. parking)',type:'number'},
+    {key:'passthrough_label',label:'Pass-through label',placeholder:'Parking'},
     {key:'rent_due_day',label:'Rent due day (1-31)',type:'number'},
     {key:'tenant_name',label:'Tenant name'},
     {key:'status',label:'Status',type:'select',options:[{value:'occupied',label:'Occupied'},{value:'vacant',label:'Vacant'}],def:'occupied'},
@@ -11324,11 +11363,64 @@ function openInvUnitForm(propId, u){
     var rec = u || { id: Date.now()+Math.floor(Math.random()*100000), property_id: propId };
     rec.property_id = u ? u.property_id : propId;
     rec.label=v.label.trim(); rec.rent_amount=invNum(v.rent_amount); rec.rent_due_day=v.rent_due_day?parseInt(v.rent_due_day):null;
+    rec.mgmt_fee=invNum(v.mgmt_fee); rec.passthrough_amount=invNum(v.passthrough_amount); rec.passthrough_label=(v.passthrough_label||'').trim();
     rec.tenant_name=v.tenant_name.trim(); rec.status=v.status; rec.lease_start=v.lease_start; rec.lease_end=v.lease_end; rec.notes=v.notes.trim();
     if(!u) IUNIT.push(rec); saveInvUnit(rec); renderInvestments();
   });
 }
 function unitOptionsFor(propId){ var o=[{value:'',label:'— whole property —'}]; unitsForProp(propId).forEach(function(u){ o.push({value:String(u.id),label:u.label}); }); return o; }
+// ---- Approved payees (the editable expense whitelist for email ingestion) ----
+function openInvPayeeForm(pay, afterSave){
+  var cats=['Utilities','HOA','Property Tax','Management','Insurance','Mortgage','Repairs','Other','Rent'];
+  var init = pay ? { name:pay.name, match:pay.match, kind:pay.kind||'expense', category:pay.category||'Utilities',
+                     property_id:(pay.property_id!=null?String(pay.property_id):''), active:(pay.active===false?'no':'yes'), notes:pay.notes||'' } : null;
+  invOpenForm(pay?'Edit approved payee':'Add approved payee', [
+    {key:'name',label:'Name',required:true,placeholder:'e.g. Rocky Mountain Power'},
+    {key:'match',label:'Match text (found in sender or body)',required:true,placeholder:'e.g. rockymountainpower  or  @freshstartmgmt.com'},
+    {key:'kind',label:'Type',type:'select',options:[{value:'expense',label:'Expense (we pay)'},{value:'rent',label:'Rent manager (pays us)'}],def:'expense'},
+    {key:'category',label:'Default category',type:'select',options:cats.map(function(c){return{value:c,label:c};}),def:'Utilities'},
+    {key:'property_id',label:'Pin to property (optional)',type:'select',options:invPropOptions()},
+    {key:'active',label:'Status',type:'select',options:[{value:'yes',label:'Active'},{value:'no',label:'Paused'}],def:'yes'},
+    {key:'notes',label:'Notes',type:'textarea'}
+  ], init, function(v){
+    if(!v.name.trim()||!v.match.trim()){ alert('Enter a name and match text.'); return false; }
+    var rec = pay || { id: Date.now()+Math.floor(Math.random()*100000) };
+    rec.name=v.name.trim(); rec.match=v.match.trim().toLowerCase(); rec.kind=v.kind||'expense'; rec.category=v.category||'Other';
+    rec.property_id=v.property_id?parseInt(v.property_id):null; rec.active=(v.active!=='no'); rec.notes=(v.notes||'').trim();
+    if(!pay) IPAYEE.push(rec); saveInvPayee(rec); if(afterSave) afterSave();
+  });
+}
+function openInvPayeesModal(){
+  var ov=document.createElement('div'); ov.className='modal-ov open'; ov.style.zIndex='1280';
+  var m=document.createElement('div'); m.className='modal'; m.style.maxWidth='640px';
+  var h=document.createElement('div'); h.style.cssText='display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--border);';
+  h.innerHTML='<div><div style="font-weight:700;font-size:17px;">Approved payees</div><div style="font-size:12px;color:var(--text3);margin-top:2px;">Only emails matching an active payee are booked. Personal receipts are ignored.</div></div>';
+  var x=document.createElement('button'); x.textContent='✕'; x.style.cssText='background:none;border:none;font-size:18px;color:var(--text3);cursor:pointer;'; x.addEventListener('click',function(){ document.body.removeChild(ov); }); h.appendChild(x); m.appendChild(h);
+  var body=document.createElement('div'); body.style.cssText='padding:12px 20px;max-height:60vh;overflow:auto;';
+  function redraw(){
+    body.innerHTML='';
+    if(!IPAYEE.length){ body.appendChild(mkDivSafe('color:var(--text3);padding:12px 0;','No approved payees yet. Add your property manager, HOA, utilities, and tax authority.')); }
+    IPAYEE.slice().sort(function(a,b){ return String(a.name||'').localeCompare(String(b.name||'')); }).forEach(function(p){
+      var r=document.createElement('div'); r.style.cssText='display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);';
+      var lab='<b>'+_esc(p.name||'')+'</b> <span style="color:var(--text3);font-size:12px;">· '+_esc(p.kind||'expense')+' · '+_esc(p.category||'')+(p.active===false?' · paused':'')+'</span>'
+             + '<div style="font-size:12px;color:var(--text3);">matches: '+_esc(p.match||'')+(p.property_id!=null?(' · '+_esc((invProp(p.property_id)||{}).name||'')):'')+'</div>';
+      r.innerHTML='<div>'+lab+'</div>';
+      var ra=document.createElement('div'); ra.style.cssText='display:flex;gap:6px;flex-shrink:0;';
+      var eb=document.createElement('button'); eb.className='btn btn-g'; eb.style.cssText='font-size:12px;padding:3px 9px;'; eb.textContent='Edit';
+      eb.addEventListener('click',function(){ openInvPayeeForm(p, redraw); });
+      var db=document.createElement('button'); db.className='btn btn-g'; db.style.cssText='font-size:12px;padding:3px 9px;'; db.textContent='Delete';
+      db.addEventListener('click',function(){ if(confirm('Delete approved payee "'+(p.name||'')+'"?')){ delInvPayee(p.id); redraw(); } });
+      ra.appendChild(eb); ra.appendChild(db); r.appendChild(ra); body.appendChild(r);
+    });
+  }
+  redraw(); m.appendChild(body);
+  var ft=document.createElement('div'); ft.style.cssText='display:flex;justify-content:space-between;gap:8px;padding:14px 20px;border-top:1px solid var(--border);';
+  var add=document.createElement('button'); add.className='btn btn-p'; add.textContent='+ Add payee'; add.addEventListener('click',function(){ openInvPayeeForm(null, redraw); });
+  var done=document.createElement('button'); done.className='btn btn-g'; done.textContent='Done'; done.addEventListener('click',function(){ document.body.removeChild(ov); });
+  ft.appendChild(add); ft.appendChild(done); m.appendChild(ft);
+  ov.appendChild(m); ov.addEventListener('click',function(e){ if(e.target===ov) document.body.removeChild(ov); });
+  document.body.appendChild(ov);
+}
 function openInvLedgerForm(entry, preset){
   preset = preset || {};
   var allCats = INV_INCOME_CATS.concat(INV_EXPENSE_CATS);
@@ -11363,26 +11455,17 @@ function invYtd(){
   ILED.forEach(function(l){ if((l.date||'').slice(0,4)!==yr) return; if((l.direction||invDirFor(l.category))==='income') inc+=invNum(l.amount); else exp+=invNum(l.amount); });
   return inc-exp;
 }
-// Auto-post each property's fixed monthly mortgage payment as a ledger expense (Jan of the current
-// year through the current month), so entering the amount once makes it subtract every month.
-// Deduped: skipped for any month that already has a Mortgage entry for the property (manual/scanned).
-function materializeMortgage(){
-  var now=new Date(); var y0=now.getFullYear(); var changed=false;
-  IPROP.forEach(function(p){
-    var amt=invNum(p.mortgage_payment); if(amt<=0) return;
-    var day=parseInt(p.mortgage_due_day)||1; if(day<1) day=1; if(day>28) day=28;
-    for(var mi=0; mi<=now.getMonth(); mi++){
-      var ym=y0+'-'+String(mi+1).padStart(2,'0');
-      var has=ILED.some(function(l){ return l.category==='Mortgage' && String(l.property_id)===String(p.id) && String(l.date||'').slice(0,7)===ym; });
-      if(has) continue;
-      var dstr=ym+'-'+String(day).padStart(2,'0');
-      var rec={ id:Date.now()+Math.floor(Math.random()*100000)+mi, date:dstr, property_id:p.id, unit_id:null, hoa_id:null,
-        category:'Mortgage', direction:'expense', amount:amt, payee:(p.mortgage_lender||''), method:null,
-        source:'recurring', email_ref:dstr+'|'+amt+'|Mortgage|'+p.id, notes:'Auto-posted monthly mortgage' };
-      ILED.push(rec); saveInvLedger(rec); changed=true;
-    }
-  });
-  return changed;
+// Ledger rows come ONLY from real emails/PDF statements or manual entry - never synthesized. The old
+// build auto-posted monthly mortgage rows (source='recurring'); this removes any that already exist so
+// "actual" numbers reflect real money movement only. Idempotent: after the first pass there are none.
+function purgeSyntheticLedger(){
+  var synthetic=ILED.filter(function(l){ return l.source==='recurring'; });
+  if(!synthetic.length) return false;
+  var ids={}; synthetic.forEach(function(l){ ids[l.id]=true; });
+  ILED=ILED.filter(function(l){ return !ids[l.id]; });
+  sv();
+  if(supaReady) synthetic.forEach(function(l){ dbDeleteBy('inv_ledger','id',l.id); });
+  return true;
 }
 var _invLedgerFilter='';   // property_id filter for the ledger table ('' = all)
 var _invDetailFrom='', _invDetailTo='', _invDetailPid=null;   // date-range filter inside a property detail view ('' = open end)
@@ -11409,7 +11492,7 @@ function _ivStyle(){
 }
 function renderInvestments(){
   _ivStyle();
-  try{ materializeMortgage(); }catch(e){}   // ensure monthly mortgage expenses exist before totals
+  try{ purgeSyntheticLedger(); }catch(e){}   // ledger holds only real rows - drop any synthesized ones
   var root=ge('invRoot'); if(!root) return; root.innerHTML='';
   var ym=invCurMonth();
 
@@ -11425,6 +11508,7 @@ function renderInvestments(){
   acts.appendChild(ivb('+ Log entry','pri',function(){ openInvLedgerForm(); }));
   var sinceVal; try{ sinceVal = localStorage.getItem('invLastScan') || (new Date().getFullYear()+'-01-01'); }catch(e){ sinceVal = new Date().getFullYear()+'-01-01'; }
   acts.appendChild(ivb('Scan email','',function(){ scanFinanceEmails(sinceVal); }));
+  acts.appendChild(ivb('Payees','',function(){ openInvPayeesModal(); }));
   acts.appendChild(ivb('Export','',function(){ invExportModal('properties'); }));
   bar.appendChild(mnav); bar.appendChild(acts);
   root.appendChild(bar);
@@ -11478,6 +11562,22 @@ function renderInvestments(){
     function stat(lbl,val,color){ return '<div><div style="font-size:12px;color:'+IVC.mut+';">'+lbl+'</div><div style="font-weight:500;color:'+color+';">'+val+'</div></div>'; }
     ion.innerHTML=stat('In',invMoney(io.inc),IVC.grn)+stat('Out',invMoney(io.exp),IVC.red)+stat('Net',invMoney(io.net),IVC.txt);
     pc.appendChild(ion);
+    // Rent: expected (from the unit's editable terms) vs what actually landed, with the shortfall
+    // called out as a repair. This is the manager-controlled rent side - clear at a glance.
+    var _expDep=propExpectedDeposit(p.id);
+    if(_expDep>0){
+      var _got=propRentReceived(p.id, ym); var _short=propRentShortfall(p.id, ym);
+      var rr=document.createElement('div'); rr.style.cssText='font-size:13px;margin:2px 0 10px;color:'+IVC.mut+';line-height:1.5;';
+      var _line='Rent expected <b style="color:'+IVC.txt+';">'+invMoney(_expDep)+'</b>';
+      if(_got>0){
+        _line += ' · got <b style="color:'+(_short>0?IVC.warn:IVC.grn)+';">'+invMoney(_got)+'</b>';
+        _line += _short>0 ? (' · <span style="color:'+IVC.red+';">'+invMoney(_short)+' short (repair)</span>')
+                          : (' · <span style="color:'+IVC.grn+';">on target</span>');
+      } else {
+        _line += ' · <span style="color:'+IVC.warn+';">not received yet</span>';
+      }
+      rr.innerHTML=_line; pc.appendChild(rr);
+    }
     // Header + summary open the property detail view.
     hd.style.cursor='pointer'; ion.style.cursor='pointer';
     (function(pid){ hd.addEventListener('click',function(){ openInvPropertyDetail(pid); }); ion.addEventListener('click',function(){ openInvPropertyDetail(pid); }); })(p.id);
@@ -11529,8 +11629,9 @@ function renderInvestments(){
     var pnm=l.property_id?((invProp(l.property_id)||{}).name||(invProp(l.property_id)||{}).address||''):'—';
     var dir=(l.direction||invDirFor(l.category)); var amtColor=dir==='income'?IVC.grn:IVC.red; var sign=dir==='income'?'+':'−';
     var tr=document.createElement('tr'); tr.style.cursor='pointer';
-    var tag=(l.source==='email'||l.source==='auto'||l.source==='recurring')?' <span style="font-size:11px;color:'+IVC.mut+';">('+_esc(l.source)+')</span>':'';
-    tr.innerHTML='<td>'+_esc(fd(l.date))+'</td><td>'+_esc(pnm)+'</td><td>'+_esc(l.category)+tag+'</td>'
+    var tag=(l.source==='email'||l.source==='auto')?' <span style="font-size:11px;color:'+IVC.mut+';">('+_esc(l.source)+')</span>':'';
+    var due=l.due_date?(' <span style="font-size:11px;color:'+IVC.warn+';background:'+IVC.warnbg+';padding:1px 6px;border-radius:6px;white-space:nowrap;">Due '+_esc(fd(l.due_date))+'</span>'):'';
+    tr.innerHTML='<td>'+_esc(fd(l.date))+'</td><td>'+_esc(pnm)+'</td><td>'+_esc(l.category)+tag+due+'</td>'
       + '<td style="text-align:right;color:'+amtColor+';">'+sign+invMoney(l.amount).replace('-','')+'</td>';
     var tdx=document.createElement('td'); tdx.style.textAlign='center';
     var xb=document.createElement('span'); xb.textContent='×'; xb.title='Delete'; xb.style.cssText='color:'+IVC.mut+';cursor:pointer;font-size:16px;';
@@ -11558,7 +11659,7 @@ function mkDivSafe(style, html){ var d=document.createElement('div'); if(style) 
 // full ledger history for that one property.
 function openInvPropertyDetail(pid){
   _ivStyle();
-  try{ materializeMortgage(); }catch(e){}
+  try{ purgeSyntheticLedger(); }catch(e){}
   var root=ge('invRoot'); if(!root) return; root.innerHTML='';
   var p=invProp(pid); if(!p){ renderInvestments(); return; }
   if(_invDetailPid!==String(pid)){ _invDetailFrom=''; _invDetailTo=''; _invDetailPid=String(pid); }   // reset range when switching property
@@ -11603,6 +11704,21 @@ function openInvPropertyDetail(pid){
     });
   }
 
+  // Rent expected vs actual for the current month (the manager-controlled rent side).
+  (function(){
+    var ymC=invCurMonth();
+    var expDep=propExpectedDeposit(p.id); if(expDep<=0) return;
+    var got=propRentReceived(p.id, ymC); var short=propRentShortfall(p.id, ymC); var expProfit=propExpectedProfit(p.id);
+    var box=document.createElement('div'); box.style.cssText='background:'+IVC.card+';border:1px solid '+IVC.bord+';border-radius:12px;padding:12px 16px;margin:16px 0 6px;';
+    box.appendChild(mkDivSafe('font-size:13px;color:'+IVC.mut+';margin-bottom:6px;','Rent — expected vs actual · '+_esc(invMonthLabel(ymC))));
+    function row(l,v,c){ var r=document.createElement('div'); r.style.cssText='display:flex;justify-content:space-between;padding:4px 0;'; r.innerHTML='<span style="color:'+IVC.mut+';">'+l+'</span><span style="color:'+(c||IVC.txt)+';font-weight:500;">'+v+'</span>'; return r; }
+    box.appendChild(row('Expected deposit', invMoney(expDep)));
+    box.appendChild(row('Actually received', got>0?invMoney(got):'not yet', got>0?(short>0?IVC.warn:IVC.grn):IVC.warn));
+    if(short>0) box.appendChild(row('Shortfall booked as repair/maintenance', invMoney(short), IVC.red));
+    box.appendChild(row('Expected profit (rent − mgmt)', invMoney(expProfit)));
+    root.appendChild(box);
+  })();
+
   // Date-range picker (blank ends = open). Quick presets + From/To.
   var mine=ILED.filter(function(l){ return String(l.property_id)===String(p.id); });
   var rp=document.createElement('div'); rp.style.cssText='display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:16px 0 6px;';
@@ -11646,7 +11762,8 @@ function openInvPropertyDetail(pid){
   rows.forEach(function(l){
     var dir=(l.direction||invDirFor(l.category)); var col=dir==='income'?IVC.grn:IVC.red; var sign=dir==='income'?'+':'−';
     var tr=document.createElement('tr'); tr.style.cursor='pointer';
-    tr.innerHTML='<td>'+_esc(fd(l.date))+'</td><td>'+_esc(l.category)+'</td><td style="color:'+IVC.mut+';font-size:13px;">'+_esc(l.notes||l.payee||'')+'</td><td style="text-align:right;color:'+col+';">'+sign+invMoney(l.amount).replace('-','')+'</td>';
+    var due2=l.due_date?(' <span style="font-size:11px;color:'+IVC.warn+';background:'+IVC.warnbg+';padding:1px 6px;border-radius:6px;white-space:nowrap;">Due '+_esc(fd(l.due_date))+'</span>'):'';
+    tr.innerHTML='<td>'+_esc(fd(l.date))+'</td><td>'+_esc(l.category)+'</td><td style="color:'+IVC.mut+';font-size:13px;">'+_esc(l.notes||l.payee||'')+due2+'</td><td style="text-align:right;color:'+col+';">'+sign+invMoney(l.amount).replace('-','')+'</td>';
     var tdx=document.createElement('td'); tdx.style.textAlign='center'; var xb=document.createElement('span'); xb.textContent='×'; xb.style.cssText='color:'+IVC.mut+';cursor:pointer;font-size:16px;';
     (function(l2){ xb.addEventListener('click',function(e){ e.stopPropagation(); if(confirm('Delete this entry?')){ delInvLedger(l2.id); openInvPropertyDetail(pid); } }); })(l);
     tdx.appendChild(xb); tr.appendChild(tdx);
