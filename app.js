@@ -116,7 +116,7 @@ var DB_COLS = {
   inv_hoa: ['id','name','account_number','dues_amount','dues_frequency','due_day','notes'],
   inv_properties: ['id','name','address','hoa_id','purchase_price','purchase_date','mortgage_lender','mortgage_balance','mortgage_payment','mortgage_due_day','notes'],
   inv_units: ['id','property_id','label','rent_amount','rent_due_day','mgmt_fee','passthrough_amount','passthrough_label','tenant_name','lease_start','lease_end','status','notes'],
-  inv_ledger: ['id','date','property_id','unit_id','hoa_id','direction','category','amount','payee','method','source','email_ref','notes'],
+  inv_ledger: ['id','date','property_id','unit_id','hoa_id','direction','category','amount','payee','method','source','email_ref','message_id','received_date','due_date','notes'],
   inv_loans: ['id','borrower','address','notes','principal','interest_rate','term_months','start_date','end_date','first_payment_date','monthly_payment','status'],
   inv_loan_payments: ['id','loan_id','date','amount','note']
 };
