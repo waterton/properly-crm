@@ -11627,8 +11627,9 @@ function renderInvestments(){
     var pnm=l.property_id?((invProp(l.property_id)||{}).name||(invProp(l.property_id)||{}).address||''):'—';
     var dir=(l.direction||invDirFor(l.category)); var amtColor=dir==='income'?IVC.grn:IVC.red; var sign=dir==='income'?'+':'−';
     var tr=document.createElement('tr'); tr.style.cursor='pointer';
-    var tag=(l.source==='email'||l.source==='auto'||l.source==='recurring')?' <span style="font-size:11px;color:'+IVC.mut+';">('+_esc(l.source)+')</span>':'';
-    tr.innerHTML='<td>'+_esc(fd(l.date))+'</td><td>'+_esc(pnm)+'</td><td>'+_esc(l.category)+tag+'</td>'
+    var tag=(l.source==='email'||l.source==='auto')?' <span style="font-size:11px;color:'+IVC.mut+';">('+_esc(l.source)+')</span>':'';
+    var due=l.due_date?(' <span style="font-size:11px;color:'+IVC.warn+';background:'+IVC.warnbg+';padding:1px 6px;border-radius:6px;white-space:nowrap;">Due '+_esc(fd(l.due_date))+'</span>'):'';
+    tr.innerHTML='<td>'+_esc(fd(l.date))+'</td><td>'+_esc(pnm)+'</td><td>'+_esc(l.category)+tag+due+'</td>'
       + '<td style="text-align:right;color:'+amtColor+';">'+sign+invMoney(l.amount).replace('-','')+'</td>';
     var tdx=document.createElement('td'); tdx.style.textAlign='center';
     var xb=document.createElement('span'); xb.textContent='×'; xb.title='Delete'; xb.style.cssText='color:'+IVC.mut+';cursor:pointer;font-size:16px;';
@@ -11759,7 +11760,8 @@ function openInvPropertyDetail(pid){
   rows.forEach(function(l){
     var dir=(l.direction||invDirFor(l.category)); var col=dir==='income'?IVC.grn:IVC.red; var sign=dir==='income'?'+':'−';
     var tr=document.createElement('tr'); tr.style.cursor='pointer';
-    tr.innerHTML='<td>'+_esc(fd(l.date))+'</td><td>'+_esc(l.category)+'</td><td style="color:'+IVC.mut+';font-size:13px;">'+_esc(l.notes||l.payee||'')+'</td><td style="text-align:right;color:'+col+';">'+sign+invMoney(l.amount).replace('-','')+'</td>';
+    var due2=l.due_date?(' <span style="font-size:11px;color:'+IVC.warn+';background:'+IVC.warnbg+';padding:1px 6px;border-radius:6px;white-space:nowrap;">Due '+_esc(fd(l.due_date))+'</span>'):'';
+    tr.innerHTML='<td>'+_esc(fd(l.date))+'</td><td>'+_esc(l.category)+'</td><td style="color:'+IVC.mut+';font-size:13px;">'+_esc(l.notes||l.payee||'')+due2+'</td><td style="text-align:right;color:'+col+';">'+sign+invMoney(l.amount).replace('-','')+'</td>';
     var tdx=document.createElement('td'); tdx.style.textAlign='center'; var xb=document.createElement('span'); xb.textContent='×'; xb.style.cssText='color:'+IVC.mut+';cursor:pointer;font-size:16px;';
     (function(l2){ xb.addEventListener('click',function(e){ e.stopPropagation(); if(confirm('Delete this entry?')){ delInvLedger(l2.id); openInvPropertyDetail(pid); } }); })(l);
     tdx.appendChild(xb); tr.appendChild(tdx);
