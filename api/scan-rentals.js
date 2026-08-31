@@ -210,7 +210,9 @@ async function authorized(req) { return (cronOk(req) || (await userOk(req))); }
 export default async function handler(req, res) {
   if (!(await authorized(req))) return res.status(401).json({ error: 'Unauthorized' });
   if (!GEMINI_KEY) return res.status(500).json({ error: 'GEMINI_API_KEY not set' });
-  const result = { mailbox: RENTAL_MAILBOX, scanned: 0, added: 0, skipped: 0, unmatched: 0, freshStartPending: 0, errors: [] };
+  const result = { mailbox: RENTAL_MAILBOX, scanned: 0, added: 0, skipped: 0, unmatched: 0, freshStartPending: 0, errors: [],
+    recorded: [], ignored: [], noPdf: [] };   // review details (from/subject) for the in-app triage view
+  const brief = (m, extra) => Object.assign({ from: m.from || '', subject: m.subject || '', date: m.received || '' }, extra || {});
   try {
     const [props, units, payees, ledger, tokens] = await Promise.all([
       supaGet('inv_properties?select=*'),
@@ -250,16 +252,16 @@ export default async function handler(req, res) {
       let m; try { m = await gmailGet(at.accessToken, mref.id); } catch (e) { continue; }
       result.scanned++;
       const payee = payeeFor(m.from, (m.subject || '') + ' \n ' + m.text, payees);
-      if (!payee) { result.unmatched++; continue; }                        // not an approved sender -> ignore
+      if (!payee) { result.unmatched++; if (result.ignored.length < 100) result.ignored.push(brief(m)); continue; }   // not an approved sender
       if (payee.kind === 'rent') {
         // Fresh Start rent statement: the money is split per property from the attached PDF.
-        if (processedMsg[m.messageId]) { result.skipped++; continue; }     // this statement already booked
+        if (processedMsg[m.messageId]) { result.skipped++; if (result.recorded.length < 100) result.recorded.push(brief(m, { payee: payee.name })); continue; }
         const pdf = (m.attachments || []).find(a => /pdf/i.test(a.mimeType) || /\.pdf$/i.test(a.filename || ''));
-        if (!pdf) { result.freshStartPending++; continue; }                // no statement attached -> manual
+        if (!pdf) { result.freshStartPending++; if (result.noPdf.length < 100) result.noPdf.push(brief(m, { payee: payee.name })); continue; }
         rentJobs.push({ msg: m, payee: payee, pdf: pdf });
         continue;
       }
-      if (seen[m.messageId]) { result.skipped++; continue; }               // already booked this expense email
+      if (seen[m.messageId]) { result.skipped++; if (result.recorded.length < 100) result.recorded.push(brief(m, { payee: payee.name })); continue; }   // already booked
       const prop = payee.property_id != null ? props.find(p => String(p.id) === String(payee.property_id)) : matchProp((m.subject || '') + ' ' + m.text, props);
       expenseJobs.push({ msg: m, payee: payee, prop: prop });
     }
