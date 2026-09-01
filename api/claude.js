@@ -95,9 +95,12 @@ export default async function handler(req, res) {
       }
     };
     // When the caller wants JSON (e.g. the document scanner), ask Gemini for strict JSON so the
-    // response is always valid and parseable - no ```json fences, no unescaped characters.
+    // response is always valid and parseable - no ```json fences, no unescaped characters. Also turn
+    // OFF "thinking": gemini-2.5-flash thinks before answering and that reasoning is billed against
+    // maxOutputTokens, which was starving the actual JSON and truncating it mid-object.
     if (body.response_format === 'json' || body.json === true) {
       geminiBody.generationConfig.responseMimeType = 'application/json';
+      geminiBody.generationConfig.thinkingConfig = { thinkingBudget: 0 };
     }
 
     var model = 'gemini-2.5-flash';
