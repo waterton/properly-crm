@@ -94,6 +94,11 @@ export default async function handler(req, res) {
         maxOutputTokens: body.max_tokens || 8192
       }
     };
+    // When the caller wants JSON (e.g. the document scanner), ask Gemini for strict JSON so the
+    // response is always valid and parseable - no ```json fences, no unescaped characters.
+    if (body.response_format === 'json' || body.json === true) {
+      geminiBody.generationConfig.responseMimeType = 'application/json';
+    }
 
     var model = 'gemini-2.5-flash';
     var url = 'https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent?key=' + apiKey;

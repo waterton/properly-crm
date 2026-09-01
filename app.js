@@ -6003,6 +6003,7 @@ function startScan(file){
       body: JSON.stringify({
         model:'claude-sonnet-4-20250514',
         max_tokens:8192,
+        response_format:'json',   // force strict JSON so the extraction always parses
         messages:[{role:'user', content:msgContent}]
       })
     });
@@ -7382,7 +7383,7 @@ function showScannerRawResult(text){
   var dtBlank2 = document.createElement('option');
   dtBlank2.value = ''; dtBlank2.textContent = '-- Link to transaction (optional) --';
   docTxSel2.appendChild(dtBlank2);
-  TX.forEach(function(tx){
+  TX.filter(function(tx){ return tx.status!=='closed'; }).forEach(function(tx){
     var c4 = gc(tx.contactId);
     var o = document.createElement('option');
     o.value = tx.id; o.textContent = (tx.address||'Unknown') + (c4 ? ' - ' + fn(c4) : '');
