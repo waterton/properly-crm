@@ -116,6 +116,18 @@ async function geminiReadStatementPdf(b64pdf, propList) {
   const txt = d.candidates && d.candidates[0] && d.candidates[0].content && d.candidates[0].content.parts && d.candidates[0].content.parts[0] ? d.candidates[0].content.parts[0].text : '';
   return parseArr(txt || '') || [];
 }
+// Some managers email a plain deposit line and never attach a statement PDF. Read the same figures
+// from the email TEXT. If only a total deposit is stated, return it in "deposit" (rent/mgmt = 0).
+async function geminiReadStatementText(emailText, propList) {
+  const prompt = 'This is an email reporting one or more rental deposits to the owner. For EACH property/unit mentioned, extract its figures. '
+    + 'Return ONLY a JSON array: [{"property":"<address or name as written>","unit":"<unit label if distinguished, else empty>","rent":<gross rent number>,"management":<mgmt fee number>,"parking":<parking/other income or 0>,"repairs":[{"desc":"<label>","amount":<number>}],"deposit":<net amount deposited to the owner, number>}]. '
+    + 'If the email only states a total amount deposited (no rent/fee breakdown), put that amount in "deposit" and use 0 for rent/management/parking and [] for repairs. Use 0 for any absent value. Known properties: ' + propList + '.';
+  const body = { contents: [{ parts: [{ text: prompt + '\n\nEMAIL:\n' + String(emailText || '').slice(0, 8000) }] }], generationConfig: { temperature: 0.1, maxOutputTokens: 4096, responseMimeType: 'application/json' } };
+  const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + GEMINI_KEY, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const d = await r.json();
+  const txt = d.candidates && d.candidates[0] && d.candidates[0].content && d.candidates[0].content.parts && d.candidates[0].content.parts[0] ? d.candidates[0].content.parts[0].text : '';
+  return parseArr(txt || '') || [];
+}
 function num(v) { const n = parseFloat(String(v == null ? '' : v).replace(/[^0-9.\-]/g, '')); return isNaN(n) ? 0 : n; }
 function normCat(c) {
   c = String(c || '').trim().toLowerCase();
@@ -274,8 +286,8 @@ export default async function handler(req, res) {
         // Fresh Start rent statement: the money is split per property from the attached PDF.
         if (processedMsg[m.messageId]) { result.skipped++; if (result.recorded.length < 100) result.recorded.push(brief(m, { payee: payee.name })); continue; }
         const pdf = (m.attachments || []).find(a => /pdf/i.test(a.mimeType) || /\.pdf$/i.test(a.filename || ''));
-        if (!pdf) { result.freshStartPending++; if (result.noPdf.length < 100) result.noPdf.push(brief(m, { payee: payee.name })); continue; }
-        rentJobs.push({ msg: m, payee: payee, pdf: pdf });
+        // PDF statement -> split from the PDF; no PDF -> read the deposit from the email body.
+        rentJobs.push({ msg: m, payee: payee, pdf: pdf || null });
         continue;
       }
       if (seen[m.messageId]) { result.skipped++; if (result.recorded.length < 100) result.recorded.push(brief(m, { payee: payee.name })); continue; }   // already booked
@@ -329,12 +341,17 @@ export default async function handler(req, res) {
     // ---- Fresh Start owner statements: read the attached PDF and split per property. ----
     const propList = props.map(p => (p.name || '') + (p.address ? (' (' + p.address + ')') : '')).join('; ');
     for (const j of rentJobs) {
-      let b64 = '';
-      try { b64 = await gmailGetAttachment(at.accessToken, j.msg.gmailId, j.pdf.attachmentId); } catch (e) { result.errors.push('attach: ' + e.message); }
-      if (!b64) { result.errors.push('empty PDF for ' + j.msg.messageId); continue; }
       let statement = [];
-      try { statement = await geminiReadStatementPdf(b64, propList); } catch (e) { result.errors.push('pdf-gemini: ' + e.message); }
-      if (!Array.isArray(statement) || !statement.length) { result.freshStartPending++; continue; }
+      if (j.pdf) {
+        let b64 = '';
+        try { b64 = await gmailGetAttachment(at.accessToken, j.msg.gmailId, j.pdf.attachmentId); } catch (e) { result.errors.push('attach: ' + e.message); }
+        if (!b64) { result.errors.push('empty PDF for ' + j.msg.messageId); continue; }
+        try { statement = await geminiReadStatementPdf(b64, propList); } catch (e) { result.errors.push('pdf-gemini: ' + e.message); }
+      } else {
+        // No PDF: read the deposit line(s) straight from the email body.
+        try { statement = await geminiReadStatementText((j.msg.subject || '') + '\n' + (j.msg.text || ''), propList); } catch (e) { result.errors.push('body-gemini: ' + e.message); }
+      }
+      if (!Array.isArray(statement) || !statement.length) { result.freshStartPending++; if (result.noPdf.length < 100) result.noPdf.push(brief(j.msg, { payee: j.payee.name })); continue; }
       let slotN = 0;
       const post = async (pid, uid, hoaId, cat, dir, amt, note, slot) => {
         if (num(amt) <= 0) return;
@@ -356,13 +373,17 @@ export default async function handler(req, res) {
         if (ok) result.added++; else result.skipped++;
       };
       for (const sp of statement) {
-        const prop = matchProp(sp.property, props);
+        let prop = matchProp(sp.property, props);
+        if (!prop && j.payee.property_id != null) prop = props.find(p => String(p.id) === String(j.payee.property_id));  // pinned payee -> its property
         if (!prop) { result.unmatched++; continue; }                       // don't post blank/unmatched rows
         const unit = matchUnit(prop, sp.unit, units);
         const pid = prop.id, uid = unit ? unit.id : null, hoaId = prop.hoa_id;
         const ul = unit ? (' (' + (unit.label || '') + ')') : '';           // show which unit on the row
         const rent = num(sp.rent), mgmt = num(sp.management), parking = num(sp.parking), deposit = num(sp.deposit);
-        await post(pid, uid, null, 'Rent', 'income', rent, 'Rent — statement' + ul, 'rent');
+        // When the email gives only a total deposit (no gross-rent breakdown), book that deposit as
+        // the rent income so it still lands - propRentReceived then equals the real deposit.
+        const rentIncome = rent > 0 ? rent : deposit;
+        await post(pid, uid, null, 'Rent', 'income', rentIncome, 'Rent — deposit' + ul, 'rent');
         if (parking > 0) {
           await post(pid, uid, null, 'Other income', 'income', parking, ((j.payee.name || '') + ' parking' + ul), 'parking');
           await post(pid, uid, hoaId, 'HOA', 'expense', parking, 'Parking pass-through to HOA' + ul, 'hoa_pass');
