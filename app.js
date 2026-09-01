@@ -8686,20 +8686,26 @@ async function checkConnectedAccounts(){
     // needs no TM data (TM is localStorage-only and may not be loaded yet at this point).
     var preferred = null;
     var myEmail = (currentUser && currentUser.email) ? currentUser.email.toLowerCase() : '';
-    if(myEmail){
+    // 1) This user's remembered choice from last time (per-login), if still connected.
+    try{ var pk=_gmailPrefKey(); var saved=pk?localStorage.getItem(pk):''; if(saved && gmailState.connectedAccounts[String(saved)]) preferred=String(saved); }catch(e){}
+    // 2) A connected account whose Gmail address matches the signed-in user.
+    if(!preferred && myEmail){
       Object.keys(gmailState.connectedAccounts).forEach(function(k){
         var a = gmailState.connectedAccounts[k];
         if(!preferred && a && a.email && String(a.email).toLowerCase() === myEmail) preferred = k;
       });
     }
-    // Fallback: match via the team-member record (covers a CRM login that differs from the
-    // connected Gmail address).
+    // 3) Match via the team-member record (covers a CRM login that differs from the Gmail address).
     if(!preferred){
       var mid = resolveMyMember();
       if(mid != null && gmailState.connectedAccounts[String(mid)]) preferred = String(mid);
     }
-    // Last resort: whatever is connected (e.g. your own Gmail isn't linked yet).
-    if(!preferred) preferred = Object.keys(gmailState.connectedAccounts)[0];
+    // 4) Last resort: the first connected account that ISN'T the rental scan-only mailbox, so nobody
+    //    lands on banff1997 by default; only fall back to it if it's the only thing connected.
+    if(!preferred){
+      var keys=Object.keys(gmailState.connectedAccounts);
+      preferred = keys.find(function(k){ var a=gmailState.connectedAccounts[k]; return !a || String(a.email||'').toLowerCase()!==GMAIL_SCAN_ONLY; }) || keys[0];
+    }
     if(preferred){
       gmailState.activeMemberId = preferred;
       ge('gmailNotConnected').style.display = 'none';
@@ -8873,8 +8879,12 @@ async function disconnectGmail(memberId){
   }catch(e){ alert('Error disconnecting: '+e.message); }
 }
 
+// The mailbox that only exists for the rental scan - never auto-default to it.
+var GMAIL_SCAN_ONLY = 'banff1997@gmail.com';
+function _gmailPrefKey(){ var e=(currentUser&&currentUser.email)?currentUser.email.toLowerCase():''; return e?('gmailPref:'+e):''; }
 function switchGmailAccount(memberId){
   gmailState.activeMemberId = memberId;
+  try{ var k=_gmailPrefKey(); if(k) localStorage.setItem(k, String(memberId)); }catch(e){}   // remember this user's choice
   var acc = gmailState.connectedAccounts[String(memberId)];
   if(acc) ge('gmailAccountEmail').textContent = acc.email;
   renderGmailAccountBar();
