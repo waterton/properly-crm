@@ -9239,10 +9239,10 @@ function renderThread(messages, threadId){
           var scanBtn = document.createElement('button');
           scanBtn.style.cssText = 'margin-left:6px;background:var(--accent);border:none;border-radius:4px;padding:2px 7px;font-size:18px;color:var(--bg);cursor:pointer;font-family:DM Sans,sans-serif;font-weight:700;';
           scanBtn.textContent = 'Scan';
-          (function(a, mid){ scanBtn.addEventListener('click', function(e){
+          (function(a, mid, memberId){ scanBtn.addEventListener('click', function(e){
             e.stopPropagation();
-            importAttachmentToScanner(mid, a.attachmentId, a.filename, a.mimeType);
-          }); })(att, msg.id);
+            importAttachmentToScanner(memberId, mid, a.attachmentId, a.filename, a.mimeType);
+          }); })(att, msg.id, gmailState.activeMemberId);
           attBtn.appendChild(scanBtn);
         }
         attDiv.appendChild(attBtn);
@@ -9302,7 +9302,11 @@ function renderThread(messages, threadId){
   thread.appendChild(replyBar);
 }
 
-async function importAttachmentToScanner(messageId, attachmentId, filename, mimeType){
+async function importAttachmentToScanner(memberId, messageId, attachmentId, filename, mimeType){
+  // memberId is captured when the email renders and passed in - do NOT read gmailState.activeMemberId
+  // here, because navigating to the scanner for the first attachment can leave it stale, which made
+  // a second attachment in the same email fail with a permission error until the email was re-opened.
+  var mem = (memberId != null) ? memberId : gmailState.activeMemberId;
   sp('scanner');
   ge('scannerUploadArea').style.display='none';
   ge('scannerProcessing').style.display='block';
@@ -9311,7 +9315,7 @@ async function importAttachmentToScanner(messageId, attachmentId, filename, mime
   try{
     var resp = await fetch('/api/gmail-api', {
       method:'POST', headers: await apiHeaders(),
-      body: JSON.stringify({action:'attachment', memberId:gmailState.activeMemberId, messageId:messageId, attachmentId:attachmentId})
+      body: JSON.stringify({action:'attachment', memberId:mem, messageId:messageId, attachmentId:attachmentId})
     });
     var data = await resp.json();
     if(data.error){ showScannerError(data.error); return; }
