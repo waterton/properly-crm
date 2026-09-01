@@ -6743,36 +6743,45 @@ function showScannerResults(r){
 
   function renderTxChoice(){
     if(!txChoice || !newCb) return;   // an auto-link during setup can fire this before the UI exists
+    var prev = (document.querySelector('input[name="sc_tx_choice"]:checked')||{}).value || '';   // keep the user's pick across re-renders
     txChoice.innerHTML = '';
     var cid = newCb.checked ? null : (scPicker.hidden.value ? parseInt(scPicker.hidden.value) : null);
     var existing = cid ? TX.filter(function(t){ return String(t.contactId)===String(cid) && t.status!=='closed'; }) : [];
+    // Auto-attach: if the scanned address clearly matches one of this contact's existing deals,
+    // pre-select it (so a second offer lands on the same listing without extra clicks).
+    var _na=function(s){ return String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim(); };
+    var scAddr=_na((ge('sc_address')&&ge('sc_address').value) ? ge('sc_address').value : (r.address||''));
+    var autoId=null;
+    existing.forEach(function(t){ if(autoId==null && scAddr){ var a=_na(t.address); if(a && (a.indexOf(scAddr)>=0 || scAddr.indexOf(a)>=0)) autoId=t.id; } });
+    var validPrev = prev==='new' || existing.some(function(t){ return ('existing:'+t.id)===prev; });
+    var sel = validPrev ? prev : (autoId!=null ? ('existing:'+autoId) : 'new');
 
-    function radio(val, labelTxt, checked){
+    function radio(val, labelTxt, checked, onChg){
       var lab=document.createElement('label');
       lab.style.cssText='display:flex;align-items:center;gap:8px;cursor:pointer;padding:5px 0;font-size:14px;color:var(--text);';
       var rb=document.createElement('input'); rb.type='radio'; rb.name='sc_tx_choice'; rb.value=val; rb.checked=checked;
       rb.style.cssText='accent-color:var(--accent);';
-      rb.addEventListener('change', renderTxChoice);
+      rb.addEventListener('change', onChg||renderTxChoice);
       lab.appendChild(rb); lab.appendChild(document.createTextNode(labelTxt));
       return lab;
     }
-    txChoice.appendChild(radio('new', 'Create new transaction', true));
+    txChoice.appendChild(radio('new', 'Create new transaction', sel==='new'));
     if(existing.length){
       var exWrap=document.createElement('div');
       exWrap.style.cssText='margin-top:4px;padding-left:4px;';
       existing.forEach(function(t){
         var lab=document.createElement('label');
         lab.style.cssText='display:flex;align-items:center;gap:8px;cursor:pointer;padding:4px 0;font-size:13px;color:var(--text2);';
-        var rb=document.createElement('input'); rb.type='radio'; rb.name='sc_tx_choice'; rb.value='existing:'+t.id;
+        var rb=document.createElement('input'); rb.type='radio'; rb.name='sc_tx_choice'; rb.value='existing:'+t.id; rb.checked=(sel==='existing:'+t.id);
         rb.style.cssText='accent-color:var(--accent);';
         rb.addEventListener('change', renderDiff);
         lab.appendChild(rb);
-        lab.appendChild(document.createTextNode((t.address||'Unknown address')+' ('+(t.type||'')+')'));
+        lab.appendChild(document.createTextNode((t.address||'Unknown address')+' ('+(t.type||'')+')'+((autoId===t.id)?'  — matches this document':'')));
         exWrap.appendChild(lab);
       });
       var exHdr=document.createElement('div');
       exHdr.style.cssText='font-size:12px;color:var(--text3);margin-top:6px;';
-      exHdr.textContent='or add to an existing transaction for this contact:';
+      exHdr.textContent = (autoId!=null && !validPrev) ? 'auto-attached to the matching deal (change if wrong):' : 'or add to an existing transaction for this contact:';
       txChoice.appendChild(exHdr);
       txChoice.appendChild(exWrap);
     }
