@@ -4655,6 +4655,21 @@ var OFFER_STATUS=[{value:'active',label:'Active'},{value:'countered',label:'Coun
 function _finLabel(v){ var f=OFFER_FIN.find(function(x){return x.value===v;}); return f?f.label:(v||'—'); }
 function txOffers(tx){ return (tx && tx.details && Array.isArray(tx.details.offers)) ? tx.details.offers : []; }
 function saveOffers(tx, offs){ tx.details=tx.details||{}; tx.details.offers=offs; saveTX(tx); }
+// Commission % for an offer: the offer's own, else the listing's total (list + buyer side).
+function offerCommissionPct(o, tx){
+  var c=invNum(o.commissionPct); if(c>0) return c;
+  return invNum(tx&&tx.listCommissionPct)+invNum(tx&&tx.buyerCommissionPct);
+}
+// Estimated CASH to the seller at closing = cash basis (full price, or just the down for seller
+// financing) minus commission (on full price), concessions, and other seller costs (title/payoff/etc.).
+function offerNetToSeller(o, tx){
+  var price=invNum(o.price);
+  var cashBasis=(o.financingType==='seller') ? invNum((o.sf||{}).down) : price;
+  var commission=price*offerCommissionPct(o,tx)/100;
+  return cashBasis - commission - invNum(o.concessions) - invNum(o.sellerCosts);
+}
+// For seller financing, the balance carried as a note (a receivable, not cash at close).
+function offerFinancedBalance(o){ return (o.financingType==='seller') ? Math.max(0, invNum(o.price)-invNum((o.sf||{}).down)) : 0; }
 function openOfferForm(txId, offer){
   var tx=TX.find(function(t){return t.id===txId;}); if(!tx) return;
   var sf=(offer&&offer.sf)||{};
@@ -4672,6 +4687,8 @@ function openOfferForm(txId, offer){
     {key:'financingDate',label:'Financing deadline',type:'date'},
     {key:'appraisalDate',label:'Appraisal deadline',type:'date'},
     {key:'concessions',label:'Seller concessions ($)',type:'number'},
+    {key:'commissionPct',label:'Total commission (%)',type:'number'},
+    {key:'sellerCosts',label:'Other seller costs ($) — title, payoff, etc.',type:'number'},
     {key:'sfDown',label:'Seller-fin: down payment',type:'number'},
     {key:'sfRate',label:'Seller-fin: interest rate %',type:'number'},
     {key:'sfTermMonths',label:'Seller-fin: term (months)',type:'number'},
@@ -4685,7 +4702,8 @@ function openOfferForm(txId, offer){
     rec.buyer=(v.buyer||'').trim(); rec.buyerAgent=(v.buyerAgent||'').trim(); rec.offerDate=v.offerDate||'';
     rec.price=v.price; rec.financingType=v.financingType||'conventional'; rec.earnest=v.earnest;
     rec.closingDate=v.closingDate; rec.dueDiligenceDate=v.dueDiligenceDate; rec.financingDate=v.financingDate; rec.appraisalDate=v.appraisalDate;
-    rec.concessions=v.concessions; rec.contingencies=(v.contingencies||'').trim(); rec.status=v.status||'active'; rec.notes=(v.notes||'').trim();
+    rec.concessions=v.concessions; rec.commissionPct=v.commissionPct; rec.sellerCosts=v.sellerCosts;
+    rec.contingencies=(v.contingencies||'').trim(); rec.status=v.status||'active'; rec.notes=(v.notes||'').trim();
     rec.sf={down:v.sfDown,rate:v.sfRate,termMonths:v.sfTermMonths,balloonMonths:v.sfBalloonMonths,monthly:v.sfMonthly};
     var offs=txOffers(tx).slice(); var i=offs.findIndex(function(o){return String(o.id)===String(rec.id);});
     if(i>=0) offs[i]=rec; else offs.push(rec);
@@ -4743,6 +4761,8 @@ function renderOffersSection(tx){
     ['Financing',function(o){return _esc(_finLabel(o.financingType));}],
     ['Earnest',function(o){return o.earnest?_esc(invMoney(invNum(o.earnest))):'—';}],
     ['Concessions',function(o){return o.concessions?_esc(invMoney(invNum(o.concessions))):'—';}],
+    ['Commission %',function(o){var p=offerCommissionPct(o,tx);return p?_esc(p+'%'):'—';}],
+    ['Other seller costs',function(o){return o.sellerCosts?_esc(invMoney(invNum(o.sellerCosts))):'—';}],
     ['Closing',function(o){return o.closingDate?_esc(fd(o.closingDate)):'—';}],
     ['Due diligence',function(o){return o.dueDiligenceDate?_esc(fd(o.dueDiligenceDate)):'—';}],
     ['Financing deadline',function(o){return o.financingDate?_esc(fd(o.financingDate)):'—';}],
@@ -4755,7 +4775,21 @@ function renderOffersSection(tx){
     ['Contingencies',function(o){return _esc(o.contingencies||'—');}],
     ['Notes',function(o){return _esc(o.notes||'—');}]
   ];
-  var bodyHtml='';
+  // Highlighted net-to-seller row: best (highest cash at close) shown bold green. Seller-financing
+  // shows the carried note separately since it isn't cash at the table.
+  var _nets=offs.map(function(o){ return offerNetToSeller(o,tx); });
+  var _maxNet=Math.max.apply(null, _nets);
+  var netRow='<tr style="background:var(--surface2);"><td style="padding:8px 10px;border-top:2px solid var(--border);font-weight:700;white-space:nowrap;">Est. net to seller<div style="font-size:11px;color:var(--text3);font-weight:400;">cash at close</div></td>';
+  offs.forEach(function(o,i){
+    var n=_nets[i]; var best=(n===_maxNet && offs.length>1);
+    var fb=offerFinancedBalance(o);
+    netRow+='<td style="padding:8px 10px;border-top:2px solid var(--border);border-left:1px solid var(--border);">'
+      + '<div style="font-weight:700;color:'+(best?'var(--lead)':'var(--text)')+';">'+_esc(invMoney(n))+(best?' ★':'')+'</div>'
+      + (fb>0?('<div style="font-size:11px;color:var(--text3);">+ note '+_esc(invMoney(fb))+((o.sf&&o.sf.rate)?(' @ '+_esc(o.sf.rate)+'%'):'')+'</div>'):'')
+      + '</td>';
+  });
+  netRow+='</tr>';
+  var bodyHtml=netRow;
   rows.forEach(function(r){
     bodyHtml+='<tr><td style="padding:6px 10px;color:var(--text3);border-top:1px solid var(--border);white-space:nowrap;">'+r[0]+'</td>';
     offs.forEach(function(o){ bodyHtml+='<td style="padding:6px 10px;border-top:1px solid var(--border);border-left:1px solid var(--border);">'+r[1](o)+'</td>'; });
