@@ -6537,6 +6537,24 @@ function showScannerResults(r){
   sideWrap.appendChild(sideLbl); sideWrap.appendChild(sideSel);
   imp.insertBefore(sideWrap, cLbl);
 
+  // Import mode — a seller's listing can receive OFFERS to compare without going under contract.
+  var modeWrap=document.createElement('div'); modeWrap.id='sc_import_mode_wrap'; modeWrap.style.cssText='margin-bottom:10px;';
+  imp.insertBefore(modeWrap, cLbl);
+  function renderImportMode(){
+    modeWrap.innerHTML='';
+    var _side = ge('sc_client_side') ? ge('sc_client_side').value : 'buyer';
+    if(_side!=='seller' || scanIsLease(r)) return;   // offers apply to seller residential listings
+    modeWrap.appendChild(mkDivSafe('font-size:13px;color:var(--text3);margin-bottom:4px;','This document is'));
+    [['offer','An offer — add to the listing to compare (stays NOT under contract)'],
+     ['contract','The ratified contract — put this deal under contract']].forEach(function(o,i){
+      var l=document.createElement('label'); l.style.cssText='display:flex;align-items:flex-start;gap:8px;cursor:pointer;font-size:14px;color:var(--text2);margin:3px 0;';
+      var rb=document.createElement('input'); rb.type='radio'; rb.name='sc_import_mode'; rb.value=o[0]; rb.style.marginTop='3px'; if(i===0) rb.checked=true;
+      l.appendChild(rb); l.appendChild(document.createTextNode(o[1])); modeWrap.appendChild(l);
+    });
+  }
+  renderImportMode();
+  sideSel.addEventListener('change', renderImportMode);
+
   if(docName){
     var hit0=scMatch(docName);
     if(hit0){ scPicker.setContact(hit0); }
@@ -6970,6 +6988,60 @@ async function commitScanImport(r, btn){
   // A commercial lease is a different transaction shape - detect it so we store lease terms and
   // lease milestones instead of the residential purchase fields.
   var isLease = scanIsLease(r);
+
+  // ---- OFFER PATH: a seller's listing receiving a competing offer. Inert: no under-contract, no
+  //      deadlines, no pipeline move. The offer is stored on the listing for side-by-side compare. ----
+  var _clientSide = ge('sc_client_side') ? ge('sc_client_side').value : 'buyer';
+  var _importMode = (document.querySelector('input[name="sc_import_mode"]:checked')||{}).value || 'contract';
+  if(_clientSide==='seller' && !isLease && _importMode==='offer'){
+    var _choiceEl0 = document.querySelector('input[name="sc_tx_choice"]:checked');
+    var _choice0 = _choiceEl0 ? _choiceEl0.value : 'new';
+    var listTx = null;
+    if(_choice0.indexOf('existing:')===0){ var _exId0=_choice0.split(':')[1]; listTx = TX.find(function(t){ return String(t.id)===String(_exId0); }); }
+    if(!listTx){
+      listTx = { id: Date.now()+Math.floor(Math.random()*100000), contactId: contactId, type:'seller', address: address, status:'active', steps:{}, notes:'Listing (created from a scanned offer).', details:{} };
+      TX.push(listTx);
+    }
+    if(!listTx.address && address) listTx.address = address;
+    var _fin0 = r.financing || {};
+    var _cls0 = (typeof classifyFinancingFromLines==='function') ? classifyFinancingFromLines((r.repc&&r.repc.paymentLines)||_fin0.paymentLines) : null;
+    var _sellerAdd0 = !!(r.repc && Array.isArray(r.repc.addendaTypes) && r.repc.addendaTypes.indexOf('seller_financing')>=0);
+    var _offFin = (_sellerAdd0 || (_cls0&&_cls0.type==='seller') || normFinancingType(_fin0.type)==='seller') ? 'seller'
+                : (_cls0 ? _cls0.type : (normFinancingType(_fin0.type) || 'conventional'));
+    var _sfo = (typeof sfTermsFromScan==='function') ? (sfTermsFromScan(_fin0)||{}) : {};
+    if(_cls0 && _cls0.sellerAmount && !_sfo.amount) _sfo.amount=_cls0.sellerAmount;
+    var _offer = {
+      id: Date.now()+Math.floor(Math.random()*100000)+7,
+      buyer: (r.buyerName||'').trim(), buyerAgent: (r.buyerAgent||'').trim(),
+      offerDate: contractDate || tod(), price: price, financingType: _offFin,
+      earnest: (r.earnestMoneyAmount||''),
+      closingDate: closingDate, dueDiligenceDate: dueDiligDate, financingDate: financingDate, appraisalDate: appraisalDate,
+      concessions: '', contingencies: '', status: 'active',
+      sf: { down:_sfo.down, rate:_sfo.rate, termMonths:_sfo.term, balloonMonths:_sfo.balloon, monthly:_sfo.monthly },
+      notes: 'Imported from scan: '+(r.docType||'Offer')
+    };
+    listTx.details = listTx.details || {};
+    listTx.details.offers = (Array.isArray(listTx.details.offers)?listTx.details.offers:[]).concat([_offer]);
+    saveTX(listTx);
+    var _oNote = {id:Date.now()+Math.floor(Math.random()*100000)+8, contactId:contactId, transactionId:listTx.id, text:'Offer scanned: '+(r.docType||'Document')+'. '+(r.summary||''), date:new Date().toISOString(), category:'Document'};
+    N.push(_oNote); saveNote(_oNote); logActivity(contactId,'Offer added from scan');
+    r.imported = true; renderScannerHistory(); rd(); renderTC();
+    var _ofWarn='';
+    if(lastScanFile){
+      if(btn){ btn.textContent='Storing file...'; btn.disabled=true; }
+      try{ await saveDocument(lastScanFile, { contact_id:contactId, transaction_id:listTx.id, doc_type:r.docType||'Offer', summary:r.summary||'', extracted:buildDocExtract(r) }); }
+      catch(e){ _ofWarn=' (file not stored: '+e.message+')'; }
+    }
+    var _rs0=ge('sc_result_state');
+    if(_rs0){ _rs0.style.display='block'; _rs0.innerHTML='';
+      var _who0=gc(contactId);
+      _rs0.appendChild(mkDivSafe('font-size:14px;color:var(--text);margin-bottom:8px;', _esc('Added as an offer to '+(_who0?fn(_who0):'the listing')+'. The deal is NOT under contract.'+_ofWarn)));
+      var _vb0=document.createElement('button'); _vb0.className='btn btn-p'; _vb0.style.fontSize='13px'; _vb0.textContent='View listing';
+      _vb0.addEventListener('click', function(){ sp('tc'); if(typeof openTCDetail==='function') openTCDetail(listTx.id); }); _rs0.appendChild(_vb0);
+    }
+    if(btn){ btn.textContent='Added as offer'; btn.disabled=true; }
+    return;
+  }
 
   // ---- Resolve transaction choice ----
   var choiceEl = document.querySelector('input[name="sc_tx_choice"]:checked');
