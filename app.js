@@ -12285,7 +12285,8 @@ function _dsStyle(){
   +'#dsSheet .ds-hdr{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:6px;}'
   +'#dsSheet .ds-hdr img.l1{height:96px;}'
   +'#dsSheet .ds-hdr img.l2{height:56px;}'
-  +'#dsSheet .ds-agent{font-size:12px;color:#333;text-align:center;line-height:1.5;}'
+  +'#dsSheet .ds-agent{font-size:11px;color:#333;text-align:center;line-height:1.5;}'
+  +'#dsSheet .ds-agent .nm{font-size:15px;font-weight:700;margin-bottom:2px;display:block;}'
   +'#dsSheet .ds-title{font-size:26px;font-weight:700;text-align:center;margin:6px 0 4px;}'
   +'#dsSheet .ds-disc{font-size:10.5px;color:#cc0000;text-align:center;margin-bottom:12px;line-height:1.4;}'
   +'#dsSheet .ds-row{display:flex;gap:12px;margin:3px 0;font-size:13px;align-items:center;}'
@@ -12347,7 +12348,7 @@ function openDealSheet(sh, isNew){
   var sheet=document.createElement('div'); sheet.id='dsSheet';
   var hdr=document.createElement('div'); hdr.className='ds-hdr';
   hdr.innerHTML='<img class="l1" src="pbre-logo.png" alt="Palacios Baker Real Estate">'
-    +'<div class="ds-agent"><b>'+_esc(d.agent)+'</b><br>'+_esc(d.brokerage)+'<br>'+_esc(d.brokerageAddr||'')+'<br>'+_esc(d.agentPhone)+'<br>'+_esc(d.email)+'</div>'
+    +'<div class="ds-agent"><span class="nm">'+_esc(d.agent)+'</span>'+_esc(d.brokerage)+'<br>'+_esc(d.brokerageAddr||'')+'<br>'+_esc(d.agentPhone)+'<br>'+_esc(d.email)+'</div>'
     +'<img class="l2" src="pbre-logo2.png" alt="">';
   sheet.appendChild(hdr);
   sheet.appendChild(mkDivSafe('','<div class="ds-title">Seller Net Sheet</div>'));
@@ -12421,15 +12422,21 @@ function dsRefresh(sh){
   });
 }
 function dsLoadScript(src){ return new Promise(function(res,rej){ if(document.querySelector('script[src="'+src+'"]')){ res(); return; } var s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=rej; document.head.appendChild(s); }); }
+// Render the sheet to a canvas at a FIXED desktop width (800px) regardless of the device, so a
+// phone export isn't captured at the narrow mobile viewport width (which cut off the form).
+function dsRenderCanvas(){
+  return dsLoadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js').then(function(){
+    var node=ge('dsSheet'); var pw=node.style.width, pm=node.style.maxWidth;
+    node.style.width='800px'; node.style.maxWidth='800px';
+    var restore=function(){ node.style.width=pw; node.style.maxWidth=pm; };
+    return window.html2canvas(node,{scale:2,backgroundColor:'#ffffff',useCORS:true,windowWidth:840,width:800}).then(function(c){ restore(); return c; }, function(e){ restore(); throw e; });
+  });
+}
 function dsExportPDF(sh, btn){
   if(btn){ btn.textContent='Building…'; btn.disabled=true; }
-  Promise.all([
-    dsLoadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js'),
-    dsLoadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js')
-  ]).then(function(){
-    var node=ge('dsSheet');
-    return window.html2canvas(node,{scale:2,backgroundColor:'#ffffff',useCORS:true});
-  }).then(function(canvas){
+  dsLoadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js')
+  .then(dsRenderCanvas)
+  .then(function(canvas){
     var img=canvas.toDataURL('image/png');
     var JsPDF=(window.jspdf&&window.jspdf.jsPDF)||window.jsPDF;
     var pdf=new JsPDF('p','pt','letter'); var pw=612, ph=792, m=24;
@@ -12442,9 +12449,7 @@ function dsExportPDF(sh, btn){
 }
 function dsExportPNG(sh, btn){
   if(btn){ btn.textContent='Building…'; btn.disabled=true; }
-  dsLoadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js').then(function(){
-    return window.html2canvas(ge('dsSheet'),{scale:2,backgroundColor:'#ffffff',useCORS:true});
-  }).then(function(canvas){
+  dsRenderCanvas().then(function(canvas){
     var a=document.createElement('a'); a.href=canvas.toDataURL('image/png');
     a.download=(sh.name||'Seller Net Sheet').replace(/[^a-z0-9]+/gi,'_')+'.png'; a.click();
     if(btn){ btn.textContent='Save PNG'; btn.disabled=false; }
