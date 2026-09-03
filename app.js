@@ -12254,7 +12254,7 @@ function dsScenarioDefault(){ return { salesPrice:'', mtg1:'', mtg2:'', otherLie
 function dsDefault(){ return { id: Date.now()+Math.floor(Math.random()*100000), contact_id:null, name:'',
   data:{ seller:'', address:'', annualTaxes:'', hoaFees:'', closingDate:'',
     agent:'Elda Palacios Baker & Randy Baker', agentPhone:'801-706-3806 & 801-910-2296',
-    brokerage:'Wise Choice Real Estate', email:'eldarealtor@gmail.com',
+    brokerage:'Wise Choice Real Estate', email:'eldarealtor@gmail.com & randyknowsutah@gmail.com',
     scenarios:[ dsScenarioDefault(), dsScenarioDefault() ] } }; }
 // Per-scenario calculated figures (mirrors the Excel formulas exactly).
 function dsCompute(sh){
@@ -12290,10 +12290,10 @@ function _dsStyle(){
   +'#dsSheet .ds-disc{font-size:10.5px;color:#555;text-align:center;margin-bottom:12px;line-height:1.4;}'
   +'#dsSheet .ds-row{display:flex;gap:12px;margin:3px 0;font-size:13px;align-items:center;}'
   +'#dsSheet .ds-lbl{font-weight:700;color:#222;}'
-  +'#dsSheet input.dsi{background:#FFFF99;border:1px solid #d9c94a;border-radius:3px;padding:3px 6px;font-family:inherit;font-size:13px;color:#1a1a1a;}'
-  +'#dsSheet table.ds-t{width:100%;border-collapse:collapse;margin-top:12px;font-size:13px;}'
-  +'#dsSheet table.ds-t td{padding:4px 8px;border-bottom:1px solid #eee;}'
-  +'#dsSheet table.ds-t td.c{text-align:center;} #dsSheet table.ds-t td.lbl{font-weight:600;color:#222;width:42%;}'
+  +'#dsSheet input.dsi{background:#FFFF99;border:1px solid #d9c94a;border-radius:3px;padding:5px 7px 7px;line-height:1.5;height:auto;box-sizing:border-box;font-family:inherit;font-size:13px;color:#1a1a1a;}'
+  +'#dsSheet table.ds-t{width:640px;max-width:100%;border-collapse:collapse;margin:12px auto;font-size:13px;}'
+  +'#dsSheet table.ds-t td{padding:5px 8px;border-bottom:1px solid #eee;vertical-align:middle;}'
+  +'#dsSheet table.ds-t td.c{text-align:center;width:27%;} #dsSheet table.ds-t td.lbl{font-weight:600;color:#222;width:46%;padding-left:14px;}'
   +'#dsSheet .ds-scenhdr{background:#1F497D;color:#fff;font-weight:700;text-align:center;padding:5px;}'
   +'#dsSheet .ds-net td{border-top:2px solid #1F497D;font-weight:700;font-size:15px;background:#FFF7D6;}'
   +'#dsSheet .ds-foot{font-size:10px;color:#666;margin-top:12px;line-height:1.5;}'
@@ -12340,6 +12340,7 @@ function openDealSheet(sh, isNew){
     saveDealSheet(sh); saveB.textContent='Saved ✓'; setTimeout(function(){saveB.textContent='Save';},1500);
   }); tb.appendChild(saveB);
   var pdfB=document.createElement('button'); pdfB.className='dsbtn'; pdfB.textContent='Export PDF'; pdfB.addEventListener('click',function(){ dsExportPDF(sh, pdfB); }); tb.appendChild(pdfB);
+  var pngB=document.createElement('button'); pngB.className='dsbtn g'; pngB.textContent='Save PNG'; pngB.addEventListener('click',function(){ dsExportPNG(sh, pngB); }); tb.appendChild(pngB);
   root.appendChild(tb);
 
   // The sheet
@@ -12392,7 +12393,6 @@ function openDealSheet(sh, isNew){
   calcRow('Settlement/Closing Fee','settlement');
   calcRow("Homeowner's Title Policy**",'title');
   calcRow('Reconveyance Fee***','recon');
-  calcRow('Secure Document Storage','secure');
   inputRow('Home Warranty','homeWarranty');
   inputRow('Utilities/Assessments','utilities');
   inputRow('Seller Concessions','concessions');
@@ -12439,6 +12439,16 @@ function dsExportPDF(sh, btn){
     pdf.save((sh.name||'Seller Net Sheet').replace(/[^a-z0-9]+/gi,'_')+'.pdf');
     if(btn){ btn.textContent='Export PDF'; btn.disabled=false; }
   }).catch(function(e){ if(btn){ btn.textContent='Export PDF'; btn.disabled=false; } alert('PDF export failed: '+(e&&e.message||e)); });
+}
+function dsExportPNG(sh, btn){
+  if(btn){ btn.textContent='Building…'; btn.disabled=true; }
+  dsLoadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js').then(function(){
+    return window.html2canvas(ge('dsSheet'),{scale:2,backgroundColor:'#ffffff',useCORS:true});
+  }).then(function(canvas){
+    var a=document.createElement('a'); a.href=canvas.toDataURL('image/png');
+    a.download=(sh.name||'Seller Net Sheet').replace(/[^a-z0-9]+/gi,'_')+'.png'; a.click();
+    if(btn){ btn.textContent='Save PNG'; btn.disabled=false; }
+  }).catch(function(e){ if(btn){ btn.textContent='Save PNG'; btn.disabled=false; } alert('PNG export failed: '+(e&&e.message||e)); });
 }
 // ============================================================================
 // HARD MONEY LENDING
