@@ -12254,7 +12254,7 @@ function dsScenarioDefault(){ return { salesPrice:'', mtg1:'', mtg2:'', otherLie
 function dsDefault(){ return { id: Date.now()+Math.floor(Math.random()*100000), contact_id:null, name:'',
   data:{ seller:'', address:'', annualTaxes:'', hoaFees:'', closingDate:'',
     agent:'Elda Palacios Baker & Randy Baker', agentPhone:'801-706-3806 & 801-910-2296',
-    brokerage:'Wise Choice Real Estate', email:'eldarealtor@gmail.com & randyknowsutah@gmail.com',
+    brokerage:'Wise Choice Real Estate', brokerageAddr:'193 E Fort Union Blvd #202, Midvale, UT 84047', email:'eldarealtor@gmail.com & randyknowsutah@gmail.com',
     scenarios:[ dsScenarioDefault(), dsScenarioDefault() ] } }; }
 // Per-scenario calculated figures (mirrors the Excel formulas exactly).
 function dsCompute(sh){
@@ -12285,9 +12285,9 @@ function _dsStyle(){
   +'#dsSheet .ds-hdr{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:6px;}'
   +'#dsSheet .ds-hdr img.l1{height:96px;}'
   +'#dsSheet .ds-hdr img.l2{height:56px;}'
-  +'#dsSheet .ds-agent{font-size:12px;color:#333;text-align:right;line-height:1.5;}'
+  +'#dsSheet .ds-agent{font-size:12px;color:#333;text-align:center;line-height:1.5;}'
   +'#dsSheet .ds-title{font-size:26px;font-weight:700;text-align:center;margin:6px 0 4px;}'
-  +'#dsSheet .ds-disc{font-size:10.5px;color:#555;text-align:center;margin-bottom:12px;line-height:1.4;}'
+  +'#dsSheet .ds-disc{font-size:10.5px;color:#cc0000;text-align:center;margin-bottom:12px;line-height:1.4;}'
   +'#dsSheet .ds-row{display:flex;gap:12px;margin:3px 0;font-size:13px;align-items:center;}'
   +'#dsSheet .ds-lbl{font-weight:700;color:#222;}'
   +'#dsSheet input.dsi{background:#FFFF99;border:1px solid #d9c94a;border-radius:3px;padding:5px 7px 7px;line-height:1.5;height:auto;box-sizing:border-box;font-family:inherit;font-size:13px;color:#1a1a1a;}'
@@ -12347,7 +12347,7 @@ function openDealSheet(sh, isNew){
   var sheet=document.createElement('div'); sheet.id='dsSheet';
   var hdr=document.createElement('div'); hdr.className='ds-hdr';
   hdr.innerHTML='<img class="l1" src="pbre-logo.png" alt="Palacios Baker Real Estate">'
-    +'<div class="ds-agent"><b>'+_esc(d.agent)+'</b><br>'+_esc(d.brokerage)+'<br>'+_esc(d.agentPhone)+'<br>'+_esc(d.email)+'</div>'
+    +'<div class="ds-agent"><b>'+_esc(d.agent)+'</b><br>'+_esc(d.brokerage)+'<br>'+_esc(d.brokerageAddr||'')+'<br>'+_esc(d.agentPhone)+'<br>'+_esc(d.email)+'</div>'
     +'<img class="l2" src="pbre-logo2.png" alt="">';
   sheet.appendChild(hdr);
   sheet.appendChild(mkDivSafe('','<div class="ds-title">Seller Net Sheet</div>'));
