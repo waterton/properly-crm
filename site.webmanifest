@@ -1,0 +1,12 @@
+{
+  "name": "Palacios Baker RE",
+  "short_name": "PB RE",
+  "icons": [
+    { "src": "icon-192.png", "type": "image/png", "sizes": "192x192" },
+    { "src": "icon-512.png", "type": "image/png", "sizes": "512x512" }
+  ],
+  "theme_color": "#b8912f",
+  "background_color": "#ffffff",
+  "display": "standalone",
+  "start_url": "./"
+}
