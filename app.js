@@ -1027,6 +1027,7 @@ function sp(id, fromHistory){
   document.querySelectorAll('.ni').forEach(function(n){n.classList.remove('active');});
   var pg=ge('page-'+id);if(pg)pg.classList.add('active');
   var nv=ge('nav-'+id);if(nv)nv.classList.add('active');
+  try{ openActiveNavSection(); }catch(e){}   // keep the active item's section expanded
   ge('pageTitle').textContent=pn[id]||id;
   csb();
   if(id==='briefing'){rb();loadBriefingSchedule();}
@@ -10329,7 +10330,12 @@ function computeRestricted(){ var e=(currentUser&&currentUser.email)?currentUser
 function applyRestrictions(){
   computeRestricted();
   ['nav-investments','nav-hardmoney'].forEach(function(id){ var el=ge(id); if(el) el.style.display = IS_RESTRICTED ? 'none' : ''; });
-  var ni=ge('nav-investments'); if(ni && ni.previousElementSibling && ni.previousElementSibling.classList && ni.previousElementSibling.classList.contains('nav-sec')) ni.previousElementSibling.style.display = IS_RESTRICTED ? 'none' : '';
+  // Hide the whole Investments section (group + its collapsible header) for limited users.
+  var grp=document.querySelector('.nav-group[data-sec="Investments"]');
+  var hdr=document.querySelector('.nav-toggle[data-sec="Investments"]');
+  if(hdr) hdr.style.display = IS_RESTRICTED ? 'none' : '';
+  if(grp && IS_RESTRICTED) grp.style.display = 'none';
+  if(!grp){ var ni=ge('nav-investments'); if(ni && ni.previousElementSibling && ni.previousElementSibling.classList && ni.previousElementSibling.classList.contains('nav-sec')) ni.previousElementSibling.style.display = IS_RESTRICTED ? 'none' : ''; }
   if(IS_RESTRICTED && (curPage==='investments'||curPage==='hardmoney')){ try{ sp('dashboard'); }catch(e){} }
 }
 // Block every Supabase DELETE for a limited user at one choke point (covers all delete code paths).
@@ -10346,6 +10352,44 @@ function applyRestrictions(){
     return _of.apply(this, arguments);
   };
 })();
+// ---- Sidebar: 5 logical groups, each collapsible (state remembered per signed-in user) ----
+var NAV_GROUPS=[
+  ['Home',        ['nav-briefing','nav-pipeline']],
+  ['Clients',     ['nav-contacts','nav-followups','nav-notes','nav-drips']],
+  ['Deals',       ['nav-tc','nav-dealsheet','nav-loi','nav-documents','nav-deadlines']],
+  ['Tools',       ['nav-gmail','nav-calendar','nav-scanner','nav-cardscanner','nav-team']],
+  ['Investments', ['nav-investments','nav-hardmoney']]
+];
+function _navSecKey(){ var e=(currentUser&&currentUser.email)?currentUser.email.toLowerCase():''; return 'navsec:'+e; }
+function _navSecState(){ try{ return JSON.parse(localStorage.getItem(_navSecKey())||'{}'); }catch(e){ return {}; } }
+function _navSecSave(sec,open){ var st=_navSecState(); st[sec]=open; try{ localStorage.setItem(_navSecKey(), JSON.stringify(st)); }catch(e){} }
+function _navSecOpen(sec){ var st=_navSecState(); return (sec in st) ? !!st[sec] : true; }   // default: open
+function _setNavGroup(hdr,grp,open){ grp.style.display=open?'':'none'; var ch=hdr.querySelector('.nav-chev'); if(ch) ch.textContent=open?'▾':'▸'; }
+function setupCollapsibleNav(){
+  var nav=document.querySelector('nav'); if(!nav || nav._grouped) return;
+  if(!ge('navCollapseCss')){ var st=document.createElement('style'); st.id='navCollapseCss';
+    st.textContent='.nav-toggle{display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none;}'
+      +'.nav-toggle:hover{opacity:.8;} .nav-chev{font-size:11px;opacity:.6;margin-right:2px;}';
+    document.head.appendChild(st); }
+  var btns={}; NAV_GROUPS.forEach(function(g){ g[1].forEach(function(id){ var b=ge(id); if(b) btns[id]=b; }); });
+  Array.prototype.slice.call(nav.querySelectorAll('.nav-sec')).forEach(function(h){ if(!h.classList.contains('nav-toggle')) h.remove(); });
+  NAV_GROUPS.forEach(function(g){
+    var have=g[1].filter(function(id){ return btns[id]; }); if(!have.length) return;
+    var hdr=document.createElement('div'); hdr.className='nav-sec nav-toggle'; hdr.setAttribute('data-sec',g[0]);
+    hdr.innerHTML='<span>'+g[0]+'</span><span class="nav-chev">▾</span>'; nav.appendChild(hdr);
+    var grp=document.createElement('div'); grp.className='nav-group'; grp.setAttribute('data-sec',g[0]);
+    have.forEach(function(id){ grp.appendChild(btns[id]); }); nav.appendChild(grp);
+    _setNavGroup(hdr,grp,_navSecOpen(g[0]));
+    hdr.addEventListener('click',function(){ var open=(grp.style.display==='none'); _setNavGroup(hdr,grp,open); _navSecSave(g[0],open); });
+  });
+  nav._grouped=true;
+}
+// Keep the section holding the current page expanded so the active item is always visible.
+function openActiveNavSection(){
+  var active=document.querySelector('nav .ni.active'); if(!active) return;
+  var grp=active.parentNode; if(!grp || !grp.classList || !grp.classList.contains('nav-group')) return;
+  if(grp.style.display==='none'){ var hdr=document.querySelector('.nav-toggle[data-sec="'+grp.getAttribute('data-sec')+'"]'); if(hdr) _setNavGroup(hdr,grp,true); }
+}
 var myMemberId = null; // team member id matching whoever is signed into the CRM right now
 
 function showLoginScreen(){
@@ -10376,7 +10420,9 @@ function showApp(user){
   if(tm) initials = (tm.first.charAt(0) + tm.last.charAt(0)).toUpperCase();
   ge('topbarUser').textContent = initials;
   ge('topbarUser').title = user.email + ' (click to sign out)';
+  try{ setupCollapsibleNav(); }catch(e){}   // regroup + collapsible sidebar (per-user state)
   applyRestrictions();
+  try{ openActiveNavSection(); }catch(e){}
 }
 
 function clearLoginMessages(){
