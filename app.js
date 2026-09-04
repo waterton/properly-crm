@@ -12682,16 +12682,12 @@ function loiExportWord(loi, btn){
   if(btn){ btn.textContent='Building…'; btn.disabled=true; }
   var done=function(){ if(btn){ btn.textContent='Export Word'; btn.disabled=false; } };
   var body=loiLetterHTML(loi.data);
-  fetch('pbre-logo2.png').then(function(r){ return r.blob(); }).then(function(b){
-    return new Promise(function(res){ var fr=new FileReader(); fr.onload=function(){ res(fr.result); }; fr.onerror=function(){ res(''); }; fr.readAsDataURL(b); });
-  }).catch(function(){ return ''; }).then(function(logoData){
-    // Replace the whole logo tag: with the embedded image at an explicit size Word honors (a bare
-    // class-sized/relative <img> left a large empty box and no logo). If the fetch failed, drop it.
-    var imgTag = logoData ? '<img src="'+logoData+'" width="150" style="width:150px;" alt="Wise Choice Real Estate">' : '';
-    body = body.replace(/<img class="loi-logo"[^>]*>/, imgTag);
+  // Word export: drop the logo image and use a plain text header top-right instead.
+  body = body.replace(/<img class="loi-logo"[^>]*>/, '<span class="loi-wordmark">Utah\'s Wise Choice Real Estate</span>');
+  (function(){
     var css='<style>'
       +'body{font-family:Georgia,\'Times New Roman\',serif;font-size:11pt;color:#000;}'
-      +'.loi-top{text-align:right;} .loi-logo{height:46px;}'
+      +'.loi-top{text-align:right;} .loi-wordmark{font-size:12pt;font-weight:bold;color:#1F497D;}'
       +'.loi-title{font-size:20pt;font-weight:bold;margin:2pt 0;}'
       +'.loi-addr{font-size:11pt;margin-bottom:8pt;}'
       +'.loi-h{font-size:13pt;font-weight:bold;border-bottom:1px solid #999;margin:12pt 0 4pt;}'
@@ -12705,7 +12701,7 @@ function loiExportWord(loi, btn){
     var blob=new Blob(['﻿'+html],{type:'application/msword'});
     var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=(loi.name||'Letter of Intent').replace(/[^a-z0-9]+/gi,'_')+'.doc'; a.click();
     setTimeout(function(){ try{ URL.revokeObjectURL(a.href); }catch(e){} },2000); done();
-  }).catch(function(e){ done(); alert('Word export failed: '+(e&&e.message||e)); });
+  })();
 }
 function loiExport(loi, kind, btn){
   if(btn){ btn.textContent='Building…'; btn.disabled=true; }
