@@ -12641,7 +12641,7 @@ function openLoi(loi, isNew){
   var picker=buildContactPicker(cWrap,'loi_client','Load client (search name / address)…',function(){ var id=picker.hidden.value; if(!id) return; var c=gc(parseInt(id)); if(!c) return; loi.contact_id=parseInt(id); d.tenant=fn(c); d.address=c.property||c.address||d.address; if(!loi.name) loi.name=d.address||d.tenant; openLoi(loi,isNew); });
   var saveB=document.createElement('button'); saveB.className='loibtn'; saveB.textContent='Save'; saveB.addEventListener('click',function(){ if(!loi.name) loi.name=d.address||d.tenant||'LOI'; if(!LOIS.some(function(x){return String(x.id)===String(loi.id);})) LOIS.push(loi); saveLoi(loi); saveB.textContent='Saved ✓'; setTimeout(function(){saveB.textContent='Save';},1500); }); tb.appendChild(saveB);
   var pdfB=document.createElement('button'); pdfB.className='loibtn'; pdfB.textContent='Export PDF'; pdfB.addEventListener('click',function(){ loiExport(loi,'pdf',pdfB); }); tb.appendChild(pdfB);
-  var pngB=document.createElement('button'); pngB.className='loibtn g'; pngB.textContent='Save PNG'; pngB.addEventListener('click',function(){ loiExport(loi,'png',pngB); }); tb.appendChild(pngB);
+  var docB=document.createElement('button'); docB.className='loibtn g'; docB.textContent='Export Word'; docB.addEventListener('click',function(){ loiExportWord(loi,docB); }); tb.appendChild(docB);
   root.appendChild(tb);
 
   var preview=document.createElement('div'); preview.id='loiSheet';
@@ -12676,14 +12676,38 @@ function _docCanvas(id){
     return window.html2canvas(node,{scale:2,backgroundColor:'#ffffff',useCORS:true,windowWidth:840,width:800}).then(function(c){ restore(); return c; }, function(e){ restore(); throw e; });
   });
 }
+// Export the letter as an editable Word document (HTML .doc that Word opens and edits). The logo is
+// embedded as a data URI so it shows offline. Text-based, so it stays a real editable document.
+function loiExportWord(loi, btn){
+  if(btn){ btn.textContent='Building…'; btn.disabled=true; }
+  var done=function(){ if(btn){ btn.textContent='Export Word'; btn.disabled=false; } };
+  var body=loiLetterHTML(loi.data);
+  fetch('pbre-logo2.png').then(function(r){ return r.blob(); }).then(function(b){
+    return new Promise(function(res){ var fr=new FileReader(); fr.onload=function(){ res(fr.result); }; fr.onerror=function(){ res(''); }; fr.readAsDataURL(b); });
+  }).catch(function(){ return ''; }).then(function(logoData){
+    if(logoData) body=body.replace('src="pbre-logo2.png"','src="'+logoData+'"');
+    var css='<style>'
+      +'body{font-family:Georgia,\'Times New Roman\',serif;font-size:11pt;color:#000;}'
+      +'.loi-top{text-align:right;} .loi-logo{height:46px;}'
+      +'.loi-title{font-size:20pt;font-weight:bold;margin:2pt 0;}'
+      +'.loi-addr{font-size:11pt;margin-bottom:8pt;}'
+      +'.loi-h{font-size:13pt;font-weight:bold;border-bottom:1px solid #999;margin:12pt 0 4pt;}'
+      +'.loi-intro{font-size:10.5pt;}'
+      +'table{width:100%;border-collapse:collapse;}'
+      +'table.loi-meta td.k, table.loi-terms td.k{font-weight:bold;vertical-align:top;padding:3pt 10px 3pt 0;}'
+      +'table.loi-terms td.v, table.loi-meta td.v{vertical-align:top;padding:3pt 0;}'
+      +'.sh{font-weight:bold;} .sl{margin-top:8pt;} .sn{font-weight:bold;} p{margin:6pt 0;}'
+      +'</style>';
+    var html='<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8">'+css+'</head><body>'+body+'</body></html>';
+    var blob=new Blob(['﻿'+html],{type:'application/msword'});
+    var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=(loi.name||'Letter of Intent').replace(/[^a-z0-9]+/gi,'_')+'.doc'; a.click();
+    setTimeout(function(){ try{ URL.revokeObjectURL(a.href); }catch(e){} },2000); done();
+  }).catch(function(e){ done(); alert('Word export failed: '+(e&&e.message||e)); });
+}
 function loiExport(loi, kind, btn){
   if(btn){ btn.textContent='Building…'; btn.disabled=true; }
-  var done=function(){ if(btn){ btn.textContent=(kind==='pdf'?'Export PDF':'Save PNG'); btn.disabled=false; } };
+  var done=function(){ if(btn){ btn.textContent='Export PDF'; btn.disabled=false; } };
   var fname=(loi.name||'Letter of Intent').replace(/[^a-z0-9]+/gi,'_');
-  if(kind==='png'){
-    _docCanvas('loiSheet').then(function(canvas){ var a=document.createElement('a'); a.href=canvas.toDataURL('image/png'); a.download=fname+'.png'; a.click(); done(); }).catch(function(e){ done(); alert('PNG export failed: '+(e&&e.message||e)); });
-    return;
-  }
   dsLoadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js').then(function(){ return _docCanvas('loiSheet'); }).then(function(canvas){
     var img=canvas.toDataURL('image/png'); var JsPDF=(window.jspdf&&window.jspdf.jsPDF)||window.jsPDF;
     var pdf=new JsPDF('p','pt','letter'); var pw=612, ph=792, m=24;
