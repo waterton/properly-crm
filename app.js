@@ -12658,22 +12658,48 @@ function _loiStyle(){
   +'#page-loi .loi-tg{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text);}';
   document.head.appendChild(s);
 }
+var _loiView='active', _loiQuery='';
+function loiArchived(l){ return !!(l.data&&l.data.archived); }
+function setLoiArchived(l,val){ if(!l.data) l.data={}; l.data.archived=val; saveLoi(l); }
 function renderLois(){
   _loiStyle(); var root=ge('loiRoot'); if(!root) return; root.innerHTML='';
-  var bar=document.createElement('div'); bar.style.cssText='display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;';
+  var bar=document.createElement('div'); bar.style.cssText='display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;';
   bar.appendChild(mkDivSafe('font-size:22px;font-weight:600;','Letters of Intent'));
   var nb=document.createElement('button'); nb.className='loibtn'; nb.textContent='+ New LOI'; nb.addEventListener('click',function(){ openLoi(loiDefault(), true); }); bar.appendChild(nb); root.appendChild(bar);
   if(!LOIS.length){ root.appendChild(mkDivSafe('color:var(--text3);padding:20px 0;','No letters yet. Create one, fill the fields, and export a PDF.')); return; }
-  var list=document.createElement('div'); list.style.cssText='display:flex;flex-direction:column;gap:8px;';
-  LOIS.slice().sort(function(a,b){ return String(b.updated_at||'').localeCompare(String(a.updated_at||'')); }).forEach(function(l){
-    var c=gc(l.contact_id);
-    var row=document.createElement('div'); row.style.cssText='display:flex;justify-content:space-between;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 14px;cursor:pointer;';
-    row.innerHTML='<div><div style="font-weight:600;">'+_esc(l.name||(l.data&&l.data.address)||'Untitled LOI')+'</div><div style="font-size:12px;color:var(--text3);">'+_esc((l.data&&l.data.tenant||'')+(l.updated_at?(' · updated '+fd(l.updated_at)):''))+'</div></div>';
-    var del=document.createElement('button'); del.className='loibtn g'; del.style.cssText='font-size:12px;padding:3px 9px;'; del.textContent='Delete';
-    (function(id){ del.addEventListener('click',function(e){ e.stopPropagation(); if(confirm('Delete this LOI?')){ delLoi(id); renderLois(); } }); })(l.id);
-    row.addEventListener('click',function(){ openLoi(l,false); }); row.appendChild(del); list.appendChild(row);
-  });
-  root.appendChild(list);
+  var ctr=document.createElement('div'); ctr.style.cssText='display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;';
+  var search=document.createElement('input'); search.type='text'; search.placeholder='Search LOIs (name, tenant, address)…'; search.value=_loiQuery;
+  search.style.cssText='flex:1;min-width:200px;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:7px 10px;font-family:inherit;font-size:13px;';
+  var sel=document.createElement('select'); sel.style.cssText='background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:7px 8px;font-family:inherit;font-size:13px;width:auto;';
+  [['active','Active'],['archived','Archived'],['all','All']].forEach(function(o){ var op=document.createElement('option'); op.value=o[0]; op.textContent=o[1]; if(o[0]===_loiView) op.selected=true; sel.appendChild(op); });
+  ctr.appendChild(search); ctr.appendChild(sel); root.appendChild(ctr);
+  var list=document.createElement('div'); list.style.cssText='display:flex;flex-direction:column;gap:8px;'; root.appendChild(list);
+  function drawList(){
+    list.innerHTML=''; var q=_loiQuery.trim().toLowerCase();
+    var items=LOIS.filter(function(l){
+      var arch=loiArchived(l);
+      if(!q){ if(_loiView==='active'&&arch) return false; if(_loiView==='archived'&&!arch) return false; return true; }
+      var hay=((l.name||'')+' '+(l.data&&l.data.tenant||'')+' '+(l.data&&l.data.address||'')).toLowerCase();
+      return hay.indexOf(q)>=0;  // searching spans both active + archived
+    }).sort(function(a,b){ return String(b.updated_at||'').localeCompare(String(a.updated_at||'')); });
+    if(!items.length){ list.appendChild(mkDivSafe('color:var(--text3);padding:16px 0;', q?'No LOIs match your search.':(_loiView==='archived'?'No archived LOIs.':'No LOIs here.'))); return; }
+    items.forEach(function(l){
+      var arch=loiArchived(l);
+      var row=document.createElement('div'); row.style.cssText='display:flex;justify-content:space-between;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 14px;cursor:pointer;'+(arch?'opacity:.72;':'');
+      var badge=arch?'<span style="font-size:10px;font-weight:700;color:var(--text3);border:1px solid var(--border);border-radius:4px;padding:1px 5px;margin-left:6px;vertical-align:middle;">ARCHIVED</span>':'';
+      row.innerHTML='<div><div style="font-weight:600;">'+_esc(l.name||(l.data&&l.data.address)||'Untitled LOI')+badge+'</div><div style="font-size:12px;color:var(--text3);">'+_esc((l.data&&l.data.tenant||'')+(l.updated_at?(' · updated '+fd(l.updated_at)):''))+'</div></div>';
+      var btns=document.createElement('div'); btns.style.cssText='display:flex;gap:6px;flex-shrink:0;';
+      var ab=document.createElement('button'); ab.className='loibtn g'; ab.style.cssText='font-size:12px;padding:3px 9px;'; ab.textContent=arch?'Unarchive':'Archive';
+      ab.addEventListener('click',function(e){ e.stopPropagation(); setLoiArchived(l,!arch); drawList(); });
+      var del=document.createElement('button'); del.className='loibtn g'; del.style.cssText='font-size:12px;padding:3px 9px;'; del.textContent='Delete';
+      (function(id){ del.addEventListener('click',function(e){ e.stopPropagation(); if(confirm('Delete this LOI?')){ delLoi(id); drawList(); } }); })(l.id);
+      btns.appendChild(ab); btns.appendChild(del);
+      row.addEventListener('click',function(){ openLoi(l,false); }); row.appendChild(btns); list.appendChild(row);
+    });
+  }
+  search.addEventListener('input',function(){ _loiQuery=search.value; drawList(); });
+  sel.addEventListener('change',function(){ _loiView=sel.value; drawList(); });
+  drawList();
 }
 function openLoi(loi, isNew){
   _loiStyle(); var root=ge('loiRoot'); if(!root) return; root.innerHTML=''; var d=loi.data;
@@ -12723,9 +12749,19 @@ function _docCanvas(id){
     return window.html2canvas(node,{scale:2,backgroundColor:'#ffffff',useCORS:true,windowWidth:840,width:800}).then(function(c){ restore(); return c; }, function(e){ restore(); throw e; });
   });
 }
-// Export the letter as an editable Word document (HTML .doc that Word opens and edits). The logo is
-// embedded as a data URI so it shows offline. Text-based, so it stays a real editable document.
+// Ask for a file name (spaces allowed; only characters illegal in file names are stripped).
+// Returns the chosen base name, or null if the user cancelled.
+function loiAskName(loi){
+  var suggested=(loi.name||(loi.data&&loi.data.address)||'Letter of Intent');
+  var v=window.prompt('Name this file (no extension):', suggested);
+  if(v===null) return null;
+  v=v.replace(/[\\\/:*?"<>|]+/g,'').replace(/\s+/g,' ').trim();
+  return v||suggested;
+}
+// Export the letter as an editable Word document (HTML .doc that Word opens and edits). Text-based, so
+// it stays a real editable document; the crest is dropped and a text masthead is used instead.
 function loiExportWord(loi, btn){
+  var name=loiAskName(loi); if(name===null) return;
   if(btn){ btn.textContent='Building…'; btn.disabled=true; }
   var done=function(){ if(btn){ btn.textContent='Export Word'; btn.disabled=false; } };
   var body=loiLetterHTML(loi.data);
@@ -12751,14 +12787,14 @@ function loiExportWord(loi, btn){
       +'</style>';
     var html='<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8">'+css+'</head><body>'+body+'</body></html>';
     var blob=new Blob(['﻿'+html],{type:'application/msword'});
-    var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=(loi.name||'Letter of Intent').replace(/[^a-z0-9]+/gi,'_')+'.doc'; a.click();
+    var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name+'.doc'; a.click();
     setTimeout(function(){ try{ URL.revokeObjectURL(a.href); }catch(e){} },2000); done();
   })();
 }
 function loiExport(loi, kind, btn){
+  var fname=loiAskName(loi); if(fname===null) return;
   if(btn){ btn.textContent='Building…'; btn.disabled=true; }
   var done=function(){ if(btn){ btn.textContent='Export PDF'; btn.disabled=false; } };
-  var fname=(loi.name||'Letter of Intent').replace(/[^a-z0-9]+/gi,'_');
   dsLoadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js').then(function(){ return _docCanvas('loiSheet'); }).then(function(canvas){
     var img=canvas.toDataURL('image/png'); var JsPDF=(window.jspdf&&window.jspdf.jsPDF)||window.jsPDF;
     var pdf=new JsPDF('p','pt','letter'); var pw=612, ph=792, m=24;
