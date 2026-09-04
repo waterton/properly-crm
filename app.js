@@ -72,6 +72,7 @@ var IHOA=[], IPROP=[], IUNIT=[], ILED=[]; // Investments: HOA accounts, properti
 var IPAYEE=[]; // Approved payees/senders — the editable expense whitelist for email ingestion
 var ISCAN=[]; // inv_scan_log: heartbeat of each rental scan (cron or button)
 var DSHEET=[]; // deal_sheets: saved Seller Net Sheets (one per client)
+var LOIS=[]; // loi_letters: saved commercial Letters of Intent
 var ILOAN=[], ILPAY=[]; // Hard money: loans made, and payments received
 var curSort='last'; // 'last' or 'first'
 var selectedContacts = new Set();
@@ -122,6 +123,7 @@ var DB_COLS = {
   inv_ledger: ['id','date','property_id','unit_id','hoa_id','direction','category','amount','payee','method','source','email_ref','message_id','received_date','due_date','notes'],
   inv_payees: ['id','name','match','category','kind','property_id','active','notes'],
   deal_sheets: ['id','contact_id','name','data','updated_at'],
+  loi_letters: ['id','contact_id','name','data','updated_at'],
   inv_loans: ['id','borrower','address','notes','principal','interest_rate','term_months','start_date','end_date','first_payment_date','monthly_payment','status'],
   inv_loan_payments: ['id','loan_id','date','amount','note']
 };
@@ -664,7 +666,8 @@ async function loadFromDB(){
       fetchAllRows(base, 'inv_loan_payments?order=id.asc', headers).catch(function(){return []; }),
       fetchAllRows(base, 'inv_payees?order=id.asc', headers).catch(function(){return []; }),
       fetchAllRows(base, 'inv_scan_log?order=ran_at.desc&limit=25', headers).catch(function(){return []; }),
-      fetchAllRows(base, 'deal_sheets?order=updated_at.desc', headers).catch(function(){return []; })
+      fetchAllRows(base, 'deal_sheets?order=updated_at.desc', headers).catch(function(){return []; }),
+      fetchAllRows(base, 'loi_letters?order=updated_at.desc', headers).catch(function(){return []; })
     ]);
     var rc = results[0], rn = results[1], rf = results[2], rd = results[3], rtx = results[4];
 
@@ -703,6 +706,7 @@ async function loadFromDB(){
     if(Array.isArray(results[19])) IPAYEE = results[19];
     if(Array.isArray(results[20])) ISCAN = results[20];
     if(Array.isArray(results[21])) DSHEET = results[21];
+    if(Array.isArray(results[22])) LOIS = results[22];
     DOCS.forEach(function(d){
       d.id = typeof d.id === 'string' ? parseInt(d.id)||d.id : d.id;
       if(d.contact_id != null) d.contact_id = typeof d.contact_id === 'string' ? parseInt(d.contact_id) : d.contact_id;
@@ -761,6 +765,8 @@ function saveInvPayee(x){ sv(); if(supaReady) dbSave('inv_payees', [x]); }
 function delInvPayee(id){ IPAYEE = IPAYEE.filter(function(x){return String(x.id)!==String(id);}); sv(); if(supaReady) dbDeleteBy('inv_payees','id',id); }
 function saveDealSheet(x){ x.updated_at=new Date().toISOString(); sv(); if(supaReady) dbSave('deal_sheets', [x]); }
 function delDealSheet(id){ DSHEET = DSHEET.filter(function(x){return String(x.id)!==String(id);}); sv(); if(supaReady) dbDeleteBy('deal_sheets','id',id); }
+function saveLoi(x){ x.updated_at=new Date().toISOString(); sv(); if(supaReady) dbSave('loi_letters', [x]); }
+function delLoi(id){ LOIS = LOIS.filter(function(x){return String(x.id)!==String(id);}); sv(); if(supaReady) dbDeleteBy('loi_letters','id',id); }
 // lookups
 function invProp(id){ return IPROP.find(function(p){return String(p.id)===String(id);}) || null; }
 function invUnit(id){ return IUNIT.find(function(u){return String(u.id)===String(id);}) || null; }
@@ -1032,6 +1038,7 @@ function sp(id, fromHistory){
   else if(id==='investments'){ if(typeof renderInvestments==='function') renderInvestments(); }
   else if(id==='hardmoney'){ if(typeof renderHardMoney==='function') renderHardMoney(); }
   else if(id==='dealsheet'){ if(typeof renderDealSheets==='function') renderDealSheets(); }
+  else if(id==='loi'){ if(typeof renderLois==='function') renderLois(); }
   else if(id==='documents')renderDocsPage();
 
   else if(id==='deadlines'){
@@ -9971,6 +9978,7 @@ ge('nav-drips').addEventListener('click',function(){sp('drips');});
 (function(){ var ni=ge('nav-investments'); if(ni) ni.addEventListener('click',function(){sp('investments');}); })();
 (function(){ var nh=ge('nav-hardmoney'); if(nh) nh.addEventListener('click',function(){sp('hardmoney');}); })();
 (function(){ var nd=ge('nav-dealsheet'); if(nd) nd.addEventListener('click',function(){sp('dealsheet');}); })();
+(function(){ var nl=ge('nav-loi'); if(nl) nl.addEventListener('click',function(){sp('loi');}); })();
 
 ge('nav-documents').addEventListener('click',function(){sp('documents');});
 if(ge('docSearch')) ge('docSearch').addEventListener('input', renderDocsPage);
@@ -12454,6 +12462,190 @@ function dsExportPNG(sh, btn){
     a.download=(sh.name||'Seller Net Sheet').replace(/[^a-z0-9]+/gi,'_')+'.png'; a.click();
     if(btn){ btn.textContent='Save PNG'; btn.disabled=false; }
   }).catch(function(e){ if(btn){ btn.textContent='Save PNG'; btn.disabled=false; } alert('PNG export failed: '+(e&&e.message||e)); });
+}
+// ============================================================================
+// LETTER OF INTENT (LOI) — commercial lease, tenant-rep. Deterministic template: you fill the
+// variables + toggle optional clauses; the legal boilerplate below is fixed word-for-word.
+// ============================================================================
+function _numWord(n){ var w=['zero','one','two','three','four','five','six','seven','eight','nine','ten','eleven','twelve','thirteen','fourteen','fifteen','sixteen','seventeen','eighteen','nineteen','twenty']; n=parseInt(n); return (n>=0&&n<=20)?w[n]:String(n); }
+function _nw(n){ var s=_numWord(n); return s.charAt(0).toUpperCase()+s.slice(1)+' ('+(parseInt(n)||0)+')'; }  // "Five (5)"
+function _loiM(n){ n=dsNum(n); return '$'+n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function loiComputed(d){ var rent=dsNum(d.baseRent), term=parseInt(d.termYears)||0; return { annual:rent*12, abatementTotal:rent*(parseInt(d.abatementMonths)||0), commissionAgg:rent*12*term*(dsNum(d.commissionPct)/100) }; }
+function loiDefault(){ return { id:Date.now()+Math.floor(Math.random()*100000), contact_id:null, name:'', data:{
+  date:tod(), address:'', toName:'', toBrokerage:'', toRole:'Listing Agent',
+  fromLine:"Elda & Randy Baker, Wise Choice Real Estate, as Tenant's representatives",
+  tenant:'', sqft:'', permittedUse:'', termYears:5, baseRent:'', nnnEstimate:'', rentCommence:'',
+  securityDeposit:'', commissionPct:3, expireDate:'', expireTime:'5:00 p.m. Mountain Time',
+  sigEntity:'', sigName:'', sigTitle:'', preparedBy:'Elda Baker', preparedByBrokerage:'Wise Choice Real Estate',
+  abatementOn:true, abatementMonths:6, tiOn:true, tiAmount:'',
+  renewalOn:true, renewalCount:1, renewalMin:3, renewalMax:5, parkingOn:true, signageOn:true,
+  exclusivityOn:false, exclusivityText:"Landlord agrees that during the initial lease term and any renewal period, no other tenant in the shopping center/plaza will be permitted to operate a business substantially similar to Tenant's event venue business or otherwise directly compete with Tenant's primary use.",
+  subleasingOn:false, subleasingText:"Tenant may sublease or assign the Premises with Landlord's prior written consent, which shall not be unreasonably withheld, conditioned, or delayed." } }; }
+function loiLetterHTML(d){
+  var c=loiComputed(d); var rent=dsNum(d.baseRent);
+  var sec = (d.securityDeposit!=='' && d.securityDeposit!=null) ? dsNum(d.securityDeposit) : rent;
+  var tiMonthsN = d.abatementOn ? (parseInt(d.abatementMonths)||6) : 6;
+  var ti = (d.tiAmount!=='' && d.tiAmount!=null) ? dsNum(d.tiAmount) : rent*tiMonthsN;
+  var rows='';
+  function row(k,v){ rows+='<tr><td class="k">'+_esc(k)+'</td><td class="v">'+v+'</td></tr>'; }
+  row('Permitted Use', _esc(d.permittedUse||''));
+  row('Lease Term', _nw(d.termYears)+' years, commencing on the Rent Commencement Date.');
+  row('Base Rent', _loiM(rent)+' per month ('+_loiM(c.annual)+' annually), triple net (NNN), subject to verification of the rentable area and agreed lease terms.');
+  row('NNN Expenses', "Tenant will pay its proportionate share of taxes, insurance, and common-area operating expenses. The current estimated NNN/CAM charge is approximately "+_loiM(dsNum(d.nnnEstimate))+" per month, subject to annual reconciliation and adjustment. Landlord will provide the current NNN/CAM budget, prior two years of reconciliations (if available), the allocation methodology, and an estimate of Tenant&rsquo;s monthly share before lease execution.");
+  row('Utilities / Services', "Tenant will pay separately metered utilities and services used by the Premises. Responsibility for HVAC maintenance/replacement, structural components, roof, parking areas, landscaping, snow removal, and other building services will be specifically allocated in the lease.");
+  row('Delivery Condition', "Premises will be delivered in its existing full build-out condition, broom-clean, free of occupants and personal property, with all building systems serving the Premises in good working order, and compliant with applicable laws for the agreed use, subject to Tenant&rsquo;s inspection and approval.");
+  row('Rent Commencement', "The later of "+_esc(d.rentCommence||'')+", or Landlord&rsquo;s delivery of the Premises in the required condition, following satisfaction or waiver of Tenant&rsquo;s contingencies.");
+  if(d.abatementOn) row('Rent Abatement', "The first "+_nw(d.abatementMonths)+" months of base rent will be fully abated, totaling "+_loiM(c.abatementTotal)+" at the stated initial base rent. Tenant will remain responsible for NNN expenses and separately metered utilities during the abatement period. This abatement is separate from the tenant-improvement allowance described below.");
+  if(d.tiOn) row('Tenant Improvements', "Landlord will provide a tenant-improvement allowance of "+_loiM(ti)+", equivalent to "+_numWord(tiMonthsN)+" months of the stated base rent. The allowance may be applied to mutually approved design, permitting, construction, fixtures, cabling, signage, accessibility, and other improvements to the Premises. The lease will specify the approval, documentation, draw, reimbursement, and final-disbursement process and deadlines.");
+  row('Security Deposit', "A security deposit of "+_loiM(sec)+", equal to one month&rsquo;s base rent, will be paid upon execution of the lease together with any other amounts then due. Any first month&rsquo;s base-rent payment required at signing will be credited and applied consistently with the base-rent abatement stated above.");
+  if(d.renewalOn) row('Renewal Option', "Tenant will have "+_nw(d.renewalCount)+" option to renew the lease for an additional term of not less than "+_nw(d.renewalMin)+" years and not more than "+_nw(d.renewalMax)+" years, as selected by Tenant in its renewal notice, at the then-current fair market base rent. The lease will establish the notice period and a reasonable process for determining fair market rent.");
+  if(d.parkingOn) row('Parking / Access', "Tenant and its employees, clients, and invitees will have nonexclusive use of the property&rsquo;s parking areas and 24-hour access to the Premises, subject to reasonable rules that do not materially interfere with Tenant&rsquo;s use.");
+  if(d.signageOn) row('Signage', "Tenant may install code-compliant building, storefront, monument/panel, and door signage, subject to Landlord&rsquo;s reasonable approval and applicable governmental requirements.");
+  var extra='';
+  if(d.exclusivityOn || d.subleasingOn){
+    extra='<div class="loi-h">Requested Additional Lease Provisions</div>';
+    if(d.exclusivityOn) extra+='<p><b>Exclusivity:</b> '+_esc(d.exclusivityText||'')+'</p>';
+    if(d.subleasingOn) extra+='<p><b>Subleasing:</b> '+_esc(d.subleasingText||'')+'</p>';
+  }
+  var pct=dsNum(d.commissionPct);
+  return ''
+   +'<div class="loi-top"><img class="loi-logo" src="pbre-logo2.png" alt="Wise Choice Real Estate"></div>'
+   +'<div class="loi-title">Letter of Intent to Lease</div>'
+   +'<div class="loi-addr">'+_esc(d.address||'')+'</div>'
+   +'<table class="loi-meta">'
+     +'<tr><td class="k">Date</td><td class="v">'+_esc(dsLongDate(d.date)||d.date||'')+'</td></tr>'
+     +'<tr><td class="k">To</td><td class="v">'+_esc([d.toName,d.toBrokerage,d.toRole].filter(Boolean).join(', '))+'</td></tr>'
+     +'<tr><td class="k">From</td><td class="v">'+_esc(d.fromLine||'')+'</td></tr>'
+     +'<tr><td class="k">Proposed Tenant</td><td class="v">'+_esc(d.tenant||'')+'</td></tr>'
+     +'<tr><td class="k">Property</td><td class="v">'+_esc(d.address||'')+' (the &ldquo;Premises&rdquo;), consisting of approximately '+_esc(d.sqft||'')+' rentable square feet.</td></tr>'
+   +'</table>'
+   +'<p class="loi-intro">The proposed tenant submits this non-binding Letter of Intent (&ldquo;LOI&rdquo;) as a basis for negotiating a mutually acceptable lease. Except for the provisions expressly stated as binding, neither party will be obligated unless and until a definitive lease is negotiated, approved, executed, and delivered by both parties.</p>'
+   +'<div class="loi-h">Proposed Business Terms</div>'
+   +'<table class="loi-terms">'+rows+'</table>'
+   +'<div class="loi-h">Tenant Contingencies</div>'
+   +'<ul class="loi-ul">'
+     +'<li>Tenant&rsquo;s confirmation that its intended use is permitted by applicable zoning and that all required business, conditional-use, occupancy, health, fire, or other governmental approvals can be obtained on terms acceptable to Tenant.</li>'
+     +'<li>Tenant&rsquo;s satisfactory inspection of the Premises and building systems, review of plans and measurements, and confirmation of ADA/accessibility requirements applicable to Tenant&rsquo;s use.</li>'
+     +'<li>Tenant&rsquo;s review and approval of the proposed lease, title/ownership information, property rules, insurance requirements, and all NNN/CAM documentation and estimates.</li>'
+     +'<li>Tenant&rsquo;s receipt of any required internal, lender, franchise, partner, or legal approvals.</li>'
+   +'</ul>'
+   +'<div class="loi-h">Additional Provisions</div>'
+   +'<p><b>Lease Documentation.</b> Landlord will prepare the initial lease draft. Each party may review the lease with its own legal and tax advisers.</p>'
+   +'<p><b>Brokerage.</b> Landlord acknowledges that Elda Baker and Randy Baker of Wise Choice Real Estate represent the proposed tenant. Landlord or Landlord&rsquo;s brokerage will pay Wise Choice Real Estate a commission equal to '+_esc(_numWord(pct))+' percent ('+pct+'%) of the aggregate base rent payable during the initial '+_esc(_numWord(d.termYears))+'-year lease term. The commission will be earned and payable pursuant to a separate written commission agreement executed by the applicable parties, and will not be contingent on Tenant&rsquo;s continued occupancy after lease commencement.</p>'
+   +'<p><b>Confidentiality and Costs.</b> Unless otherwise agreed in writing, each party will bear its own costs. The parties will use reasonable discretion regarding nonpublic financial and business information exchanged during negotiations.</p>'
+   +'<p><b>Non-Binding Effect.</b> This LOI is intended only as an expression of interest and a framework for negotiation. No leasehold interest is created. Neither party is bound unless a definitive lease is fully executed and delivered. Any binding confidentiality, access, or brokerage obligations must be stated in a separate signed agreement.</p>'
+   +'<p><b>Expiration.</b> This proposal will expire at '+_esc(d.expireTime||'')+' on '+_esc(dsLongDate(d.expireDate)||d.expireDate||'')+', unless extended in writing by the proposed tenant.</p>'
+   +'<p>If these terms are acceptable as a basis for lease preparation, please acknowledge below. We look forward to working toward a successful agreement.</p>'
+   +'<table class="loi-sig"><tr>'
+     +'<td><div class="sh">PROPOSED TENANT</div><div class="sl">By: _______________________</div><div class="sn">'+_esc(d.sigEntity||d.tenant||'')+'</div><div class="sl">Name: ____________________</div><div class="sn">'+_esc(d.sigName||'')+'</div><div class="sl">Title: _____________________</div><div class="sn">'+_esc(d.sigTitle||'')+'</div><div class="sl">Date: _____________________</div></td>'
+     +'<td><div class="sh">ACKNOWLEDGED BY LANDLORD</div><div class="sl">By: _______________________</div><div class="sn">&nbsp;</div><div class="sl">Name: ____________________</div><div class="sn">&nbsp;</div><div class="sl">Title: _____________________</div><div class="sn">&nbsp;</div><div class="sl">Date: _____________________</div></td>'
+   +'</tr></table>'
+   +extra
+   +'<div class="loi-h">Prepared By</div><p>'+_esc(d.preparedBy||'')+'<br>'+_esc(d.preparedByBrokerage||'')+'</p>';
+}
+function _loiStyle(){
+  if(ge('loiCss')) return; var s=document.createElement('style'); s.id='loiCss';
+  s.textContent=
+   '#loiSheet{background:#fff;color:#1a1a1a;max-width:820px;margin:0 auto;padding:34px 40px;font-family:Georgia,\'Times New Roman\',serif;font-size:12.5px;line-height:1.5;border:1px solid #ddd;}'
+  +'#loiSheet .loi-top{display:flex;justify-content:flex-end;margin-bottom:6px;} #loiSheet .loi-logo{height:46px;}'
+  +'#loiSheet .loi-title{font-size:24px;font-weight:700;margin:2px 0 2px;}'
+  +'#loiSheet .loi-addr{font-size:13px;color:#333;margin-bottom:14px;}'
+  +'#loiSheet table.loi-meta{width:100%;border-collapse:collapse;margin-bottom:12px;}'
+  +'#loiSheet table.loi-meta td.k{font-weight:700;width:150px;vertical-align:top;padding:2px 8px 2px 0;}'
+  +'#loiSheet table.loi-meta td.v{vertical-align:top;padding:2px 0;}'
+  +'#loiSheet .loi-intro{font-size:11.5px;color:#333;}'
+  +'#loiSheet .loi-h{font-size:14px;font-weight:700;margin:14px 0 6px;border-bottom:1px solid #ccc;padding-bottom:2px;}'
+  +'#loiSheet table.loi-terms{width:100%;border-collapse:collapse;}'
+  +'#loiSheet table.loi-terms td.k{font-weight:700;width:170px;vertical-align:top;padding:5px 10px 5px 0;}'
+  +'#loiSheet table.loi-terms td.v{vertical-align:top;padding:5px 0;border-bottom:1px solid #f0f0f0;}'
+  +'#loiSheet ul.loi-ul{margin:4px 0;padding-left:18px;} #loiSheet ul.loi-ul li{margin:3px 0;}'
+  +'#loiSheet p{margin:6px 0;}'
+  +'#loiSheet table.loi-sig{width:100%;margin-top:16px;} #loiSheet table.loi-sig td{width:50%;vertical-align:top;padding-right:16px;}'
+  +'#loiSheet .sh{font-weight:700;font-size:11px;letter-spacing:.5px;margin-bottom:8px;} #loiSheet .sl{margin-top:10px;color:#333;} #loiSheet .sn{font-weight:600;margin-top:1px;}'
+  +'#page-loi .loibtn{background:var(--accent);color:#fff;border:none;border-radius:7px;padding:7px 14px;font-family:inherit;font-size:14px;cursor:pointer;}'
+  +'#page-loi .loibtn.g{background:transparent;border:1px solid var(--border);color:var(--text);}'
+  +'#page-loi .loi-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:16px;}'
+  +'#page-loi .loi-form label{font-size:12px;color:var(--text3);display:block;margin-bottom:3px;}'
+  +'#page-loi .loi-form input,#page-loi .loi-form textarea{width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px 8px;font-family:inherit;font-size:13px;}'
+  +'#page-loi .loi-tg{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text);}';
+  document.head.appendChild(s);
+}
+function renderLois(){
+  _loiStyle(); var root=ge('loiRoot'); if(!root) return; root.innerHTML='';
+  var bar=document.createElement('div'); bar.style.cssText='display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;';
+  bar.appendChild(mkDivSafe('font-size:22px;font-weight:600;','Letters of Intent'));
+  var nb=document.createElement('button'); nb.className='loibtn'; nb.textContent='+ New LOI'; nb.addEventListener('click',function(){ openLoi(loiDefault(), true); }); bar.appendChild(nb); root.appendChild(bar);
+  if(!LOIS.length){ root.appendChild(mkDivSafe('color:var(--text3);padding:20px 0;','No letters yet. Create one, fill the fields, and export a PDF.')); return; }
+  var list=document.createElement('div'); list.style.cssText='display:flex;flex-direction:column;gap:8px;';
+  LOIS.slice().sort(function(a,b){ return String(b.updated_at||'').localeCompare(String(a.updated_at||'')); }).forEach(function(l){
+    var c=gc(l.contact_id);
+    var row=document.createElement('div'); row.style.cssText='display:flex;justify-content:space-between;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 14px;cursor:pointer;';
+    row.innerHTML='<div><div style="font-weight:600;">'+_esc(l.name||(l.data&&l.data.address)||'Untitled LOI')+'</div><div style="font-size:12px;color:var(--text3);">'+_esc((l.data&&l.data.tenant||'')+(l.updated_at?(' · updated '+fd(l.updated_at)):''))+'</div></div>';
+    var del=document.createElement('button'); del.className='loibtn g'; del.style.cssText='font-size:12px;padding:3px 9px;'; del.textContent='Delete';
+    (function(id){ del.addEventListener('click',function(e){ e.stopPropagation(); if(confirm('Delete this LOI?')){ delLoi(id); renderLois(); } }); })(l.id);
+    row.addEventListener('click',function(){ openLoi(l,false); }); row.appendChild(del); list.appendChild(row);
+  });
+  root.appendChild(list);
+}
+function openLoi(loi, isNew){
+  _loiStyle(); var root=ge('loiRoot'); if(!root) return; root.innerHTML=''; var d=loi.data;
+  var tb=document.createElement('div'); tb.style.cssText='display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;';
+  var back=document.createElement('button'); back.className='loibtn g'; back.textContent='‹ Back'; back.addEventListener('click',renderLois); tb.appendChild(back);
+  var cWrap=document.createElement('div'); cWrap.style.cssText='min-width:240px;'; tb.appendChild(cWrap);
+  var picker=buildContactPicker(cWrap,'loi_client','Load client (search name / address)…',function(){ var id=picker.hidden.value; if(!id) return; var c=gc(parseInt(id)); if(!c) return; loi.contact_id=parseInt(id); d.tenant=fn(c); d.address=c.property||c.address||d.address; if(!loi.name) loi.name=d.address||d.tenant; openLoi(loi,isNew); });
+  var saveB=document.createElement('button'); saveB.className='loibtn'; saveB.textContent='Save'; saveB.addEventListener('click',function(){ if(!loi.name) loi.name=d.address||d.tenant||'LOI'; if(!LOIS.some(function(x){return String(x.id)===String(loi.id);})) LOIS.push(loi); saveLoi(loi); saveB.textContent='Saved ✓'; setTimeout(function(){saveB.textContent='Save';},1500); }); tb.appendChild(saveB);
+  var pdfB=document.createElement('button'); pdfB.className='loibtn'; pdfB.textContent='Export PDF'; pdfB.addEventListener('click',function(){ loiExport(loi,'pdf',pdfB); }); tb.appendChild(pdfB);
+  var pngB=document.createElement('button'); pngB.className='loibtn g'; pngB.textContent='Save PNG'; pngB.addEventListener('click',function(){ loiExport(loi,'png',pngB); }); tb.appendChild(pngB);
+  root.appendChild(tb);
+
+  var preview=document.createElement('div'); preview.id='loiSheet';
+  function refresh(){ preview.innerHTML=loiLetterHTML(d); }
+  var form=document.createElement('div'); form.className='loi-form';
+  function fld(key,label,type,ph){ var w=document.createElement('div'); var l=document.createElement('label'); l.textContent=label; w.appendChild(l);
+    var el = type==='textarea'?document.createElement('textarea'):document.createElement('input'); if(type&&type!=='textarea')el.type=type; if(ph)el.placeholder=ph; if(type==='textarea')el.rows=2;
+    el.value=(d[key]!=null?d[key]:''); el.addEventListener('input',function(){ d[key]=el.value; refresh(); }); w.appendChild(el); form.appendChild(w); return w; }
+  function tgl(key,label){ var w=document.createElement('div'); var lab=document.createElement('label'); lab.className='loi-tg'; var cb=document.createElement('input'); cb.type='checkbox'; cb.checked=!!d[key]; cb.addEventListener('change',function(){ d[key]=cb.checked; refresh(); }); lab.appendChild(cb); lab.appendChild(document.createTextNode(label)); w.appendChild(lab); form.appendChild(w); return w; }
+  fld('date','Date','date'); fld('address','Lease / Property address','text','address of the lease');
+  fld('toName','Recipient name'); fld('toBrokerage','Recipient brokerage'); fld('toRole','Recipient role');
+  fld('tenant','Proposed tenant'); fld('sqft','Rentable square feet');
+  fld('permittedUse','Permitted use','textarea');
+  fld('termYears','Lease term (years)','number'); fld('baseRent','Base rent ($/month)','number'); fld('nnnEstimate','NNN estimate ($/month)','number');
+  fld('rentCommence','Rent commencement (e.g. August 1, 2026)'); fld('securityDeposit','Security deposit ($, blank = 1 month)','number');
+  fld('commissionPct','Commission %','number'); fld('expireDate','Expiration date','date'); fld('expireTime','Expiration time');
+  fld('sigEntity','Tenant entity (signature)'); fld('sigName','Tenant signer name'); fld('sigTitle','Tenant signer title');
+  // toggles + their sub-values
+  tgl('abatementOn','Rent Abatement'); fld('abatementMonths','Abatement months','number');
+  tgl('tiOn','Tenant Improvements'); fld('tiAmount','TI allowance ($, blank = months×rent)','number');
+  tgl('renewalOn','Renewal Option'); fld('renewalCount','Renewal options (count)','number'); fld('renewalMin','Renewal min years','number'); fld('renewalMax','Renewal max years','number');
+  tgl('parkingOn','Parking / Access'); tgl('signageOn','Signage');
+  tgl('exclusivityOn','Exclusivity'); fld('exclusivityText','Exclusivity text','textarea');
+  tgl('subleasingOn','Subleasing'); fld('subleasingText','Subleasing text','textarea');
+  root.appendChild(form);
+  root.appendChild(preview); refresh();
+}
+function _docCanvas(id){
+  return dsLoadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js').then(function(){
+    var node=ge(id); var pw=node.style.width, pm=node.style.maxWidth; node.style.width='800px'; node.style.maxWidth='800px';
+    var restore=function(){ node.style.width=pw; node.style.maxWidth=pm; };
+    return window.html2canvas(node,{scale:2,backgroundColor:'#ffffff',useCORS:true,windowWidth:840,width:800}).then(function(c){ restore(); return c; }, function(e){ restore(); throw e; });
+  });
+}
+function loiExport(loi, kind, btn){
+  if(btn){ btn.textContent='Building…'; btn.disabled=true; }
+  var done=function(){ if(btn){ btn.textContent=(kind==='pdf'?'Export PDF':'Save PNG'); btn.disabled=false; } };
+  var fname=(loi.name||'Letter of Intent').replace(/[^a-z0-9]+/gi,'_');
+  if(kind==='png'){
+    _docCanvas('loiSheet').then(function(canvas){ var a=document.createElement('a'); a.href=canvas.toDataURL('image/png'); a.download=fname+'.png'; a.click(); done(); }).catch(function(e){ done(); alert('PNG export failed: '+(e&&e.message||e)); });
+    return;
+  }
+  dsLoadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js').then(function(){ return _docCanvas('loiSheet'); }).then(function(canvas){
+    var img=canvas.toDataURL('image/png'); var JsPDF=(window.jspdf&&window.jspdf.jsPDF)||window.jsPDF;
+    var pdf=new JsPDF('p','pt','letter'); var pw=612, ph=792, m=24;
+    var iw=pw-m*2, ih=canvas.height*(iw/canvas.width); var pageH=ph-m*2;
+    if(ih<=pageH){ pdf.addImage(img,'PNG',m,m,iw,ih); }
+    else { var pages=Math.ceil(ih/pageH); for(var p=0;p<pages;p++){ if(p>0) pdf.addPage(); pdf.addImage(img,'PNG',m,m-p*pageH,iw,ih); } }
+    pdf.save(fname+'.pdf'); done();
+  }).catch(function(e){ done(); alert('PDF export failed: '+(e&&e.message||e)); });
 }
 // ============================================================================
 // HARD MONEY LENDING
