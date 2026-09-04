@@ -12685,7 +12685,10 @@ function loiExportWord(loi, btn){
   fetch('pbre-logo2.png').then(function(r){ return r.blob(); }).then(function(b){
     return new Promise(function(res){ var fr=new FileReader(); fr.onload=function(){ res(fr.result); }; fr.onerror=function(){ res(''); }; fr.readAsDataURL(b); });
   }).catch(function(){ return ''; }).then(function(logoData){
-    if(logoData) body=body.replace('src="pbre-logo2.png"','src="'+logoData+'"');
+    // Replace the whole logo tag: with the embedded image at an explicit size Word honors (a bare
+    // class-sized/relative <img> left a large empty box and no logo). If the fetch failed, drop it.
+    var imgTag = logoData ? '<img src="'+logoData+'" width="150" style="width:150px;" alt="Wise Choice Real Estate">' : '';
+    body = body.replace(/<img class="loi-logo"[^>]*>/, imgTag);
     var css='<style>'
       +'body{font-family:Georgia,\'Times New Roman\',serif;font-size:11pt;color:#000;}'
       +'.loi-top{text-align:right;} .loi-logo{height:46px;}'
