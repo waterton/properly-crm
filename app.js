@@ -12516,19 +12516,36 @@ function dsExportPNG(sh, btn){
 function _numWord(n){ var w=['zero','one','two','three','four','five','six','seven','eight','nine','ten','eleven','twelve','thirteen','fourteen','fifteen','sixteen','seventeen','eighteen','nineteen','twenty']; n=parseInt(n); return (n>=0&&n<=20)?w[n]:String(n); }
 function _nw(n){ var s=_numWord(n); return s.charAt(0).toUpperCase()+s.slice(1)+' ('+(parseInt(n)||0)+')'; }  // "Five (5)"
 function _loiM(n){ n=dsNum(n); return '$'+n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
-function loiComputed(d){ var rent=dsNum(d.baseRent), term=parseInt(d.termYears)||0; return { annual:rent*12, abatementTotal:rent*(parseInt(d.abatementMonths)||0), commissionAgg:rent*12*term*(dsNum(d.commissionPct)/100) }; }
+function loiComputed(d){
+  var sqft=dsNum(d.sqft), perSF=dsNum(d.baseRentPerSF), term=parseInt(d.termYears)||0;
+  var monthly, annual;
+  if(perSF>0 && sqft>0){ annual=perSF*sqft; monthly=annual/12; }
+  else { monthly=dsNum(d.baseRent); annual=monthly*12; if(!perSF && sqft>0) perSF=annual/sqft; }
+  var camLo=dsNum(d.camLowPerSF), camHi=dsNum(d.camHighPerSF), hasCamRange=(camLo>0||camHi>0)&&sqft>0;
+  var camLoAnn=camLo*sqft, camHiAnn=camHi*sqft, camLoMo=camLoAnn/12, camHiMo=camHiAnn/12;
+  return {
+    sqft:sqft, perSF:perSF, monthly:monthly, annual:annual, term:term,
+    abatementTotal:monthly*(parseInt(d.abatementMonths)||0),
+    commissionAgg:monthly*12*term*(dsNum(d.commissionPct)/100),
+    hasCamRange:hasCamRange, camLoMo:camLoMo, camHiMo:camHiMo, camLoAnn:camLoAnn, camHiAnn:camHiAnn,
+    totLoMo:monthly+camLoMo, totHiMo:monthly+camHiMo, totLoAnn:annual+camLoAnn, totHiAnn:annual+camHiAnn
+  };
+}
 function loiDefault(){ return { id:Date.now()+Math.floor(Math.random()*100000), contact_id:null, name:'', data:{
   date:tod(), address:'', toName:'', toBrokerage:'', toRole:'Listing Agent',
-  fromLine:"Elda & Randy Baker, Wise Choice Real Estate, as Tenant's representatives",
-  tenant:'', sqft:'', permittedUse:'', termYears:5, baseRent:'', nnnEstimate:'', rentCommence:'',
-  securityDeposit:'', commissionPct:3, expireDate:'', expireTime:'5:00 p.m. Mountain Time',
-  sigEntity:'', sigName:'', sigTitle:'', preparedBy:'Elda Baker', preparedByBrokerage:'Wise Choice Real Estate',
+  fromLine:"Elda & Randy Baker, Palacios Baker Real Estate, as Tenant's representatives",
+  tenant:'', sqft:'', permittedUse:'', termYears:5, baseRent:'', baseRentPerSF:'', nnnEstimate:'',
+  camLowPerSF:'', camHighPerSF:'', ddOn:true, ddDays:45, rentCommence:'',
+  securityDeposit:'', commissionPct:3, commissionMin:'', brokerageRationaleOn:false,
+  brokerageRationale:"Palacios Baker Real Estate is independently managing zoning verification, conditional-use analysis, and Certificate of Occupancy confirmation on Tenant's behalf — diligence that reduces Landlord's risk, streamlines approvals, and is work that would customarily fall to Landlord's side of the transaction or be reflected in a higher co-op commission split.",
+  expireDate:'', expireTime:'5:00 p.m. Mountain Time',
+  sigEntity:'', sigName:'', sigTitle:'', preparedBy:'Elda Baker', preparedByBrokerage:'Palacios Baker Real Estate',
   abatementOn:true, abatementMonths:6, tiOn:true, tiAmount:'',
   renewalOn:true, renewalCount:1, renewalMin:3, renewalMax:5, parkingOn:true, signageOn:true,
   exclusivityOn:false, exclusivityText:"Landlord agrees that during the initial lease term and any renewal period, no other tenant in the shopping center/plaza will be permitted to operate a business substantially similar to Tenant's event venue business or otherwise directly compete with Tenant's primary use.",
   subleasingOn:false, subleasingText:"Tenant may sublease or assign the Premises with Landlord's prior written consent, which shall not be unreasonably withheld, conditioned, or delayed." } }; }
 function loiLetterHTML(d){
-  var c=loiComputed(d); var rent=dsNum(d.baseRent);
+  var c=loiComputed(d); var rent=c.monthly;
   var sec = (d.securityDeposit!=='' && d.securityDeposit!=null) ? dsNum(d.securityDeposit) : rent;
   var tiMonthsN = d.abatementOn ? (parseInt(d.abatementMonths)||6) : 6;
   var ti = (d.tiAmount!=='' && d.tiAmount!=null) ? dsNum(d.tiAmount) : rent*tiMonthsN;
@@ -12536,11 +12553,17 @@ function loiLetterHTML(d){
   function row(k,v){ rows+='<tr><td class="k">'+_esc(k)+'</td><td class="v">'+v+'</td></tr>'; }
   row('Permitted Use', _esc(d.permittedUse||''));
   row('Lease Term', _nw(d.termYears)+' years, commencing on the Rent Commencement Date.');
-  row('Base Rent', _loiM(rent)+' per month ('+_loiM(c.annual)+' annually), triple net (NNN), subject to verification of the rentable area and agreed lease terms.');
-  row('NNN Expenses', "Tenant will pay its proportionate share of taxes, insurance, and common-area operating expenses. The current estimated NNN/CAM charge is approximately "+_loiM(dsNum(d.nnnEstimate))+" per month, subject to annual reconciliation and adjustment. Landlord will provide the current NNN/CAM budget, prior two years of reconciliations (if available), the allocation methodology, and an estimate of Tenant&rsquo;s monthly share before lease execution.");
+  row('Base Rent', (c.perSF>0 ? (_loiM(c.perSF)+'/SF annually ('+_loiM(rent)+' per month; '+_loiM(c.annual)+' annually)') : (_loiM(rent)+' per month ('+_loiM(c.annual)+' annually)'))+', triple net (NNN), subject to verification of the rentable area and agreed lease terms.');
+  if(c.hasCamRange){
+    row('CAM Expenses', 'CAM is estimated at '+_loiM(dsNum(d.camLowPerSF))+'&ndash;'+_loiM(dsNum(d.camHighPerSF))+'/SF annually, or approximately '+_loiM(c.camLoMo)+'&ndash;'+_loiM(c.camHiMo)+' per month ('+_loiM(c.camLoAnn)+'&ndash;'+_loiM(c.camHiAnn)+' annually), subject to annual reconciliation and adjustment. Landlord will provide the current CAM/NNN budget, prior two years of reconciliations (if available), the allocation methodology, and a confirmed estimate of Tenant&rsquo;s monthly share before lease execution.');
+    row('Estimated Total Occupancy Cost', 'Approximately '+_loiM(c.totLoMo)+'&ndash;'+_loiM(c.totHiMo)+' per month ('+_loiM(c.totLoAnn)+'&ndash;'+_loiM(c.totHiAnn)+' annually), combining Base Rent and estimated CAM range, before separately metered utilities.');
+  } else {
+    row('NNN Expenses', "Tenant will pay its proportionate share of taxes, insurance, and common-area operating expenses. The current estimated NNN/CAM charge is approximately "+_loiM(dsNum(d.nnnEstimate))+" per month, subject to annual reconciliation and adjustment. Landlord will provide the current NNN/CAM budget, prior two years of reconciliations (if available), the allocation methodology, and an estimate of Tenant&rsquo;s monthly share before lease execution.");
+  }
   row('Utilities / Services', "Tenant will pay separately metered utilities and services used by the Premises. Responsibility for HVAC maintenance/replacement, structural components, roof, parking areas, landscaping, snow removal, and other building services will be specifically allocated in the lease.");
   row('Delivery Condition', "Premises will be delivered in its existing full build-out condition, broom-clean, free of occupants and personal property, with all building systems serving the Premises in good working order, and compliant with applicable laws for the agreed use, subject to Tenant&rsquo;s inspection and approval.");
   row('Rent Commencement', "The later of "+_esc(d.rentCommence||'')+", or Landlord&rsquo;s delivery of the Premises in the required condition, following satisfaction or waiver of Tenant&rsquo;s contingencies.");
+  if(d.ddOn) row('Due Diligence Period', 'Tenant will have '+(parseInt(d.ddDays)||45)+' days from full execution of this LOI (the &ldquo;Due Diligence Period&rdquo;) to complete, at Tenant&rsquo;s expense, all zoning verification, conditional-use approval, parking-ratio confirmation, and Certificate of Occupancy requirements with the applicable municipality for Tenant&rsquo;s intended use. Landlord will reasonably cooperate with and, where required, co-sign or authorize Tenant&rsquo;s permit and approval applications as property owner, at no cost to Landlord. If Tenant is unable to obtain confirmation that its intended use is permitted, and that a Certificate of Occupancy for that use is obtainable, on terms acceptable to Tenant within the Due Diligence Period, Tenant may terminate this LOI and any resulting lease negotiations by written notice to Landlord, without further obligation to either party. No definitive lease will be executed prior to satisfaction or written waiver of this contingency.');
   if(d.abatementOn) row('Rent Abatement', "The first "+_nw(d.abatementMonths)+" months of base rent will be fully abated, totaling "+_loiM(c.abatementTotal)+" at the stated initial base rent. Tenant will remain responsible for NNN expenses and separately metered utilities during the abatement period. This abatement is separate from the tenant-improvement allowance described below.");
   if(d.tiOn) row('Tenant Improvements', "Landlord will provide a tenant-improvement allowance of "+_loiM(ti)+", equivalent to "+_numWord(tiMonthsN)+" months of the stated base rent. The allowance may be applied to mutually approved design, permitting, construction, fixtures, cabling, signage, accessibility, and other improvements to the Premises. The lease will specify the approval, documentation, draw, reimbursement, and final-disbursement process and deadlines.");
   row('Security Deposit', "A security deposit of "+_loiM(sec)+", equal to one month&rsquo;s base rent, will be paid upon execution of the lease together with any other amounts then due. Any first month&rsquo;s base-rent payment required at signing will be credited and applied consistently with the base-rent abatement stated above.");
@@ -12553,11 +12576,18 @@ function loiLetterHTML(d){
     if(d.exclusivityOn) extra+='<p><b>Exclusivity:</b> '+_esc(d.exclusivityText||'')+'</p>';
     if(d.subleasingOn) extra+='<p><b>Subleasing:</b> '+_esc(d.subleasingText||'')+'</p>';
   }
-  var pct=dsNum(d.commissionPct);
+  var pct=dsNum(d.commissionPct), cmin=dsNum(d.commissionMin);
+  var commClause=_esc(_numWord(pct))+' percent ('+pct+'%) of the aggregate base rent payable during the initial '+_esc(_numWord(d.termYears))+'-year lease term'+(cmin>0?(', or '+_loiM(cmin)+', whichever is greater'):'');
+  var brokRationale=(d.brokerageRationaleOn && d.brokerageRationale)?(' '+_esc(d.brokerageRationale)):'';
   return ''
-   +'<div class="loi-top"><img class="loi-logo" src="pbre-logo2.png" alt="Wise Choice Real Estate"></div>'
+   +'<div class="loi-head">'
+     +'<img class="loi-crest" src="pbre-loi-logo.png" alt="Palacios Baker Real Estate">'
+     +'<div class="loi-brand">PALACIOS BAKER REAL ESTATE</div>'
+     +'<div class="loi-sub">NON-BINDING LOI &bull; '+_esc(dsLongDate(d.date)||d.date||'')+'</div>'
+   +'</div>'
    +'<div class="loi-title">Letter of Intent to Lease</div>'
    +'<div class="loi-addr">'+_esc(d.address||'')+'</div>'
+   +(d.sqft?('<div class="loi-sqft">Approximately '+_esc(d.sqft)+' rentable square feet</div>'):'')
    +'<table class="loi-meta">'
      +'<tr><td class="k">Date</td><td class="v">'+_esc(dsLongDate(d.date)||d.date||'')+'</td></tr>'
      +'<tr><td class="k">To</td><td class="v">'+_esc([d.toName,d.toBrokerage,d.toRole].filter(Boolean).join(', '))+'</td></tr>'
@@ -12577,7 +12607,7 @@ function loiLetterHTML(d){
    +'</ul>'
    +'<div class="loi-h">Additional Provisions</div>'
    +'<p><b>Lease Documentation.</b> Landlord will prepare the initial lease draft. Each party may review the lease with its own legal and tax advisers.</p>'
-   +'<p><b>Brokerage.</b> Landlord acknowledges that Elda Baker and Randy Baker of Wise Choice Real Estate represent the proposed tenant. Landlord or Landlord&rsquo;s brokerage will pay Wise Choice Real Estate a commission equal to '+_esc(_numWord(pct))+' percent ('+pct+'%) of the aggregate base rent payable during the initial '+_esc(_numWord(d.termYears))+'-year lease term. The commission will be earned and payable pursuant to a separate written commission agreement executed by the applicable parties, and will not be contingent on Tenant&rsquo;s continued occupancy after lease commencement.</p>'
+   +'<p><b>Brokerage.</b> Landlord acknowledges that Elda Baker and Randy Baker of Palacios Baker Real Estate represent the proposed tenant.'+brokRationale+' Landlord or Landlord&rsquo;s brokerage will pay Palacios Baker Real Estate a commission equal to '+commClause+'. The commission will be earned and payable pursuant to a separate written commission agreement executed by the applicable parties, and will not be contingent on Tenant&rsquo;s continued occupancy after lease commencement.</p>'
    +'<p><b>Confidentiality and Costs.</b> Unless otherwise agreed in writing, each party will bear its own costs. The parties will use reasonable discretion regarding nonpublic financial and business information exchanged during negotiations.</p>'
    +'<p><b>Non-Binding Effect.</b> This LOI is intended only as an expression of interest and a framework for negotiation. No leasehold interest is created. Neither party is bound unless a definitive lease is fully executed and delivered. Any binding confidentiality, access, or brokerage obligations must be stated in a separate signed agreement.</p>'
    +'<p><b>Expiration.</b> This proposal will expire at '+_esc(d.expireTime||'')+' on '+_esc(dsLongDate(d.expireDate)||d.expireDate||'')+', unless extended in writing by the proposed tenant.</p>'
@@ -12587,15 +12617,26 @@ function loiLetterHTML(d){
      +'<td><div class="sh">ACKNOWLEDGED BY LANDLORD</div><div class="sl">By: _______________________</div><div class="sn">&nbsp;</div><div class="sl">Name: ____________________</div><div class="sn">&nbsp;</div><div class="sl">Title: _____________________</div><div class="sn">&nbsp;</div><div class="sl">Date: _____________________</div></td>'
    +'</tr></table>'
    +extra
-   +'<div class="loi-h">Prepared By</div><p>'+_esc(d.preparedBy||'')+'<br>'+_esc(d.preparedByBrokerage||'')+'</p>';
+   +'<div class="loi-h">Prepared By</div>'
+   +'<div class="sn">'+_esc(d.preparedBy||'')+'</div>'
+   +'<div class="loi-pbline">'+_esc(d.preparedByBrokerage||'')+'</div>'
+   +'<div class="loi-pbline">Tenant&rsquo;s Representative / REALTOR&reg;</div>'
+   +'<div class="sl">Signature: _______________________</div>'
+   +'<div class="sl">Date: _______________________</div>'
+   +'<div class="loi-foot">Palacios Baker Real Estate &middot; Utah&rsquo;s Wise Choice</div>';
 }
 function _loiStyle(){
   if(ge('loiCss')) return; var s=document.createElement('style'); s.id='loiCss';
   s.textContent=
    '#loiSheet{background:#fff;color:#1a1a1a;max-width:820px;margin:0 auto;padding:34px 40px;font-family:Georgia,\'Times New Roman\',serif;font-size:12.5px;line-height:1.5;border:1px solid #ddd;}'
-  +'#loiSheet .loi-top{display:flex;justify-content:flex-end;margin-bottom:6px;} #loiSheet .loi-logo{height:46px;}'
-  +'#loiSheet .loi-title{font-size:24px;font-weight:700;margin:2px 0 2px;}'
-  +'#loiSheet .loi-addr{font-size:13px;color:#333;margin-bottom:14px;}'
+  +'#loiSheet .loi-head{text-align:center;margin:0 0 12px;padding-bottom:10px;border-bottom:2px solid #b8912f;}'
+  +'#loiSheet .loi-crest{height:96px;width:auto;display:block;margin:0 auto 4px;}'
+  +'#loiSheet .loi-brand{font-size:15px;font-weight:700;letter-spacing:2.5px;color:#1a1a1a;}'
+  +'#loiSheet .loi-sub{font-size:10.5px;letter-spacing:1.5px;color:#8a6d1a;text-transform:uppercase;margin-top:3px;}'
+  +'#loiSheet .loi-title{font-size:24px;font-weight:700;margin:2px 0 2px;text-align:center;}'
+  +'#loiSheet .loi-addr{font-size:13px;color:#333;text-align:center;}'
+  +'#loiSheet .loi-sqft{font-size:12px;color:#555;font-style:italic;text-align:center;margin-bottom:14px;}'
+  +'#loiSheet .loi-foot{text-align:center;font-size:10px;color:#999;margin-top:24px;border-top:1px solid #e5e5e5;padding-top:8px;}'
   +'#loiSheet table.loi-meta{width:100%;border-collapse:collapse;margin-bottom:12px;}'
   +'#loiSheet table.loi-meta td.k{font-weight:700;width:150px;vertical-align:top;padding:2px 8px 2px 0;}'
   +'#loiSheet table.loi-meta td.v{vertical-align:top;padding:2px 0;}'
@@ -12608,6 +12649,7 @@ function _loiStyle(){
   +'#loiSheet p{margin:6px 0;}'
   +'#loiSheet table.loi-sig{width:100%;margin-top:16px;} #loiSheet table.loi-sig td{width:50%;vertical-align:top;padding-right:16px;}'
   +'#loiSheet .sh{font-weight:700;font-size:11px;letter-spacing:.5px;margin-bottom:8px;} #loiSheet .sl{margin-top:10px;color:#333;} #loiSheet .sn{font-weight:600;margin-top:1px;}'
+  +'#loiSheet .loi-pbline{color:#333;}'
   +'#page-loi .loibtn{background:var(--accent);color:#fff;border:none;border-radius:7px;padding:7px 14px;font-family:inherit;font-size:14px;cursor:pointer;}'
   +'#page-loi .loibtn.g{background:transparent;border:1px solid var(--border);color:var(--text);}'
   +'#page-loi .loi-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:16px;}'
@@ -12655,9 +12697,14 @@ function openLoi(loi, isNew){
   fld('toName','Recipient name'); fld('toBrokerage','Recipient brokerage'); fld('toRole','Recipient role');
   fld('tenant','Proposed tenant'); fld('sqft','Rentable square feet');
   fld('permittedUse','Permitted use','textarea');
-  fld('termYears','Lease term (years)','number'); fld('baseRent','Base rent ($/month)','number'); fld('nnnEstimate','NNN estimate ($/month)','number');
-  fld('rentCommence','Rent commencement (e.g. August 1, 2026)'); fld('securityDeposit','Security deposit ($, blank = 1 month)','number');
-  fld('commissionPct','Commission %','number'); fld('expireDate','Expiration date','date'); fld('expireTime','Expiration time');
+  fld('termYears','Lease term (years)','number'); fld('baseRent','Base rent ($/month)','number'); fld('baseRentPerSF','Base rent ($/SF/yr, optional — overrides monthly)','number');
+  fld('camLowPerSF','CAM low ($/SF/yr, optional)','number'); fld('camHighPerSF','CAM high ($/SF/yr, optional)','number'); fld('nnnEstimate','NNN estimate ($/month, if no CAM range)','number');
+  fld('rentCommence','Rent commencement (e.g. August 1, 2026)');
+  tgl('ddOn','Due Diligence Period'); fld('ddDays','Due diligence days','number');
+  fld('securityDeposit','Security deposit ($, blank = 1 month)','number');
+  fld('commissionPct','Commission %','number'); fld('commissionMin','Commission floor ($, optional)','number');
+  tgl('brokerageRationaleOn','Brokerage rationale'); fld('brokerageRationale','Brokerage rationale text','textarea');
+  fld('expireDate','Expiration date','date'); fld('expireTime','Expiration time');
   fld('sigEntity','Tenant entity (signature)'); fld('sigName','Tenant signer name'); fld('sigTitle','Tenant signer title');
   // toggles + their sub-values
   tgl('abatementOn','Rent Abatement'); fld('abatementMonths','Abatement months','number');
@@ -12682,14 +12729,19 @@ function loiExportWord(loi, btn){
   if(btn){ btn.textContent='Building…'; btn.disabled=true; }
   var done=function(){ if(btn){ btn.textContent='Export Word'; btn.disabled=false; } };
   var body=loiLetterHTML(loi.data);
-  // Word export: drop the logo image and use a plain text header top-right instead.
-  body = body.replace(/<img class="loi-logo"[^>]*>/, '<span class="loi-wordmark">Utah\'s Wise Choice Real Estate</span>');
+  // Word export: drop the crest image (embedded images render unreliably) and keep the text masthead.
+  body = body.replace(/<img class="loi-crest"[^>]*>/, '');
   (function(){
     var css='<style>'
       +'body{font-family:Georgia,\'Times New Roman\',serif;font-size:11pt;color:#000;}'
-      +'.loi-top{text-align:right;} .loi-wordmark{font-size:12pt;font-weight:bold;color:#1F497D;}'
-      +'.loi-title{font-size:20pt;font-weight:bold;margin:2pt 0;}'
-      +'.loi-addr{font-size:11pt;margin-bottom:8pt;}'
+      +'.loi-head{text-align:center;border-bottom:2px solid #b8912f;padding-bottom:6pt;margin-bottom:10pt;}'
+      +'.loi-brand{font-size:14pt;font-weight:bold;letter-spacing:2pt;color:#000;}'
+      +'.loi-sub{font-size:9pt;letter-spacing:1pt;color:#8a6d1a;}'
+      +'.loi-title{font-size:20pt;font-weight:bold;margin:2pt 0;text-align:center;}'
+      +'.loi-addr{font-size:11pt;text-align:center;}'
+      +'.loi-sqft{font-size:10pt;font-style:italic;color:#555;text-align:center;margin-bottom:8pt;}'
+      +'.loi-foot{text-align:center;font-size:8pt;color:#888;border-top:1px solid #ccc;padding-top:5pt;margin-top:14pt;}'
+      +'.loi-pbline{color:#333;}'
       +'.loi-h{font-size:13pt;font-weight:bold;border-bottom:1px solid #999;margin:12pt 0 4pt;}'
       +'.loi-intro{font-size:10.5pt;}'
       +'table{width:100%;border-collapse:collapse;}'
