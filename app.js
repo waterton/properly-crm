@@ -12827,7 +12827,7 @@ function listSlugify(s){ return String(s||'').toLowerCase().replace(/[^a-z0-9]+/
 function listArchived(l){ return !!(l.data&&l.data.archived); }
 function listMoney(v){ v=dsNum(v); return v?('$'+v.toLocaleString('en-US',{maximumFractionDigits:0})):''; }
 function listDefault(){ return { id:Date.now()+Math.floor(Math.random()*100000), contact_id:null, name:'', data:{
-  status:'draft', property_type:'residential', mls_number:'', slug:'', slug_locked:false,
+  status:'draft', property_type:'residential', transaction_id:null, mls_number:'', slug:'', slug_locked:false,
   address_full:'', street:'', city:'', state:'UT', zip:'', county:'',
   price:'', price_qualifier:'', hoa_monthly:'', taxes_annual:'', lot_size:'', year_built:'', parking:'',
   details:{}, headline_en:'', headline_es:'', pitch_en:'', pitch_es:'',
@@ -13040,6 +13040,19 @@ function openListing(loi, isNew){
   sec('Status & identity');
   pick('status','Status',LIST_STATUS); pick('property_type','Property type',LIST_TYPES);
   fld('mls_number','MLS #'); fld('slug','URL slug (auto from address)');
+  // Linked transaction (the seller deal this listing belongs to)
+  var txWrap=document.createElement('div'); var txl=document.createElement('label'); txl.textContent='Linked transaction (optional)'; txWrap.appendChild(txl);
+  var txs=document.createElement('select'); var none=document.createElement('option'); none.value=''; none.textContent='(none)'; txs.appendChild(none);
+  (typeof TX!=='undefined'?TX:[]).slice().sort(function(a,b){ return String(a.address||'').localeCompare(String(b.address||'')); }).forEach(function(t){ var op=document.createElement('option'); op.value=String(t.id); var cN=gc(t.contactId); op.textContent=(t.address||'(no address)')+' — '+(t.type||'')+(cN?(' · '+fn(cN)):''); txs.appendChild(op); });
+  txs.value = (d.transaction_id!=null?String(d.transaction_id):'');
+  txs.addEventListener('change',function(){
+    d.transaction_id = txs.value?(parseInt(txs.value)||txs.value):null;
+    if(d.transaction_id){ var t=(TX||[]).filter(function(x){return String(x.id)===String(d.transaction_id);})[0]; if(t){ if(!d.address_full && t.address) d.address_full=t.address; if(loi.contact_id==null && t.contactId!=null) loi.contact_id=t.contactId; } }
+    openListing(loi,false);
+  });
+  txWrap.appendChild(txs);
+  if(d.transaction_id){ var lk=document.createElement('div'); lk.style.cssText='font-size:11px;margin-top:3px;'; var a=document.createElement('a'); a.href='#'; a.textContent='Open transaction ›'; a.style.color='var(--accent)'; a.addEventListener('click',function(e){ e.preventDefault(); if(typeof sp==='function') sp('tc'); if(typeof openTCDetail==='function') openTCDetail(d.transaction_id); }); lk.appendChild(a); txWrap.appendChild(lk); }
+  form.appendChild(txWrap);
   sec('Address & price');
   fld('address_full','Full address (display)','text',true);
   fld('city','City'); fld('state','State'); fld('zip','ZIP'); fld('county','County');
