@@ -12893,6 +12893,46 @@ function listSocialCaption(d){
   L.push(''); L.push('#UtahRealEstate #'+((d.city||'Utah').replace(/[^A-Za-z0-9]/g,''))+'RealEstate #PalaciosBaker #WiseChoice');
   return L.join('\n');
 }
+// ---- auto-fill from a pasted listing page (utahrealestate.com etc.) via the AI extractor ----
+function listAutofillPrompt(text){
+  return 'You are extracting real-estate listing facts from the pasted listing/MLS web-page text below. '
+    +'Return ONLY a JSON object (no prose, no markdown, no code fences) with exactly these keys; use null when a value is not present:\n'
+    +'{"address_full":string,"city":string,"state":string,"zip":string,"county":string,"price":number,'
+    +'"status":one of ["draft","coming_soon","active","under_contract","pending","sold","withdrawn","expired"],'
+    +'"property_type":one of ["residential","land","commercial"],"mls_number":string,"year_built":number,'
+    +'"lot_size":string,"parking":string,"hoa_monthly":number,"taxes_annual":number,"beds":number,'
+    +'"baths_full":number,"baths_half":number,"sqft":number,"style":string,"headline_en":string,'
+    +'"pitch_en":string,"features":[string]}\n'
+    +'Rules: numbers must be plain (no commas, $, or units). Map "Accepting Backup Offers" to "active". '
+    +'If it is vacant land with no beds/baths, set property_type to "land". headline_en = a short marketable '
+    +'title (city plus one highlight). pitch_en = the cleaned property description paragraph. '
+    +'features = 4-8 short standout-feature phrases. Ignore navigation, schools lists, ads, and agent contact blocks.\n\n'
+    +'PASTED TEXT:\n'+String(text||'').slice(0,14000);
+}
+function listAutofill(loi, textarea, btn){
+  var text=(textarea.value||'').trim(); if(text.length<40){ alert('Paste the listing page text first (open it on the MLS site, select all, copy).'); return; }
+  var orig=btn.textContent; btn.textContent='Reading…'; btn.disabled=true;
+  (async function(){
+    try{
+      var resp=await fetch('/api/claude',{method:'POST',headers:await apiHeaders(),body:JSON.stringify({ max_tokens:4096, response_format:'json', messages:[{ role:'user', content:listAutofillPrompt(text) }] })});
+      var data=await resp.json(); if(data&&data.error) throw new Error(data.error.message||JSON.stringify(data.error));
+      var raw=(data.content&&data.content[0]&&data.content[0].text)||''; var r=_parseJsonLoose(raw);
+      if(!r) throw new Error('Could not read the fields from that text.');
+      var d=loi.data; d.details=d.details||{};
+      function setT(k,v){ if(v!=null&&v!=='') d[k]=v; }
+      setT('address_full',r.address_full); setT('city',r.city); setT('state',r.state); setT('zip',r.zip); setT('county',r.county);
+      if(r.price!=null) d.price=r.price;
+      setT('status',r.status); setT('property_type',r.property_type); setT('mls_number',r.mls_number);
+      if(r.year_built!=null) d.year_built=r.year_built; setT('lot_size',r.lot_size); setT('parking',r.parking);
+      if(r.hoa_monthly!=null) d.hoa_monthly=r.hoa_monthly; if(r.taxes_annual!=null) d.taxes_annual=r.taxes_annual;
+      setT('headline_en',r.headline_en); setT('pitch_en',r.pitch_en);
+      if(Array.isArray(r.features)&&r.features.length) d.features=r.features.filter(Boolean).join('\n');
+      var x=d.details;
+      if(r.beds!=null)x.beds=r.beds; if(r.baths_full!=null)x.baths_full=r.baths_full; if(r.baths_half!=null)x.baths_half=r.baths_half; if(r.sqft!=null)x.sqft=r.sqft; if(r.style)x.style=r.style;
+      openListing(loi,false);
+    }catch(e){ alert('Auto-fill failed: '+(e&&e.message||e)); btn.textContent=orig; btn.disabled=false; }
+  })();
+}
 // ---- styles ----
 function _listStyle(){
   if(ge('listCss')) return; var s=document.createElement('style'); s.id='listCss';
@@ -12992,6 +13032,11 @@ function openListing(loi, isNew){
     var s=document.createElement('select'); opts.forEach(function(o){ var op=document.createElement('option'); op.value=o[0]; op.textContent=o[1]; if(d[key]===o[0])op.selected=true; s.appendChild(op); }); s.value=d[key]; s.addEventListener('change',function(){ d[key]=s.value; if(key==='property_type') openListing(loi,isNew); else refresh(); }); w.appendChild(s); form.appendChild(w); }
   function tgl(key,label){ var w=document.createElement('div'); w.className='l-wide'; var lab=document.createElement('label'); lab.style.cssText='display:flex;align-items:center;gap:8px;cursor:pointer;color:var(--text);'; var cb=document.createElement('input'); cb.type='checkbox'; cb.checked=!!d[key]; cb.style.width='auto'; cb.addEventListener('change',function(){ d[key]=cb.checked; }); lab.appendChild(cb); lab.appendChild(document.createTextNode(label)); w.appendChild(lab); form.appendChild(w); }
 
+  var af=document.createElement('div'); af.className='l-wide'; af.style.cssText='background:var(--surface2);border:1px dashed var(--border);border-radius:8px;padding:10px;';
+  af.appendChild(mkDivSafe('font-size:12px;color:var(--text3);margin-bottom:6px;line-height:1.5;','<b>Auto-fill from a listing page.</b> Open the listing on utahrealestate.com, select all (Ctrl+A) and copy (Ctrl+C), paste below, and click Extract &amp; fill. Review the fields it pulls in.'));
+  var afta=document.createElement('textarea'); afta.rows=3; afta.placeholder='Paste the listing page text here…'; afta.style.cssText='width:100%;box-sizing:border-box;background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px 8px;font-family:inherit;font-size:13px;';
+  var afb=document.createElement('button'); afb.className='lbtn'; afb.textContent='Extract & fill'; afb.style.cssText='margin-top:6px;'; afb.addEventListener('click',function(){ listAutofill(loi,afta,afb); });
+  af.appendChild(afta); af.appendChild(afb); form.appendChild(af);
   sec('Status & identity');
   pick('status','Status',LIST_STATUS); pick('property_type','Property type',LIST_TYPES);
   fld('mls_number','MLS #'); fld('slug','URL slug (auto from address)');
