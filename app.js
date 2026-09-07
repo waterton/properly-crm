@@ -3475,6 +3475,9 @@ function materializeWorkflowTasks(txArg){
   return changed;
 }
 function saveTX(tx){ recomputeCommission(tx); sv(); if(supaReady && tx) dbSave('transactions', [tx]); try{ materializeWorkflowTasks(tx); }catch(e){} }
+// A transaction's address is its own field, captured up front. Never borrow the contact's address —
+// the contact may hold a prior/other address that has nothing to do with this deal.
+function txAddr(tx){ return (tx && tx.address) ? tx.address : ''; }
 function deleteTX(id){
   var _delTx = TX.find(function(t){ return String(t.id)===String(id); });
   var _delCid = _delTx ? _delTx.contactId : null;
@@ -3968,7 +3971,7 @@ function renderTC(){
     tl.style.flex = '1';
     var title = document.createElement('div');
     title.className = 'tc-card-title';
-    title.textContent = tx.address || 'No address';
+    title.textContent = txAddr(tx) || 'No address';
     var sub = document.createElement('div');
     sub.style.cssText = 'font-size:18px;color:var(--text3);margin-top:2px;';
     sub.textContent = c ? fn(c) : 'Unknown client';
@@ -7005,6 +7008,17 @@ function renderLeaseScanFields(card, r){
 }
 
 async function commitScanImport(r, btn){
+  // ---- Require a property address up front (before creating anything) ----
+  // A transaction IS a property/address. It must come from the scan or be typed in; we never assume
+  // the contact's address (which may be a prior/other property). Block here so no contact or deal is
+  // created without one, and so retrying doesn't duplicate a just-created contact.
+  var _scAddr = ge('sc_address') ? ge('sc_address').value.trim() : (r.address||'');
+  var _txChoiceEl0 = document.querySelector('input[name="sc_tx_choice"]:checked');
+  var _txChoice0 = _txChoiceEl0 ? _txChoiceEl0.value : 'new';
+  var _updatingExisting = false;
+  if(_txChoice0.indexOf('existing:')===0){ var _exid0=_txChoice0.split(':')[1]; _updatingExisting = !!TX.find(function(t){ return String(t.id)===String(_exid0); }); }
+  if(!_updatingExisting && !_scAddr){ alert('This transaction needs a property address before it can be created.\n\nEnter it in the “Property Address” field (from the scan or typed in). The contact’s address is never assumed.'); return; }
+
   // ---- Resolve contact (required) ----
   var newCb = ge('sc_new_contact_toggle');
   var contactId = null;
@@ -7065,6 +7079,7 @@ async function commitScanImport(r, btn){
     var listTx = null;
     if(_choice0.indexOf('existing:')===0){ var _exId0=_choice0.split(':')[1]; listTx = TX.find(function(t){ return String(t.id)===String(_exId0); }); }
     if(!listTx){
+      if(!address){ alert('This listing needs a property address before it can be created. Enter it in the “Property Address” field above (from the scan or typed in).'); return; }
       listTx = { id: Date.now()+Math.floor(Math.random()*100000), contactId: contactId, type:'seller', address: address, status:'active', steps:{}, notes:'Listing (created from a scanned offer).', details:{} };
       TX.push(listTx);
     }
@@ -7170,6 +7185,7 @@ async function commitScanImport(r, btn){
   } else if(isLease){
     // ---- New commercial lease transaction ----
     var Ld = readLeaseForm(r);
+    if(!String(Ld.premises||address||'').trim()){ alert('This transaction needs a property address before it can be created. Enter it in the “Property Address” field above (from the scan or typed in).'); if(btn){ btn.disabled=false; } return; }
     var leaseSide = (ge('sc_client_side') && ge('sc_client_side').value === 'seller') ? 'landlord' : 'tenant';
     tx = {
       id: Date.now() + Math.floor(Math.random()*100000),
@@ -7184,6 +7200,7 @@ async function commitScanImport(r, btn){
     };
     TX.push(tx);
   } else {
+    if(!String(address||'').trim()){ alert('This transaction needs a property address before it can be created. Enter it in the “Property Address” field above (from the scan or typed in).'); if(btn){ btn.disabled=false; } return; }
     var txType = (ge('sc_client_side') && ge('sc_client_side').value) ? ge('sc_client_side').value : ((r.docType && r.docType.toLowerCase().indexOf('list') >= 0) ? 'seller' : 'buyer');
     tx = {
       id: Date.now() + Math.floor(Math.random()*100000),
@@ -13073,11 +13090,11 @@ function openListing(loi, isNew){
   // Linked transaction (the seller deal this listing belongs to)
   var txWrap=document.createElement('div'); var txl=document.createElement('label'); txl.textContent='Linked transaction (optional)'; txWrap.appendChild(txl);
   var txs=document.createElement('select'); var none=document.createElement('option'); none.value=''; none.textContent='(none)'; txs.appendChild(none);
-  (typeof TX!=='undefined'?TX:[]).slice().sort(function(a,b){ return String(a.address||'').localeCompare(String(b.address||'')); }).forEach(function(t){ var op=document.createElement('option'); op.value=String(t.id); var cN=gc(t.contactId); op.textContent=(t.address||'(no address)')+' — '+(t.type||'')+(cN?(' · '+fn(cN)):''); txs.appendChild(op); });
+  (typeof TX!=='undefined'?TX:[]).slice().sort(function(a,b){ return String(txAddr(a)).localeCompare(String(txAddr(b))); }).forEach(function(t){ var op=document.createElement('option'); op.value=String(t.id); var cN=gc(t.contactId); op.textContent=(txAddr(t)||'(no address)')+' — '+(t.type||'')+(cN?(' · '+fn(cN)):''); txs.appendChild(op); });
   txs.value = (d.transaction_id!=null?String(d.transaction_id):'');
   txs.addEventListener('change',function(){
     d.transaction_id = txs.value?(parseInt(txs.value)||txs.value):null;
-    if(d.transaction_id){ var t=(TX||[]).filter(function(x){return String(x.id)===String(d.transaction_id);})[0]; if(t){ if(!d.address_full && t.address) d.address_full=t.address; if(loi.contact_id==null && t.contactId!=null) loi.contact_id=t.contactId; } }
+    if(d.transaction_id){ var t=(TX||[]).filter(function(x){return String(x.id)===String(d.transaction_id);})[0]; if(t){ if(!d.address_full) d.address_full=txAddr(t); if(loi.contact_id==null && t.contactId!=null) loi.contact_id=t.contactId; } }
     openListing(loi,false);
   });
   txWrap.appendChild(txs);
