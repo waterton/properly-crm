@@ -12832,25 +12832,7 @@ function listDefault(){ return { id:Date.now()+Math.floor(Math.random()*100000),
   price:'', price_qualifier:'', hoa_monthly:'', taxes_annual:'', lot_size:'', year_built:'', parking:'',
   details:{}, headline_en:'', headline_es:'', pitch_en:'', pitch_es:'',
   features:'', highlights:'', hero_image_url:'', gallery_url:'', video_url:'', tour_url:'', open_house:'',
-  source_notes:'', archived:false, wp_live:false, outputs:{} } }; }
-// Push the listing to WordPress (create or update). Draft by default; live only when wp_live is on.
-function listPublishWeb(loi, btn){
-  var d=loi.data; if(!d.address_full && !d.headline_en){ alert('Add an address or headline first.'); return; }
-  var wp=(d.outputs&&d.outputs.wp)||null, goLive=!!d.wp_live;
-  if(goLive && !confirm('Publish this listing LIVE to your public website now?')) return;
-  var orig=btn.textContent; btn.textContent='Publishing…'; btn.disabled=true;
-  var payload={ title:d.headline_en||d.address_full||'Listing', slug:d.slug||'', content:listWebsiteBlock(d), status:goLive?'publish':'draft', postId:(wp&&wp.id)?wp.id:'' };
-  (async function(){
-    try{
-      var resp=await fetch('/api/wp-publish',{method:'POST',headers:await apiHeaders(),body:JSON.stringify(payload)});
-      var j=await resp.json(); if(!resp.ok) throw new Error((j&&j.error)||('HTTP '+resp.status));
-      d.outputs=d.outputs||{}; d.outputs.wp={ id:j.id, link:j.link, status:j.status, type:j.type, edit_link:j.edit_link, at:new Date().toISOString() };
-      if(!LISTINGS.some(function(x){return String(x.id)===String(loi.id);})) LISTINGS.push(loi);
-      saveListing(loi); openListing(loi,false);
-      alert((goLive?'Published live to your website.':'Saved as a draft in WordPress for review.')+(j.link?('\n\n'+j.link):''));
-    }catch(e){ alert('Publish failed: '+(e&&e.message||e)); btn.textContent=orig; btn.disabled=false; }
-  })();
-}
+  mls_url:'', card_note:'', source_notes:'', archived:false } }; }
 // type-specific detail fields: [key,label,type]
 function listDetailFields(type){
   if(type==='land') return [['acreage','Acreage','text'],['zoning','Zoning','text'],['utilities','Utilities','text'],['road_access','Road access','text'],['water_rights','Water rights','text'],['buildable','Buildable? (yes/no)','text']];
@@ -12872,23 +12854,32 @@ function _listClip(text, btn, okLabel){
 }
 function _listClipFallback(text){ try{ var ta=document.createElement('textarea'); ta.value=text; ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta); ta.focus(); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); }catch(e){ alert('Copy failed — select and copy manually.'); } }
 // ---- transforms (one entry -> many outputs) ----
-function listWebsiteBlock(d){
-  var title=d.headline_en||d.address_full||'New Listing';
-  var spec=listSpecLine(d); var price=listMoney(d.price); if(price&&d.price_qualifier) price+=' '+d.price_qualifier;
-  var feats=_listArr(d.features), out=[];
-  out.push('<!-- Palacios Baker listing: '+_esc(d.address_full||'')+' -->');
-  out.push('<h1>'+_esc(title)+'</h1>');
-  if(d.address_full) out.push('<p class="listing-address">'+_esc(d.address_full)+'</p>');
-  var meta=[price, spec, (d.status?listStatusLabel(d.status):'')].filter(Boolean).join(' &nbsp;|&nbsp; ');
-  if(meta) out.push('<p class="listing-meta"><strong>'+meta+'</strong></p>');
-  if(d.hero_image_url) out.push('<p><img src="'+_esc(d.hero_image_url)+'" alt="'+_esc(d.address_full||title)+'" style="max-width:100%;height:auto;"></p>');
-  if(d.pitch_en) out.push('<p>'+_esc(d.pitch_en).replace(/\n/g,'<br>')+'</p>');
-  if(feats.length){ out.push('<ul>'); feats.forEach(function(f){ out.push('  <li>'+_esc(f)+'</li>'); }); out.push('</ul>'); }
-  if(d.pitch_es){ out.push('<h3>En Español</h3>'); out.push('<p>'+_esc(d.pitch_es).replace(/\n/g,'<br>')+'</p>'); }
-  if(d.gallery_url) out.push('<p><a href="'+_esc(d.gallery_url)+'">View all photos</a></p>');
-  if(d.tour_url) out.push('<p><a href="'+_esc(d.tour_url)+'">3D tour</a></p>');
-  if(d.open_house) out.push('<p><strong>Open House:</strong> '+_esc(d.open_house)+'</p>');
-  return out.join('\n');
+// The beds/baths/sqft line, in the format the site's cards use ("5 bdrm / 2 bath – 3,296 sq ft").
+function listCardSpec(d){
+  var x=d.details||{};
+  if(d.property_type==='land'){ return [x.acreage?(x.acreage+' acres'):'', x.zoning?('zoned '+x.zoning):''].filter(Boolean).join(' – '); }
+  if(d.property_type==='commercial'){ return [x.rentable_sqft?(Number(x.rentable_sqft).toLocaleString()+' sq ft'):'', x.use_type].filter(Boolean).join(' – '); }
+  var parts=[]; if(x.beds) parts.push(x.beds+' bdrm'); var ba=(parseFloat(x.baths_full)||0)+(parseFloat(x.baths_half)||0)*0.5; if(ba) parts.push(ba+' bath');
+  var bb=parts.join(' / '); var sf=x.sqft?(Number(x.sqft).toLocaleString()+' sq ft'):'';
+  return [bb, sf].filter(Boolean).join(' – ');
+}
+// A ready-to-paste Gutenberg card block matching the site's Listings grid: photo + "City – $Price"
+// heading (linked to the MLS listing) + beds/baths/sqft line. Paste into a column on the Listings page.
+function listWebsiteCard(d){
+  var mls=d.mls_url||''; var city=d.city||String(d.address_full||'').split(',')[0].trim();
+  var price=listMoney(d.price);
+  var head=[city, price].filter(Boolean).join(' – '); if(!head) head=d.headline_en||d.address_full||'Listing';
+  var note=d.card_note?(' '+_esc(d.card_note)):''; var spec=listCardSpec(d); var img=d.hero_image_url||''; var L=[];
+  if(img){
+    L.push('<!-- wp:image {"sizeSlug":"large"'+(mls?',"linkDestination":"custom"':'')+'} -->');
+    L.push('<figure class="wp-block-image size-large">'+(mls?('<a href="'+_esc(mls)+'">'):'')+'<img src="'+_esc(img)+'" alt="'+_esc(city)+'"/>'+(mls?'</a>':'')+'</figure>');
+    L.push('<!-- /wp:image -->'); L.push('');
+  } else { L.push('<!-- Add the property photo here in WordPress (Image block). -->'); L.push(''); }
+  L.push('<!-- wp:heading {"textAlign":"center","level":4} -->');
+  L.push('<h4 class="wp-block-heading has-text-align-center">'+(mls?('<a href="'+_esc(mls)+'">'+_esc(head)+'</a>'):_esc(head))+note+'</h4>');
+  L.push('<!-- /wp:heading -->'); L.push('');
+  if(spec){ L.push('<!-- wp:paragraph {"align":"center"} -->'); L.push('<p class="has-text-align-center">'+_esc(spec)+'</p>'); L.push('<!-- /wp:paragraph -->'); }
+  return L.join('\n');
 }
 function listSocialCaption(d){
   var hl=_listArr(d.highlights); if(!hl.length) hl=_listArr(d.features).slice(0,3);
@@ -12970,12 +12961,10 @@ function openListing(loi, isNew){
   var cWrap=document.createElement('div'); cWrap.style.cssText='min-width:240px;'; tb.appendChild(cWrap);
   var picker=buildContactPicker(cWrap,'list_client','Link seller contact (optional) — name or address…',function(){ var id=picker.hidden.value; if(!id) return; var c=gc(parseInt(id)); if(!c) return; loi.contact_id=parseInt(id); if(!d.address_full){ d.address_full=c.property||c.address||''; } if(!loi.name) loi.name=d.address_full||fn(c); openListing(loi,isNew); });
   var saveB=document.createElement('button'); saveB.className='lbtn'; saveB.textContent='Save listing'; saveB.title='Store this record in your CRM (Listings list). Nothing is published.'; saveB.addEventListener('click',function(){ if(!loi.name) loi.name=d.address_full||'Listing'; if(!LISTINGS.some(function(x){return String(x.id)===String(loi.id);})) LISTINGS.push(loi); saveListing(loi); saveB.textContent='Saved ✓'; setTimeout(function(){saveB.textContent='Save listing';},1500); }); tb.appendChild(saveB);
-  var wpInfo=(d.outputs&&d.outputs.wp)||null;
-  var pubB=document.createElement('button'); pubB.className='lbtn'; pubB.textContent=(wpInfo&&wpInfo.id)?'Update website':'Publish to website'; pubB.title='Send this listing straight to your WordPress site (draft unless "Publish live" is on).'; pubB.addEventListener('click',function(){ listPublishWeb(loi,pubB); }); tb.appendChild(pubB);
-  var webB=document.createElement('button'); webB.className='lbtn g'; webB.textContent='Copy for website'; webB.title='Fallback: copy a ready-to-paste post to your clipboard for a manual WordPress paste.'; webB.addEventListener('click',function(){ _listClip(listWebsiteBlock(d), webB, 'Copied ✓'); }); tb.appendChild(webB);
+  var webB=document.createElement('button'); webB.className='lbtn'; webB.textContent='Copy website card'; webB.title='Copy a ready-to-paste card block for your Listings page grid in WordPress.'; webB.addEventListener('click',function(){ _listClip(listWebsiteCard(d), webB, 'Copied — paste into a column on your Listings page ✓'); }); tb.appendChild(webB);
   var socB=document.createElement('button'); socB.className='lbtn g'; socB.textContent='Copy for Instagram / Facebook'; socB.title='Copy a caption to your clipboard. Paste it into your social post and attach your photos.'; socB.addEventListener('click',function(){ _listClip(listSocialCaption(d), socB, 'Copied — now paste in your post ✓'); }); tb.appendChild(socB);
   root.appendChild(tb);
-  root.appendChild(mkDivSafe('color:var(--text3);font-size:12px;margin:-4px 0 12px;line-height:1.5;','Fill the fields once and <b>Save listing</b> to store it here. <b>Publish to website</b> sends it straight to WordPress — as a draft for you to review, or live if you turn on “Publish live” in the Website section below. <b>Copy for Instagram / Facebook</b> copies a caption to paste into your social post.'));
+  root.appendChild(mkDivSafe('color:var(--text3);font-size:12px;margin:-4px 0 12px;line-height:1.5;','Fill the fields once and <b>Save listing</b> to store it here. <b>Copy website card</b> copies a ready-to-paste card for your Listings page grid in WordPress (add a column to the grid, switch that block to the code/HTML view, and paste). <b>Copy for Instagram / Facebook</b> copies a caption for your social post.'));
 
   var prev=document.createElement('div'); prev.className='l-prev';
   var form=document.createElement('div'); form.className='l-form';
@@ -13027,9 +13016,9 @@ function openListing(loi, isNew){
   fld('gallery_url','Photo gallery URL (Dropbox/Google/MLS)','text',true);
   fld('video_url','Video URL'); fld('tour_url','3D tour URL');
   fld('open_house','Open house (free text)','text',true);
-  sec('Website');
-  tgl('wp_live','Publish live (off = send to WordPress as a draft for review)');
-  if(d.outputs&&d.outputs.wp&&d.outputs.wp.link){ var info=document.createElement('div'); info.className='l-wide'; info.style.cssText='font-size:12px;color:var(--text3);'; info.innerHTML='On WordPress: <a href="'+_esc(d.outputs.wp.link)+'" target="_blank" rel="noopener">'+_esc(d.outputs.wp.status||'post')+'</a>'+(d.outputs.wp.edit_link?(' · <a href="'+_esc(d.outputs.wp.edit_link)+'" target="_blank" rel="noopener">edit</a>'):'')+(d.outputs.wp.at?(' · pushed '+fd(d.outputs.wp.at)):''); form.appendChild(info); }
+  sec('Website card');
+  fld('mls_url','MLS listing URL — the utahrealestate.com link the card opens','text',true);
+  fld('card_note','Card note (optional, e.g. "-seller financing available")','text',true);
   sec('Notes');
   fld('source_notes','Source notes (raw facts you fed the MLS)','textarea',true);
 
