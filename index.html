@@ -111,7 +111,7 @@
         <input class="sbox" type="text" placeholder="Search..." id="searchBox">
         <div id="globalSearchResults" style="display:none;position:fixed;top:52px;right:12px;width:min(460px,92vw);max-height:74vh;overflow:auto;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:0 10px 34px rgba(0,0,0,0.45);z-index:1200;padding:6px;"></div>
         <button class="btn btn-p" id="btnAdd" style="display:none;">+ Add</button>
-        <div style="font-size:11px;color:var(--text3);margin-right:4px;">v14.7</div>
+        <div style="font-size:11px;color:var(--text3);margin-right:4px;">v14.8</div>
         <div class="topbar-user" id="topbarUser" title="Click to sign out" style="cursor:pointer;position:relative;" id="topbarUserBtn">RE</div>
       </div>
     </div>
@@ -161,6 +161,28 @@
         <div class="col2">
           <div class="card"><div class="card-hdr"><div class="card-title">Follow-ups Due</div><button class="btn btn-g" id="btnViewFU" style="padding:4px 9px;font-size:16px;">View all</button></div><div id="dFollowups"></div></div>
           <div class="card"><div class="card-hdr"><div class="card-title">Pipeline</div></div><div id="dPipeline"></div></div>
+        </div>
+        <!-- Sending controls: master + per-type switches + test mode (all outbound email) -->
+        <div class="bsec" id="sendingControlsSection">
+          <div class="bsechdr">SENDING CONTROLS</div>
+          <div style="padding:16px 18px;">
+            <div style="font-size:13px;color:var(--text3);margin-bottom:14px;line-height:1.5;">Automated outbound email is OFF by default while you test. Turn on the master switch, then choose exactly what may send. <b>Test mode</b> reroutes every message to your test address so real clients never receive anything.</div>
+            <label style="display:flex;align-items:center;gap:8px;font-size:16px;font-weight:600;margin-bottom:12px;"><input type="checkbox" id="scMaster"> Master &mdash; allow automated sending</label>
+            <div style="display:flex;flex-direction:column;gap:9px;margin:4px 0 16px;padding-left:8px;border-left:2px solid var(--border);">
+              <label style="display:flex;align-items:center;gap:8px;font-size:15px;"><input type="checkbox" id="scReminders"> Deadline reminders to clients</label>
+              <label style="display:flex;align-items:center;gap:8px;font-size:15px;"><input type="checkbox" id="scDrips"> Drip-campaign emails</label>
+              <label style="display:flex;align-items:center;gap:8px;font-size:15px;"><input type="checkbox" id="scBriefing"> Daily briefing digest</label>
+            </div>
+            <label style="display:flex;align-items:center;gap:8px;font-size:16px;font-weight:600;margin-bottom:8px;"><input type="checkbox" id="scTestMode"> Test mode &mdash; reroute all mail to a test address</label>
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+              <span style="font-size:13px;color:var(--text3);white-space:nowrap;">Test address</span>
+              <input type="email" id="scTestEmail" placeholder="you@example.com" style="flex:1;max-width:340px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:15px;color:var(--text);font-family:'DM Sans',sans-serif;outline:none;">
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;">
+              <button class="btn btn-p" id="btnSaveSendingControls" style="padding:7px 20px;">Save controls</button>
+              <span id="sendingControlsStatus" style="font-size:14px;color:var(--lead);"></span>
+            </div>
+          </div>
         </div>
         <!-- Email schedule (moved from the removed Daily Briefing tab) -->
         <div class="bsec" id="briefingScheduleSection">
@@ -1164,6 +1186,6 @@
 </div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="app.js?v=20260904o"></script>
+<script src="app.js?v=20260904p"></script>
 </body>
 </html>

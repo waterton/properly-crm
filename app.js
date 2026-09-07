@@ -1036,8 +1036,8 @@ function sp(id, fromHistory){
   try{ openActiveNavSection(); }catch(e){}   // keep the active item's section expanded
   ge('pageTitle').textContent=pn[id]||id;
   csb();
-  if(id==='briefing'){rb();loadBriefingSchedule();}
-  else if(id==='dashboard'){rd();loadBriefingSchedule();}
+  if(id==='briefing'){rb();loadBriefingSchedule();loadSendingControls();}
+  else if(id==='dashboard'){rd();loadBriefingSchedule();loadSendingControls();}
   else if(id==='pipeline')rp();
   else if(id==='contacts'){ selectedContacts.clear(); updateBulkBar(); rc(); }
   else if(id==='followups')rfu();
@@ -10556,6 +10556,7 @@ function onAuthSuccess(user){
     // Email-schedule editor now lives on the dashboard; ensure it populates on first load
     // (restoreTabFromHash only triggers it when a #hash routes through sp()).
     try{ loadBriefingSchedule(); }catch(e){}
+    try{ loadSendingControls(); }catch(e){}
     // Know which Gmail accounts are connected from the start, not just after visiting
     // the Gmail tab - enrolling and sending need this everywhere.
     try{ checkConnectedAccounts(); }catch(e){}
@@ -10652,6 +10653,41 @@ async function saveBriefingSchedule(){
   }catch(e){ alert('Save failed: '+e.message); }
 }
 ge('btnSaveBriefingSchedule').addEventListener('click', saveBriefingSchedule);
+
+// ---- Sending Controls: master + per-type switches + test mode, stored in the settings table and
+// read by the cron senders (run-drips, cron-briefing). Everything defaults OFF. ----
+async function loadSendingControls(){
+  if(!supaReady) return;
+  try{
+    var headers = await getAuthHeaders();
+    var r = await fetch(SUPA_URL+'/rest/v1/settings?key=eq.sending_controls&select=value',{ headers: headers });
+    var text = await r.text(); if(!text) return;
+    var rows = JSON.parse(text); if(!rows.length) return;
+    var v = rows[0].value||{};
+    if(ge('scMaster')) ge('scMaster').checked = !!v.master;
+    if(ge('scReminders')) ge('scReminders').checked = !!v.reminders;
+    if(ge('scDrips')) ge('scDrips').checked = !!v.drips;
+    if(ge('scBriefing')) ge('scBriefing').checked = !!v.briefing;
+    if(ge('scTestMode')) ge('scTestMode').checked = (v.testMode!==false);
+    if(ge('scTestEmail')) ge('scTestEmail').value = v.testEmail||'';
+  }catch(e){}
+}
+async function saveSendingControls(){
+  if(!supaReady){ alert('Connect to Supabase first.'); return; }
+  var val = {
+    master: ge('scMaster').checked, reminders: ge('scReminders').checked, drips: ge('scDrips').checked,
+    briefing: ge('scBriefing').checked, testMode: ge('scTestMode').checked, testEmail: (ge('scTestEmail').value||'').trim()
+  };
+  if(val.master && !val.testMode){ if(!confirm('Master sending is ON and Test mode is OFF — real clients will receive automated emails. Save and go live?')) return; }
+  if(val.master && val.testMode && !val.testEmail){ alert('Enter a test address (or turn off Test mode).'); return; }
+  try{
+    var headers = await getAuthHeaders({'Prefer':'resolution=merge-duplicates'});
+    var r = await fetch(SUPA_URL+'/rest/v1/settings',{ method:'POST', headers: headers, body: JSON.stringify({ key:'sending_controls', value: val }) });
+    if(r.ok){ ge('sendingControlsStatus').textContent='Saved!'; setTimeout(function(){ ge('sendingControlsStatus').textContent=''; },3000); }
+    else { alert('Save failed: '+(await r.text())); }
+  }catch(e){ alert('Save failed: '+e.message); }
+}
+(function(){ var b=ge('btnSaveSendingControls'); if(b) b.addEventListener('click', saveSendingControls); })();
 
 async function startup(){
   try{

@@ -11,6 +11,17 @@ const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
 const CRON_SECRET = process.env.CRON_SECRET;
 const APP_URL = process.env.APP_URL || 'https://properly-crm.vercel.app';
 
+// Per-request outbound controls, loaded from the settings row (see run-drips.js for the shared shape).
+let SEND_CTRL = null;
+async function getSendControls() {
+  const def = { master: false, reminders: false, drips: false, briefing: false, testMode: true, testEmail: '' };
+  try {
+    const rows = await supa('settings?key=eq.sending_controls&select=value');
+    if (Array.isArray(rows) && rows[0] && rows[0].value) return Object.assign(def, rows[0].value);
+  } catch (e) {}
+  return def;
+}
+
 module.exports = async function (req, res) {
   // ── Security ──────────────────────────────────────────────────────────────
   // Vercel cron sends Authorization: Bearer <CRON_SECRET>
@@ -20,9 +31,12 @@ module.exports = async function (req, res) {
   if (querySecret !== CRON_SECRET && authHeader !== CRON_SECRET) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
-  // MASTER OUTBOUND KILL SWITCH — briefing email is OFF unless SENDING_ENABLED is exactly 'true'.
-  if (process.env.SENDING_ENABLED !== 'true') {
-    return res.json({ paused: true, reason: 'Outbound sending is paused. Set SENDING_ENABLED=true to enable.' });
+  // Outbound controls from the CRM (Sending Controls). Briefing needs both master + briefing on;
+  // everything defaults off.
+  const CTRL = await getSendControls();
+  SEND_CTRL = CTRL;
+  if (!CTRL.master || !CTRL.briefing) {
+    return res.json({ paused: true, reason: 'Briefing sending is off. Turn it on in the CRM → Sending Controls.' });
   }
 
    try {
@@ -295,6 +309,7 @@ async function refreshAccessToken(refreshToken) {
 }
 
 async function sendEmail(accessToken, to, subject, htmlBody) {
+  if (SEND_CTRL && SEND_CTRL.testMode) { to = SEND_CTRL.testEmail || to; subject = '[TEST] ' + subject; }
   // RFC 2047 encode subject to handle non-ASCII characters (em dash, accents, etc.)
   const encodedSubject = '=?UTF-8?B?' + Buffer.from(subject, 'utf-8').toString('base64') + '?=';
   const message = [

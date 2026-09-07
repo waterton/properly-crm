@@ -76,7 +76,15 @@ function encodeSubject(s) {
   return /^[\x00-\x7F]*$/.test(s) ? s : '=?UTF-8?B?' + Buffer.from(s, 'utf8').toString('base64') + '?=';
 }
 
+// Per-request outbound controls (loaded from the settings row). Test mode redirects every message to
+// the test address and tags the subject, so nothing reaches real clients while testing.
+let SEND_CTRL = null;
 async function gmailSend(accessToken, to, subject, htmlBody, cc) {
+  if (SEND_CTRL && SEND_CTRL.testMode) {
+    to = SEND_CTRL.testEmail || to;
+    cc = undefined;
+    subject = '[TEST] ' + subject;
+  }
   const lines = ['To: ' + to];
   if (cc) lines.push('Cc: ' + cc);
   lines.push(
@@ -532,13 +540,25 @@ async function authorized(req) {
   } catch (e) { return false; }
 }
 
+// Load the outbound controls from the settings row. Missing/failed -> everything OFF (safe default),
+// test mode ON so even an accidental enable can't reach a real client without a test address set.
+async function getSendControls() {
+  const def = { master: false, reminders: false, drips: false, briefing: false, testMode: true, testEmail: '' };
+  try {
+    const rows = await supaGet('settings?key=eq.sending_controls&select=value');
+    if (Array.isArray(rows) && rows[0] && rows[0].value) return Object.assign(def, rows[0].value);
+  } catch (e) {}
+  return def;
+}
+
 export default async function handler(req, res) {
   if (!(await authorized(req))) return res.status(401).json({ error: 'Unauthorized' });
-  // MASTER OUTBOUND KILL SWITCH. All automated client/team email (deadline reminders, the daily
-  // briefing digest, and drip-campaign steps) is OFF unless SENDING_ENABLED is exactly 'true'.
-  // While testing, leave it unset so nothing goes out. Set SENDING_ENABLED=true in Vercel to resume.
-  if (process.env.SENDING_ENABLED !== 'true') {
-    return res.status(200).json({ paused: true, reason: 'Outbound sending is paused. Set SENDING_ENABLED=true to enable.' });
+  // Outbound controls come from the CRM (Sending Controls panel), stored in the settings table.
+  // Everything defaults OFF, so nothing sends unless it's been explicitly turned on in the app.
+  const CTRL = await getSendControls();
+  SEND_CTRL = CTRL;
+  if (!CTRL.master) {
+    return res.status(200).json({ paused: true, reason: 'Outbound sending is off. Turn it on in the CRM → Sending Controls.' });
   }
   if (!CLIENT_ID || !CLIENT_SECRET) {
     return res.status(500).json({ error: 'GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET not set' });
@@ -552,9 +572,9 @@ export default async function handler(req, res) {
 
   // 1. Process drip enrollments
   try {
-    const due = await supaGet(
+    const due = CTRL.drips ? await supaGet(
       'enrollments?status=eq.active&nextSendAt=lte.' + encodeURIComponent(nowIso) + '&order=nextSendAt.asc&limit=100'
-    );
+    ) : [];
 
     if (Array.isArray(due) && due.length) {
       const campaigns = await supaGet('campaigns?limit=500');
@@ -656,7 +676,7 @@ export default async function handler(req, res) {
 
   // 2. Transaction deadline reminders (transactional - separate from drips)
   try {
-    await processReminders(result);
+    if (CTRL.reminders) await processReminders(result);
   } catch (err) {
     result.reminders.errors.push('Reminder error: ' + err.message);
   }
