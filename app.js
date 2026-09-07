@@ -73,6 +73,7 @@ var IPAYEE=[]; // Approved payees/senders — the editable expense whitelist for
 var ISCAN=[]; // inv_scan_log: heartbeat of each rental scan (cron or button)
 var DSHEET=[]; // deal_sheets: saved Seller Net Sheets (one per client)
 var LOIS=[]; // loi_letters: saved commercial Letters of Intent
+var LISTINGS=[]; // listings: canonical marketable-property records (one entry -> site/social/drip outputs)
 var ILOAN=[], ILPAY=[]; // Hard money: loans made, and payments received
 var curSort='last'; // 'last' or 'first'
 var selectedContacts = new Set();
@@ -124,6 +125,7 @@ var DB_COLS = {
   inv_payees: ['id','name','match','category','kind','property_id','active','notes'],
   deal_sheets: ['id','contact_id','name','data','updated_at'],
   loi_letters: ['id','contact_id','name','data','updated_at'],
+  listings: ['id','contact_id','name','data','updated_at'],
   inv_loans: ['id','borrower','address','notes','principal','interest_rate','term_months','start_date','end_date','first_payment_date','monthly_payment','status'],
   inv_loan_payments: ['id','loan_id','date','amount','note']
 };
@@ -667,7 +669,8 @@ async function loadFromDB(){
       fetchAllRows(base, 'inv_payees?order=id.asc', headers).catch(function(){return []; }),
       fetchAllRows(base, 'inv_scan_log?order=ran_at.desc&limit=25', headers).catch(function(){return []; }),
       fetchAllRows(base, 'deal_sheets?order=updated_at.desc', headers).catch(function(){return []; }),
-      fetchAllRows(base, 'loi_letters?order=updated_at.desc', headers).catch(function(){return []; })
+      fetchAllRows(base, 'loi_letters?order=updated_at.desc', headers).catch(function(){return []; }),
+      fetchAllRows(base, 'listings?order=updated_at.desc', headers).catch(function(){return []; })
     ]);
     var rc = results[0], rn = results[1], rf = results[2], rd = results[3], rtx = results[4];
 
@@ -707,6 +710,7 @@ async function loadFromDB(){
     if(Array.isArray(results[20])) ISCAN = results[20];
     if(Array.isArray(results[21])) DSHEET = results[21];
     if(Array.isArray(results[22])) LOIS = results[22];
+    if(Array.isArray(results[23])) LISTINGS = results[23];
     DOCS.forEach(function(d){
       d.id = typeof d.id === 'string' ? parseInt(d.id)||d.id : d.id;
       if(d.contact_id != null) d.contact_id = typeof d.contact_id === 'string' ? parseInt(d.contact_id) : d.contact_id;
@@ -767,6 +771,8 @@ function saveDealSheet(x){ x.updated_at=new Date().toISOString(); sv(); if(supaR
 function delDealSheet(id){ DSHEET = DSHEET.filter(function(x){return String(x.id)!==String(id);}); sv(); if(supaReady) dbDeleteBy('deal_sheets','id',id); }
 function saveLoi(x){ x.updated_at=new Date().toISOString(); sv(); if(supaReady) dbSave('loi_letters', [x]); }
 function delLoi(id){ LOIS = LOIS.filter(function(x){return String(x.id)!==String(id);}); sv(); if(supaReady) dbDeleteBy('loi_letters','id',id); }
+function saveListing(x){ x.updated_at=new Date().toISOString(); sv(); if(supaReady) dbSave('listings', [x]); }
+function delListing(id){ LISTINGS = LISTINGS.filter(function(x){return String(x.id)!==String(id);}); sv(); if(supaReady) dbDeleteBy('listings','id',id); }
 // lookups
 function invProp(id){ return IPROP.find(function(p){return String(p.id)===String(id);}) || null; }
 function invUnit(id){ return IUNIT.find(function(u){return String(u.id)===String(id);}) || null; }
@@ -1040,6 +1046,7 @@ function sp(id, fromHistory){
   else if(id==='hardmoney'){ if(typeof renderHardMoney==='function') renderHardMoney(); }
   else if(id==='dealsheet'){ if(typeof renderDealSheets==='function') renderDealSheets(); }
   else if(id==='loi'){ if(typeof renderLois==='function') renderLois(); }
+  else if(id==='listings'){ if(typeof renderListings==='function') renderListings(); }
   else if(id==='documents')renderDocsPage();
 
   else if(id==='deadlines'){
@@ -9980,6 +9987,7 @@ ge('nav-drips').addEventListener('click',function(){sp('drips');});
 (function(){ var nh=ge('nav-hardmoney'); if(nh) nh.addEventListener('click',function(){sp('hardmoney');}); })();
 (function(){ var nd=ge('nav-dealsheet'); if(nd) nd.addEventListener('click',function(){sp('dealsheet');}); })();
 (function(){ var nl=ge('nav-loi'); if(nl) nl.addEventListener('click',function(){sp('loi');}); })();
+(function(){ var nl=ge('nav-listings'); if(nl) nl.addEventListener('click',function(){sp('listings');}); })();
 
 ge('nav-documents').addEventListener('click',function(){sp('documents');});
 if(ge('docSearch')) ge('docSearch').addEventListener('input', renderDocsPage);
@@ -10356,7 +10364,7 @@ function applyRestrictions(){
 var NAV_GROUPS=[
   ['Home',        ['nav-briefing','nav-pipeline']],
   ['Clients',     ['nav-contacts','nav-followups','nav-notes','nav-drips']],
-  ['Deals',       ['nav-tc','nav-dealsheet','nav-loi','nav-documents','nav-deadlines']],
+  ['Deals',       ['nav-tc','nav-listings','nav-dealsheet','nav-loi','nav-documents','nav-deadlines']],
   ['Tools',       ['nav-gmail','nav-calendar','nav-scanner','nav-cardscanner','nav-team']],
   ['Investments', ['nav-investments','nav-hardmoney']]
 ];
@@ -12803,6 +12811,205 @@ function loiExport(loi, kind, btn){
     else { var pages=Math.ceil(ih/pageH); for(var p=0;p<pages;p++){ if(p>0) pdf.addPage(); pdf.addImage(img,'PNG',m,m-p*pageH,iw,ih); } }
     pdf.save(fname+'.pdf'); done();
   }).catch(function(e){ done(); alert('PDF export failed: '+(e&&e.message||e)); });
+}
+// ============================================================================
+// LISTINGS — canonical marketable-property record. Enter once; generate the website post, a social
+// caption, and (later) drip content from it. MLS stays the system of record; this is built from the
+// same inputs, not synced. v1 stores everything in the `data` JSON so the shape can evolve freely.
+// ============================================================================
+var LIST_STATUS=[['draft','Draft'],['coming_soon','Coming Soon'],['active','Active'],['under_contract','Under Contract'],['pending','Pending'],['sold','Sold'],['withdrawn','Withdrawn'],['expired','Expired']];
+var LIST_TYPES=[['residential','Residential'],['land','Land'],['commercial','Commercial']];
+var _listView='all', _listQuery='';
+function listStatusLabel(v){ for(var i=0;i<LIST_STATUS.length;i++){ if(LIST_STATUS[i][0]===v) return LIST_STATUS[i][1]; } return v||''; }
+function listTypeLabel(v){ for(var i=0;i<LIST_TYPES.length;i++){ if(LIST_TYPES[i][0]===v) return LIST_TYPES[i][1]; } return v||''; }
+function listStatusColor(v){ return ({draft:'#888',coming_soon:'#7a5cff',active:'#1f9d55',under_contract:'#d08b1f',pending:'#c0692b',sold:'#c0392b',withdrawn:'#888',expired:'#888'})[v]||'#888'; }
+function listSlugify(s){ return String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,80); }
+function listArchived(l){ return !!(l.data&&l.data.archived); }
+function listMoney(v){ v=dsNum(v); return v?('$'+v.toLocaleString('en-US',{maximumFractionDigits:0})):''; }
+function listDefault(){ return { id:Date.now()+Math.floor(Math.random()*100000), contact_id:null, name:'', data:{
+  status:'draft', property_type:'residential', mls_number:'', slug:'', slug_locked:false,
+  address_full:'', street:'', city:'', state:'UT', zip:'', county:'',
+  price:'', price_qualifier:'', hoa_monthly:'', taxes_annual:'', lot_size:'', year_built:'', parking:'',
+  details:{}, headline_en:'', headline_es:'', pitch_en:'', pitch_es:'',
+  features:'', highlights:'', hero_image_url:'', gallery_url:'', video_url:'', tour_url:'', open_house:'',
+  source_notes:'', archived:false } }; }
+// type-specific detail fields: [key,label,type]
+function listDetailFields(type){
+  if(type==='land') return [['acreage','Acreage','text'],['zoning','Zoning','text'],['utilities','Utilities','text'],['road_access','Road access','text'],['water_rights','Water rights','text'],['buildable','Buildable? (yes/no)','text']];
+  if(type==='commercial') return [['building_sqft','Building SF','number'],['rentable_sqft','Rentable SF','number'],['use_type','Use type','text'],['for_sale_or_lease','For sale or lease','text'],['lease_type','Lease type (NNN, gross)','text'],['cam_per_sf','CAM $/SF/yr','text'],['cap_rate','Cap rate %','text'],['zoning','Zoning','text'],['parking_ratio','Parking ratio','text'],['occupancy','Occupancy','text']];
+  return [['beds','Beds','number'],['baths_full','Full baths','number'],['baths_half','Half baths','number'],['sqft','Sq ft','number'],['garage_spaces','Garage spaces','number'],['stories','Stories','number'],['basement','Basement','text'],['style','Style','text']];
+}
+// short "spec line" per type for previews and outputs
+function listSpecLine(d){
+  var x=d.details||{};
+  if(d.property_type==='land'){ return [x.acreage?(x.acreage+' ac'):'', d.lot_size, x.zoning?('Zoned '+x.zoning):''].filter(Boolean).join(' · '); }
+  if(d.property_type==='commercial'){ return [x.rentable_sqft?(Number(x.rentable_sqft).toLocaleString()+' SF'):'', x.use_type, x.lease_type].filter(Boolean).join(' · '); }
+  var b=[]; if(x.beds) b.push(x.beds+' bd'); var ba=(parseFloat(x.baths_full)||0)+(parseFloat(x.baths_half)||0)*0.5; if(ba) b.push(ba+' ba'); if(x.sqft) b.push(Number(x.sqft).toLocaleString()+' sf'); return b.join(' · ');
+}
+function _listArr(s){ return String(s||'').split(/\r?\n/).map(function(x){return x.trim();}).filter(Boolean); }
+function _listClip(text, btn, okLabel){
+  var restore=btn?btn.textContent:''; function ok(){ if(btn){ btn.textContent=okLabel||'Copied ✓'; setTimeout(function(){btn.textContent=restore;},1500); } }
+  try{ if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(text).then(ok, function(){ _listClipFallback(text); ok(); }); return; } }catch(e){}
+  _listClipFallback(text); ok();
+}
+function _listClipFallback(text){ try{ var ta=document.createElement('textarea'); ta.value=text; ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta); ta.focus(); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); }catch(e){ alert('Copy failed — select and copy manually.'); } }
+// ---- transforms (one entry -> many outputs) ----
+function listWebsiteBlock(d){
+  var title=d.headline_en||d.address_full||'New Listing';
+  var spec=listSpecLine(d); var price=listMoney(d.price); if(price&&d.price_qualifier) price+=' '+d.price_qualifier;
+  var feats=_listArr(d.features), out=[];
+  out.push('<!-- Palacios Baker listing: '+_esc(d.address_full||'')+' -->');
+  out.push('<h1>'+_esc(title)+'</h1>');
+  if(d.address_full) out.push('<p class="listing-address">'+_esc(d.address_full)+'</p>');
+  var meta=[price, spec, (d.status?listStatusLabel(d.status):'')].filter(Boolean).join(' &nbsp;|&nbsp; ');
+  if(meta) out.push('<p class="listing-meta"><strong>'+meta+'</strong></p>');
+  if(d.hero_image_url) out.push('<p><img src="'+_esc(d.hero_image_url)+'" alt="'+_esc(d.address_full||title)+'" style="max-width:100%;height:auto;"></p>');
+  if(d.pitch_en) out.push('<p>'+_esc(d.pitch_en).replace(/\n/g,'<br>')+'</p>');
+  if(feats.length){ out.push('<ul>'); feats.forEach(function(f){ out.push('  <li>'+_esc(f)+'</li>'); }); out.push('</ul>'); }
+  if(d.pitch_es){ out.push('<h3>En Español</h3>'); out.push('<p>'+_esc(d.pitch_es).replace(/\n/g,'<br>')+'</p>'); }
+  if(d.gallery_url) out.push('<p><a href="'+_esc(d.gallery_url)+'">View all photos</a></p>');
+  if(d.tour_url) out.push('<p><a href="'+_esc(d.tour_url)+'">3D tour</a></p>');
+  if(d.open_house) out.push('<p><strong>Open House:</strong> '+_esc(d.open_house)+'</p>');
+  return out.join('\n');
+}
+function listSocialCaption(d){
+  var hl=_listArr(d.highlights); if(!hl.length) hl=_listArr(d.features).slice(0,3);
+  var price=listMoney(d.price); if(price&&d.price_qualifier) price+=' '+d.price_qualifier;
+  var L=[]; L.push((d.headline_en||d.address_full||'New Listing').toUpperCase());
+  var spec=listSpecLine(d); var line2=[price,spec].filter(Boolean).join('  •  '); if(line2) L.push(line2);
+  if(d.address_full) L.push('📍 '+d.address_full);
+  hl.forEach(function(h){ L.push('• '+h); });
+  L.push(''); L.push('DM us for a private showing. Palacios Baker Real Estate · Utah’s Wise Choice');
+  if(d.pitch_es||d.headline_es){ L.push(''); L.push('— '+(d.headline_es||'Nueva propiedad en venta')); }
+  L.push(''); L.push('#UtahRealEstate #'+((d.city||'Utah').replace(/[^A-Za-z0-9]/g,''))+'RealEstate #PalaciosBaker #WiseChoice');
+  return L.join('\n');
+}
+// ---- styles ----
+function _listStyle(){
+  if(ge('listCss')) return; var s=document.createElement('style'); s.id='listCss';
+  s.textContent=
+   '#page-listings .lbtn{background:var(--accent);color:#fff;border:none;border-radius:7px;padding:7px 14px;font-family:inherit;font-size:14px;cursor:pointer;}'
+  +'#page-listings .lbtn.g{background:transparent;border:1px solid var(--border);color:var(--text);}'
+  +'#page-listings .l-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:16px;}'
+  +'#page-listings .l-form label{font-size:12px;color:var(--text3);display:block;margin-bottom:3px;}'
+  +'#page-listings .l-form input,#page-listings .l-form textarea,#page-listings .l-form select{width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px 8px;font-family:inherit;font-size:13px;}'
+  +'#page-listings .l-sec{grid-column:1/-1;font-size:13px;font-weight:700;color:var(--text2);margin:6px 0 -2px;border-top:1px solid var(--border);padding-top:10px;}'
+  +'#page-listings .l-sec:first-child{border-top:none;padding-top:0;}'
+  +'#page-listings .l-wide{grid-column:1/-1;}'
+  +'#page-listings .l-prev{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;}'
+  +'#page-listings .l-badge{display:inline-block;font-size:10px;font-weight:700;color:#fff;border-radius:4px;padding:2px 7px;vertical-align:middle;}';
+  document.head.appendChild(s);
+}
+function renderListings(){
+  _listStyle(); var root=ge('listRoot'); if(!root) return; root.innerHTML='';
+  var bar=document.createElement('div'); bar.style.cssText='display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;';
+  bar.appendChild(mkDivSafe('font-size:22px;font-weight:600;','Listings'));
+  var nb=document.createElement('button'); nb.className='lbtn'; nb.textContent='+ New Listing'; nb.addEventListener('click',function(){ openListing(listDefault(), true); }); bar.appendChild(nb); root.appendChild(bar);
+  root.appendChild(mkDivSafe('color:var(--text3);font-size:12px;margin:-4px 0 12px;','Enter a property once — then copy the website post and a social caption from it. The MLS stays your system of record.'));
+  if(!LISTINGS.length){ root.appendChild(mkDivSafe('color:var(--text3);padding:20px 0;','No listings yet. Create one and fill the fields.')); return; }
+  var ctr=document.createElement('div'); ctr.style.cssText='display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;';
+  var search=document.createElement('input'); search.type='text'; search.placeholder='Search listings (address, city, MLS)…'; search.value=_listQuery;
+  search.style.cssText='flex:1;min-width:200px;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:7px 10px;font-family:inherit;font-size:13px;';
+  var sel=document.createElement('select'); sel.style.cssText='background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:7px 8px;font-family:inherit;font-size:13px;width:auto;';
+  var opts=[['all','All active']].concat(LIST_STATUS).concat([['archived','Archived']]);
+  opts.forEach(function(o){ var op=document.createElement('option'); op.value=o[0]; op.textContent=o[1]; if(o[0]===_listView) op.selected=true; sel.appendChild(op); });
+  ctr.appendChild(search); ctr.appendChild(sel); root.appendChild(ctr);
+  var list=document.createElement('div'); list.style.cssText='display:flex;flex-direction:column;gap:8px;'; root.appendChild(list);
+  function draw(){
+    list.innerHTML=''; var q=_listQuery.trim().toLowerCase();
+    var items=LISTINGS.filter(function(l){
+      var d=l.data||{}, arch=listArchived(l);
+      if(q){ var hay=((l.name||'')+' '+(d.address_full||'')+' '+(d.city||'')+' '+(d.mls_number||'')).toLowerCase(); if(hay.indexOf(q)<0) return false; return true; }
+      if(_listView==='archived') return arch;
+      if(arch) return false;
+      if(_listView==='all') return true;
+      return d.status===_listView;
+    }).sort(function(a,b){ return String(b.updated_at||'').localeCompare(String(a.updated_at||'')); });
+    if(!items.length){ list.appendChild(mkDivSafe('color:var(--text3);padding:16px 0;', q?'No listings match your search.':'Nothing here.')); return; }
+    items.forEach(function(l){
+      var d=l.data||{}, arch=listArchived(l);
+      var row=document.createElement('div'); row.style.cssText='display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 14px;cursor:pointer;'+(arch?'opacity:.7;':'');
+      var badge='<span class="l-badge" style="background:'+listStatusColor(d.status)+';">'+_esc(listStatusLabel(d.status||'draft'))+'</span>';
+      var sub=[listTypeLabel(d.property_type), listSpecLine(d), (d.updated_at?('updated '+fd(l.updated_at)):'')].filter(Boolean).join(' · ');
+      row.innerHTML='<div style="min-width:0;"><div style="font-weight:600;overflow:hidden;text-overflow:ellipsis;">'+_esc(l.name||d.address_full||'Untitled listing')+' '+badge+(arch?' <span class="l-badge" style="background:#888;">ARCHIVED</span>':'')+'</div><div style="font-size:12px;color:var(--text3);">'+_esc(sub)+(d.price?(' · '+listMoney(d.price)):'')+'</div></div>';
+      var btns=document.createElement('div'); btns.style.cssText='display:flex;gap:6px;flex-shrink:0;';
+      var ab=document.createElement('button'); ab.className='lbtn g'; ab.style.cssText='font-size:12px;padding:3px 9px;'; ab.textContent=arch?'Unarchive':'Archive';
+      ab.addEventListener('click',function(e){ e.stopPropagation(); if(!l.data)l.data={}; l.data.archived=!arch; saveListing(l); draw(); });
+      var del=document.createElement('button'); del.className='lbtn g'; del.style.cssText='font-size:12px;padding:3px 9px;'; del.textContent='Delete';
+      (function(id){ del.addEventListener('click',function(e){ e.stopPropagation(); if(confirm('Delete this listing?')){ delListing(id); draw(); } }); })(l.id);
+      btns.appendChild(ab); btns.appendChild(del);
+      row.addEventListener('click',function(){ openListing(l,false); }); row.appendChild(btns); list.appendChild(row);
+    });
+  }
+  search.addEventListener('input',function(){ _listQuery=search.value; draw(); });
+  sel.addEventListener('change',function(){ _listView=sel.value; draw(); });
+  draw();
+}
+function openListing(loi, isNew){
+  _listStyle(); var root=ge('listRoot'); if(!root) return; root.innerHTML=''; var d=loi.data;
+  var tb=document.createElement('div'); tb.style.cssText='display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;';
+  var back=document.createElement('button'); back.className='lbtn g'; back.textContent='‹ Back'; back.addEventListener('click',renderListings); tb.appendChild(back);
+  var cWrap=document.createElement('div'); cWrap.style.cssText='min-width:240px;'; tb.appendChild(cWrap);
+  var picker=buildContactPicker(cWrap,'list_client','Load seller (search name / address)…',function(){ var id=picker.hidden.value; if(!id) return; var c=gc(parseInt(id)); if(!c) return; loi.contact_id=parseInt(id); if(!d.address_full){ d.address_full=c.property||c.address||''; } if(!loi.name) loi.name=d.address_full||fn(c); openListing(loi,isNew); });
+  var saveB=document.createElement('button'); saveB.className='lbtn'; saveB.textContent='Save'; saveB.addEventListener('click',function(){ if(!loi.name) loi.name=d.address_full||'Listing'; if(!LISTINGS.some(function(x){return String(x.id)===String(loi.id);})) LISTINGS.push(loi); saveListing(loi); saveB.textContent='Saved ✓'; setTimeout(function(){saveB.textContent='Save';},1500); }); tb.appendChild(saveB);
+  var webB=document.createElement('button'); webB.className='lbtn'; webB.textContent='Copy website post'; webB.addEventListener('click',function(){ _listClip(listWebsiteBlock(d), webB, 'Copied ✓'); }); tb.appendChild(webB);
+  var socB=document.createElement('button'); socB.className='lbtn g'; socB.textContent='Copy social caption'; socB.addEventListener('click',function(){ _listClip(listSocialCaption(d), socB, 'Copied ✓'); }); tb.appendChild(socB);
+  root.appendChild(tb);
+
+  var prev=document.createElement('div'); prev.className='l-prev';
+  var form=document.createElement('div'); form.className='l-form';
+  function refresh(){
+    if(!d.slug_locked) d.slug=listSlugify(d.address_full);
+    var spec=listSpecLine(d); var price=listMoney(d.price); if(price&&d.price_qualifier) price+=' '+d.price_qualifier;
+    var feats=_listArr(d.features);
+    prev.innerHTML='<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:baseline;">'
+      +'<div style="font-size:18px;font-weight:700;">'+_esc(d.headline_en||d.address_full||'New listing')+'</div>'
+      +'<span class="l-badge" style="background:'+listStatusColor(d.status)+';">'+_esc(listStatusLabel(d.status))+'</span></div>'
+      +(d.address_full?('<div style="color:var(--text3);font-size:13px;">'+_esc(d.address_full)+'</div>'):'')
+      +'<div style="margin:6px 0;font-weight:600;">'+_esc([price,spec].filter(Boolean).join('  ·  '))+'</div>'
+      +(d.hero_image_url?('<img src="'+_esc(d.hero_image_url)+'" alt="" style="max-width:100%;border-radius:8px;margin:4px 0;">'):'')
+      +(d.pitch_en?('<div style="font-size:13px;margin:6px 0;">'+_esc(d.pitch_en).replace(/\n/g,'<br>')+'</div>'):'')
+      +(feats.length?('<ul style="margin:6px 0 0;padding-left:18px;font-size:13px;">'+feats.map(function(f){return '<li>'+_esc(f)+'</li>';}).join('')+'</ul>'):'')
+      +'<div style="color:var(--text3);font-size:11px;margin-top:8px;">Slug: /'+_esc(d.slug||'')+(d.mls_number?('  ·  MLS '+_esc(d.mls_number)):'')+'</div>';
+  }
+  function sec(t){ var w=document.createElement('div'); w.className='l-sec'; w.textContent=t; form.appendChild(w); }
+  function fld(key,label,type,wide){ var w=document.createElement('div'); if(wide)w.className='l-wide'; var l=document.createElement('label'); l.textContent=label; w.appendChild(l);
+    var el = type==='textarea'?document.createElement('textarea'):document.createElement('input'); if(type&&type!=='textarea')el.type=type; if(type==='textarea')el.rows=3;
+    el.value=(d[key]!=null?d[key]:''); el.addEventListener('input',function(){ d[key]=el.value; if(key==='slug') d.slug_locked=true; refresh(); }); w.appendChild(el); form.appendChild(w); return el; }
+  function dfld(key,label,type){ var w=document.createElement('div'); var l=document.createElement('label'); l.textContent=label; w.appendChild(l);
+    var el=document.createElement('input'); if(type)el.type=type; if(!d.details)d.details={}; el.value=(d.details[key]!=null?d.details[key]:''); el.addEventListener('input',function(){ if(!d.details)d.details={}; d.details[key]=el.value; refresh(); }); w.appendChild(el); form.appendChild(w); }
+  function pick(key,label,opts){ var w=document.createElement('div'); var l=document.createElement('label'); l.textContent=label; w.appendChild(l);
+    var s=document.createElement('select'); opts.forEach(function(o){ var op=document.createElement('option'); op.value=o[0]; op.textContent=o[1]; if(d[key]===o[0])op.selected=true; s.appendChild(op); }); s.value=d[key]; s.addEventListener('change',function(){ d[key]=s.value; if(key==='property_type') openListing(loi,isNew); else refresh(); }); w.appendChild(s); form.appendChild(w); }
+
+  sec('Status & identity');
+  pick('status','Status',LIST_STATUS); pick('property_type','Property type',LIST_TYPES);
+  fld('mls_number','MLS #'); fld('slug','URL slug (auto from address)');
+  sec('Address & price');
+  fld('address_full','Full address (display)','text',true);
+  fld('city','City'); fld('state','State'); fld('zip','ZIP'); fld('county','County');
+  fld('price','Price ($)','number'); fld('price_qualifier','Price qualifier (OBO, /SF NNN…)');
+  fld('hoa_monthly','HOA ($/mo)','number'); fld('taxes_annual','Taxes ($/yr)','number');
+  fld('lot_size','Lot size'); fld('year_built','Year built','number'); fld('parking','Parking');
+  sec(listTypeLabel(d.property_type)+' details');
+  listDetailFields(d.property_type).forEach(function(f){ dfld(f[0],f[1],f[2]); });
+  sec('Marketing — English');
+  fld('headline_en','Headline (EN)','text',true);
+  fld('pitch_en','Description (EN)','textarea',true);
+  sec('Marketing — Español');
+  fld('headline_es','Headline (ES)','text',true);
+  fld('pitch_es','Description (ES)','textarea',true);
+  sec('Features & media');
+  fld('features','Standout features (one per line)','textarea',true);
+  fld('highlights','Social highlights (one per line, ~3)','textarea',true);
+  fld('hero_image_url','Hero image URL','text',true);
+  fld('gallery_url','Photo gallery URL (Dropbox/Google/MLS)','text',true);
+  fld('video_url','Video URL'); fld('tour_url','3D tour URL');
+  fld('open_house','Open house (free text)','text',true);
+  sec('Notes');
+  fld('source_notes','Source notes (raw facts you fed the MLS)','textarea',true);
+
+  root.appendChild(form);
+  root.appendChild(prev); refresh();
 }
 // ============================================================================
 // HARD MONEY LENDING
