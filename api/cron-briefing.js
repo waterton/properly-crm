@@ -20,6 +20,10 @@ module.exports = async function (req, res) {
   if (querySecret !== CRON_SECRET && authHeader !== CRON_SECRET) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
+  // MASTER OUTBOUND KILL SWITCH — briefing email is OFF unless SENDING_ENABLED is exactly 'true'.
+  if (process.env.SENDING_ENABLED !== 'true') {
+    return res.json({ paused: true, reason: 'Outbound sending is paused. Set SENDING_ENABLED=true to enable.' });
+  }
 
    try {
     // ── Load schedule from Supabase ─────────────────────────────────────────

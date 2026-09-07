@@ -534,6 +534,12 @@ async function authorized(req) {
 
 export default async function handler(req, res) {
   if (!(await authorized(req))) return res.status(401).json({ error: 'Unauthorized' });
+  // MASTER OUTBOUND KILL SWITCH. All automated client/team email (deadline reminders, the daily
+  // briefing digest, and drip-campaign steps) is OFF unless SENDING_ENABLED is exactly 'true'.
+  // While testing, leave it unset so nothing goes out. Set SENDING_ENABLED=true in Vercel to resume.
+  if (process.env.SENDING_ENABLED !== 'true') {
+    return res.status(200).json({ paused: true, reason: 'Outbound sending is paused. Set SENDING_ENABLED=true to enable.' });
+  }
   if (!CLIENT_ID || !CLIENT_SECRET) {
     return res.status(500).json({ error: 'GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET not set' });
   }
