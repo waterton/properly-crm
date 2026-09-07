@@ -12893,6 +12893,34 @@ function listSocialCaption(d){
   L.push(''); L.push('#UtahRealEstate #'+((d.city||'Utah').replace(/[^A-Za-z0-9]/g,''))+'RealEstate #PalaciosBaker #WiseChoice');
   return L.join('\n');
 }
+function _firstSentences(t,n){ if(!t) return ''; var p=String(t).trim().split('. '); return p.slice(0,n).join('. ').replace(/\.*$/,'')+'.'; }
+// New-listing announcement generated from the record — email or text, English + Spanish. Copy it to
+// blast your sphere, or paste into a drip/broadcast. (Third of the "one entry, several outputs" set.)
+function listAnnouncement(d, kind){
+  var city=d.city||String(d.address_full||'').split(',')[0].trim();
+  var price=listMoney(d.price); if(price&&d.price_qualifier) price+=' '+d.price_qualifier;
+  var spec=listCardSpec(d), feats=_listArr(d.features).slice(0,3), link=d.mls_url||'';
+  var headEn=d.headline_en||('New listing in '+city), headEs=d.headline_es||('Nueva propiedad en '+city);
+  if(kind==='sms'){
+    var en='🏡 Just listed'+(city?(' in '+city):'')+': '+[price,spec].filter(Boolean).join(', ')+'. '+(link?('Details: '+link):'Reply for info.')+' — Palacios Baker RE';
+    var es='🏡 Recién listada'+(city?(' en '+city):'')+': '+[price,spec].filter(Boolean).join(', ')+'. '+(link?('Info: '+link):'Responda para más.')+' — Palacios Baker RE';
+    return 'ENGLISH (text):\n'+en+'\n\nESPAÑOL (texto):\n'+es;
+  }
+  var line=[price,spec].filter(Boolean).join(' · ');
+  var en=[]; en.push('Subject: Just Listed: '+headEn+(price?(' — '+price):'')); en.push('');
+  en.push('Just listed'+(city?(' in '+city):'')+' — '+headEn+'.'); if(d.address_full) en.push(d.address_full); if(line) en.push(line);
+  if(feats.length){ en.push(''); feats.forEach(function(f){ en.push('• '+f); }); }
+  if(d.pitch_en){ en.push(''); en.push(_firstSentences(d.pitch_en,2)); }
+  en.push(''); en.push(link?('See photos & details: '+link):'Reply to this email and I’ll send full details and set up a showing.');
+  en.push('— Palacios Baker Real Estate · Utah’s Wise Choice');
+  var es=[]; es.push('Asunto: Recién listada: '+headEs+(price?(' — '+price):'')); es.push('');
+  es.push('Recién listada'+(city?(' en '+city):'')+' — '+headEs+'.'); if(d.address_full) es.push(d.address_full); if(line) es.push(line);
+  if(feats.length){ es.push(''); feats.forEach(function(f){ es.push('• '+f); }); }
+  if(d.pitch_es){ es.push(''); es.push(_firstSentences(d.pitch_es,2)); }
+  es.push(''); es.push(link?('Vea fotos y detalles: '+link):'Responda a este correo y le enviaré todos los detalles y coordinaré una visita.');
+  es.push('— Palacios Baker Real Estate · Utah’s Wise Choice');
+  return 'ENGLISH (email):\n'+en.join('\n')+'\n\n----------\n\nESPAÑOL (correo):\n'+es.join('\n');
+}
 // ---- auto-fill from a pasted listing page (utahrealestate.com etc.) via the AI extractor ----
 function listAutofillPrompt(text){
   return 'You are extracting real-estate listing facts from the pasted listing/MLS web-page text below. '
@@ -13003,8 +13031,10 @@ function openListing(loi, isNew){
   var saveB=document.createElement('button'); saveB.className='lbtn'; saveB.textContent='Save listing'; saveB.title='Store this record in your CRM (Listings list). Nothing is published.'; saveB.addEventListener('click',function(){ if(!loi.name) loi.name=d.address_full||'Listing'; if(!LISTINGS.some(function(x){return String(x.id)===String(loi.id);})) LISTINGS.push(loi); saveListing(loi); saveB.textContent='Saved ✓'; setTimeout(function(){saveB.textContent='Save listing';},1500); }); tb.appendChild(saveB);
   var webB=document.createElement('button'); webB.className='lbtn'; webB.textContent='Copy website card'; webB.title='Copy a ready-to-paste card block for your Listings page grid in WordPress.'; webB.addEventListener('click',function(){ _listClip(listWebsiteCard(d), webB, 'Copied — paste into a column on your Listings page ✓'); }); tb.appendChild(webB);
   var socB=document.createElement('button'); socB.className='lbtn g'; socB.textContent='Copy for Instagram / Facebook'; socB.title='Copy a caption to your clipboard. Paste it into your social post and attach your photos.'; socB.addEventListener('click',function(){ _listClip(listSocialCaption(d), socB, 'Copied — now paste in your post ✓'); }); tb.appendChild(socB);
+  var emailB=document.createElement('button'); emailB.className='lbtn g'; emailB.textContent='Copy email blast'; emailB.title='Copy a Just-Listed email (English + Spanish) to send to your sphere.'; emailB.addEventListener('click',function(){ _listClip(listAnnouncement(d,'email'), emailB, 'Copied ✓'); }); tb.appendChild(emailB);
+  var smsB=document.createElement('button'); smsB.className='lbtn g'; smsB.textContent='Copy text blast'; smsB.title='Copy a short Just-Listed text message (English + Spanish).'; smsB.addEventListener('click',function(){ _listClip(listAnnouncement(d,'sms'), smsB, 'Copied ✓'); }); tb.appendChild(smsB);
   root.appendChild(tb);
-  root.appendChild(mkDivSafe('color:var(--text3);font-size:12px;margin:-4px 0 12px;line-height:1.5;','Fill the fields once and <b>Save listing</b> to store it here. <b>Copy website card</b> copies a ready-to-paste card for your Listings page grid in WordPress (add a column to the grid, switch that block to the code/HTML view, and paste). <b>Copy for Instagram / Facebook</b> copies a caption for your social post.'));
+  root.appendChild(mkDivSafe('color:var(--text3);font-size:12px;margin:-4px 0 12px;line-height:1.5;','Fill the fields once and <b>Save listing</b> to store it here — then generate every output from it: <b>Copy website card</b> (paste into your Listings page grid in WordPress), <b>Copy for Instagram / Facebook</b> (a social caption), and <b>Copy email blast</b> / <b>Copy text blast</b> (a Just-Listed announcement in English + Spanish to send your sphere).'));
 
   var prev=document.createElement('div'); prev.className='l-prev';
   var form=document.createElement('div'); form.className='l-form';
