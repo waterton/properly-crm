@@ -10393,8 +10393,9 @@ function _setNavGroup(hdr,grp,open){ grp.style.display=open?'':'none'; var ch=hd
 function setupCollapsibleNav(){
   var nav=document.querySelector('nav'); if(!nav || nav._grouped) return;
   if(!ge('navCollapseCss')){ var st=document.createElement('style'); st.id='navCollapseCss';
-    st.textContent='.nav-toggle{display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none;}'
-      +'.nav-toggle:hover{opacity:.8;} .nav-chev{font-size:11px;opacity:.6;margin-right:2px;}';
+    st.textContent='.nav-toggle{display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none;'
+      +'background:var(--surface3);border:1px solid var(--border);border-radius:7px;padding:7px 10px;margin:10px 4px 5px;}'
+      +'.nav-toggle:hover{background:var(--surface2);} .nav-chev{font-size:11px;opacity:.7;margin-right:2px;}';
     document.head.appendChild(st); }
   var btns={}; NAV_GROUPS.forEach(function(g){ g[1].forEach(function(id){ var b=ge(id); if(b) btns[id]=b; }); });
   Array.prototype.slice.call(nav.querySelectorAll('.nav-sec')).forEach(function(h){ if(!h.classList.contains('nav-toggle')) h.remove(); });
