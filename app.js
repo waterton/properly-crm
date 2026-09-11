@@ -71,6 +71,7 @@ var RL=[]; // reminder_log: which reminders the cron has already sent (used to h
 var IHOA=[], IPROP=[], IUNIT=[], ILED=[]; // Investments: HOA accounts, properties, units, money ledger
 var IPAYEE=[]; // Approved payees/senders — the editable expense whitelist for email ingestion
 var ISCAN=[]; // inv_scan_log: heartbeat of each rental scan (cron or button)
+var INVREC=[]; // inv_recurring: monthly recurring expense/income templates (fixed auto-post, variable confirm)
 var DSHEET=[]; // deal_sheets: saved Seller Net Sheets (one per client)
 var LOIS=[]; // loi_letters: saved commercial Letters of Intent
 var LISTINGS=[]; // listings: canonical marketable-property records (one entry -> site/social/drip outputs)
@@ -127,7 +128,8 @@ var DB_COLS = {
   loi_letters: ['id','contact_id','name','data','updated_at'],
   listings: ['id','contact_id','name','data','updated_at'],
   inv_loans: ['id','borrower','address','notes','principal','interest_rate','term_months','start_date','end_date','first_payment_date','monthly_payment','status'],
-  inv_loan_payments: ['id','loan_id','date','amount','note']
+  inv_loan_payments: ['id','loan_id','date','amount','note'],
+  inv_recurring: ['id','property_id','unit_id','category','payee','amount','day_of_month','variable','active','notes']
 };
 function stripForDB(table, row){
   var cols = DB_COLS[table];
@@ -670,7 +672,8 @@ async function loadFromDB(){
       fetchAllRows(base, 'inv_scan_log?order=ran_at.desc&limit=25', headers).catch(function(){return []; }),
       fetchAllRows(base, 'deal_sheets?order=updated_at.desc', headers).catch(function(){return []; }),
       fetchAllRows(base, 'loi_letters?order=updated_at.desc', headers).catch(function(){return []; }),
-      fetchAllRows(base, 'listings?order=updated_at.desc', headers).catch(function(){return []; })
+      fetchAllRows(base, 'listings?order=updated_at.desc', headers).catch(function(){return []; }),
+      fetchAllRows(base, 'inv_recurring?order=id.asc', headers).catch(function(){return []; })
     ]);
     var rc = results[0], rn = results[1], rf = results[2], rd = results[3], rtx = results[4];
 
@@ -711,6 +714,8 @@ async function loadFromDB(){
     if(Array.isArray(results[21])) DSHEET = results[21];
     if(Array.isArray(results[22])) LOIS = results[22];
     if(Array.isArray(results[23])) LISTINGS = results[23];
+    if(Array.isArray(results[24])) INVREC = results[24];
+    try{ materializeRecurring(); }catch(e){}
     DOCS.forEach(function(d){
       d.id = typeof d.id === 'string' ? parseInt(d.id)||d.id : d.id;
       if(d.contact_id != null) d.contact_id = typeof d.contact_id === 'string' ? parseInt(d.contact_id) : d.contact_id;
@@ -767,6 +772,8 @@ function delInvUnit(id){ IUNIT = IUNIT.filter(function(x){return String(x.id)!==
 function delInvLedger(id){ ILED = ILED.filter(function(x){return String(x.id)!==String(id);}); sv(); if(supaReady) dbDeleteBy('inv_ledger','id',id); }
 function saveInvPayee(x){ sv(); if(supaReady) dbSave('inv_payees', [x]); }
 function delInvPayee(id){ IPAYEE = IPAYEE.filter(function(x){return String(x.id)!==String(id);}); sv(); if(supaReady) dbDeleteBy('inv_payees','id',id); }
+function saveInvRecurring(x){ sv(); if(supaReady) dbSave('inv_recurring', [x]); }
+function delInvRecurring(id){ INVREC = INVREC.filter(function(x){return String(x.id)!==String(id);}); sv(); if(supaReady) dbDeleteBy('inv_recurring','id',id); }
 function saveDealSheet(x){ x.updated_at=new Date().toISOString(); sv(); if(supaReady) dbSave('deal_sheets', [x]); }
 function delDealSheet(id){ DSHEET = DSHEET.filter(function(x){return String(x.id)!==String(id);}); sv(); if(supaReady) dbDeleteBy('deal_sheets','id',id); }
 function saveLoi(x){ x.updated_at=new Date().toISOString(); sv(); if(supaReady) dbSave('loi_letters', [x]); }
@@ -11860,6 +11867,96 @@ function purgeSyntheticLedger(){
   if(supaReady) synthetic.forEach(function(l){ dbDeleteBy('inv_ledger','id',l.id); });
   return true;
 }
+// ---- Recurring monthly expenses/income ------------------------------------------------------------
+// Templates live in INVREC. Each month, FIXED items (variable=false, e.g. a mortgage) auto-post a real
+// inv_ledger row; VARIABLE items (variable=true, e.g. utilities) post NOTHING until you confirm the
+// actual amount — so ledger totals only ever hold real figures. Rows carry source 'recur:<id>', which
+// is distinct from the purged legacy 'recurring' source, so they are never auto-deleted.
+function recurMoney(n){ n=invNum(n); return '$'+n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function recurYM(){ var d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
+function recurDateFor(ym, dayOfMonth){ var p=String(ym).split('-'); var y=+p[0], m=+p[1]; var last=new Date(y,m,0).getDate(); var day=Math.min(Math.max(parseInt(dayOfMonth)||1,1), last); return ym+'-'+String(day).padStart(2,'0'); }
+function recurRowExists(tid, ym){ return ILED.some(function(l){ return l.source==='recur:'+tid && String(l.date||'').slice(0,7)===ym; }); }
+function recurMakeRow(t, ym, amount){
+  var rec={ id:Date.now()+Math.floor(Math.random()*100000), date:recurDateFor(ym, t.day_of_month),
+    property_id:t.property_id?parseInt(t.property_id):null, unit_id:t.unit_id?parseInt(t.unit_id):null,
+    category:t.category, direction:invDirFor(t.category), amount:invNum(amount), payee:t.payee||'',
+    source:'recur:'+t.id, notes:t.notes||'' };
+  if(t.category==='HOA' && rec.property_id){ var pp=invProp(rec.property_id); rec.hoa_id=pp?pp.hoa_id:null; }
+  return rec;
+}
+function materializeRecurring(){
+  if(typeof INVREC==='undefined' || !INVREC || !INVREC.length) return;
+  var ym=recurYM(); var made=[];
+  INVREC.forEach(function(t){
+    if(!t.active || t.variable) return;            // variable ones wait for confirmation
+    if(recurRowExists(t.id, ym)) return;           // already posted this month
+    var rec=recurMakeRow(t, ym, t.amount); ILED.push(rec); made.push(rec);
+  });
+  if(made.length){ sv(); if(supaReady) dbSave('inv_ledger', made); }
+}
+function recurPendingThisMonth(){ var ym=recurYM(); return (INVREC||[]).filter(function(t){ return t.active && t.variable && !recurRowExists(t.id, ym); }); }
+function recurConfirmVariable(t){
+  var ym=recurYM();
+  invOpenForm('Confirm '+(t.category||'bill')+' — this month', [
+    {key:'amount',label:'Actual amount from this month’s bill',type:'number',required:true}
+  ], { amount: t.amount||'' }, function(v){
+    if(invNum(v.amount)<=0){ alert('Enter the amount from this month’s bill.'); return false; }
+    if(recurRowExists(t.id, ym)) return;
+    var rec=recurMakeRow(t, ym, v.amount); ILED.push(rec); saveInvLedger(rec); renderInvestments();
+  });
+}
+function recurLabel(t){ var p=t.property_id?invProp(t.property_id):null; var who=p?(p.name||p.address||'Property'):'—'; return (t.category||'')+' · '+who; }
+function openRecurringForm(t){
+  invOpenForm(t?'Edit recurring item':'Add recurring item', [
+    {key:'property_id',label:'Property',type:'select',options:invPropOptions()},
+    {key:'unit_id',label:'Unit (optional, for rent)',type:'select',options:unitOptionsFor(t?t.property_id:'')},
+    {key:'category',label:'Category',type:'select',options:INV_INCOME_CATS.concat(INV_EXPENSE_CATS).map(function(c){return {value:c,label:c};})},
+    {key:'payee',label:'Payee / payer'},
+    {key:'amount',label:'Amount (usual / fixed)',type:'number',required:true},
+    {key:'day_of_month',label:'Day of month (1-31)',type:'number',required:true},
+    {key:'variable',label:'Amount changes monthly?',type:'select',options:[{value:'no',label:'No — fixed, post automatically'},{value:'yes',label:'Yes — I confirm the amount each month'}]},
+    {key:'active',label:'Active',type:'select',options:[{value:'yes',label:'Yes'},{value:'no',label:'No (paused)'}]}
+  ], t ? { property_id:t.property_id||'', unit_id:t.unit_id||'', category:t.category||'Mortgage', payee:t.payee||'', amount:t.amount||'', day_of_month:t.day_of_month||1, variable:t.variable?'yes':'no', active:(t.active===false?'no':'yes') }
+       : { category:'Mortgage', variable:'no', active:'yes', day_of_month:1 },
+  function(v){
+    if(invNum(v.amount)<=0){ alert('Enter an amount greater than 0.'); return false; }
+    var rec = t || { id:Date.now()+Math.floor(Math.random()*100000) };
+    rec.property_id = v.property_id?parseInt(v.property_id):null;
+    rec.unit_id = v.unit_id?parseInt(v.unit_id):null;
+    rec.category = v.category; rec.payee=(v.payee||'').trim(); rec.amount=invNum(v.amount);
+    rec.day_of_month = Math.min(Math.max(parseInt(v.day_of_month)||1,1),31);
+    rec.variable = (v.variable==='yes'); rec.active = (v.active!=='no'); rec.notes = rec.notes||'';
+    if(!t) INVREC.push(rec); saveInvRecurring(rec);
+    try{ materializeRecurring(); }catch(e){}
+    renderInvestments();
+  });
+}
+function openRecurringModal(){
+  var ov=document.createElement('div'); ov.className='modal-ov open'; ov.style.zIndex='1300';
+  var m=document.createElement('div'); m.className='modal'; m.style.maxWidth='640px';
+  var h=document.createElement('div'); h.style.cssText='display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--border);';
+  h.innerHTML='<div style="font-weight:700;font-size:17px;">Recurring monthly items</div>';
+  var x=document.createElement('button'); x.textContent='✕'; x.style.cssText='background:none;border:none;font-size:18px;color:var(--text3);cursor:pointer;'; x.addEventListener('click',function(){ document.body.removeChild(ov); }); h.appendChild(x); m.appendChild(h);
+  var body=document.createElement('div'); body.style.cssText='padding:16px 20px;display:flex;flex-direction:column;gap:10px;max-height:70vh;overflow:auto;';
+  body.appendChild(mkDivSafe('font-size:12px;color:var(--text3);line-height:1.5;','Fixed items (like a mortgage) post automatically each month. Variable items (like utilities) wait for you to confirm the real amount before they count toward your totals.'));
+  if(!INVREC.length){ body.appendChild(mkDivSafe('color:var(--text3);padding:10px 0;','No recurring items yet. Add one below.')); }
+  INVREC.slice().sort(function(a,b){ return String(recurLabel(a)).localeCompare(String(recurLabel(b))); }).forEach(function(t){
+    var row=document.createElement('div'); row.style.cssText='display:flex;justify-content:space-between;align-items:center;gap:10px;border:1px solid var(--border);border-radius:8px;padding:10px 12px;'+(t.active===false?'opacity:.6;':'');
+    var tag=t.variable?'<span style="font-size:10px;font-weight:700;color:#b26a00;border:1px solid #e3a93c;border-radius:4px;padding:1px 5px;margin-left:6px;">VARIABLE</span>':'<span style="font-size:10px;font-weight:700;color:#1f9d55;border:1px solid #1f9d55;border-radius:4px;padding:1px 5px;margin-left:6px;">FIXED</span>';
+    row.innerHTML='<div><div style="font-weight:600;">'+_esc(recurLabel(t))+tag+(t.active===false?' <span style="font-size:10px;color:var(--text3);">(paused)</span>':'')+'</div><div style="font-size:12px;color:var(--text3);">'+_esc((t.payee?(t.payee+' · '):'')+recurMoney(t.amount)+' · day '+(t.day_of_month||1))+'</div></div>';
+    var btns=document.createElement('div'); btns.style.cssText='display:flex;gap:6px;flex-shrink:0;';
+    var ed=document.createElement('button'); ed.className='btn btn-g'; ed.style.cssText='font-size:12px;padding:3px 9px;'; ed.textContent='Edit'; ed.addEventListener('click',function(){ document.body.removeChild(ov); openRecurringForm(t); });
+    var del=document.createElement('button'); del.className='btn btn-g'; del.style.cssText='font-size:12px;padding:3px 9px;'; del.textContent='Delete'; (function(id){ del.addEventListener('click',function(){ if(confirm('Delete this recurring item? Past ledger entries stay.')){ delInvRecurring(id); document.body.removeChild(ov); openRecurringModal(); } }); })(t.id);
+    btns.appendChild(ed); btns.appendChild(del); row.appendChild(btns); body.appendChild(row);
+  });
+  m.appendChild(body);
+  var ft=document.createElement('div'); ft.style.cssText='display:flex;justify-content:space-between;gap:8px;padding:14px 20px;border-top:1px solid var(--border);';
+  var add=document.createElement('button'); add.className='btn btn-p'; add.textContent='+ Add recurring item'; add.addEventListener('click',function(){ document.body.removeChild(ov); openRecurringForm(null); });
+  var cl=document.createElement('button'); cl.className='btn btn-g'; cl.textContent='Close'; cl.addEventListener('click',function(){ document.body.removeChild(ov); });
+  ft.appendChild(add); ft.appendChild(cl); m.appendChild(ft);
+  ov.appendChild(m); ov.addEventListener('click',function(e){ if(e.target===ov) document.body.removeChild(ov); });
+  document.body.appendChild(ov);
+}
 var _invLedgerFilter='';   // property_id filter for the ledger table ('' = all)
 var _invDetailFrom='', _invDetailTo='', _invDetailPid=null;   // date-range filter inside a property detail view ('' = open end)
 // Dark "money page" palette (this page is intentionally dark to stand apart from the rest of the CRM).
@@ -11914,6 +12011,7 @@ function openScanLog(){
 function renderInvestments(){
   _ivStyle();
   try{ purgeSyntheticLedger(); }catch(e){}   // ledger holds only real rows - drop any synthesized ones
+  try{ materializeRecurring(); }catch(e){}   // post this month's FIXED recurring items (real amounts)
   var root=ge('invRoot'); if(!root) return; root.innerHTML='';
   var ym=invCurMonth();
 
@@ -11930,9 +12028,19 @@ function renderInvestments(){
   var sinceVal; try{ sinceVal = localStorage.getItem('invLastScan') || (new Date().getFullYear()+'-01-01'); }catch(e){ sinceVal = new Date().getFullYear()+'-01-01'; }
   acts.appendChild(ivb('Scan email','',function(){ scanFinanceEmails(sinceVal); }));
   acts.appendChild(ivb('Payees','',function(){ openInvPayeesModal(); }));
+  acts.appendChild(ivb('Recurring','',function(){ openRecurringModal(); }));
   acts.appendChild(ivb('Export','',function(){ invExportModal('properties'); }));
   bar.appendChild(mnav); bar.appendChild(acts);
   root.appendChild(bar);
+  (function(){ var pend=recurPendingThisMonth(); if(!pend.length) return;
+    var pc=document.createElement('div'); pc.style.cssText='background:'+IVC.warnbg+';border:1px solid '+IVC.warn+';border-radius:10px;padding:12px 14px;margin-bottom:14px;';
+    pc.appendChild(mkDivSafe('font-weight:600;color:'+IVC.warn+';margin-bottom:8px;','Confirm this month’s recurring bills'));
+    pend.forEach(function(t){ var r=document.createElement('div'); r.style.cssText='display:flex;justify-content:space-between;align-items:center;gap:10px;padding:5px 0;';
+      r.appendChild(mkDivSafe('font-size:13px;color:'+IVC.txt+';',_esc(recurLabel(t)+(t.payee?(' · '+t.payee):''))+' — usually '+recurMoney(t.amount)));
+      var b=ivb('Enter amount','pri',function(){ recurConfirmVariable(t); }); b.style.padding='4px 10px'; b.style.fontSize='13px'; r.appendChild(b); pc.appendChild(r);
+    });
+    root.appendChild(pc);
+  })();
 
   // Scan heartbeat: proves the cron is alive. Warns (amber) if the last run is stale (>14h).
   (function(){
