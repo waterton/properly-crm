@@ -12468,7 +12468,7 @@ function openDealSheet(sh, isNew){
     +'<img class="l2" src="pbre-logo2.png" alt="">';
   sheet.appendChild(hdr);
   sheet.appendChild(mkDivSafe('','<div class="ds-title">Seller Net Sheet</div>'));
-  sheet.appendChild(mkDivSafe('','<div class="ds-disc">This is an estimate and fees can vary slightly between escrow officers and underwriters. Please contact our office for exact fees. Please provide a copy of this worksheet to your Escrow Officer.</div>'));
+  sheet.appendChild(mkDivSafe('','<div class="ds-disc">This is an estimate and fees can vary.</div>'));
 
   function field(key, ph, type){ var i=document.createElement('input'); i.className='dsi'; i.type=type||'text'; i.value=(d[key]!=null?d[key]:''); if(ph)i.placeholder=ph; i.style.flex='1';
     i.addEventListener('input',function(){ d[key]=i.value; dsRefresh(sh); }); return i; }
