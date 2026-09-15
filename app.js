@@ -75,6 +75,7 @@ var INVREC=[]; // inv_recurring: monthly recurring expense/income templates (fix
 var DSHEET=[]; // deal_sheets: saved Seller Net Sheets (one per client)
 var LOIS=[]; // loi_letters: saved commercial Letters of Intent
 var LISTINGS=[]; // listings: canonical marketable-property records (one entry -> site/social/drip outputs)
+var CPROS=[]; // commercial_prospects: candidate commercial properties scouted for a client (tenant/buyer rep)
 var ILOAN=[], ILPAY=[]; // Hard money: loans made, and payments received
 var curSort='last'; // 'last' or 'first'
 var selectedContacts = new Set();
@@ -127,6 +128,7 @@ var DB_COLS = {
   deal_sheets: ['id','contact_id','name','data','updated_at'],
   loi_letters: ['id','contact_id','name','data','updated_at'],
   listings: ['id','contact_id','name','data','updated_at'],
+  commercial_prospects: ['id','contact_id','name','data','updated_at'],
   inv_loans: ['id','borrower','address','notes','principal','interest_rate','term_months','start_date','end_date','first_payment_date','monthly_payment','status'],
   inv_loan_payments: ['id','loan_id','date','amount','note'],
   inv_recurring: ['id','property_id','unit_id','category','payee','amount','day_of_month','variable','active','notes']
@@ -673,7 +675,8 @@ async function loadFromDB(){
       fetchAllRows(base, 'deal_sheets?order=updated_at.desc', headers).catch(function(){return []; }),
       fetchAllRows(base, 'loi_letters?order=updated_at.desc', headers).catch(function(){return []; }),
       fetchAllRows(base, 'listings?order=updated_at.desc', headers).catch(function(){return []; }),
-      fetchAllRows(base, 'inv_recurring?order=id.asc', headers).catch(function(){return []; })
+      fetchAllRows(base, 'inv_recurring?order=id.asc', headers).catch(function(){return []; }),
+      fetchAllRows(base, 'commercial_prospects?order=updated_at.desc', headers).catch(function(){return []; })
     ]);
     var rc = results[0], rn = results[1], rf = results[2], rd = results[3], rtx = results[4];
 
@@ -715,6 +718,7 @@ async function loadFromDB(){
     if(Array.isArray(results[22])) LOIS = results[22];
     if(Array.isArray(results[23])) LISTINGS = results[23];
     if(Array.isArray(results[24])) INVREC = results[24];
+    if(Array.isArray(results[25])) CPROS = results[25];
     try{ materializeRecurring(); }catch(e){}
     DOCS.forEach(function(d){
       d.id = typeof d.id === 'string' ? parseInt(d.id)||d.id : d.id;
@@ -780,6 +784,8 @@ function saveLoi(x){ x.updated_at=new Date().toISOString(); sv(); if(supaReady) 
 function delLoi(id){ LOIS = LOIS.filter(function(x){return String(x.id)!==String(id);}); sv(); if(supaReady) dbDeleteBy('loi_letters','id',id); }
 function saveListing(x){ x.updated_at=new Date().toISOString(); sv(); if(supaReady) dbSave('listings', [x]); }
 function delListing(id){ LISTINGS = LISTINGS.filter(function(x){return String(x.id)!==String(id);}); sv(); if(supaReady) dbDeleteBy('listings','id',id); }
+function saveProspect(x){ x.updated_at=new Date().toISOString(); sv(); if(supaReady) dbSave('commercial_prospects', [x]); }
+function delProspect(id){ CPROS = CPROS.filter(function(x){return String(x.id)!==String(id);}); sv(); if(supaReady) dbDeleteBy('commercial_prospects','id',id); }
 // lookups
 function invProp(id){ return IPROP.find(function(p){return String(p.id)===String(id);}) || null; }
 function invUnit(id){ return IUNIT.find(function(u){return String(u.id)===String(id);}) || null; }
@@ -1054,6 +1060,7 @@ function sp(id, fromHistory){
   else if(id==='dealsheet'){ if(typeof renderDealSheets==='function') renderDealSheets(); }
   else if(id==='loi'){ if(typeof renderLois==='function') renderLois(); }
   else if(id==='listings'){ if(typeof renderListings==='function') renderListings(); }
+  else if(id==='commercial'){ if(typeof renderCommercial==='function') renderCommercial(); }
   else if(id==='documents')renderDocsPage();
 
   else if(id==='deadlines'){
@@ -10012,6 +10019,7 @@ ge('nav-drips').addEventListener('click',function(){sp('drips');});
 (function(){ var nd=ge('nav-dealsheet'); if(nd) nd.addEventListener('click',function(){sp('dealsheet');}); })();
 (function(){ var nl=ge('nav-loi'); if(nl) nl.addEventListener('click',function(){sp('loi');}); })();
 (function(){ var nl=ge('nav-listings'); if(nl) nl.addEventListener('click',function(){sp('listings');}); })();
+(function(){ var nl=ge('nav-commercial'); if(nl) nl.addEventListener('click',function(){sp('commercial');}); })();
 
 ge('nav-documents').addEventListener('click',function(){sp('documents');});
 if(ge('docSearch')) ge('docSearch').addEventListener('input', renderDocsPage);
@@ -10388,7 +10396,7 @@ function applyRestrictions(){
 var NAV_GROUPS=[
   ['Home',        ['nav-briefing','nav-pipeline']],
   ['Clients',     ['nav-contacts','nav-followups','nav-notes','nav-drips']],
-  ['Deals',       ['nav-tc','nav-listings','nav-dealsheet','nav-loi','nav-documents','nav-deadlines']],
+  ['Deals',       ['nav-tc','nav-listings','nav-commercial','nav-dealsheet','nav-loi','nav-documents','nav-deadlines']],
   ['Tools',       ['nav-gmail','nav-calendar','nav-scanner','nav-cardscanner','nav-team']],
   ['Investments', ['nav-investments','nav-hardmoney']]
 ];
@@ -12678,6 +12686,215 @@ function dsExportPNG(sh, btn){
     a.download=(sh.name||'Seller Net Sheet').replace(/[^a-z0-9]+/gi,'_')+'.png'; a.click();
     if(btn){ btn.textContent='Save PNG'; btn.disabled=false; }
   }).catch(function(e){ if(btn){ btn.textContent='Save PNG'; btn.disabled=false; } alert('PNG export failed: '+(e&&e.message||e)); });
+}
+// ============================================================================
+// COMMERCIAL SEARCH — tenant/buyer-rep prospecting. A shortlist of candidate commercial properties
+// scouted for a client: capture fast in the field, enrich with due diligence later (zoning, NNN/CAM,
+// $/SF/yr...), track through a status pipeline, and export a client-facing PDF. Stored in CPROS.
+// ============================================================================
+var CPRO_STATUS=[['spotted','Spotted'],['researching','Researching'],['shortlisted','Shortlisted'],['presented','Presented'],['toured','Toured'],['passed','Passed']];
+var CPRO_DEALTYPES=[['lease','For lease'],['sale','For sale'],['both','Lease or sale']];
+var CPRO_LEASETYPES=[['NNN','NNN (triple net)'],['modified','Modified gross'],['gross','Full gross']];
+var _cproView='active', _cproClient='', _cproQuery='';
+function cproStatusLabel(v){ for(var i=0;i<CPRO_STATUS.length;i++){ if(CPRO_STATUS[i][0]===v) return CPRO_STATUS[i][1]; } return v||''; }
+function cproStatusColor(v){ return ({spotted:'#888',researching:'#7a5cff',shortlisted:'#1f9d55',presented:'#d08b1f',toured:'#2b8fc0',passed:'#c0392b'})[v]||'#888'; }
+function cproArchived(p){ return !!(p.data&&p.data.archived); }
+function cproM(n){ n=dsNum(n); return n?('$'+n.toLocaleString('en-US',{maximumFractionDigits:0})):''; }
+function cproPerSf(n){ n=dsNum(n); return n?('$'+n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})):''; }
+function prospectDefault(){ return { id:Date.now()+Math.floor(Math.random()*100000), contact_id:null, name:'', data:{
+  status:'spotted', address_full:'', city:'', state:'UT', zip:'',
+  deal_type:'lease', use_type:'', zoning:'', rentable_sqft:'', lot_size:'', year_built:'', parking:'',
+  lease_type:'NNN', rate_per_sf:'', cam_per_sf:'', price:'', availability:'',
+  listing_url:'', listing_source:'', agent:'', pros:'', cons:'', notes:'', archived:false } }; }
+function cproCompute(d){ var sf=dsNum(d.rentable_sqft), rate=dsNum(d.rate_per_sf), cam=dsNum(d.cam_per_sf);
+  return { sf:sf, rate:rate, cam:cam, annualBase:rate*sf, moBase:rate*sf/12, moCam:cam*sf/12, moAll:(rate+cam)*sf/12, annualAll:(rate+cam)*sf, hasSf:sf>0 }; }
+function cproSpecLine(d){ var c=cproCompute(d);
+  var bits=[]; if(d.use_type) bits.push(d.use_type); if(c.sf) bits.push(Number(c.sf).toLocaleString()+' SF'); if(c.rate) bits.push(cproPerSf(c.rate)+'/SF '+(d.lease_type||'')); return bits.filter(Boolean).join(' · '); }
+function _cproStyle(){
+  if(ge('cproCss')) return; var s=document.createElement('style'); s.id='cproCss';
+  s.textContent=
+   '#page-commercial .cbtn{background:var(--accent);color:#fff;border:none;border-radius:7px;padding:7px 14px;font-family:inherit;font-size:14px;cursor:pointer;}'
+  +'#page-commercial .cbtn.g{background:transparent;border:1px solid var(--border);color:var(--text);}'
+  +'#page-commercial .c-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:16px;}'
+  +'#page-commercial .c-form label{font-size:12px;color:var(--text3);display:block;margin-bottom:3px;}'
+  +'#page-commercial .c-form input,#page-commercial .c-form textarea,#page-commercial .c-form select{width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px 8px;font-family:inherit;font-size:13px;}'
+  +'#page-commercial .c-sec{grid-column:1/-1;font-size:13px;font-weight:700;color:var(--text2);margin:6px 0 -2px;border-top:1px solid var(--border);padding-top:10px;}'
+  +'#page-commercial .c-sec:first-child{border-top:none;padding-top:0;}'
+  +'#page-commercial .c-wide{grid-column:1/-1;}'
+  +'#page-commercial .c-badge{display:inline-block;font-size:10px;font-weight:700;color:#fff;border-radius:4px;padding:2px 7px;vertical-align:middle;}';
+  document.head.appendChild(s);
+}
+function quickAddProspect(){
+  invOpenForm('Quick add — commercial prospect', [
+    {key:'contact_id',label:'Client',type:'select',options:[{value:'',label:'— pick later —'}].concat((C||[]).map(function(c){return {value:String(c.id),label:fn(c)+(c.property?(' · '+c.property):'')};}))},
+    {key:'address_full',label:'Address',required:true},
+    {key:'notes',label:'Quick note (what caught your eye)',type:'textarea'}
+  ], {}, function(v){
+    if(!(v.address_full||'').trim()){ alert('Enter an address.'); return false; }
+    var p=prospectDefault(); p.contact_id=v.contact_id?parseInt(v.contact_id):null;
+    p.data.address_full=v.address_full.trim(); p.data.notes=(v.notes||'').trim(); p.name=p.data.address_full;
+    CPROS.push(p); saveProspect(p); renderCommercial();
+  });
+}
+function renderCommercial(){
+  _cproStyle(); var root=ge('cproRoot'); if(!root) return; root.innerHTML='';
+  var bar=document.createElement('div'); bar.style.cssText='display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;';
+  bar.appendChild(mkDivSafe('font-size:22px;font-weight:600;','Commercial Search'));
+  var bwrap=document.createElement('div'); bwrap.style.cssText='display:flex;gap:8px;flex-wrap:wrap;';
+  var qa=document.createElement('button'); qa.className='cbtn'; qa.textContent='+ Quick add'; qa.addEventListener('click',quickAddProspect); bwrap.appendChild(qa);
+  var nf=document.createElement('button'); nf.className='cbtn g'; nf.textContent='New (full)'; nf.addEventListener('click',function(){ openProspect(prospectDefault(), true); }); bwrap.appendChild(nf);
+  bar.appendChild(bwrap); root.appendChild(bar);
+  root.appendChild(mkDivSafe('color:var(--text3);font-size:12px;margin:-2px 0 12px;','Track candidate commercial properties per client. Capture the address fast now; add zoning, NNN/CAM, $/SF and the rest later; export a client’s shortlist as a PDF.'));
+  if(!CPROS.length){ root.appendChild(mkDivSafe('color:var(--text3);padding:20px 0;','No prospects yet. Use Quick add while you’re out, or New (full) to enter everything.')); return; }
+  var ctr=document.createElement('div'); ctr.style.cssText='display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;';
+  var search=document.createElement('input'); search.type='text'; search.placeholder='Search address / use / zoning…'; search.value=_cproQuery;
+  search.style.cssText='flex:1;min-width:180px;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:7px 10px;font-family:inherit;font-size:13px;';
+  var cli=document.createElement('select'); cli.style.cssText='background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:7px 8px;font-family:inherit;font-size:13px;width:auto;';
+  var cliIds={}; CPROS.forEach(function(p){ if(p.contact_id!=null) cliIds[p.contact_id]=true; });
+  var cOpts=[['','All clients']].concat(Object.keys(cliIds).map(function(id){ var c=gc(parseInt(id)); return [String(id), c?fn(c):('Client '+id)]; }));
+  cOpts.forEach(function(o){ var op=document.createElement('option'); op.value=o[0]; op.textContent=o[1]; if(o[0]===_cproClient) op.selected=true; cli.appendChild(op); });
+  var stat=document.createElement('select'); stat.style.cssText=cli.style.cssText;
+  [['active','Active']].concat(CPRO_STATUS).concat([['archived','Archived']]).forEach(function(o){ var op=document.createElement('option'); op.value=o[0]; op.textContent=o[1]; if(o[0]===_cproView) op.selected=true; stat.appendChild(op); });
+  ctr.appendChild(search); ctr.appendChild(cli); ctr.appendChild(stat);
+  var expB=document.createElement('button'); expB.className='cbtn'; expB.style.cssText='padding:7px 12px;'; expB.textContent='Export client PDF';
+  expB.addEventListener('click',function(){ if(!_cproClient){ alert('Pick a client in the filter first, then export their shortlist.'); return; } cproExportPdf(parseInt(_cproClient), expB); });
+  ctr.appendChild(expB); root.appendChild(ctr);
+  var list=document.createElement('div'); list.style.cssText='display:flex;flex-direction:column;gap:8px;'; root.appendChild(list);
+  function draw(){
+    list.innerHTML=''; var q=_cproQuery.trim().toLowerCase();
+    var items=CPROS.filter(function(p){
+      var d=p.data||{}, arch=cproArchived(p);
+      if(_cproClient && String(p.contact_id)!==String(_cproClient)) return false;
+      if(q){ var hay=((d.address_full||'')+' '+(d.use_type||'')+' '+(d.zoning||'')+' '+(d.city||'')).toLowerCase(); if(hay.indexOf(q)<0) return false; }
+      if(_cproView==='archived') return arch;
+      if(arch) return false;
+      if(_cproView==='active') return true;
+      return d.status===_cproView;
+    }).sort(function(a,b){ return String(b.updated_at||'').localeCompare(String(a.updated_at||'')); });
+    if(!items.length){ list.appendChild(mkDivSafe('color:var(--text3);padding:16px 0;','Nothing matches.')); return; }
+    items.forEach(function(p){
+      var d=p.data||{}, arch=cproArchived(p), c=gc(p.contact_id);
+      var row=document.createElement('div'); row.style.cssText='display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 14px;cursor:pointer;'+(arch?'opacity:.7;':'');
+      var badge='<span class="c-badge" style="background:'+cproStatusColor(d.status)+';">'+_esc(cproStatusLabel(d.status||'spotted'))+'</span>';
+      var sub=[ (c?fn(c):'(no client)'), cproSpecLine(d) ].filter(Boolean).join('  ·  ');
+      row.innerHTML='<div style="min-width:0;"><div style="font-weight:600;overflow:hidden;text-overflow:ellipsis;">'+_esc(d.address_full||p.name||'(no address)')+' '+badge+(arch?' <span class="c-badge" style="background:#888;">ARCHIVED</span>':'')+'</div><div style="font-size:12px;color:var(--text3);">'+_esc(sub)+'</div></div>';
+      var btns=document.createElement('div'); btns.style.cssText='display:flex;gap:6px;flex-shrink:0;';
+      var ab=document.createElement('button'); ab.className='cbtn g'; ab.style.cssText='font-size:12px;padding:3px 9px;'; ab.textContent=arch?'Unarchive':'Archive';
+      ab.addEventListener('click',function(e){ e.stopPropagation(); if(!p.data)p.data={}; p.data.archived=!arch; saveProspect(p); draw(); });
+      var del=document.createElement('button'); del.className='cbtn g'; del.style.cssText='font-size:12px;padding:3px 9px;'; del.textContent='Delete';
+      (function(id){ del.addEventListener('click',function(e){ e.stopPropagation(); if(confirm('Delete this prospect?')){ delProspect(id); draw(); } }); })(p.id);
+      btns.appendChild(ab); btns.appendChild(del);
+      row.addEventListener('click',function(){ openProspect(p,false); }); row.appendChild(btns); list.appendChild(row);
+    });
+  }
+  search.addEventListener('input',function(){ _cproQuery=search.value; draw(); });
+  cli.addEventListener('change',function(){ _cproClient=cli.value; draw(); });
+  stat.addEventListener('change',function(){ _cproView=stat.value; draw(); });
+  draw();
+}
+function openProspect(p, isNew){
+  _cproStyle(); var root=ge('cproRoot'); if(!root) return; root.innerHTML=''; var d=p.data;
+  var tb=document.createElement('div'); tb.style.cssText='display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;';
+  var back=document.createElement('button'); back.className='cbtn g'; back.textContent='‹ Back'; back.addEventListener('click',renderCommercial); tb.appendChild(back);
+  var cWrap=document.createElement('div'); cWrap.style.cssText='min-width:240px;'; tb.appendChild(cWrap);
+  var picker=buildContactPicker(cWrap,'cpro_client','Client (search name / address)…',function(){ var id=picker.hidden.value; if(!id) return; p.contact_id=parseInt(id); openProspect(p,isNew); });
+  var saveB=document.createElement('button'); saveB.className='cbtn'; saveB.textContent='Save'; saveB.addEventListener('click',function(){ if(!p.name) p.name=d.address_full||'Prospect'; if(!CPROS.some(function(x){return String(x.id)===String(p.id);})) CPROS.push(p); saveProspect(p); saveB.textContent='Saved ✓'; setTimeout(function(){saveB.textContent='Save';},1500); }); tb.appendChild(saveB);
+  var pdfB=document.createElement('button'); pdfB.className='cbtn g'; pdfB.textContent='Export client PDF'; pdfB.addEventListener('click',function(){ if(p.contact_id==null){ alert('Link a client first.'); return; } cproExportPdf(p.contact_id, pdfB); }); tb.appendChild(pdfB);
+  root.appendChild(tb);
+  if(p.contact_id!=null){ var c=gc(p.contact_id); if(c) root.appendChild(mkDivSafe('color:var(--text3);font-size:12px;margin:-6px 0 12px;','Client: '+_esc(fn(c)))); }
+
+  var prev=document.createElement('div'); prev.style.cssText='background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;';
+  var form=document.createElement('div'); form.className='c-form';
+  function refresh(){
+    var cc=cproCompute(d);
+    var occ='';
+    if(cc.hasSf && cc.rate){ occ='Base '+cproM(cc.moBase)+'/mo ('+cproM(cc.annualBase)+'/yr)'; if(cc.cam) occ+=' · +CAM '+cproM(cc.moCam)+'/mo · all-in '+cproM(cc.moAll)+'/mo'; }
+    prev.innerHTML='<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:baseline;">'
+      +'<div style="font-size:18px;font-weight:700;">'+_esc(d.address_full||'(no address)')+'</div>'
+      +'<span class="c-badge" style="background:'+cproStatusColor(d.status)+';">'+_esc(cproStatusLabel(d.status))+'</span></div>'
+      +(cproSpecLine(d)?('<div style="margin:6px 0;font-weight:600;">'+_esc(cproSpecLine(d))+'</div>'):'')
+      +(occ?('<div style="font-size:13px;color:var(--text2);">'+_esc(occ)+'</div>'):'')
+      +(d.zoning?('<div style="font-size:12px;color:var(--text3);margin-top:4px;">Zoning: '+_esc(d.zoning)+'</div>'):'')
+      +(d.notes?('<div style="font-size:13px;margin-top:8px;">'+_esc(d.notes).replace(/\n/g,'<br>')+'</div>'):'');
+  }
+  function sec(t){ var w=document.createElement('div'); w.className='c-sec'; w.textContent=t; form.appendChild(w); }
+  function fld(key,label,type,wide){ var w=document.createElement('div'); if(wide)w.className='c-wide'; var l=document.createElement('label'); l.textContent=label; w.appendChild(l);
+    var el=type==='textarea'?document.createElement('textarea'):document.createElement('input'); if(type&&type!=='textarea')el.type=type; if(type==='textarea')el.rows=3;
+    el.value=(d[key]!=null?d[key]:''); el.addEventListener('input',function(){ d[key]=el.value; refresh(); }); w.appendChild(el); form.appendChild(w); }
+  function pick(key,label,opts){ var w=document.createElement('div'); var l=document.createElement('label'); l.textContent=label; w.appendChild(l);
+    var s=document.createElement('select'); opts.forEach(function(o){ var op=document.createElement('option'); op.value=o[0]; op.textContent=o[1]; if(d[key]===o[0])op.selected=true; s.appendChild(op); }); s.value=d[key]; s.addEventListener('change',function(){ d[key]=s.value; refresh(); }); w.appendChild(s); form.appendChild(w); }
+  sec('Status & location');
+  pick('status','Status',CPRO_STATUS); pick('deal_type','Lease or sale',CPRO_DEALTYPES);
+  fld('address_full','Address','text',true);
+  fld('city','City'); fld('state','State'); fld('zip','ZIP');
+  sec('Property & zoning');
+  fld('use_type','Use / property type (retail, office, industrial…)','text',true);
+  fld('zoning','Zoning'); fld('rentable_sqft','Rentable SF','number'); fld('lot_size','Lot size'); fld('year_built','Year built','number'); fld('parking','Parking');
+  sec('Deal terms');
+  fld('rate_per_sf','Asking rate ($/SF/yr)','number'); pick('lease_type','Lease type',CPRO_LEASETYPES);
+  fld('cam_per_sf','CAM ($/SF/yr)','number'); fld('price','Sale price / other ($)','number'); fld('availability','Availability');
+  sec('Listing & contacts');
+  fld('listing_url','Listing URL','text',true); fld('listing_source','Listing source (LoopNet, CoStar, sign…)'); fld('agent','Listing broker / contact');
+  sec('Assessment');
+  fld('pros','Pros / fit for client','textarea',true);
+  fld('cons','Cons / concerns','textarea',true);
+  fld('notes','Notes','textarea',true);
+  root.appendChild(form); root.appendChild(prev); refresh();
+}
+function cproSheetHTML(c, items){
+  var today=new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'});
+  var css='<style>#cproSheet .cp-h1{font-size:22px;font-weight:700;color:#1a1a1a;} #cproSheet .cp-sub{color:#555;font-size:13px;margin-bottom:2px;}'
+    +'#cproSheet .cp-card{border:1px solid #ddd;border-radius:8px;padding:14px 16px;margin:12px 0;page-break-inside:avoid;}'
+    +'#cproSheet .cp-addr{font-size:16px;font-weight:700;} #cproSheet .cp-spec{color:#333;font-size:13px;margin:3px 0 6px;}'
+    +'#cproSheet table.cp-t{width:100%;border-collapse:collapse;font-size:12.5px;} #cproSheet table.cp-t td{padding:2px 8px 2px 0;vertical-align:top;}'
+    +'#cproSheet table.cp-t td.k{color:#666;width:150px;} #cproSheet .cp-foot{margin-top:20px;border-top:1px solid #e5e5e5;padding-top:8px;color:#999;font-size:10px;text-align:center;}</style>';
+  var rows=items.map(function(p){
+    var d=p.data||{}, cc=cproCompute(d), lines=[];
+    function tr(k,v){ if(v==null||v==='') return; lines.push('<tr><td class="k">'+_esc(k)+'</td><td>'+_esc(v)+'</td></tr>'); }
+    tr('Status', cproStatusLabel(d.status));
+    tr('Use / type', d.use_type);
+    tr('Zoning', d.zoning);
+    tr('Size', cc.sf?(Number(cc.sf).toLocaleString()+' SF'):'');
+    if(cc.rate) tr('Asking rate', cproPerSf(cc.rate)+'/SF/yr '+(d.lease_type||''));
+    if(cc.cam) tr('CAM', cproPerSf(cc.cam)+'/SF/yr');
+    if(cc.hasSf && cc.rate){ var occ='Base '+cproM(cc.moBase)+'/mo ('+cproM(cc.annualBase)+'/yr)'; if(cc.cam) occ+='; all-in '+cproM(cc.moAll)+'/mo'; tr('Est. occupancy', occ); }
+    if(dsNum(d.price)) tr('Sale price', cproM(d.price));
+    tr('Availability', d.availability);
+    tr('Parking', d.parking);
+    tr('Year built', d.year_built);
+    tr('Listing', d.listing_url || d.listing_source);
+    if(d.pros) tr('Fit', d.pros);
+    if(d.cons) tr('Concerns', d.cons);
+    if(d.notes) tr('Notes', d.notes);
+    return '<div class="cp-card"><div class="cp-addr">'+_esc(d.address_full||'(no address)')+'</div>'
+      +(cproSpecLine(d)?('<div class="cp-spec">'+_esc(cproSpecLine(d))+'</div>'):'')
+      +'<table class="cp-t">'+lines.join('')+'</table></div>';
+  }).join('');
+  return css
+    +'<div class="cp-sub">Palacios Baker Real Estate · Utah’s Wise Choice</div>'
+    +'<div class="cp-h1">Commercial Property Shortlist</div>'
+    +'<div class="cp-sub">Prepared for '+_esc(fn(c))+' — '+_esc(today)+'</div>'
+    +rows
+    +'<div class="cp-foot">Figures are preliminary and subject to verification. Palacios Baker Real Estate.</div>';
+}
+function cproExportPdf(contactId, btn){
+  var c=gc(contactId); if(!c){ alert('Pick a client to export.'); return; }
+  var items=CPROS.filter(function(p){ return String(p.contact_id)===String(contactId) && !cproArchived(p) && (p.data&&p.data.status!=='passed'); })
+    .sort(function(a,b){ return String((a.data&&a.data.address_full)||'').localeCompare(String((b.data&&b.data.address_full)||'')); });
+  if(!items.length){ alert('No active (non-passed) properties for this client to export yet.'); return; }
+  var sheet=document.createElement('div'); sheet.id='cproSheet'; sheet.style.cssText='position:fixed;left:-9999px;top:0;background:#fff;color:#1a1a1a;width:760px;padding:32px;font-family:Georgia,\'Times New Roman\',serif;';
+  sheet.innerHTML=cproSheetHTML(c, items); document.body.appendChild(sheet);
+  var name=(fn(c)||'Client').replace(/[^a-z0-9]+/gi,'_')+'_Commercial_Shortlist';
+  if(btn){ btn.textContent='Building…'; btn.disabled=true; }
+  var done=function(){ if(btn){ btn.textContent='Export client PDF'; btn.disabled=false; } try{ document.body.removeChild(sheet); }catch(e){} };
+  dsLoadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js').then(function(){ return _docCanvas('cproSheet'); }).then(function(canvas){
+    var img=canvas.toDataURL('image/png'); var JsPDF=(window.jspdf&&window.jspdf.jsPDF)||window.jsPDF;
+    var pdf=new JsPDF('p','pt','letter'); var pw=612, ph=792, m=24;
+    var iw=pw-m*2, ih=canvas.height*(iw/canvas.width); var pageH=ph-m*2;
+    if(ih<=pageH){ pdf.addImage(img,'PNG',m,m,iw,ih); }
+    else { var pages=Math.ceil(ih/pageH); for(var pg=0;pg<pages;pg++){ if(pg>0) pdf.addPage(); pdf.addImage(img,'PNG',m,m-pg*pageH,iw,ih); } }
+    pdf.save(name+'.pdf'); done();
+  }).catch(function(e){ done(); alert('PDF export failed: '+(e&&e.message||e)); });
 }
 // ============================================================================
 // LETTER OF INTENT (LOI) — commercial lease, tenant-rep. Deterministic template: you fill the
