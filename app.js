@@ -10396,8 +10396,9 @@ function applyRestrictions(){
 var NAV_GROUPS=[
   ['Home',        ['nav-briefing','nav-pipeline']],
   ['Clients',     ['nav-contacts','nav-followups','nav-notes','nav-drips']],
-  ['Deals',       ['nav-tc','nav-listings','nav-commercial','nav-dealsheet','nav-loi','nav-documents','nav-deadlines']],
+  ['Deals',       ['nav-tc','nav-listings','nav-dealsheet','nav-documents','nav-deadlines']],
   ['Tools',       ['nav-gmail','nav-calendar','nav-scanner','nav-cardscanner','nav-team']],
+  ['Commercial',  ['nav-commercial','nav-loi']],
   ['Investments', ['nav-investments','nav-hardmoney']]
 ];
 function _navSecKey(){ var e=(currentUser&&currentUser.email)?currentUser.email.toLowerCase():''; return 'navsec:'+e; }
@@ -12781,7 +12782,7 @@ function quickAddProspect(){
 function renderCommercial(){
   _cproStyle(); var root=ge('cproRoot'); if(!root) return; root.innerHTML='';
   var bar=document.createElement('div'); bar.style.cssText='display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;';
-  bar.appendChild(mkDivSafe('font-size:22px;font-weight:600;','Commercial Search'));
+  bar.appendChild(mkDivSafe('font-size:22px;font-weight:600;','Property Search'));
   var bwrap=document.createElement('div'); bwrap.style.cssText='display:flex;gap:8px;flex-wrap:wrap;';
   var qa=document.createElement('button'); qa.className='cbtn'; qa.textContent='+ Quick add'; qa.addEventListener('click',quickAddProspect); bwrap.appendChild(qa);
   var nf=document.createElement('button'); nf.className='cbtn g'; nf.textContent='New (full)'; nf.addEventListener('click',function(){ openProspect(prospectDefault(), true); }); bwrap.appendChild(nf);
