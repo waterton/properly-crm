@@ -12705,7 +12705,24 @@ function prospectDefault(){ return { id:Date.now()+Math.floor(Math.random()*1000
   status:'spotted', address_full:'', city:'', state:'UT', zip:'',
   deal_type:'lease', use_type:'', zoning:'', rentable_sqft:'', lot_size:'', year_built:'', parking:'',
   lease_type:'NNN', rate_per_sf:'', cam_per_sf:'', price:'', availability:'',
-  listing_url:'', listing_source:'', agent:'', pros:'', cons:'', notes:'', archived:false } }; }
+  listing_url:'', listing_source:'', agent:'', pros:'', cons:'', notes:'', lat:'', lon:'', archived:false } }; }
+// Use the phone's GPS to fill an address (reverse-geocoded via /api/geocode). onResult(result, lat, lon).
+function cproGeolocate(btn, onResult){
+  if(!navigator.geolocation){ alert('This device can’t share its location.'); return; }
+  var orig=btn?btn.textContent:''; if(btn){ btn.textContent='Locating…'; btn.disabled=true; }
+  function stop(){ if(btn){ btn.textContent=orig; btn.disabled=false; } }
+  navigator.geolocation.getCurrentPosition(function(pos){
+    var lat=pos.coords.latitude, lon=pos.coords.longitude;
+    (async function(){
+      try{
+        var resp=await fetch('/api/geocode?lat='+encodeURIComponent(lat)+'&lon='+encodeURIComponent(lon),{ headers: await apiHeaders() });
+        var j=await resp.json(); if(!resp.ok || !j || j.error) throw new Error((j&&j.error)||('HTTP '+resp.status));
+        stop(); onResult(j, lat, lon);
+      }catch(e){ stop(); alert('Got your location, but the address lookup failed: '+(e&&e.message||e)+'\nYou can type the address instead.'); }
+    })();
+  }, function(err){ stop(); alert(err&&err.code===1 ? 'Location permission was denied. Allow location for this site, or type the address.' : 'Could not get your location. Type the address instead.'); },
+  { enableHighAccuracy:true, timeout:12000, maximumAge:0 });
+}
 function cproCompute(d){ var sf=dsNum(d.rentable_sqft), rate=dsNum(d.rate_per_sf), cam=dsNum(d.cam_per_sf);
   return { sf:sf, rate:rate, cam:cam, annualBase:rate*sf, moBase:rate*sf/12, moCam:cam*sf/12, moAll:(rate+cam)*sf/12, annualAll:(rate+cam)*sf, hasSf:sf>0 }; }
 function cproSpecLine(d){ var c=cproCompute(d);
@@ -12725,16 +12742,41 @@ function _cproStyle(){
   document.head.appendChild(s);
 }
 function quickAddProspect(){
-  invOpenForm('Quick add — commercial prospect', [
-    {key:'contact_id',label:'Client',type:'select',options:[{value:'',label:'— pick later —'}].concat((C||[]).map(function(c){return {value:String(c.id),label:fn(c)+(c.property?(' · '+c.property):'')};}))},
-    {key:'address_full',label:'Address',required:true},
-    {key:'notes',label:'Quick note (what caught your eye)',type:'textarea'}
-  ], {}, function(v){
-    if(!(v.address_full||'').trim()){ alert('Enter an address.'); return false; }
-    var p=prospectDefault(); p.contact_id=v.contact_id?parseInt(v.contact_id):null;
-    p.data.address_full=v.address_full.trim(); p.data.notes=(v.notes||'').trim(); p.name=p.data.address_full;
-    CPROS.push(p); saveProspect(p); renderCommercial();
+  var geo={};   // captured lat/lon/city/state/zip from "Use my location"
+  var ov=document.createElement('div'); ov.className='modal-ov open'; ov.style.zIndex='1300';
+  var m=document.createElement('div'); m.className='modal'; m.style.maxWidth='520px';
+  var h=document.createElement('div'); h.style.cssText='display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--border);';
+  h.innerHTML='<div style="font-weight:700;font-size:17px;">Quick add — commercial prospect</div>';
+  var x=document.createElement('button'); x.textContent='✕'; x.style.cssText='background:none;border:none;font-size:18px;color:var(--text3);cursor:pointer;'; x.addEventListener('click',function(){ document.body.removeChild(ov); }); h.appendChild(x); m.appendChild(h);
+  var body=document.createElement('div'); body.style.cssText='padding:16px 20px;display:flex;flex-direction:column;gap:12px;';
+  function lbl(t){ var l=document.createElement('label'); l.className='fl'; l.textContent=t; return l; }
+  var cw=document.createElement('div'); cw.appendChild(lbl('Client'));
+  var csel=document.createElement('select'); csel.className='fsel';
+  [{value:'',label:'— pick later —'}].concat((C||[]).map(function(c){return {value:String(c.id),label:fn(c)+(c.property?(' · '+c.property):'')};})).forEach(function(o){ var op=document.createElement('option'); op.value=o.value; op.textContent=o.label; csel.appendChild(op); });
+  cw.appendChild(csel); body.appendChild(cw);
+  var aw=document.createElement('div'); aw.appendChild(lbl('Address'));
+  var arow=document.createElement('div'); arow.style.cssText='display:flex;gap:8px;';
+  var ain=document.createElement('input'); ain.className='fi'; ain.style.flex='1'; ain.placeholder='Type it, or use your location →';
+  var gb=document.createElement('button'); gb.className='cbtn'; gb.type='button'; gb.style.cssText='white-space:nowrap;padding:7px 12px;'; gb.textContent='📍 Use my location';
+  gb.addEventListener('click',function(){ cproGeolocate(gb,function(j,lat,lon){ if(j.address) ain.value=j.address; geo={ city:j.city, state:j.state, zip:j.zip, lat:lat, lon:lon }; }); });
+  arow.appendChild(ain); arow.appendChild(gb); aw.appendChild(arow); body.appendChild(aw);
+  var nw=document.createElement('div'); nw.appendChild(lbl('Quick note (what caught your eye)'));
+  var nin=document.createElement('textarea'); nin.className='fi'; nin.rows=2; nw.appendChild(nin); body.appendChild(nw);
+  m.appendChild(body);
+  var ft=document.createElement('div'); ft.style.cssText='display:flex;justify-content:flex-end;gap:8px;padding:14px 20px;border-top:1px solid var(--border);';
+  var cancel=document.createElement('button'); cancel.className='btn btn-g'; cancel.textContent='Cancel'; cancel.addEventListener('click',function(){ document.body.removeChild(ov); });
+  var save=document.createElement('button'); save.className='btn btn-p'; save.textContent='Save';
+  save.addEventListener('click',function(){
+    var addr=(ain.value||'').trim(); if(!addr){ alert('Enter an address (or use your location).'); return; }
+    var p=prospectDefault(); p.contact_id=csel.value?parseInt(csel.value):null;
+    p.data.address_full=addr; p.data.notes=(nin.value||'').trim(); p.name=addr;
+    if(geo.city) p.data.city=geo.city; if(geo.state) p.data.state=geo.state; if(geo.zip) p.data.zip=geo.zip;
+    if(geo.lat!=null) p.data.lat=geo.lat; if(geo.lon!=null) p.data.lon=geo.lon;
+    CPROS.push(p); saveProspect(p); document.body.removeChild(ov); renderCommercial();
   });
+  ft.appendChild(cancel); ft.appendChild(save); m.appendChild(ft);
+  ov.appendChild(m); ov.addEventListener('click',function(e){ if(e.target===ov) document.body.removeChild(ov); });
+  document.body.appendChild(ov); setTimeout(function(){ try{ ain.focus(); }catch(e){} },50);
 }
 function renderCommercial(){
   _cproStyle(); var root=ge('cproRoot'); if(!root) return; root.innerHTML='';
@@ -12826,6 +12868,7 @@ function openProspect(p, isNew){
   sec('Status & location');
   pick('status','Status',CPRO_STATUS); pick('deal_type','Lease or sale',CPRO_DEALTYPES);
   fld('address_full','Address','text',true);
+  (function(){ var w=document.createElement('div'); w.className='c-wide'; var b=document.createElement('button'); b.className='cbtn g'; b.type='button'; b.textContent='📍 Use my location'; b.style.cssText='font-size:12px;padding:5px 12px;'; b.addEventListener('click',function(){ cproGeolocate(b,function(j){ if(j.address) d.address_full=j.address; if(j.city) d.city=j.city; if(j.state) d.state=j.state; if(j.zip) d.zip=j.zip; if(j.lat!=null) d.lat=j.lat; if(j.lon!=null) d.lon=j.lon; openProspect(p,isNew); }); }); w.appendChild(b); form.appendChild(w); })();
   fld('city','City'); fld('state','State'); fld('zip','ZIP');
   sec('Property & zoning');
   fld('use_type','Use / property type (retail, office, industrial…)','text',true);
