@@ -13317,9 +13317,22 @@ function ncPasteModal(){
   h.innerHTML='<div style="font-weight:700;font-size:17px;">Paste from a builder page</div>';
   var x=document.createElement('button'); x.textContent='✕'; x.style.cssText='background:none;border:none;font-size:18px;color:var(--text3);cursor:pointer;'; x.addEventListener('click',function(){ document.body.removeChild(ov); }); h.appendChild(x); m.appendChild(h);
   var body=document.createElement('div'); body.style.cssText='padding:16px 20px;display:flex;flex-direction:column;gap:10px;';
-  body.appendChild(mkDivSafe('font-size:12px;color:var(--text3);line-height:1.5;','Open a builder’s communities / available-homes page in your browser, select all (Ctrl+A), copy (Ctrl+C), and paste below. The AI pulls the communities, prices, and incentives into your list. Setting the builder name helps it attribute them.'));
-  var bl=document.createElement('label'); bl.className='fl'; bl.textContent='Builder name (optional)'; body.appendChild(bl);
-  var bin=document.createElement('input'); bin.className='fi'; bin.placeholder='e.g. Edge Homes'; body.appendChild(bin);
+  body.appendChild(mkDivSafe('font-size:12px;color:var(--text3);line-height:1.5;','Open a builder’s communities / available-homes page in your browser, select all (Ctrl+A), copy (Ctrl+C), and paste below. Pick the builder from the list so this update attaches to the same group you already have — retyping a name (e.g. “DR Horton” vs “D.R. Horton”) would create a duplicate group instead.'));
+  var bl=document.createElement('label'); bl.className='fl'; bl.textContent='Builder'; body.appendChild(bl);
+  // Builder picker: existing builders first (verbatim, so re-pastes match), then known builders not yet
+  // present, then a "+ New builder…" option that reveals a text box. Lennar and D.R. Horton pages are
+  // auto-detected and override this selection, so it can't misfile them.
+  var _seen={}, _builders=[];
+  (NC||[]).forEach(function(r){ var b=(r.builder||'').trim(); if(b && !_seen[b.toLowerCase()]){ _seen[b.toLowerCase()]=1; _builders.push(b); } });
+  ['D.R. Horton','Edge Homes','Fieldstone Homes','Ivory Homes','Lennar','Richmond American Homes'].forEach(function(b){ if(!_seen[b.toLowerCase()]){ _seen[b.toLowerCase()]=1; _builders.push(b); } });
+  _builders.sort(function(a,b){ return a.toLowerCase().localeCompare(b.toLowerCase()); });
+  var bin=document.createElement('select'); bin.className='fi';
+  var o0=document.createElement('option'); o0.value=''; o0.textContent='— Select builder —'; bin.appendChild(o0);
+  _builders.forEach(function(b){ var o=document.createElement('option'); o.value=b; o.textContent=b; bin.appendChild(o); });
+  var oNew=document.createElement('option'); oNew.value='__new__'; oNew.textContent='+ New builder…'; bin.appendChild(oNew);
+  body.appendChild(bin);
+  var newBin=document.createElement('input'); newBin.className='fi'; newBin.placeholder='New builder name (e.g. Holmes Homes)'; newBin.style.display='none'; body.appendChild(newBin);
+  bin.addEventListener('change',function(){ newBin.style.display = (bin.value==='__new__') ? '' : 'none'; if(bin.value==='__new__') newBin.focus(); });
   var tl=document.createElement('label'); tl.className='fl'; tl.textContent='Pasted page text'; body.appendChild(tl);
   var ta=document.createElement('textarea'); ta.className='fi'; ta.rows=9; ta.placeholder='Paste the page here…'; body.appendChild(ta);
   m.appendChild(body);
@@ -13328,7 +13341,11 @@ function ncPasteModal(){
   var go=document.createElement('button'); go.className='btn btn-p'; go.textContent='Extract & add';
   go.addEventListener('click',function(){
     var text=(ta.value||'').trim(); if(text.length<40){ alert('Paste the page text first.'); return; }
-    var builderHint=bin.value.trim();
+    var builderHint=(bin.value==='__new__'?newBin.value:bin.value).trim();
+    // Lennar/D.R. Horton set their own builder from the page; everything else needs a picked builder so
+    // the import doesn't land in an "(Unspecified)" group.
+    var _autoDetected=/lennar\.com\/new-homes\/|drhorton\.com\//i.test(text);
+    if(!_autoDetected && !builderHint){ alert('Pick a builder from the list first (or choose “+ New builder…”), so these communities attach to the right group.'); return; }
     var orig=go.textContent; go.textContent='Reading…'; go.disabled=true;
     (async function(){
       try{
