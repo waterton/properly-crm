@@ -13160,32 +13160,22 @@ function ncApplyExtracted(arr, sourceLabel){
   });
   return { added:added, updated:updated };
 }
-// Deterministic parse of a copied builder listing page. These pages copy as bracketed links grouped
-// by community URL — one URL per community, with its name/type/city/price lines sharing that URL. Fast
-// and free; the AI is only a fallback for formats this doesn't recognize.
+// Deterministic parse of a copied builder listing page. Works whether the copy came through as plain
+// text (one field per line, or space-joined) or as markdown links — it strips any links, then finds
+// each community by its Name / TYPE / City, ST ZIP / Price pattern, with an optional incentive line.
+// Fast and free; the AI is only a fallback for formats this doesn't recognize.
 function ncLocalParse(text, builderHint){
-  var lines=String(text||'').split(/\r?\n/);
-  var groups={}, order=[], linkRe=/\[([^\]]*)\]\(([^)]+)\)/;
-  lines.forEach(function(ln){
-    var m=ln.match(linkRe); if(!m) return;
-    var txt=(m[1]||'').trim(), url=(m[2]||'').trim(); if(!txt||!url) return;
-    if(!groups[url]){ groups[url]={texts:[],url:url}; order.push(url); }
-    groups[url].texts.push(txt);
-  });
-  var out=[];
-  order.forEach(function(u){
-    var texts=groups[u].texts, name='',type='',city='',state='',price='',promo='';
-    texts.forEach(function(t){
-      if(/limited.?time|incentive|toward|buydown|%\s*(interest|rate)|design options/i.test(t)){ if(!promo) promo=t; return; }
-      if(/^(single family|townhome|twinhome|twin home|condo|multi.?family)$/i.test(t)){ type=t; return; }
-      var cm=t.match(/^(.+?),\s*([A-Z]{2}),?\s*([0-9]{5}(?:\/[0-9]{5})?)?\s*$/);
-      if(cm){ city=cm[1].trim(); state=cm[2]; return; }
-      if(/\$|from the|from \$|limited lots|sold out|coming soon|call for/i.test(t)){ if(!price) price=t; return; }
-      if(!name) name=t;
-    });
-    if(!name){ var s=u.match(/\/communities\/([^\/?#]+)/)||u.match(/\/([^\/?#]+)\/?$/); if(s) name=s[1].replace(/-/g,' ').replace(/\b\w/g,function(c){return c.toUpperCase();}); }
-    if(name && (type||city||price)) out.push({ builder:builderHint||'', community:name, city:city, state:state, home_types:type, price_text:price, promo:promo, url:u, status:/sold out/i.test(price)?'sold_out':(/coming soon/i.test(price)?'coming_soon':'active') });
-  });
+  var norm=String(text||'').replace(/\r/g,'').replace(/\[([^\]]*)\]\([^)]*\)/g,'$1');
+  var typeRe='SINGLE FAMILY|TOWNHOMES?|CONDOS?|TWINHOMES?|TWIN HOME|MULTI-?FAMILY|DUPLEX';
+  var priceRe="From the \\$[\\d,]+'?s|From \\$[\\d,]+|Starting (?:at|in|in the) \\$[\\d,'s]+|\\$[\\d,]+'?s|Limited Lots|Coming Soon|Sold Out|Now Selling|Call for [Pp]ricing";
+  var re=new RegExp("(?:([^\\n]*(?:limited.?time|incentive|toward|buydown|%\\s*(?:interest|rate)|design options)[^\\n]*)\\n)?([^\\n]+?)[\\n ]+("+typeRe+")[\\n ]+(.+?,\\s*[A-Z]{2},?\\s*\\d{5}(?:/\\d{5})?)[\\n ]+("+priceRe+")","gi");
+  var out=[], m;
+  while((m=re.exec(norm))){
+    var promo=(m[1]||'').trim(), name=(m[2]||'').trim(), type=(m[3]||'').trim(), cityBlob=(m[4]||'').trim(), price=(m[5]||'').trim();
+    if(!name || name.length>60) continue;
+    var cm=cityBlob.match(/^(.+?),\s*([A-Z]{2})/); var city=cm?cm[1].trim():cityBlob, state=cm?cm[2]:'';
+    out.push({ builder:builderHint||'', community:name, city:city, state:state, home_types:type, price_text:price, promo:promo, url:'', status:/sold out/i.test(price)?'sold_out':(/coming soon/i.test(price)?'coming_soon':'active') });
+  }
   return out;
 }
 function ncPasteModal(){
