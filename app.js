@@ -13204,6 +13204,44 @@ function ncApplyExtracted(arr, sourceLabel){
   });
   return { added:added, updated:updated };
 }
+// Lennar-specific parse. Lennar's listing pages show individual move-in-ready homes (one block per
+// home), not communities. Each block links to a URL like
+//   lennar.com/new-homes/utah/salt-lake-city/{city}/{community}/{plan}/{homesite-id}
+// so the city and community are reliably in the URL path, and the "Homesite #… {Plan} in {Community}"
+// line gives the community's display name. We roll the homes up into one record per community, using the
+// lowest home price as the community's "From $…". City/state are taken from the URL slug.
+function _slugTitle(s){ return String(s||'').split('-').map(function(w){ return w? w.charAt(0).toUpperCase()+w.slice(1) : w; }).join(' ').trim(); }
+function ncParseLennar(text){
+  var norm=String(text||'').replace(/\r/g,'');
+  // Price per home URL (skip promo links).
+  var priceByUrl={};
+  var pr=/\[\$([\d,]+)\]\((https?:\/\/[^)]*lennar\.com\/new-homes\/[^)]+)\)/gi, pm;
+  while((pm=pr.exec(norm))){
+    var url=pm[2]; if(/\/promo\//i.test(url)) continue;
+    var n=parseInt(pm[1].replace(/,/g,''),10); if(isNaN(n)) continue;
+    if(priceByUrl[url]==null || n<priceByUrl[url]) priceByUrl[url]=n;
+  }
+  // "Homesite #NNNN {Plan} in {Community}" line carries the community display name + the home URL.
+  var comm={};
+  var hr=/Homesite\s*#\d+[^\]\n]*?\bin\b\s+([^\]\n]+?)\]\((https?:\/\/[^)]*lennar\.com\/new-homes\/[^)]+)\)/gi, hm;
+  while((hm=hr.exec(norm))){
+    var cname=(hm[1]||'').trim(), url=hm[2];
+    if(/\/promo\//i.test(url)) continue;
+    var seg=url.split('/new-homes/')[1]; if(!seg) continue;
+    var parts=seg.split('/');                 // [state, metro, city, community, plan, homesite...]
+    var citySlug=parts[2]||'', commSlug=(parts[3]||cname).toLowerCase();
+    if(!comm[commSlug]) comm[commSlug]={ name:cname, city:_slugTitle(citySlug), min:null };
+    var price=priceByUrl[url];
+    if(price!=null && (comm[commSlug].min==null || price<comm[commSlug].min)) comm[commSlug].min=price;
+  }
+  var out=[];
+  Object.keys(comm).forEach(function(k){ var c=comm[k];
+    out.push({ builder:'Lennar', community:c.name, city:c.city, state:'UT',
+      home_types:ncGuessType(c.name), price_text:(c.min!=null?('From $'+c.min.toLocaleString('en-US')):''),
+      promo:'', url:'', status:'active' });
+  });
+  return out;
+}
 // Deterministic parse of a copied builder listing page. Works whether the copy came through as plain
 // text (one field per line, or space-joined) or as markdown links — it strips any links, then finds
 // each community by its Name / TYPE / City, ST ZIP / Price pattern, with an optional incentive line.
@@ -13253,7 +13291,9 @@ function ncPasteModal(){
     (async function(){
       try{
         // 1) Fast local parse of the copied listing format. 2) AI fallback for anything it can't read.
-        var arr=ncLocalParse(text, builderHint);
+        // Lennar lists individual homes, not communities, so it gets its own URL-based parser first.
+        var arr=/lennar\.com\/new-homes\//i.test(text) ? ncParseLennar(text) : [];
+        if(!arr.length) arr=ncLocalParse(text, builderHint);
         if(!arr.length){
           var corpus=(builderHint?('Builder: '+builderHint+'\n'):'')+text;
           var r=await ncExtractFromText(corpus); arr=r.arr;
@@ -13261,7 +13301,9 @@ function ncPasteModal(){
         }
         var res=ncApplyExtracted(arr,'paste');
         document.body.removeChild(ov); renderNewConstruction();
-        alert('Added '+res.added+' new communit'+(res.added===1?'y':'ies')+', updated '+res.updated+'.');
+        var msg='Imported into New Construction:\n\n• '+res.added+' new communit'+(res.added===1?'y':'ies')+' added';
+        if(res.updated){ msg+='\n• '+res.updated+' row'+(res.updated===1?'':'s')+' matched a community already on the list (updated in place, or a duplicate/individual home under the same community).\n\nNote: one record is kept per community — not per home or floor plan — so builder pages that list many homes will collapse down to their community count.'; }
+        alert(msg);
       }catch(e){ go.textContent=orig; go.disabled=false; alert('Extract failed: '+(e&&e.message||e)); }
     })();
   });
