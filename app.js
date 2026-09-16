@@ -12957,7 +12957,8 @@ function cproExportPdf(contactId, btn){
 var NC_STATUS=[['active','Active'],['coming_soon','Coming Soon'],['sold_out','Sold Out'],['unknown','Unknown']];
 var _ncBuilder='', _ncCity='', _ncView='active', _ncQuery='', _ncType='', _ncSort='city', _ncCollapse={};
 function ncType(d){ var h=String((d&&d.home_types)||'').toLowerCase(); if(/condo/.test(h)) return 'condo'; if(/town|twin/.test(h)) return 'townhome'; if(/single|sfr|detached|family/.test(h)) return 'single family'; return ''; }
-function ncPriceNum(d){ var lo=dsNum(d&&d.price_min); if(lo>0) return lo; var m=String((d&&d.price_text)||'').match(/\$\s*([\d,]+)/); if(!m) return 0; var n=parseInt(m[1].replace(/,/g,''))||0; return (n>0 && n<10000)?n*1000:n; }
+function ncGuessType(name){ if(/\btowns?\b|townhome/i.test(name)) return 'Townhome'; if(/condo/i.test(name)) return 'Condo'; if(/\bvillas?\b/i.test(name)) return 'Townhome'; return 'Single Family'; }
+function ncPriceNum(d){ var lo=dsNum(d&&d.price_min); if(lo>0) return lo; var m=String((d&&d.price_text)||'').match(/\$\s*([\d.,]+)\s*([KMkm])?/); if(!m) return 0; var n=parseFloat(m[1].replace(/,/g,''))||0; var suf=(m[2]||'').toUpperCase(); if(suf==='M') return Math.round(n*1e6); if(suf==='K') return Math.round(n*1e3); return (n>0 && n<10000)?n*1000:n; }
 function ncStatusLabel(v){ for(var i=0;i<NC_STATUS.length;i++){ if(NC_STATUS[i][0]===v) return NC_STATUS[i][1]; } return v||''; }
 function ncStatusColor(v){ return ({active:'#1f9d55',coming_soon:'#7a5cff',sold_out:'#888',unknown:'#888'})[v]||'#888'; }
 function ncArchived(x){ return !!(x.data&&x.data.archived); }
@@ -13066,9 +13067,13 @@ function renderNewConstruction(){
     order.sort(function(a,b){ return a.toLowerCase().localeCompare(b.toLowerCase()); });
     order.forEach(function(b){
       var arr=groups[b].slice().sort(cmp); var collapsed=!!_ncCollapse[b];
-      var hdr=document.createElement('div'); hdr.style.cssText='display:flex;justify-content:space-between;align-items:center;cursor:pointer;user-select:none;background:var(--surface3);border:1px solid var(--border);border-radius:7px;padding:9px 12px;margin-top:10px;';
-      hdr.innerHTML='<span style="font-weight:700;font-size:15px;">'+_esc(b)+' <span style="color:var(--text3);font-weight:400;font-size:13px;">('+arr.length+')</span></span><span style="opacity:.6;font-size:12px;">'+(collapsed?'▸':'▾')+'</span>';
-      hdr.addEventListener('click',function(){ _ncCollapse[b]=!_ncCollapse[b]; draw(); });
+      var hdr=document.createElement('div'); hdr.style.cssText='display:flex;justify-content:space-between;align-items:center;gap:8px;user-select:none;background:var(--surface3);border:1px solid var(--border);border-radius:7px;padding:9px 12px;margin-top:10px;';
+      var left=document.createElement('div'); left.style.cssText='cursor:pointer;flex:1;min-width:0;';
+      left.innerHTML='<span style="font-weight:700;font-size:15px;">'+_esc(b)+' <span style="color:var(--text3);font-weight:400;font-size:13px;">('+arr.length+')</span></span> <span style="opacity:.6;font-size:12px;">'+(collapsed?'▸':'▾')+'</span>';
+      left.addEventListener('click',function(){ _ncCollapse[b]=!_ncCollapse[b]; draw(); });
+      var clr=document.createElement('button'); clr.className='ncbtn g'; clr.style.cssText='font-size:11px;padding:2px 8px;flex-shrink:0;'; clr.textContent='Clear all';
+      (function(bn){ clr.addEventListener('click',function(e){ e.stopPropagation(); var all=NC.filter(function(x){ return (x.builder||'(Unspecified)')===bn; }); if(confirm('Delete ALL '+all.length+' communities for '+bn+'? This cannot be undone.')){ all.map(function(x){return x.id;}).forEach(function(id){ delNC(id); }); draw(); } }); })(b);
+      hdr.appendChild(left); hdr.appendChild(clr);
       list.appendChild(hdr);
       if(collapsed) return;
       arr.forEach(function(x){ list.appendChild(rowEl(x)); });
@@ -13142,8 +13147,11 @@ function _ncExtractPrompt(corpus){
     +'Return ONLY a JSON object of the exact form {"communities": [ ... ]}, where the array has one entry per '
     +'community: {"builder":string,"community":string,"city":string,"state":string,"home_types":string,'
     +'"price_text":string,"promo":string,"status":one of ["active","coming_soon","sold_out","unknown"]}. '
-    +'Rules: include only real named communities (skip nav, footers, generic marketing). Keep every value short; '
-    +'never output long numbers or URLs. price_text = the price as written (e.g. "From the $530’s"). '
+    +'Rules: include only real named communities (skip nav, footers, generic marketing). Keep every value short '
+    +'(under ~60 characters); never output a whole URL or any number longer than 7 digits. '
+    +'Extract city and state even when they only appear inside a URL slug — e.g. ".../Amberly-Place-North-Salt-Lake-UT-84054/" '
+    +'means city "North Salt Lake", state "UT". Always fill city and state when derivable. '
+    +'price_text = the starting price if shown (e.g. "From the $530’s" or "From $800,000"), else "". '
     +'home_types = the type as written (Single Family, Townhome, Condo…) or "" if not shown. '
     +'promo = any incentive (rate buydown, $ toward options, price drop), else "". Infer builder from the branding.\n\nSOURCE TEXT:\n'+String(corpus||'').slice(0,45000);
 }
@@ -13211,6 +13219,14 @@ function ncLocalParse(text, builderHint){
     if(!name || name.length>60) continue;
     var cm=cityBlob.match(/^(.+?),\s*([A-Z]{2})/); var city=cm?cm[1].trim():cityBlob, state=cm?cm[2]:'';
     out.push({ builder:builderHint||'', community:name, city:city, state:state, home_types:type, price_text:price, promo:promo, url:'', status:/sold out/i.test(price)?'sold_out':(/coming soon/i.test(price)?'coming_soon':'active') });
+  }
+  if(out.length) return out;
+  // Format B: label-based (e.g. Ivory) — Name / Location: / City: / Homes Starting at:$XXXk|M / [View].
+  var re2=/([^\n]+)\n[ \t]*\n?[ \t]*Location:[^\n]*\n[ \t]*City:\s*([^\n]+)\n[ \t]*(?:Homes Starting at:\s*([^\n]+)|(Upcoming|Coming Soon|Sold Out))/gi, m2;
+  while((m2=re2.exec(norm))){
+    var nm=(m2[1]||'').trim(), cty=(m2[2]||'').trim(), pr=(m2[3]||'').trim(), st=(m2[4]||'').trim();
+    if(!nm || nm.length>70) continue;
+    out.push({ builder:builderHint||'', community:nm, city:cty, state:'UT', home_types:ncGuessType(nm), price_text:pr?('From '+pr):'', promo:'', url:'', status:/upcoming|coming/i.test(st)?'coming_soon':(/sold/i.test(st)?'sold_out':'active') });
   }
   return out;
 }
