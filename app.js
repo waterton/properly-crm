@@ -13160,6 +13160,34 @@ function ncApplyExtracted(arr, sourceLabel){
   });
   return { added:added, updated:updated };
 }
+// Deterministic parse of a copied builder listing page. These pages copy as bracketed links grouped
+// by community URL — one URL per community, with its name/type/city/price lines sharing that URL. Fast
+// and free; the AI is only a fallback for formats this doesn't recognize.
+function ncLocalParse(text, builderHint){
+  var lines=String(text||'').split(/\r?\n/);
+  var groups={}, order=[], linkRe=/\[([^\]]*)\]\(([^)]+)\)/;
+  lines.forEach(function(ln){
+    var m=ln.match(linkRe); if(!m) return;
+    var txt=(m[1]||'').trim(), url=(m[2]||'').trim(); if(!txt||!url) return;
+    if(!groups[url]){ groups[url]={texts:[],url:url}; order.push(url); }
+    groups[url].texts.push(txt);
+  });
+  var out=[];
+  order.forEach(function(u){
+    var texts=groups[u].texts, name='',type='',city='',state='',price='',promo='';
+    texts.forEach(function(t){
+      if(/limited.?time|incentive|toward|buydown|%\s*(interest|rate)|design options/i.test(t)){ if(!promo) promo=t; return; }
+      if(/^(single family|townhome|twinhome|twin home|condo|multi.?family)$/i.test(t)){ type=t; return; }
+      var cm=t.match(/^(.+?),\s*([A-Z]{2}),?\s*([0-9]{5}(?:\/[0-9]{5})?)?\s*$/);
+      if(cm){ city=cm[1].trim(); state=cm[2]; return; }
+      if(/\$|from the|from \$|limited lots|sold out|coming soon|call for/i.test(t)){ if(!price) price=t; return; }
+      if(!name) name=t;
+    });
+    if(!name){ var s=u.match(/\/communities\/([^\/?#]+)/)||u.match(/\/([^\/?#]+)\/?$/); if(s) name=s[1].replace(/-/g,' ').replace(/\b\w/g,function(c){return c.toUpperCase();}); }
+    if(name && (type||city||price)) out.push({ builder:builderHint||'', community:name, city:city, state:state, home_types:type, price_text:price, promo:promo, url:u, status:/sold out/i.test(price)?'sold_out':(/coming soon/i.test(price)?'coming_soon':'active') });
+  });
+  return out;
+}
 function ncPasteModal(){
   var ov=document.createElement('div'); ov.className='modal-ov open'; ov.style.zIndex='1300';
   var m=document.createElement('div'); m.className='modal'; m.style.maxWidth='620px';
@@ -13178,17 +13206,18 @@ function ncPasteModal(){
   var go=document.createElement('button'); go.className='btn btn-p'; go.textContent='Extract & add';
   go.addEventListener('click',function(){
     var text=(ta.value||'').trim(); if(text.length<40){ alert('Paste the page text first.'); return; }
-    var corpus=(bin.value.trim()?('Builder: '+bin.value.trim()+'\n'):'')+text;
+    var builderHint=bin.value.trim();
     var orig=go.textContent; go.textContent='Reading…'; go.disabled=true;
     (async function(){
       try{
-        var r=await ncExtractFromText(corpus); var arr=r.arr;
-        var res=ncApplyExtracted(arr,'paste');
-        if(res.added+res.updated===0){
-          go.textContent=orig; go.disabled=false;
-          alert('Nothing recognizable was found.\n\nMake sure you copied the page that lists the communities with prices (not the homepage). If it still fails, here’s the start of what the AI returned so we can fix it:\n\n'+String(r.raw||'(empty response)').slice(0,400));
-          return;
+        // 1) Fast local parse of the copied listing format. 2) AI fallback for anything it can't read.
+        var arr=ncLocalParse(text, builderHint);
+        if(!arr.length){
+          var corpus=(builderHint?('Builder: '+builderHint+'\n'):'')+text;
+          var r=await ncExtractFromText(corpus); arr=r.arr;
+          if(!arr.length){ go.textContent=orig; go.disabled=false; alert('Nothing recognizable was found.\n\nMake sure you copied the page that lists the communities with prices (not the homepage). Diagnostic:\n\n'+String(r.raw||'(empty response)').slice(0,400)); return; }
         }
+        var res=ncApplyExtracted(arr,'paste');
         document.body.removeChild(ov); renderNewConstruction();
         alert('Added '+res.added+' new communit'+(res.added===1?'y':'ies')+', updated '+res.updated+'.');
       }catch(e){ go.textContent=orig; go.disabled=false; alert('Extract failed: '+(e&&e.message||e)); }
