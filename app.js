@@ -13137,20 +13137,24 @@ function _ncBuildersModalDraw(){
   document.body.appendChild(ov);
 }
 function _ncExtractPrompt(corpus){
-  return 'These are new-home BUILDER marketing/agent emails. Extract every specific new-construction COMMUNITY mentioned, with its details. '
-    +'Return ONLY a JSON array (no prose, no markdown). Each item: '
-    +'{"builder":string,"community":string,"city":string,"state":string,"home_types":string,'
+  return 'This is text from a new-home BUILDER website or email listing MULTIPLE communities. Extract EVERY '
+    +'new-construction community — there are usually many (often 10-30); do not stop after one. '
+    +'Return ONLY a JSON object of the exact form {"communities": [ ... ]}, where the array has one entry per '
+    +'community: {"builder":string,"community":string,"city":string,"state":string,"home_types":string,'
     +'"price_text":string,"price_min":number|null,"price_max":number|null,"promo":string,'
     +'"status":one of ["active","coming_soon","sold_out","unknown"],"url":string}. '
-    +'Rules: include only real named communities (skip generic marketing/newsletters with no community). '
+    +'Rules: include only real named communities (skip nav, footers, generic marketing). '
     +'price_text = the price as written (e.g. "From the $530’s"); price_min/price_max = plain dollar numbers if determinable, else null. '
-    +'promo = any incentive (rate buydown, $ toward options, price drop), else "". Infer builder from the sender/branding.\n\nSOURCE TEXT:\n'+String(corpus||'').slice(0,45000);
+    +'home_types = the type as written (Single Family, Townhome, Condo…) or "" if not shown. '
+    +'promo = any incentive (rate buydown, $ toward options, price drop), else "". Infer builder from the branding.\n\nSOURCE TEXT:\n'+String(corpus||'').slice(0,45000);
 }
-// Schema forces Gemini to return an ARRAY of communities (it otherwise collapses a list to one object).
-var NC_SCHEMA={ type:'ARRAY', items:{ type:'OBJECT', properties:{
+// Schema wraps the list in an object property — Gemini returns a full array this way instead of
+// collapsing a list down to a single object (which happens with a bare top-level array).
+var NC_SCHEMA={ type:'OBJECT', properties:{ communities:{ type:'ARRAY', items:{ type:'OBJECT', properties:{
   builder:{type:'STRING'}, community:{type:'STRING'}, city:{type:'STRING'}, state:{type:'STRING'},
   home_types:{type:'STRING'}, price_text:{type:'STRING'}, price_min:{type:'NUMBER',nullable:true},
-  price_max:{type:'NUMBER',nullable:true}, promo:{type:'STRING'}, status:{type:'STRING'}, url:{type:'STRING'} } } };
+  price_max:{type:'NUMBER',nullable:true}, promo:{type:'STRING'}, status:{type:'STRING'}, url:{type:'STRING'} } } } },
+  required:['communities'] };
 // Call the AI extractor and normalize its output to an array of community items, however it comes back.
 async function ncExtractFromText(corpus){
   var resp=await fetch('/api/claude',{ method:'POST', headers:await apiHeaders(), body:JSON.stringify({ max_tokens:8192, response_format:'json', response_schema:NC_SCHEMA, messages:[{ role:'user', content:_ncExtractPrompt(corpus) }] }) });
