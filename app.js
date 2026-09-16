@@ -13284,6 +13284,26 @@ function ncParseDRHorton(text){
   });
   return out;
 }
+// Fieldstone-specific parse. Fieldstone's list is plain text (no per-community links), grouped under
+// "Active" and "Coming Soon" headers. Each priced community is Name / "City, UT" / "From $price" /
+// sqft / beds / baths. Coming-soon communities have a name + city but no price. We read the visible
+// list; the featured-community repeat (with a ZIP) and the footer nav names are de-duplicated / ignored.
+function ncParseFieldstone(text){
+  var norm=String(text||'').replace(/\r/g,'').replace(/\[([^\]]*)\]\([^)]*\)/g,'$1');
+  var out=[], seen={};
+  function add(name,city,price,status){
+    name=(name||'').trim(); city=(city||'').trim(); if(!name||name.length>60) return;
+    var k=name.toLowerCase(); if(seen[k]) return; seen[k]=1;
+    out.push({ builder:'Fieldstone Homes', community:name, city:city, state:'UT',
+      home_types:ncGuessType(name), price_text:(price||'').trim(), promo:'', url:'', status:status||'active' });
+  }
+  var re=/([^\n]+)\n([A-Za-z][A-Za-z .'\-]*),\s*UT(?:\s+\d{5})?\n(From (?:the )?\$[\d,]+s?)/g, m;
+  while((m=re.exec(norm))){ add(m[1], m[2], m[3], 'active'); }
+  var cs=norm.match(/Coming Soon\n([\s\S]*?)(?:\nFind Your Home|\nWhat People|\nNew Homes in Utah|\nCommunities\n|$)/);
+  if(cs){ var re2=/([^\n]+)\n([A-Za-z][A-Za-z .'\-]*),\s*UT(?:\s+\d{5})?/g, m2;
+    while((m2=re2.exec(cs[1]))){ add(m2[1], m2[2], '', 'coming_soon'); } }
+  return out;
+}
 // Deterministic parse of a copied builder listing page. Works whether the copy came through as plain
 // text (one field per line, or space-joined) or as markdown links — it strips any links, then finds
 // each community by its Name / TYPE / City, ST ZIP / Price pattern, with an optional incentive line.
@@ -13344,15 +13364,17 @@ function ncPasteModal(){
     var builderHint=(bin.value==='__new__'?newBin.value:bin.value).trim();
     // Lennar/D.R. Horton set their own builder from the page; everything else needs a picked builder so
     // the import doesn't land in an "(Unspecified)" group.
-    var _autoDetected=/lennar\.com\/new-homes\/|drhorton\.com\//i.test(text);
+    var _autoDetected=/lennar\.com\/new-homes\/|drhorton\.com\/|fieldstonehomes\.com/i.test(text);
     if(!_autoDetected && !builderHint){ alert('Pick a builder from the list first (or choose “+ New builder…”), so these communities attach to the right group.'); return; }
     var orig=go.textContent; go.textContent='Reading…'; go.disabled=true;
     (async function(){
       try{
         // 1) Fast local parse of the copied listing format. 2) AI fallback for anything it can't read.
         // Lennar lists individual homes, not communities, so it gets its own URL-based parser first.
-        var arr = /lennar\.com\/new-homes\//i.test(text) ? ncParseLennar(text)
-                : /drhorton\.com\//i.test(text)         ? ncParseDRHorton(text)
+        var _pick=builderHint.toLowerCase();
+        var arr = /lennar\.com\/new-homes\//i.test(text)                    ? ncParseLennar(text)
+                : /drhorton\.com\//i.test(text)                             ? ncParseDRHorton(text)
+                : (/fieldstonehomes\.com/i.test(text) || /fieldstone/.test(_pick)) ? ncParseFieldstone(text)
                 : [];
         if(!arr.length) arr=ncLocalParse(text, builderHint);
         if(!arr.length){
