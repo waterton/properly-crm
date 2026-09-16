@@ -12955,7 +12955,9 @@ function cproExportPdf(contactId, btn){
 // emails the builders send you, not from scraping their sites. Records live in NC.
 // ============================================================================
 var NC_STATUS=[['active','Active'],['coming_soon','Coming Soon'],['sold_out','Sold Out'],['unknown','Unknown']];
-var _ncBuilder='', _ncCity='', _ncView='active', _ncQuery='';
+var _ncBuilder='', _ncCity='', _ncView='active', _ncQuery='', _ncType='', _ncSort='city', _ncCollapse={};
+function ncType(d){ var h=String((d&&d.home_types)||'').toLowerCase(); if(/condo/.test(h)) return 'condo'; if(/town|twin/.test(h)) return 'townhome'; if(/single|sfr|detached|family/.test(h)) return 'single family'; return ''; }
+function ncPriceNum(d){ var lo=dsNum(d&&d.price_min); if(lo>0) return lo; var m=String((d&&d.price_text)||'').match(/\$\s*([\d,]+)/); if(!m) return 0; var n=parseInt(m[1].replace(/,/g,''))||0; return (n>0 && n<10000)?n*1000:n; }
 function ncStatusLabel(v){ for(var i=0;i<NC_STATUS.length;i++){ if(NC_STATUS[i][0]===v) return NC_STATUS[i][1]; } return v||''; }
 function ncStatusColor(v){ return ({active:'#1f9d55',coming_soon:'#7a5cff',sold_out:'#888',unknown:'#888'})[v]||'#888'; }
 function ncArchived(x){ return !!(x.data&&x.data.archived); }
@@ -13013,44 +13015,70 @@ function renderNewConstruction(){
   var bsel=document.createElement('select'); bsel.style.cssText='background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:7px 8px;font-family:inherit;font-size:13px;width:auto;';
   var builders={}; NC.forEach(function(x){ if(x.builder) builders[x.builder]=true; });
   [['','All builders']].concat(Object.keys(builders).sort().map(function(b){return [b,b];})).forEach(function(o){ var op=document.createElement('option'); op.value=o[0]; op.textContent=o[1]; if(o[0]===_ncBuilder)op.selected=true; bsel.appendChild(op); });
+  var tsel=document.createElement('select'); tsel.style.cssText=bsel.style.cssText;
+  [['','All types'],['single family','Single Family'],['townhome','Townhome'],['condo','Condo']].forEach(function(o){ var op=document.createElement('option'); op.value=o[0]; op.textContent=o[1]; if(o[0]===_ncType)op.selected=true; tsel.appendChild(op); });
   var ssel=document.createElement('select'); ssel.style.cssText=bsel.style.cssText;
   [['active','Active'],['all','All'],['updated','Updated this week']].concat(NC_STATUS).concat([['archived','Archived']]).forEach(function(o){ var op=document.createElement('option'); op.value=o[0]; op.textContent=o[1]; if(o[0]===_ncView)op.selected=true; ssel.appendChild(op); });
-  ctr.appendChild(search); ctr.appendChild(bsel); ctr.appendChild(ssel); root.appendChild(ctr);
-  var list=document.createElement('div'); list.style.cssText='display:flex;flex-direction:column;gap:8px;'; root.appendChild(list);
+  var sortsel=document.createElement('select'); sortsel.style.cssText=bsel.style.cssText;
+  [['city','Sort: City'],['price_lo','Sort: Price ↑'],['price_hi','Sort: Price ↓'],['name','Sort: Name'],['updated','Sort: Recent']].forEach(function(o){ var op=document.createElement('option'); op.value=o[0]; op.textContent=o[1]; if(o[0]===_ncSort)op.selected=true; sortsel.appendChild(op); });
+  ctr.appendChild(search); ctr.appendChild(bsel); ctr.appendChild(tsel); ctr.appendChild(ssel); ctr.appendChild(sortsel); root.appendChild(ctr);
+  var list=document.createElement('div'); list.style.cssText='display:flex;flex-direction:column;gap:6px;'; root.appendChild(list);
+  function rowEl(x){
+    var d=x.data||{}, arch=ncArchived(x);
+    var row=document.createElement('div'); row.style.cssText='display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 14px;cursor:pointer;margin-left:6px;'+(arch?'opacity:.7;':'');
+    var badge='<span class="nc-badge" style="background:'+ncStatusColor(d.status)+';">'+_esc(ncStatusLabel(d.status||'active'))+'</span>';
+    var fresh=ncRecent(x)?' <span class="nc-badge" style="background:#d08b1f;">NEW/UPDATED</span>':'';
+    var sub=[d.city, d.home_types, ncPrice(d)].filter(Boolean).join('  ·  ');
+    var promo=d.promo?('<div style="font-size:12px;color:#1f9d55;margin-top:2px;">'+_esc(d.promo)+'</div>'):'';
+    row.innerHTML='<div style="min-width:0;"><div style="font-weight:600;overflow:hidden;text-overflow:ellipsis;">'+_esc(x.name||'(community)')+' '+badge+fresh+(arch?' <span class="nc-badge" style="background:#888;">ARCHIVED</span>':'')+'</div><div style="font-size:12px;color:var(--text3);">'+_esc(sub)+'</div>'+promo+'</div>';
+    var btns=document.createElement('div'); btns.style.cssText='display:flex;gap:6px;flex-shrink:0;';
+    var ab=document.createElement('button'); ab.className='ncbtn g'; ab.style.cssText='font-size:12px;padding:3px 9px;'; ab.textContent=arch?'Unarchive':'Archive';
+    ab.addEventListener('click',function(e){ e.stopPropagation(); if(!x.data)x.data={}; x.data.archived=!arch; saveNC(x); draw(); });
+    var del=document.createElement('button'); del.className='ncbtn g'; del.style.cssText='font-size:12px;padding:3px 9px;'; del.textContent='Delete';
+    (function(id){ del.addEventListener('click',function(e){ e.stopPropagation(); if(confirm('Delete this community?')){ delNC(id); draw(); } }); })(x.id);
+    btns.appendChild(ab); btns.appendChild(del);
+    row.addEventListener('click',function(){ openNC(x,false); }); row.appendChild(btns); return row;
+  }
+  function cmp(a,b){
+    var da=a.data||{}, db=b.data||{};
+    if(_ncSort==='name') return String(a.name||'').localeCompare(String(b.name||''));
+    if(_ncSort==='updated') return String(b.updated_at||'').localeCompare(String(a.updated_at||''));
+    if(_ncSort==='price_lo'){ return (ncPriceNum(da)||9e15)-(ncPriceNum(db)||9e15); }
+    if(_ncSort==='price_hi'){ return (ncPriceNum(db)|| -1)-(ncPriceNum(da)|| -1); }
+    return String(da.city||'').localeCompare(String(db.city||'')) || (ncPriceNum(da)-ncPriceNum(db));
+  }
   function draw(){
     list.innerHTML=''; var q=_ncQuery.trim().toLowerCase();
     var items=NC.filter(function(x){
       var d=x.data||{}, arch=ncArchived(x);
       if(_ncBuilder && x.builder!==_ncBuilder) return false;
-      if(q){ var hay=((x.name||'')+' '+(d.city||'')+' '+(x.builder||'')).toLowerCase(); if(hay.indexOf(q)<0) return false; }
+      if(_ncType && ncType(d)!==_ncType) return false;
+      if(q){ var hay=((x.name||'')+' '+(d.city||'')+' '+(x.builder||'')+' '+(d.home_types||'')).toLowerCase(); if(hay.indexOf(q)<0) return false; }
       if(_ncView==='archived') return arch;
       if(arch) return false;
       if(_ncView==='active') return (d.status||'active')!=='sold_out';
       if(_ncView==='all') return true;
       if(_ncView==='updated') return ncRecent(x);
       return d.status===_ncView;
-    }).sort(function(a,b){ return String(b.updated_at||'').localeCompare(String(a.updated_at||'')); });
+    });
     if(!items.length){ list.appendChild(mkDivSafe('color:var(--text3);padding:16px 0;','Nothing matches.')); return; }
-    items.forEach(function(x){
-      var d=x.data||{}, arch=ncArchived(x);
-      var row=document.createElement('div'); row.style.cssText='display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 14px;cursor:pointer;'+(arch?'opacity:.7;':'');
-      var badge='<span class="nc-badge" style="background:'+ncStatusColor(d.status)+';">'+_esc(ncStatusLabel(d.status||'active'))+'</span>';
-      var fresh=ncRecent(x)?' <span class="nc-badge" style="background:#d08b1f;">NEW/UPDATED</span>':'';
-      var sub=[x.builder, d.city, d.home_types, ncPrice(d)].filter(Boolean).join('  ·  ');
-      var promo=d.promo?('<div style="font-size:12px;color:#1f9d55;margin-top:2px;">'+_esc(d.promo)+'</div>'):'';
-      row.innerHTML='<div style="min-width:0;"><div style="font-weight:600;overflow:hidden;text-overflow:ellipsis;">'+_esc(x.name||'(community)')+' '+badge+fresh+(arch?' <span class="nc-badge" style="background:#888;">ARCHIVED</span>':'')+'</div><div style="font-size:12px;color:var(--text3);">'+_esc(sub)+'</div>'+promo+'</div>';
-      var btns=document.createElement('div'); btns.style.cssText='display:flex;gap:6px;flex-shrink:0;';
-      var ab=document.createElement('button'); ab.className='ncbtn g'; ab.style.cssText='font-size:12px;padding:3px 9px;'; ab.textContent=arch?'Unarchive':'Archive';
-      ab.addEventListener('click',function(e){ e.stopPropagation(); if(!x.data)x.data={}; x.data.archived=!arch; saveNC(x); draw(); });
-      var del=document.createElement('button'); del.className='ncbtn g'; del.style.cssText='font-size:12px;padding:3px 9px;'; del.textContent='Delete';
-      (function(id){ del.addEventListener('click',function(e){ e.stopPropagation(); if(confirm('Delete this community?')){ delNC(id); draw(); } }); })(x.id);
-      btns.appendChild(ab); btns.appendChild(del);
-      row.addEventListener('click',function(){ openNC(x,false); }); row.appendChild(btns); list.appendChild(row);
+    var groups={}, order=[]; items.forEach(function(x){ var b=x.builder||'(Unspecified)'; if(!groups[b]){ groups[b]=[]; order.push(b); } groups[b].push(x); });
+    order.sort(function(a,b){ return a.toLowerCase().localeCompare(b.toLowerCase()); });
+    order.forEach(function(b){
+      var arr=groups[b].slice().sort(cmp); var collapsed=!!_ncCollapse[b];
+      var hdr=document.createElement('div'); hdr.style.cssText='display:flex;justify-content:space-between;align-items:center;cursor:pointer;user-select:none;background:var(--surface3);border:1px solid var(--border);border-radius:7px;padding:9px 12px;margin-top:10px;';
+      hdr.innerHTML='<span style="font-weight:700;font-size:15px;">'+_esc(b)+' <span style="color:var(--text3);font-weight:400;font-size:13px;">('+arr.length+')</span></span><span style="opacity:.6;font-size:12px;">'+(collapsed?'▸':'▾')+'</span>';
+      hdr.addEventListener('click',function(){ _ncCollapse[b]=!_ncCollapse[b]; draw(); });
+      list.appendChild(hdr);
+      if(collapsed) return;
+      arr.forEach(function(x){ list.appendChild(rowEl(x)); });
     });
   }
   search.addEventListener('input',function(){ _ncQuery=search.value; draw(); });
   bsel.addEventListener('change',function(){ _ncBuilder=bsel.value; draw(); });
+  tsel.addEventListener('change',function(){ _ncType=tsel.value; draw(); });
   ssel.addEventListener('change',function(){ _ncView=ssel.value; draw(); });
+  sortsel.addEventListener('change',function(){ _ncSort=sortsel.value; draw(); });
   draw();
 }
 function openNC(x, isNew){
