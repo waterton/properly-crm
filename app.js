@@ -13141,19 +13141,18 @@ function _ncExtractPrompt(corpus){
     +'new-construction community — there are usually many (often 10-30); do not stop after one. '
     +'Return ONLY a JSON object of the exact form {"communities": [ ... ]}, where the array has one entry per '
     +'community: {"builder":string,"community":string,"city":string,"state":string,"home_types":string,'
-    +'"price_text":string,"price_min":number|null,"price_max":number|null,"promo":string,'
-    +'"status":one of ["active","coming_soon","sold_out","unknown"],"url":string}. '
-    +'Rules: include only real named communities (skip nav, footers, generic marketing). '
-    +'price_text = the price as written (e.g. "From the $530’s"); price_min/price_max = plain dollar numbers if determinable, else null. '
+    +'"price_text":string,"promo":string,"status":one of ["active","coming_soon","sold_out","unknown"]}. '
+    +'Rules: include only real named communities (skip nav, footers, generic marketing). Keep every value short; '
+    +'never output long numbers or URLs. price_text = the price as written (e.g. "From the $530’s"). '
     +'home_types = the type as written (Single Family, Townhome, Condo…) or "" if not shown. '
     +'promo = any incentive (rate buydown, $ toward options, price drop), else "". Infer builder from the branding.\n\nSOURCE TEXT:\n'+String(corpus||'').slice(0,45000);
 }
 // Schema wraps the list in an object property — Gemini returns a full array this way instead of
-// collapsing a list down to a single object (which happens with a bare top-level array).
+// collapsing a list to a single object. URL and numeric price fields are omitted on purpose: they
+// triggered a runaway-digits loop that truncated the response.
 var NC_SCHEMA={ type:'OBJECT', properties:{ communities:{ type:'ARRAY', items:{ type:'OBJECT', properties:{
   builder:{type:'STRING'}, community:{type:'STRING'}, city:{type:'STRING'}, state:{type:'STRING'},
-  home_types:{type:'STRING'}, price_text:{type:'STRING'}, price_min:{type:'NUMBER',nullable:true},
-  price_max:{type:'NUMBER',nullable:true}, promo:{type:'STRING'}, status:{type:'STRING'}, url:{type:'STRING'} } } } },
+  home_types:{type:'STRING'}, price_text:{type:'STRING'}, promo:{type:'STRING'}, status:{type:'STRING'} } } } },
   required:['communities'] };
 // Call the AI extractor and normalize its output to an array of community items, however it comes back.
 async function ncExtractFromText(corpus){
@@ -13165,6 +13164,11 @@ async function ncExtractFromText(corpus){
   else if(parsed && typeof parsed==='object'){
     if(Array.isArray(parsed.communities)) arr=parsed.communities;
     else { var found=null; for(var k in parsed){ if(Array.isArray(parsed[k])){ found=parsed[k]; break; } } arr = found || ((parsed.community||parsed.name)?[parsed]:[]); }
+  }
+  // Salvage: if the JSON was truncated (e.g. a runaway field), recover whatever complete community
+  // objects we can from the raw text so a partial response still yields most of the list.
+  if(!arr.length && /"community"\s*:/.test(raw)){
+    (raw.match(/\{[^{}]*"community"\s*:[^{}]*\}/g)||[]).forEach(function(o){ try{ arr.push(JSON.parse(o)); }catch(e){} });
   }
   return { arr:arr, raw:raw };
 }
