@@ -13000,11 +13000,12 @@ function renderNewConstruction(){
   var bar=document.createElement('div'); bar.style.cssText='display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;';
   bar.appendChild(mkDivSafe('font-size:22px;font-weight:600;','New Construction'));
   var bw=document.createElement('div'); bw.style.cssText='display:flex;gap:8px;flex-wrap:wrap;';
-  var scan=document.createElement('button'); scan.className='ncbtn'; scan.textContent='Scan builder emails'; scan.addEventListener('click',function(){ scanBuilderEmails(scan); }); bw.appendChild(scan);
+  var paste=document.createElement('button'); paste.className='ncbtn'; paste.textContent='Paste from a page'; paste.addEventListener('click',ncPasteModal); bw.appendChild(paste);
+  var scan=document.createElement('button'); scan.className='ncbtn g'; scan.textContent='Scan builder emails'; scan.addEventListener('click',function(){ scanBuilderEmails(scan); }); bw.appendChild(scan);
   var mb=document.createElement('button'); mb.className='ncbtn g'; mb.textContent='Manage builders'; mb.addEventListener('click',ncBuildersModal); bw.appendChild(mb);
   var add=document.createElement('button'); add.className='ncbtn g'; add.textContent='+ Add manually'; add.addEventListener('click',function(){ openNC(ncDefault(),true); }); bw.appendChild(add);
   bar.appendChild(bw); root.appendChild(bar);
-  root.appendChild(mkDivSafe('color:var(--text3);font-size:12px;margin:-2px 0 12px;line-height:1.5;','Subscribe to each builder’s <b>agent/Realtor email list</b>, then click <b>Scan builder emails</b> — the scanner reads the updates they send you and files each community here. You can also add any manually.'));
+  root.appendChild(mkDivSafe('color:var(--text3);font-size:12px;margin:-2px 0 12px;line-height:1.5;','Open a builder’s community page in your browser, copy it, and use <b>Paste from a page</b> to file every community here. Or, if you’re on a builder’s <b>agent email list</b>, use <b>Scan builder emails</b>. Add any by hand too.'));
   if(!NC.length){ root.appendChild(mkDivSafe('color:var(--text3);padding:20px 0;','Nothing yet. Set up your builders, subscribe to their agent emails, then scan — or add a community by hand.')); return; }
   var ctr=document.createElement('div'); ctr.style.cssText='display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;';
   var search=document.createElement('input'); search.type='text'; search.placeholder='Search community / city…'; search.value=_ncQuery;
@@ -13117,6 +13118,66 @@ function _ncExtractPrompt(corpus){
     +'price_text = the price as written (e.g. "From the $530’s"); price_min/price_max = plain dollar numbers if determinable, else null. '
     +'promo = any incentive (rate buydown, $ toward options, price drop), else "". Infer builder from the sender/branding.\n\nEMAILS:\n'+String(corpus||'').slice(0,15000);
 }
+// Upsert an extracted array of communities into NC (used by both the email scan and paste-from-page).
+function ncApplyExtracted(arr, sourceLabel){
+  var added=0, updated=0, today=tod();
+  (arr||[]).forEach(function(it){
+    var name=(it.community||'').trim(); if(!name) return;
+    var builder=(it.builder||'').trim();
+    var rec=ncFind(builder,name);
+    if(rec){
+      var d=rec.data||(rec.data={}); var changed=false;
+      ['city','state','home_types','price_text','promo','url'].forEach(function(k){ if(it[k]!=null && String(it[k]).trim() && String(it[k])!==String(d[k]||'')){ d[k]=String(it[k]).trim(); changed=true; } });
+      if(it.price_min!=null){ d.price_min=it.price_min; } if(it.price_max!=null){ d.price_max=it.price_max; }
+      if(it.status && it.status!==d.status){ d.status=it.status; changed=true; }
+      d.last_seen=today; if(changed){ updated++; saveNC(rec); }
+    } else {
+      var nrec={ id:Date.now()+Math.floor(Math.random()*100000)+added, builder:builder, name:name, data:{
+        city:(it.city||'').trim(), state:(it.state||'UT').trim(), home_types:(it.home_types||'').trim(),
+        price_text:(it.price_text||'').trim(), price_min:(it.price_min!=null?it.price_min:''), price_max:(it.price_max!=null?it.price_max:''),
+        promo:(it.promo||'').trim(), status:(it.status||'active'), url:(it.url||'').trim(), source:sourceLabel||'manual', email_ref:'', notes:'',
+        first_seen:today, last_seen:today, archived:false } };
+      NC.push(nrec); saveNC(nrec); added++;
+    }
+  });
+  return { added:added, updated:updated };
+}
+function ncPasteModal(){
+  var ov=document.createElement('div'); ov.className='modal-ov open'; ov.style.zIndex='1300';
+  var m=document.createElement('div'); m.className='modal'; m.style.maxWidth='620px';
+  var h=document.createElement('div'); h.style.cssText='display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--border);';
+  h.innerHTML='<div style="font-weight:700;font-size:17px;">Paste from a builder page</div>';
+  var x=document.createElement('button'); x.textContent='✕'; x.style.cssText='background:none;border:none;font-size:18px;color:var(--text3);cursor:pointer;'; x.addEventListener('click',function(){ document.body.removeChild(ov); }); h.appendChild(x); m.appendChild(h);
+  var body=document.createElement('div'); body.style.cssText='padding:16px 20px;display:flex;flex-direction:column;gap:10px;';
+  body.appendChild(mkDivSafe('font-size:12px;color:var(--text3);line-height:1.5;','Open a builder’s communities / available-homes page in your browser, select all (Ctrl+A), copy (Ctrl+C), and paste below. The AI pulls the communities, prices, and incentives into your list. Setting the builder name helps it attribute them.'));
+  var bl=document.createElement('label'); bl.className='fl'; bl.textContent='Builder name (optional)'; body.appendChild(bl);
+  var bin=document.createElement('input'); bin.className='fi'; bin.placeholder='e.g. Edge Homes'; body.appendChild(bin);
+  var tl=document.createElement('label'); tl.className='fl'; tl.textContent='Pasted page text'; body.appendChild(tl);
+  var ta=document.createElement('textarea'); ta.className='fi'; ta.rows=9; ta.placeholder='Paste the page here…'; body.appendChild(ta);
+  m.appendChild(body);
+  var ft=document.createElement('div'); ft.style.cssText='display:flex;justify-content:flex-end;gap:8px;padding:14px 20px;border-top:1px solid var(--border);';
+  var cancel=document.createElement('button'); cancel.className='btn btn-g'; cancel.textContent='Cancel'; cancel.addEventListener('click',function(){ document.body.removeChild(ov); });
+  var go=document.createElement('button'); go.className='btn btn-p'; go.textContent='Extract & add';
+  go.addEventListener('click',function(){
+    var text=(ta.value||'').trim(); if(text.length<40){ alert('Paste the page text first.'); return; }
+    var corpus=(bin.value.trim()?('Builder: '+bin.value.trim()+'\n'):'')+text;
+    var orig=go.textContent; go.textContent='Reading…'; go.disabled=true;
+    (async function(){
+      try{
+        var resp=await fetch('/api/claude',{ method:'POST', headers:await apiHeaders(), body:JSON.stringify({ max_tokens:6000, response_format:'json', messages:[{ role:'user', content:_ncExtractPrompt(corpus) }] }) });
+        var data=await resp.json(); if(data&&data.error) throw new Error(data.error.message||JSON.stringify(data.error));
+        var raw=(data.content&&data.content[0]&&data.content[0].text)||''; var arr=_parseJsonLoose(raw);
+        if(!Array.isArray(arr)){ if(arr&&Array.isArray(arr.communities)) arr=arr.communities; else arr=[]; }
+        var res=ncApplyExtracted(arr,'paste');
+        document.body.removeChild(ov); renderNewConstruction();
+        alert('Added '+res.added+' new communit'+(res.added===1?'y':'ies')+', updated '+res.updated+'.'+(res.added+res.updated===0?'\n\nNothing recognizable was found in that text.':''));
+      }catch(e){ go.textContent=orig; go.disabled=false; alert('Extract failed: '+(e&&e.message||e)); }
+    })();
+  });
+  ft.appendChild(cancel); ft.appendChild(go); m.appendChild(ft);
+  ov.appendChild(m); ov.addEventListener('click',function(e){ if(e.target===ov) document.body.removeChild(ov); });
+  document.body.appendChild(ov); setTimeout(function(){ try{ ta.focus(); }catch(e){} },50);
+}
 async function scanBuilderEmails(btn){
   await loadNcBuilders();
   if(!NC_BUILDERS.length){ if(confirm('No builders set up yet. Add your builders and their email senders first?')) ncBuildersModal(); return; }
@@ -13146,26 +13207,7 @@ async function scanBuilderEmails(btn){
     var aiData=await aiResp.json(); if(aiData&&aiData.error) throw new Error(aiData.error.message||JSON.stringify(aiData.error));
     var raw=(aiData.content&&aiData.content[0]&&aiData.content[0].text)||''; var arr=_parseJsonLoose(raw);
     if(!Array.isArray(arr)){ if(arr && Array.isArray(arr.communities)) arr=arr.communities; else arr=[]; }
-    var added=0, updated=0, today=tod();
-    arr.forEach(function(it){
-      var name=(it.community||'').trim(); if(!name) return;
-      var builder=(it.builder||'').trim();
-      var rec=ncFind(builder,name);
-      if(rec){
-        var d=rec.data||(rec.data={}); var changed=false;
-        ['city','state','home_types','price_text','promo','url'].forEach(function(k){ if(it[k]!=null && String(it[k]).trim() && String(it[k])!==String(d[k]||'')){ d[k]=String(it[k]).trim(); changed=true; } });
-        if(it.price_min!=null){ d.price_min=it.price_min; } if(it.price_max!=null){ d.price_max=it.price_max; }
-        if(it.status && it.status!==d.status){ d.status=it.status; changed=true; }
-        d.last_seen=today; if(changed){ updated++; saveNC(rec); }
-      } else {
-        var nrec={ id:Date.now()+Math.floor(Math.random()*100000)+added, builder:builder, name:name, data:{
-          city:(it.city||'').trim(), state:(it.state||'UT').trim(), home_types:(it.home_types||'').trim(),
-          price_text:(it.price_text||'').trim(), price_min:(it.price_min!=null?it.price_min:''), price_max:(it.price_max!=null?it.price_max:''),
-          promo:(it.promo||'').trim(), status:(it.status||'active'), url:(it.url||'').trim(), source:'email', email_ref:'', notes:'',
-          first_seen:today, last_seen:today, archived:false } };
-        NC.push(nrec); saveNC(nrec); added++;
-      }
-    });
+    var res=ncApplyExtracted(arr,'email'); var added=res.added, updated=res.updated;
     done();
     renderNewConstruction();
     alert('Scan complete.\n\n'+added+' new communit'+(added===1?'y':'ies')+' added, '+updated+' updated.'+(arr.length===0?'\n\n(No communities were found in those emails — they may have been generic newsletters.)':''));
