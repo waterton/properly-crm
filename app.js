@@ -13242,6 +13242,48 @@ function ncParseLennar(text){
   });
   return out;
 }
+// D.R. Horton-specific parse. Each block on Horton's community list is already one community (not
+// individual homes), and every link in a block points to that community's URL
+//   drhorton.com/utah/salt-lake-city/{city}/{community}
+// so we group links by URL and read the community name, city, price, and status out of the block's
+// texts. The displayed "City, ST ZIP" line is preferred over the URL city slug (they can differ, e.g.
+// Riley Park's URL says "erda" but it markets as Tooele).
+function ncParseDRHorton(text){
+  var norm=String(text||'').replace(/\r/g,'');
+  var byUrl={}, order=[];
+  var lr=/\[([^\]]+)\]\((https?:\/\/[^)]*drhorton\.com\/[^)]+)\)/gi, lm;
+  while((lm=lr.exec(norm))){
+    var txt=lm[1].trim(), url=lm[2];
+    if(!byUrl[url]){ var seg=url.split('drhorton.com/')[1]||''; var parts=seg.split(/[\/?#]/);
+      byUrl[url]={ texts:[], citySlug:parts[2]||'', slug:(parts[3]||'').toLowerCase() }; order.push(url); }
+    if(byUrl[url].texts.indexOf(txt)<0) byUrl[url].texts.push(txt);
+  }
+  function isStatus(t){ return /now selling|coming soon|sold out|new phase|model now open|grand opening|final home|move-in ready/i.test(t); }
+  function isCity(t){ return /,\s*[A-Z]{2}\s+\d{5}/.test(t); }
+  function isPrice(t){ return /\$|call for/i.test(t); }
+  function isBeds(t){ return /\bbed\b/i.test(t); }
+  function isSqft(t){ return /sq\.?\s*ft/i.test(t); }
+  var out=[];
+  order.forEach(function(url){ var b=byUrl[url];
+    var name='', city='', state='UT', price='', status='active', nameCands=[];
+    b.texts.forEach(function(t){
+      if(isCity(t)){ var cm=t.match(/^(.+?),\s*([A-Z]{2})/); if(cm){ city=cm[1].trim(); state=cm[2]; } return; }
+      if(isSqft(t)) return;
+      if(isBeds(t)) return;
+      if(isPrice(t)){ if(/\$/.test(t)) price=t.trim(); return; }
+      if(isStatus(t)){ if(/coming soon/i.test(t)) status='coming_soon'; else if(/sold out/i.test(t)) status='sold_out'; return; }
+      nameCands.push(t);
+    });
+    if(nameCands.length){
+      var match=nameCands.filter(function(t){ return t.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')===b.slug; });
+      name=(match[0]||nameCands[0]).trim();
+    } else { name=_slugTitle(b.slug); }
+    if(!name) return;
+    out.push({ builder:'D.R. Horton', community:name, city:city||_slugTitle(b.citySlug), state:state,
+      home_types:ncGuessType(name), price_text:price, promo:'', url:'', status:status });
+  });
+  return out;
+}
 // Deterministic parse of a copied builder listing page. Works whether the copy came through as plain
 // text (one field per line, or space-joined) or as markdown links — it strips any links, then finds
 // each community by its Name / TYPE / City, ST ZIP / Price pattern, with an optional incentive line.
@@ -13292,7 +13334,9 @@ function ncPasteModal(){
       try{
         // 1) Fast local parse of the copied listing format. 2) AI fallback for anything it can't read.
         // Lennar lists individual homes, not communities, so it gets its own URL-based parser first.
-        var arr=/lennar\.com\/new-homes\//i.test(text) ? ncParseLennar(text) : [];
+        var arr = /lennar\.com\/new-homes\//i.test(text) ? ncParseLennar(text)
+                : /drhorton\.com\//i.test(text)         ? ncParseDRHorton(text)
+                : [];
         if(!arr.length) arr=ncLocalParse(text, builderHint);
         if(!arr.length){
           var corpus=(builderHint?('Builder: '+builderHint+'\n'):'')+text;
