@@ -13198,6 +13198,9 @@ function ncApplyExtracted(arr, sourceLabel){
     if(rec){
       var d=rec.data||(rec.data={}); var changed=false;
       ['city','state','home_types','price_text','promo','url'].forEach(function(k){ if(it[k]!=null && String(it[k]).trim() && String(it[k])!==String(d[k]||'')){ d[k]=String(it[k]).trim(); changed=true; } });
+      // Heal builder spelling/casing to the incoming (canonical) name — matching is case-insensitive, so
+      // a re-paste of "D.R. Horton" over an old "d.r. horton" record fixes the label in place.
+      if(builder && rec.builder!==builder){ rec.builder=builder; changed=true; }
       if(it.price_min!=null){ d.price_min=it.price_min; } if(it.price_max!=null){ d.price_max=it.price_max; }
       if(it.status && it.status!==d.status){ d.status=it.status; changed=true; }
       d.last_seen=today; if(changed){ updated++; saveNC(rec); }
@@ -13320,6 +13323,29 @@ function ncParseFieldstone(text){
     while((m2=re2.exec(cs[1]))){ add(m2[1], m2[2], '', 'coming_soon'); } }
   return out;
 }
+// Richmond American-specific parse. Like Lennar, the page lists individual move-in-ready homes. Each
+// home block is: "$price" / "[$x/mo.](home-url)" / details / "Ready for move-in … [Community](comm-url)
+// in City, UT / County". We roll homes up per community, using the lowest home price as "From $…", and
+// take the community landing URL and city from the "Ready for move-in" line.
+function ncParseRichmond(text){
+  var norm=String(text||'').replace(/\r/g,''); var comm={}, order=[];
+  var re=/\$([\d,]+)\s*\n[\s\S]*?Ready for move-in[^\[]*\[([^\]]+)\]\((https?:\/\/[^)]*richmondamerican\.com\/[^)]+)\)\s+in\s+([^,\n]+),\s*UT/gi, m;
+  while((m=re.exec(norm))){
+    var price=parseInt(m[1].replace(/,/g,''),10);
+    var name=(m[2]||'').trim(), url=(m[3]||'').trim(), city=(m[4]||'').trim();
+    var slug=url.replace(/[#?].*$/,'').replace(/\/+$/,'').split('/').pop().toLowerCase();
+    var key=slug||name.toLowerCase();
+    if(!comm[key]){ comm[key]={ name:name, city:city, url:url, min:(isNaN(price)?null:price) }; order.push(key); }
+    else if(!isNaN(price) && (comm[key].min==null || price<comm[key].min)) comm[key].min=price;
+  }
+  var out=[];
+  order.forEach(function(k){ var c=comm[k];
+    out.push({ builder:'Richmond American', community:c.name, city:c.city, state:'UT',
+      home_types:ncGuessType(c.name), price_text:(c.min!=null?('From $'+c.min.toLocaleString('en-US')):''),
+      promo:'', url:c.url||'', status:'active' });
+  });
+  return out;
+}
 // Deterministic parse of a copied builder listing page. Works whether the copy came through as plain
 // text (one field per line, or space-joined) or as markdown links — it strips any links, then finds
 // each community by its Name / TYPE / City, ST ZIP / Price pattern, with an optional incentive line.
@@ -13380,7 +13406,7 @@ function ncPasteModal(){
     var builderHint=(bin.value==='__new__'?newBin.value:bin.value).trim();
     // Lennar/D.R. Horton set their own builder from the page; everything else needs a picked builder so
     // the import doesn't land in an "(Unspecified)" group.
-    var _autoDetected=/lennar\.com\/new-homes\/|drhorton\.com\/|fieldstonehomes\.com/i.test(text);
+    var _autoDetected=/lennar\.com\/new-homes\/|drhorton\.com\/|richmondamerican\.com\/|fieldstonehomes\.com/i.test(text);
     if(!_autoDetected && !builderHint){ alert('Pick a builder from the list first (or choose “+ New builder…”), so these communities attach to the right group.'); return; }
     var orig=go.textContent; go.textContent='Reading…'; go.disabled=true;
     (async function(){
@@ -13390,6 +13416,7 @@ function ncPasteModal(){
         var _pick=builderHint.toLowerCase();
         var arr = /lennar\.com\/new-homes\//i.test(text)                    ? ncParseLennar(text)
                 : /drhorton\.com\//i.test(text)                             ? ncParseDRHorton(text)
+                : /richmondamerican\.com\//i.test(text)                     ? ncParseRichmond(text)
                 : (/fieldstonehomes\.com/i.test(text) || /fieldstone/.test(_pick)) ? ncParseFieldstone(text)
                 : [];
         if(!arr.length) arr=ncLocalParse(text, builderHint);
