@@ -13031,14 +13031,22 @@ function renderNewConstruction(){
     var fresh=ncRecent(x)?' <span class="nc-badge" style="background:#d08b1f;">NEW/UPDATED</span>':'';
     var sub=[d.city, d.home_types, ncPrice(d)].filter(Boolean).join('  ·  ');
     var promo=d.promo?('<div style="font-size:12px;color:#1f9d55;margin-top:2px;">'+_esc(d.promo)+'</div>'):'';
-    row.innerHTML='<div style="min-width:0;"><div style="font-weight:600;overflow:hidden;text-overflow:ellipsis;">'+_esc(x.name||'(community)')+' '+badge+fresh+(arch?' <span class="nc-badge" style="background:#888;">ARCHIVED</span>':'')+'</div><div style="font-size:12px;color:var(--text3);">'+_esc(sub)+'</div>'+promo+'</div>';
+    var nm=_esc(x.name||'(community)');
+    // When we have the builder's community page, the name itself is a link straight to it. The whole row
+    // opens the page too; the Edit button is how you get to the fields.
+    var nameHtml = d.url ? '<a class="nc-link" href="'+_esc(d.url)+'" target="_blank" rel="noopener" style="color:#b8912f;text-decoration:none;">'+nm+' <span style="font-size:11px;">↗</span></a>' : nm;
+    row.innerHTML='<div style="min-width:0;"><div style="font-weight:600;overflow:hidden;text-overflow:ellipsis;">'+nameHtml+' '+badge+fresh+(arch?' <span class="nc-badge" style="background:#888;">ARCHIVED</span>':'')+'</div><div style="font-size:12px;color:var(--text3);">'+_esc(sub)+'</div>'+promo+'</div>';
+    var _a=row.querySelector('a.nc-link'); if(_a) _a.addEventListener('click',function(e){ e.stopPropagation(); });
     var btns=document.createElement('div'); btns.style.cssText='display:flex;gap:6px;flex-shrink:0;';
+    var eb=document.createElement('button'); eb.className='ncbtn g'; eb.style.cssText='font-size:12px;padding:3px 9px;'; eb.textContent='Edit';
+    eb.addEventListener('click',function(e){ e.stopPropagation(); openNC(x,false); });
     var ab=document.createElement('button'); ab.className='ncbtn g'; ab.style.cssText='font-size:12px;padding:3px 9px;'; ab.textContent=arch?'Unarchive':'Archive';
     ab.addEventListener('click',function(e){ e.stopPropagation(); if(!x.data)x.data={}; x.data.archived=!arch; saveNC(x); draw(); });
     var del=document.createElement('button'); del.className='ncbtn g'; del.style.cssText='font-size:12px;padding:3px 9px;'; del.textContent='Delete';
     (function(id){ del.addEventListener('click',function(e){ e.stopPropagation(); if(confirm('Delete this community?')){ delNC(id); draw(); } }); })(x.id);
-    btns.appendChild(ab); btns.appendChild(del);
-    row.addEventListener('click',function(){ openNC(x,false); }); row.appendChild(btns); return row;
+    btns.appendChild(eb); btns.appendChild(ab); btns.appendChild(del);
+    row.addEventListener('click',function(){ if(d.url){ try{ window.open(d.url,'_blank','noopener'); }catch(e){} } else { openNC(x,false); } });
+    row.appendChild(btns); return row;
   }
   function cmp(a,b){
     var da=a.data||{}, db=b.data||{};
@@ -13230,7 +13238,10 @@ function ncParseLennar(text){
     var seg=url.split('/new-homes/')[1]; if(!seg) continue;
     var parts=seg.split('/');                 // [state, metro, city, community, plan, homesite...]
     var citySlug=parts[2]||'', commSlug=(parts[3]||cname).toLowerCase();
-    if(!comm[commSlug]) comm[commSlug]={ name:cname, city:_slugTitle(citySlug), min:null };
+    if(!comm[commSlug]){
+      var cu=url.split('/new-homes/')[0]+'/new-homes/'+parts.slice(0,4).join('/')+'/'; // community landing page
+      comm[commSlug]={ name:cname, city:_slugTitle(citySlug), min:null, url:cu };
+    }
     var price=priceByUrl[url];
     if(price!=null && (comm[commSlug].min==null || price<comm[commSlug].min)) comm[commSlug].min=price;
   }
@@ -13238,7 +13249,7 @@ function ncParseLennar(text){
   Object.keys(comm).forEach(function(k){ var c=comm[k];
     out.push({ builder:'Lennar', community:c.name, city:c.city, state:'UT',
       home_types:ncGuessType(c.name), price_text:(c.min!=null?('From $'+c.min.toLocaleString('en-US')):''),
-      promo:'', url:'', status:'active' });
+      promo:'', url:c.url||'', status:'active' });
   });
   return out;
 }
@@ -13280,7 +13291,7 @@ function ncParseDRHorton(text){
     } else { name=_slugTitle(b.slug); }
     if(!name) return;
     out.push({ builder:'D.R. Horton', community:name, city:city||_slugTitle(b.citySlug), state:state,
-      home_types:ncGuessType(name), price_text:price, promo:'', url:'', status:status });
+      home_types:ncGuessType(name), price_text:price, promo:'', url:url, status:status });
   });
   return out;
 }
@@ -13289,13 +13300,18 @@ function ncParseDRHorton(text){
 // sqft / beds / baths. Coming-soon communities have a name + city but no price. We read the visible
 // list; the featured-community repeat (with a ZIP) and the footer nav names are de-duplicated / ignored.
 function ncParseFieldstone(text){
-  var norm=String(text||'').replace(/\r/g,'').replace(/\[([^\]]*)\]\([^)]*\)/g,'$1');
+  var raw=String(text||'').replace(/\r/g,'');
+  // The footer "Communities" list links each community to its page — map name -> URL before stripping.
+  var urlByName={};
+  var ur=/\[([^\]]+)\]\((https?:\/\/[^)]*fieldstonehomes\.com\/new-homes\/[^)]+)\)/gi, um;
+  while((um=ur.exec(raw))){ var u=um[2].replace(/#.*$/,''); if(/\/new-homes\/ut\//i.test(u)) urlByName[um[1].trim().toLowerCase()]=u; }
+  var norm=raw.replace(/\[([^\]]*)\]\([^)]*\)/g,'$1');
   var out=[], seen={};
   function add(name,city,price,status){
     name=(name||'').trim(); city=(city||'').trim(); if(!name||name.length>60) return;
     var k=name.toLowerCase(); if(seen[k]) return; seen[k]=1;
     out.push({ builder:'Fieldstone Homes', community:name, city:city, state:'UT',
-      home_types:ncGuessType(name), price_text:(price||'').trim(), promo:'', url:'', status:status||'active' });
+      home_types:ncGuessType(name), price_text:(price||'').trim(), promo:'', url:urlByName[k]||'', status:status||'active' });
   }
   var re=/([^\n]+)\n([A-Za-z][A-Za-z .'\-]*),\s*UT(?:\s+\d{5})?\n(From (?:the )?\$[\d,]+s?)/g, m;
   while((m=re.exec(norm))){ add(m[1], m[2], m[3], 'active'); }
