@@ -13116,7 +13116,20 @@ function _ncExtractPrompt(corpus){
     +'"status":one of ["active","coming_soon","sold_out","unknown"],"url":string}. '
     +'Rules: include only real named communities (skip generic marketing/newsletters with no community). '
     +'price_text = the price as written (e.g. "From the $530’s"); price_min/price_max = plain dollar numbers if determinable, else null. '
-    +'promo = any incentive (rate buydown, $ toward options, price drop), else "". Infer builder from the sender/branding.\n\nEMAILS:\n'+String(corpus||'').slice(0,15000);
+    +'promo = any incentive (rate buydown, $ toward options, price drop), else "". Infer builder from the sender/branding.\n\nSOURCE TEXT:\n'+String(corpus||'').slice(0,45000);
+}
+// Call the AI extractor and normalize its output to an array of community items, however it comes back.
+async function ncExtractFromText(corpus){
+  var resp=await fetch('/api/claude',{ method:'POST', headers:await apiHeaders(), body:JSON.stringify({ max_tokens:8192, response_format:'json', messages:[{ role:'user', content:_ncExtractPrompt(corpus) }] }) });
+  var data=await resp.json(); if(data&&data.error) throw new Error(data.error.message||JSON.stringify(data.error));
+  var raw=(data.content&&data.content[0]&&data.content[0].text)||'';
+  var parsed=_parseJsonLoose(raw); var arr=[];
+  if(Array.isArray(parsed)) arr=parsed;
+  else if(parsed && typeof parsed==='object'){
+    if(Array.isArray(parsed.communities)) arr=parsed.communities;
+    else { for(var k in parsed){ if(Array.isArray(parsed[k])){ arr=parsed[k]; break; } } }
+  }
+  return { arr:arr, raw:raw };
 }
 // Upsert an extracted array of communities into NC (used by both the email scan and paste-from-page).
 function ncApplyExtracted(arr, sourceLabel){
@@ -13164,13 +13177,15 @@ function ncPasteModal(){
     var orig=go.textContent; go.textContent='Reading…'; go.disabled=true;
     (async function(){
       try{
-        var resp=await fetch('/api/claude',{ method:'POST', headers:await apiHeaders(), body:JSON.stringify({ max_tokens:6000, response_format:'json', messages:[{ role:'user', content:_ncExtractPrompt(corpus) }] }) });
-        var data=await resp.json(); if(data&&data.error) throw new Error(data.error.message||JSON.stringify(data.error));
-        var raw=(data.content&&data.content[0]&&data.content[0].text)||''; var arr=_parseJsonLoose(raw);
-        if(!Array.isArray(arr)){ if(arr&&Array.isArray(arr.communities)) arr=arr.communities; else arr=[]; }
+        var r=await ncExtractFromText(corpus); var arr=r.arr;
         var res=ncApplyExtracted(arr,'paste');
+        if(res.added+res.updated===0){
+          go.textContent=orig; go.disabled=false;
+          alert('Nothing recognizable was found.\n\nMake sure you copied the page that lists the communities with prices (not the homepage). If it still fails, here’s the start of what the AI returned so we can fix it:\n\n'+String(r.raw||'(empty response)').slice(0,400));
+          return;
+        }
         document.body.removeChild(ov); renderNewConstruction();
-        alert('Added '+res.added+' new communit'+(res.added===1?'y':'ies')+', updated '+res.updated+'.'+(res.added+res.updated===0?'\n\nNothing recognizable was found in that text.':''));
+        alert('Added '+res.added+' new communit'+(res.added===1?'y':'ies')+', updated '+res.updated+'.');
       }catch(e){ go.textContent=orig; go.disabled=false; alert('Extract failed: '+(e&&e.message||e)); }
     })();
   });
@@ -13203,10 +13218,7 @@ async function scanBuilderEmails(btn){
     }
     var corpus=chunks.join('\n\n---\n\n');
     if(!corpus){ done(); alert('Found builder emails but couldn’t read their contents.'); return; }
-    var aiResp=await fetch('/api/claude',{ method:'POST', headers:await apiHeaders(), body:JSON.stringify({ max_tokens:6000, response_format:'json', messages:[{ role:'user', content:_ncExtractPrompt(corpus) }] }) });
-    var aiData=await aiResp.json(); if(aiData&&aiData.error) throw new Error(aiData.error.message||JSON.stringify(aiData.error));
-    var raw=(aiData.content&&aiData.content[0]&&aiData.content[0].text)||''; var arr=_parseJsonLoose(raw);
-    if(!Array.isArray(arr)){ if(arr && Array.isArray(arr.communities)) arr=arr.communities; else arr=[]; }
+    var ex=await ncExtractFromText(corpus); var arr=ex.arr;
     var res=ncApplyExtracted(arr,'email'); var added=res.added, updated=res.updated;
     done();
     renderNewConstruction();
