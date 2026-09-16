@@ -101,6 +101,9 @@ export default async function handler(req, res) {
     if (body.response_format === 'json' || body.json === true) {
       geminiBody.generationConfig.responseMimeType = 'application/json';
       geminiBody.generationConfig.thinkingConfig = { thinkingBudget: 0 };
+      // Optional schema forces the exact JSON shape (e.g. an ARRAY of items) so Gemini can't collapse
+      // a list down to a single object.
+      if (body.response_schema) geminiBody.generationConfig.responseSchema = body.response_schema;
     }
 
     var model = 'gemini-2.5-flash';

@@ -13118,16 +13118,21 @@ function _ncExtractPrompt(corpus){
     +'price_text = the price as written (e.g. "From the $530’s"); price_min/price_max = plain dollar numbers if determinable, else null. '
     +'promo = any incentive (rate buydown, $ toward options, price drop), else "". Infer builder from the sender/branding.\n\nSOURCE TEXT:\n'+String(corpus||'').slice(0,45000);
 }
+// Schema forces Gemini to return an ARRAY of communities (it otherwise collapses a list to one object).
+var NC_SCHEMA={ type:'ARRAY', items:{ type:'OBJECT', properties:{
+  builder:{type:'STRING'}, community:{type:'STRING'}, city:{type:'STRING'}, state:{type:'STRING'},
+  home_types:{type:'STRING'}, price_text:{type:'STRING'}, price_min:{type:'NUMBER',nullable:true},
+  price_max:{type:'NUMBER',nullable:true}, promo:{type:'STRING'}, status:{type:'STRING'}, url:{type:'STRING'} } } };
 // Call the AI extractor and normalize its output to an array of community items, however it comes back.
 async function ncExtractFromText(corpus){
-  var resp=await fetch('/api/claude',{ method:'POST', headers:await apiHeaders(), body:JSON.stringify({ max_tokens:8192, response_format:'json', messages:[{ role:'user', content:_ncExtractPrompt(corpus) }] }) });
+  var resp=await fetch('/api/claude',{ method:'POST', headers:await apiHeaders(), body:JSON.stringify({ max_tokens:8192, response_format:'json', response_schema:NC_SCHEMA, messages:[{ role:'user', content:_ncExtractPrompt(corpus) }] }) });
   var data=await resp.json(); if(data&&data.error) throw new Error(data.error.message||JSON.stringify(data.error));
   var raw=(data.content&&data.content[0]&&data.content[0].text)||'';
   var parsed=_parseJsonLoose(raw); var arr=[];
   if(Array.isArray(parsed)) arr=parsed;
   else if(parsed && typeof parsed==='object'){
     if(Array.isArray(parsed.communities)) arr=parsed.communities;
-    else { for(var k in parsed){ if(Array.isArray(parsed[k])){ arr=parsed[k]; break; } } }
+    else { var found=null; for(var k in parsed){ if(Array.isArray(parsed[k])){ found=parsed[k]; break; } } arr = found || ((parsed.community||parsed.name)?[parsed]:[]); }
   }
   return { arr:arr, raw:raw };
 }
