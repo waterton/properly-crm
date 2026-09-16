@@ -76,6 +76,8 @@ var DSHEET=[]; // deal_sheets: saved Seller Net Sheets (one per client)
 var LOIS=[]; // loi_letters: saved commercial Letters of Intent
 var LISTINGS=[]; // listings: canonical marketable-property records (one entry -> site/social/drip outputs)
 var CPROS=[]; // commercial_prospects: candidate commercial properties scouted for a client (tenant/buyer rep)
+var NC=[]; // nc_communities: new-construction builder communities (from builder agent emails + manual)
+var NC_BUILDERS=[]; // builder-sender list (loaded from settings key 'nc_builders')
 var ILOAN=[], ILPAY=[]; // Hard money: loans made, and payments received
 var curSort='last'; // 'last' or 'first'
 var selectedContacts = new Set();
@@ -129,6 +131,7 @@ var DB_COLS = {
   loi_letters: ['id','contact_id','name','data','updated_at'],
   listings: ['id','contact_id','name','data','updated_at'],
   commercial_prospects: ['id','contact_id','name','data','updated_at'],
+  nc_communities: ['id','builder','name','data','updated_at'],
   inv_loans: ['id','borrower','address','notes','principal','interest_rate','term_months','start_date','end_date','first_payment_date','monthly_payment','status'],
   inv_loan_payments: ['id','loan_id','date','amount','note'],
   inv_recurring: ['id','property_id','unit_id','category','payee','amount','day_of_month','variable','active','notes']
@@ -676,7 +679,8 @@ async function loadFromDB(){
       fetchAllRows(base, 'loi_letters?order=updated_at.desc', headers).catch(function(){return []; }),
       fetchAllRows(base, 'listings?order=updated_at.desc', headers).catch(function(){return []; }),
       fetchAllRows(base, 'inv_recurring?order=id.asc', headers).catch(function(){return []; }),
-      fetchAllRows(base, 'commercial_prospects?order=updated_at.desc', headers).catch(function(){return []; })
+      fetchAllRows(base, 'commercial_prospects?order=updated_at.desc', headers).catch(function(){return []; }),
+      fetchAllRows(base, 'nc_communities?order=updated_at.desc', headers).catch(function(){return []; })
     ]);
     var rc = results[0], rn = results[1], rf = results[2], rd = results[3], rtx = results[4];
 
@@ -719,6 +723,7 @@ async function loadFromDB(){
     if(Array.isArray(results[23])) LISTINGS = results[23];
     if(Array.isArray(results[24])) INVREC = results[24];
     if(Array.isArray(results[25])) CPROS = results[25];
+    if(Array.isArray(results[26])) NC = results[26];
     try{ materializeRecurring(); }catch(e){}
     DOCS.forEach(function(d){
       d.id = typeof d.id === 'string' ? parseInt(d.id)||d.id : d.id;
@@ -786,6 +791,8 @@ function saveListing(x){ x.updated_at=new Date().toISOString(); sv(); if(supaRea
 function delListing(id){ LISTINGS = LISTINGS.filter(function(x){return String(x.id)!==String(id);}); sv(); if(supaReady) dbDeleteBy('listings','id',id); }
 function saveProspect(x){ x.updated_at=new Date().toISOString(); sv(); if(supaReady) dbSave('commercial_prospects', [x]); }
 function delProspect(id){ CPROS = CPROS.filter(function(x){return String(x.id)!==String(id);}); sv(); if(supaReady) dbDeleteBy('commercial_prospects','id',id); }
+function saveNC(x){ x.updated_at=new Date().toISOString(); sv(); if(supaReady) dbSave('nc_communities', [x]); }
+function delNC(id){ NC = NC.filter(function(x){return String(x.id)!==String(id);}); sv(); if(supaReady) dbDeleteBy('nc_communities','id',id); }
 // lookups
 function invProp(id){ return IPROP.find(function(p){return String(p.id)===String(id);}) || null; }
 function invUnit(id){ return IUNIT.find(function(u){return String(u.id)===String(id);}) || null; }
@@ -1061,6 +1068,7 @@ function sp(id, fromHistory){
   else if(id==='loi'){ if(typeof renderLois==='function') renderLois(); }
   else if(id==='listings'){ if(typeof renderListings==='function') renderListings(); }
   else if(id==='commercial'){ if(typeof renderCommercial==='function') renderCommercial(); }
+  else if(id==='newconstruction'){ if(typeof renderNewConstruction==='function') renderNewConstruction(); }
   else if(id==='documents')renderDocsPage();
 
   else if(id==='deadlines'){
@@ -10020,6 +10028,7 @@ ge('nav-drips').addEventListener('click',function(){sp('drips');});
 (function(){ var nl=ge('nav-loi'); if(nl) nl.addEventListener('click',function(){sp('loi');}); })();
 (function(){ var nl=ge('nav-listings'); if(nl) nl.addEventListener('click',function(){sp('listings');}); })();
 (function(){ var nl=ge('nav-commercial'); if(nl) nl.addEventListener('click',function(){sp('commercial');}); })();
+(function(){ var nl=ge('nav-newconstruction'); if(nl) nl.addEventListener('click',function(){sp('newconstruction');}); })();
 
 ge('nav-documents').addEventListener('click',function(){sp('documents');});
 if(ge('docSearch')) ge('docSearch').addEventListener('input', renderDocsPage);
@@ -10397,7 +10406,7 @@ var NAV_GROUPS=[
   ['Home',        ['nav-briefing','nav-pipeline']],
   ['Clients',     ['nav-contacts','nav-followups','nav-notes','nav-drips']],
   ['Deals',       ['nav-tc','nav-listings','nav-dealsheet','nav-documents','nav-deadlines']],
-  ['Tools',       ['nav-gmail','nav-calendar','nav-scanner','nav-cardscanner','nav-team']],
+  ['Tools',       ['nav-gmail','nav-calendar','nav-scanner','nav-cardscanner','nav-newconstruction','nav-team']],
   ['Commercial',  ['nav-commercial','nav-loi']],
   ['Investments', ['nav-investments','nav-hardmoney']]
 ];
@@ -12939,6 +12948,228 @@ function cproExportPdf(contactId, btn){
     else { var pages=Math.ceil(ih/pageH); for(var pg=0;pg<pages;pg++){ if(pg>0) pdf.addPage(); pdf.addImage(img,'PNG',m,m-pg*pageH,iw,ih); } }
     pdf.save(name+'.pdf'); done();
   }).catch(function(e){ done(); alert('PDF export failed: '+(e&&e.message||e)); });
+}
+// ============================================================================
+// NEW CONSTRUCTION — watch builder communities/pricing/incentives. Fed by builder AGENT emails you
+// subscribe to (parsed by the scanner) or entered by hand. Ethical by design: the data comes from
+// emails the builders send you, not from scraping their sites. Records live in NC.
+// ============================================================================
+var NC_STATUS=[['active','Active'],['coming_soon','Coming Soon'],['sold_out','Sold Out'],['unknown','Unknown']];
+var _ncBuilder='', _ncCity='', _ncView='active', _ncQuery='';
+function ncStatusLabel(v){ for(var i=0;i<NC_STATUS.length;i++){ if(NC_STATUS[i][0]===v) return NC_STATUS[i][1]; } return v||''; }
+function ncStatusColor(v){ return ({active:'#1f9d55',coming_soon:'#7a5cff',sold_out:'#888',unknown:'#888'})[v]||'#888'; }
+function ncArchived(x){ return !!(x.data&&x.data.archived); }
+function ncFmt(n){ n=dsNum(n); return n?('$'+n.toLocaleString('en-US',{maximumFractionDigits:0})):''; }
+function ncPrice(d){ if(d.price_text) return d.price_text; var lo=dsNum(d.price_min), hi=dsNum(d.price_max); if(lo&&hi) return ncFmt(lo)+'–'+ncFmt(hi); if(lo) return 'From '+ncFmt(lo); return ''; }
+function ncRecent(x){ var t=x.updated_at?Date.parse(x.updated_at):0; return t && (Date.now()-t) < 8*864e5; }
+function ncDefault(){ return { id:Date.now()+Math.floor(Math.random()*100000), builder:'', name:'', data:{
+  city:'', state:'UT', home_types:'', price_text:'', price_min:'', price_max:'', promo:'', status:'active',
+  url:'', source:'manual', email_ref:'', notes:'', archived:false } }; }
+function ncKey(builder,name){ return String(builder||'').trim().toLowerCase()+'|'+String(name||'').trim().toLowerCase(); }
+function ncFind(builder,name){ var k=ncKey(builder,name); for(var i=0;i<NC.length;i++){ if(ncKey(NC[i].builder,NC[i].name)===k) return NC[i]; } return null; }
+// ---- builder-sender list (settings key 'nc_builders') ----
+async function loadNcBuilders(){
+  if(!supaReady) return NC_BUILDERS;
+  try{ var headers=await getAuthHeaders();
+    var r=await fetch(SUPA_URL+'/rest/v1/settings?key=eq.nc_builders&select=value',{ headers:headers });
+    var text=await r.text(); if(text){ var rows=JSON.parse(text); if(rows.length && Array.isArray(rows[0].value)) NC_BUILDERS=rows[0].value; }
+  }catch(e){}
+  return NC_BUILDERS;
+}
+async function saveNcBuilders(){
+  if(!supaReady){ alert('Connect to Supabase first.'); return false; }
+  try{ var headers=await getAuthHeaders({'Prefer':'resolution=merge-duplicates'});
+    var r=await fetch(SUPA_URL+'/rest/v1/settings',{ method:'POST', headers:headers, body:JSON.stringify({ key:'nc_builders', value:NC_BUILDERS }) });
+    return r.ok;
+  }catch(e){ return false; }
+}
+function _ncStyle(){
+  if(ge('ncCss')) return; var s=document.createElement('style'); s.id='ncCss';
+  s.textContent=
+   '#page-newconstruction .ncbtn{background:var(--accent);color:#fff;border:none;border-radius:7px;padding:7px 14px;font-family:inherit;font-size:14px;cursor:pointer;}'
+  +'#page-newconstruction .ncbtn.g{background:transparent;border:1px solid var(--border);color:var(--text);}'
+  +'#page-newconstruction .nc-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:16px;}'
+  +'#page-newconstruction .nc-form label{font-size:12px;color:var(--text3);display:block;margin-bottom:3px;}'
+  +'#page-newconstruction .nc-form input,#page-newconstruction .nc-form textarea,#page-newconstruction .nc-form select{width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px 8px;font-family:inherit;font-size:13px;}'
+  +'#page-newconstruction .nc-wide{grid-column:1/-1;}'
+  +'#page-newconstruction .nc-badge{display:inline-block;font-size:10px;font-weight:700;color:#fff;border-radius:4px;padding:2px 7px;vertical-align:middle;}';
+  document.head.appendChild(s);
+}
+function renderNewConstruction(){
+  _ncStyle(); var root=ge('ncRoot'); if(!root) return; root.innerHTML=''; loadNcBuilders();
+  var bar=document.createElement('div'); bar.style.cssText='display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;';
+  bar.appendChild(mkDivSafe('font-size:22px;font-weight:600;','New Construction'));
+  var bw=document.createElement('div'); bw.style.cssText='display:flex;gap:8px;flex-wrap:wrap;';
+  var scan=document.createElement('button'); scan.className='ncbtn'; scan.textContent='Scan builder emails'; scan.addEventListener('click',function(){ scanBuilderEmails(scan); }); bw.appendChild(scan);
+  var mb=document.createElement('button'); mb.className='ncbtn g'; mb.textContent='Manage builders'; mb.addEventListener('click',ncBuildersModal); bw.appendChild(mb);
+  var add=document.createElement('button'); add.className='ncbtn g'; add.textContent='+ Add manually'; add.addEventListener('click',function(){ openNC(ncDefault(),true); }); bw.appendChild(add);
+  bar.appendChild(bw); root.appendChild(bar);
+  root.appendChild(mkDivSafe('color:var(--text3);font-size:12px;margin:-2px 0 12px;line-height:1.5;','Subscribe to each builder’s <b>agent/Realtor email list</b>, then click <b>Scan builder emails</b> — the scanner reads the updates they send you and files each community here. You can also add any manually.'));
+  if(!NC.length){ root.appendChild(mkDivSafe('color:var(--text3);padding:20px 0;','Nothing yet. Set up your builders, subscribe to their agent emails, then scan — or add a community by hand.')); return; }
+  var ctr=document.createElement('div'); ctr.style.cssText='display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;';
+  var search=document.createElement('input'); search.type='text'; search.placeholder='Search community / city…'; search.value=_ncQuery;
+  search.style.cssText='flex:1;min-width:170px;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:7px 10px;font-family:inherit;font-size:13px;';
+  var bsel=document.createElement('select'); bsel.style.cssText='background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:7px 8px;font-family:inherit;font-size:13px;width:auto;';
+  var builders={}; NC.forEach(function(x){ if(x.builder) builders[x.builder]=true; });
+  [['','All builders']].concat(Object.keys(builders).sort().map(function(b){return [b,b];})).forEach(function(o){ var op=document.createElement('option'); op.value=o[0]; op.textContent=o[1]; if(o[0]===_ncBuilder)op.selected=true; bsel.appendChild(op); });
+  var ssel=document.createElement('select'); ssel.style.cssText=bsel.style.cssText;
+  [['active','Active'],['all','All'],['updated','Updated this week']].concat(NC_STATUS).concat([['archived','Archived']]).forEach(function(o){ var op=document.createElement('option'); op.value=o[0]; op.textContent=o[1]; if(o[0]===_ncView)op.selected=true; ssel.appendChild(op); });
+  ctr.appendChild(search); ctr.appendChild(bsel); ctr.appendChild(ssel); root.appendChild(ctr);
+  var list=document.createElement('div'); list.style.cssText='display:flex;flex-direction:column;gap:8px;'; root.appendChild(list);
+  function draw(){
+    list.innerHTML=''; var q=_ncQuery.trim().toLowerCase();
+    var items=NC.filter(function(x){
+      var d=x.data||{}, arch=ncArchived(x);
+      if(_ncBuilder && x.builder!==_ncBuilder) return false;
+      if(q){ var hay=((x.name||'')+' '+(d.city||'')+' '+(x.builder||'')).toLowerCase(); if(hay.indexOf(q)<0) return false; }
+      if(_ncView==='archived') return arch;
+      if(arch) return false;
+      if(_ncView==='active') return (d.status||'active')!=='sold_out';
+      if(_ncView==='all') return true;
+      if(_ncView==='updated') return ncRecent(x);
+      return d.status===_ncView;
+    }).sort(function(a,b){ return String(b.updated_at||'').localeCompare(String(a.updated_at||'')); });
+    if(!items.length){ list.appendChild(mkDivSafe('color:var(--text3);padding:16px 0;','Nothing matches.')); return; }
+    items.forEach(function(x){
+      var d=x.data||{}, arch=ncArchived(x);
+      var row=document.createElement('div'); row.style.cssText='display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 14px;cursor:pointer;'+(arch?'opacity:.7;':'');
+      var badge='<span class="nc-badge" style="background:'+ncStatusColor(d.status)+';">'+_esc(ncStatusLabel(d.status||'active'))+'</span>';
+      var fresh=ncRecent(x)?' <span class="nc-badge" style="background:#d08b1f;">NEW/UPDATED</span>':'';
+      var sub=[x.builder, d.city, d.home_types, ncPrice(d)].filter(Boolean).join('  ·  ');
+      var promo=d.promo?('<div style="font-size:12px;color:#1f9d55;margin-top:2px;">'+_esc(d.promo)+'</div>'):'';
+      row.innerHTML='<div style="min-width:0;"><div style="font-weight:600;overflow:hidden;text-overflow:ellipsis;">'+_esc(x.name||'(community)')+' '+badge+fresh+(arch?' <span class="nc-badge" style="background:#888;">ARCHIVED</span>':'')+'</div><div style="font-size:12px;color:var(--text3);">'+_esc(sub)+'</div>'+promo+'</div>';
+      var btns=document.createElement('div'); btns.style.cssText='display:flex;gap:6px;flex-shrink:0;';
+      var ab=document.createElement('button'); ab.className='ncbtn g'; ab.style.cssText='font-size:12px;padding:3px 9px;'; ab.textContent=arch?'Unarchive':'Archive';
+      ab.addEventListener('click',function(e){ e.stopPropagation(); if(!x.data)x.data={}; x.data.archived=!arch; saveNC(x); draw(); });
+      var del=document.createElement('button'); del.className='ncbtn g'; del.style.cssText='font-size:12px;padding:3px 9px;'; del.textContent='Delete';
+      (function(id){ del.addEventListener('click',function(e){ e.stopPropagation(); if(confirm('Delete this community?')){ delNC(id); draw(); } }); })(x.id);
+      btns.appendChild(ab); btns.appendChild(del);
+      row.addEventListener('click',function(){ openNC(x,false); }); row.appendChild(btns); list.appendChild(row);
+    });
+  }
+  search.addEventListener('input',function(){ _ncQuery=search.value; draw(); });
+  bsel.addEventListener('change',function(){ _ncBuilder=bsel.value; draw(); });
+  ssel.addEventListener('change',function(){ _ncView=ssel.value; draw(); });
+  draw();
+}
+function openNC(x, isNew){
+  _ncStyle(); var root=ge('ncRoot'); if(!root) return; root.innerHTML=''; var d=x.data;
+  var tb=document.createElement('div'); tb.style.cssText='display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;';
+  var back=document.createElement('button'); back.className='ncbtn g'; back.textContent='‹ Back'; back.addEventListener('click',renderNewConstruction); tb.appendChild(back);
+  var saveB=document.createElement('button'); saveB.className='ncbtn'; saveB.textContent='Save'; saveB.addEventListener('click',function(){ if(!x.name) x.name='(community)'; if(!NC.some(function(y){return String(y.id)===String(x.id);})) NC.push(x); saveNC(x); saveB.textContent='Saved ✓'; setTimeout(function(){saveB.textContent='Save';},1500); }); tb.appendChild(saveB);
+  if(d.url){ var open=document.createElement('button'); open.className='ncbtn g'; open.textContent='Open listing ↗'; open.addEventListener('click',function(){ try{ window.open(d.url,'_blank','noopener'); }catch(e){} }); tb.appendChild(open); }
+  root.appendChild(tb);
+  var form=document.createElement('div'); form.className='nc-form';
+  function fld(get,set,label,type,wide){ var w=document.createElement('div'); if(wide)w.className='nc-wide'; var l=document.createElement('label'); l.textContent=label; w.appendChild(l);
+    var el=type==='textarea'?document.createElement('textarea'):document.createElement('input'); if(type&&type!=='textarea')el.type=type; if(type==='textarea')el.rows=3;
+    el.value=(get()!=null?get():''); el.addEventListener('input',function(){ set(el.value); }); w.appendChild(el); form.appendChild(w); }
+  function dfld(key,label,type,wide){ fld(function(){return d[key];},function(v){d[key]=v;},label,type,wide); }
+  function pick(key,label,opts){ var w=document.createElement('div'); var l=document.createElement('label'); l.textContent=label; w.appendChild(l);
+    var s=document.createElement('select'); opts.forEach(function(o){ var op=document.createElement('option'); op.value=o[0]; op.textContent=o[1]; if(d[key]===o[0])op.selected=true; s.appendChild(op); }); s.value=d[key]; s.addEventListener('change',function(){ d[key]=s.value; }); w.appendChild(s); form.appendChild(w); }
+  fld(function(){return x.builder;},function(v){x.builder=v;},'Builder');
+  fld(function(){return x.name;},function(v){x.name=v;},'Community name');
+  dfld('city','City'); dfld('state','State'); pick('status','Status',NC_STATUS);
+  dfld('home_types','Home types (single family / townhome…)','text',true);
+  dfld('price_text','Price (as shown, e.g. "From the $530’s")','text',true);
+  dfld('price_min','Price min ($, optional)','number'); dfld('price_max','Price max ($, optional)','number');
+  dfld('promo','Promotion / incentive','textarea',true);
+  dfld('url','Listing URL','text',true);
+  dfld('notes','Notes','textarea',true);
+  root.appendChild(form);
+}
+function ncBuildersModal(){
+  loadNcBuilders().then(function(){ _ncBuildersModalDraw(); });
+}
+function _ncBuildersModalDraw(){
+  var ex=ge('ncBuildersOv'); if(ex){ try{ document.body.removeChild(ex); }catch(e){} }
+  var ov=document.createElement('div'); ov.id='ncBuildersOv'; ov.className='modal-ov open'; ov.style.zIndex='1300';
+  var m=document.createElement('div'); m.className='modal'; m.style.maxWidth='620px';
+  var h=document.createElement('div'); h.style.cssText='display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--border);';
+  h.innerHTML='<div style="font-weight:700;font-size:17px;">Builders &amp; their email senders</div>';
+  var x=document.createElement('button'); x.textContent='✕'; x.style.cssText='background:none;border:none;font-size:18px;color:var(--text3);cursor:pointer;'; x.addEventListener('click',function(){ document.body.removeChild(ov); }); h.appendChild(x); m.appendChild(h);
+  var body=document.createElement('div'); body.style.cssText='padding:16px 20px;display:flex;flex-direction:column;gap:10px;max-height:66vh;overflow:auto;';
+  body.appendChild(mkDivSafe('font-size:12px;color:var(--text3);line-height:1.5;','For each builder, list the email addresses or domains their agent updates come from (comma-separated), e.g. <i>edgehomes.com, marketing@fieldstonehomes.com</i>. The scanner searches your Gmail for these senders.'));
+  NC_BUILDERS.forEach(function(b,idx){
+    var card=document.createElement('div'); card.style.cssText='border:1px solid var(--border);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;';
+    function inp(val,ph,cb){ var i=document.createElement('input'); i.value=val||''; i.placeholder=ph; i.style.cssText='width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px 8px;font-family:inherit;font-size:13px;'; i.addEventListener('input',function(){ cb(i.value); }); return i; }
+    card.appendChild(inp(b.name,'Builder name',function(v){ b.name=v; }));
+    card.appendChild(inp(b.senders,'Sender emails/domains (comma-separated)',function(v){ b.senders=v; }));
+    card.appendChild(inp(b.url,'Website (optional)',function(v){ b.url=v; }));
+    var del=document.createElement('button'); del.className='btn btn-g'; del.style.cssText='align-self:flex-start;font-size:12px;padding:3px 9px;'; del.textContent='Remove'; del.addEventListener('click',function(){ NC_BUILDERS.splice(idx,1); _ncBuildersModalDraw(); }); card.appendChild(del);
+    body.appendChild(card);
+  });
+  m.appendChild(body);
+  var ft=document.createElement('div'); ft.style.cssText='display:flex;justify-content:space-between;gap:8px;padding:14px 20px;border-top:1px solid var(--border);';
+  var addb=document.createElement('button'); addb.className='btn btn-g'; addb.textContent='+ Add builder'; addb.addEventListener('click',function(){ NC_BUILDERS.push({name:'',senders:'',url:''}); _ncBuildersModalDraw(); });
+  var saveb=document.createElement('button'); saveb.className='btn btn-p'; saveb.textContent='Save';
+  saveb.addEventListener('click',function(){ NC_BUILDERS=NC_BUILDERS.filter(function(b){ return (b.name||'').trim()||(b.senders||'').trim(); }); saveNcBuilders().then(function(ok){ if(ok){ document.body.removeChild(ov); } else { alert('Save failed.'); } }); });
+  ft.appendChild(addb); ft.appendChild(saveb); m.appendChild(ft);
+  ov.appendChild(m); ov.addEventListener('click',function(e){ if(e.target===ov) document.body.removeChild(ov); });
+  document.body.appendChild(ov);
+}
+function _ncExtractPrompt(corpus){
+  return 'These are new-home BUILDER marketing/agent emails. Extract every specific new-construction COMMUNITY mentioned, with its details. '
+    +'Return ONLY a JSON array (no prose, no markdown). Each item: '
+    +'{"builder":string,"community":string,"city":string,"state":string,"home_types":string,'
+    +'"price_text":string,"price_min":number|null,"price_max":number|null,"promo":string,'
+    +'"status":one of ["active","coming_soon","sold_out","unknown"],"url":string}. '
+    +'Rules: include only real named communities (skip generic marketing/newsletters with no community). '
+    +'price_text = the price as written (e.g. "From the $530’s"); price_min/price_max = plain dollar numbers if determinable, else null. '
+    +'promo = any incentive (rate buydown, $ toward options, price drop), else "". Infer builder from the sender/branding.\n\nEMAILS:\n'+String(corpus||'').slice(0,15000);
+}
+async function scanBuilderEmails(btn){
+  await loadNcBuilders();
+  if(!NC_BUILDERS.length){ if(confirm('No builders set up yet. Add your builders and their email senders first?')) ncBuildersModal(); return; }
+  var memberId=(typeof gmailState!=='undefined' && (gmailState.activeMemberId || Object.keys(gmailState.connectedAccounts||{})[0]));
+  if(!memberId){ alert('Connect a Gmail account first (open the Gmail tab), then try again.'); return; }
+  var senders=[]; NC_BUILDERS.forEach(function(b){ String(b.senders||'').split(/[,\n|]+/).map(function(s){return s.trim();}).filter(Boolean).forEach(function(s){ senders.push('from:'+s); }); });
+  if(!senders.length){ alert('Your builders have no email senders yet. Add them in Manage builders.'); return; }
+  var q='('+senders.join(' OR ')+') newer_than:30d';
+  var orig=btn?btn.textContent:''; if(btn){ btn.textContent='Scanning…'; btn.disabled=true; }
+  var done=function(){ if(btn){ btn.textContent=orig; btn.disabled=false; } };
+  try{
+    var listResp=await fetch('/api/gmail-api',{ method:'POST', headers:await apiHeaders(), body:JSON.stringify({ action:'inbox', memberId:memberId, query:q }) });
+    var listData=await listResp.json(); if(listData.error) throw new Error(listData.error);
+    var msgs=listData.messages||[];
+    if(!msgs.length){ done(); alert('No builder emails found in the last 30 days from those senders. Double-check the sender addresses in Manage builders, and that you’re subscribed.'); return; }
+    var threadIds=[]; msgs.forEach(function(mm){ if(mm.threadId && threadIds.indexOf(mm.threadId)<0) threadIds.push(mm.threadId); });
+    threadIds=threadIds.slice(0,12);
+    var chunks=[];
+    for(var i=0;i<threadIds.length;i++){
+      try{ var tR=await fetch('/api/gmail-api',{ method:'POST', headers:await apiHeaders(), body:JSON.stringify({ action:'thread', memberId:memberId, threadId:threadIds[i] }) });
+        var tD=await tR.json(); (tD.messages||[]).forEach(function(mm){ var t=(mm.bodyText||'').replace(/\r/g,'').trim(); if(t) chunks.push('From: '+(mm.from||'')+'\nSubject: '+(mm.subject||'')+'\n'+t.slice(0,4000)); });
+      }catch(e){}
+    }
+    var corpus=chunks.join('\n\n---\n\n');
+    if(!corpus){ done(); alert('Found builder emails but couldn’t read their contents.'); return; }
+    var aiResp=await fetch('/api/claude',{ method:'POST', headers:await apiHeaders(), body:JSON.stringify({ max_tokens:6000, response_format:'json', messages:[{ role:'user', content:_ncExtractPrompt(corpus) }] }) });
+    var aiData=await aiResp.json(); if(aiData&&aiData.error) throw new Error(aiData.error.message||JSON.stringify(aiData.error));
+    var raw=(aiData.content&&aiData.content[0]&&aiData.content[0].text)||''; var arr=_parseJsonLoose(raw);
+    if(!Array.isArray(arr)){ if(arr && Array.isArray(arr.communities)) arr=arr.communities; else arr=[]; }
+    var added=0, updated=0, today=tod();
+    arr.forEach(function(it){
+      var name=(it.community||'').trim(); if(!name) return;
+      var builder=(it.builder||'').trim();
+      var rec=ncFind(builder,name);
+      if(rec){
+        var d=rec.data||(rec.data={}); var changed=false;
+        ['city','state','home_types','price_text','promo','url'].forEach(function(k){ if(it[k]!=null && String(it[k]).trim() && String(it[k])!==String(d[k]||'')){ d[k]=String(it[k]).trim(); changed=true; } });
+        if(it.price_min!=null){ d.price_min=it.price_min; } if(it.price_max!=null){ d.price_max=it.price_max; }
+        if(it.status && it.status!==d.status){ d.status=it.status; changed=true; }
+        d.last_seen=today; if(changed){ updated++; saveNC(rec); }
+      } else {
+        var nrec={ id:Date.now()+Math.floor(Math.random()*100000)+added, builder:builder, name:name, data:{
+          city:(it.city||'').trim(), state:(it.state||'UT').trim(), home_types:(it.home_types||'').trim(),
+          price_text:(it.price_text||'').trim(), price_min:(it.price_min!=null?it.price_min:''), price_max:(it.price_max!=null?it.price_max:''),
+          promo:(it.promo||'').trim(), status:(it.status||'active'), url:(it.url||'').trim(), source:'email', email_ref:'', notes:'',
+          first_seen:today, last_seen:today, archived:false } };
+        NC.push(nrec); saveNC(nrec); added++;
+      }
+    });
+    done();
+    renderNewConstruction();
+    alert('Scan complete.\n\n'+added+' new communit'+(added===1?'y':'ies')+' added, '+updated+' updated.'+(arr.length===0?'\n\n(No communities were found in those emails — they may have been generic newsletters.)':''));
+  }catch(e){ done(); alert('Scan failed: '+(e&&e.message||e)); }
 }
 // ============================================================================
 // LETTER OF INTENT (LOI) — commercial lease, tenant-rep. Deterministic template: you fill the
