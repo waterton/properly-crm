@@ -12715,7 +12715,52 @@ function prospectDefault(){ return { id:Date.now()+Math.floor(Math.random()*1000
   status:'spotted', address_full:'', city:'', state:'UT', zip:'',
   deal_type:'lease', use_type:'', zoning:'', rentable_sqft:'', lot_size:'', year_built:'', parking:'',
   lease_type:'NNN', rate_per_sf:'', cam_per_sf:'', price:'', availability:'',
-  listing_url:'', listing_source:'', agent:'', pros:'', cons:'', notes:'', lat:'', lon:'', archived:false } }; }
+  listing_url:'', listing_source:'', agent:'', pros:'', cons:'', notes:'', lat:'', lon:'', photos:[], archived:false } }; }
+// Read a photo from the camera/gallery, downscale it (longest side 1400px) and return a compressed JPEG
+// data URL so it fits comfortably inside the prospect's JSON and syncs like any other field.
+function cproCompressImage(file, cb){
+  try{
+    var reader=new FileReader();
+    reader.onload=function(e){ var img=new Image();
+      img.onload=function(){ var max=1400, w=img.width, h=img.height;
+        if(w>max||h>max){ if(w>=h){ h=Math.round(h*max/w); w=max; } else { w=Math.round(w*max/h); h=max; } }
+        var cv=document.createElement('canvas'); cv.width=w; cv.height=h;
+        try{ cv.getContext('2d').drawImage(img,0,0,w,h); cb(cv.toDataURL('image/jpeg',0.72)); }
+        catch(err){ cb(e.target.result); } };
+      img.onerror=function(){ cb(null); }; img.src=e.target.result; };
+    reader.onerror=function(){ cb(null); }; reader.readAsDataURL(file);
+  }catch(err){ cb(null); }
+}
+// Full-screen photo viewer (tap a thumbnail).
+function cproViewPhoto(src){
+  var ov=document.createElement('div'); ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:2000;display:flex;align-items:center;justify-content:center;padding:16px;';
+  var im=document.createElement('img'); im.src=src; im.style.cssText='max-width:96vw;max-height:92vh;border-radius:8px;';
+  ov.appendChild(im); ov.addEventListener('click',function(){ try{ document.body.removeChild(ov); }catch(e){} }); document.body.appendChild(ov);
+}
+// Reusable "Photos" block: thumbnails with remove buttons + an "Add photo" control (camera on mobile).
+function cproPhotoBlock(d, onChange){
+  if(!Array.isArray(d.photos)) d.photos=[];
+  var wrap=document.createElement('div'); wrap.className='c-wide';
+  var lab=document.createElement('label'); lab.textContent='Photos'; wrap.appendChild(lab);
+  var strip=document.createElement('div'); strip.style.cssText='display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:4px;';
+  function redraw(){
+    strip.innerHTML='';
+    d.photos.forEach(function(src,idx){
+      var cell=document.createElement('div'); cell.style.cssText='position:relative;';
+      var im=document.createElement('img'); im.src=src; im.style.cssText='width:84px;height:84px;object-fit:cover;border-radius:8px;border:1px solid var(--border);cursor:pointer;';
+      im.addEventListener('click',function(){ cproViewPhoto(src); });
+      var rm=document.createElement('button'); rm.type='button'; rm.textContent='×'; rm.title='Remove'; rm.style.cssText='position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;border:none;background:#c0392b;color:#fff;font-size:13px;line-height:1;cursor:pointer;';
+      rm.addEventListener('click',function(e){ e.stopPropagation(); d.photos.splice(idx,1); redraw(); if(onChange)onChange(); });
+      cell.appendChild(im); cell.appendChild(rm); strip.appendChild(cell);
+    });
+    var add=document.createElement('button'); add.type='button'; add.className='cbtn g'; add.textContent='📷 Add photo'; add.style.cssText='font-size:12px;padding:6px 12px;height:84px;';
+    var inp=document.createElement('input'); inp.type='file'; inp.accept='image/*'; inp.setAttribute('capture','environment'); inp.style.display='none';
+    add.addEventListener('click',function(){ inp.click(); });
+    inp.addEventListener('change',function(){ var f=inp.files&&inp.files[0]; if(!f){ return; } add.textContent='…'; cproCompressImage(f,function(url){ add.textContent='📷 Add photo'; inp.value=''; if(url){ d.photos.push(url); redraw(); if(onChange)onChange(); } else { alert('Could not read that image.'); } }); });
+    strip.appendChild(add); strip.appendChild(inp);
+  }
+  redraw(); wrap.appendChild(strip); return wrap;
+}
 // Use the phone's GPS to fill an address (reverse-geocoded via /api/geocode). onResult(result, lat, lon).
 function cproGeolocate(btn, onResult){
   if(!navigator.geolocation){ alert('This device can’t share its location.'); return; }
@@ -12772,6 +12817,7 @@ function quickAddProspect(){
   arow.appendChild(ain); arow.appendChild(gb); aw.appendChild(arow); body.appendChild(aw);
   var nw=document.createElement('div'); nw.appendChild(lbl('Quick note (what caught your eye)'));
   var nin=document.createElement('textarea'); nin.className='fi'; nin.rows=2; nw.appendChild(nin); body.appendChild(nw);
+  var qd={photos:[]}; body.appendChild(cproPhotoBlock(qd));
   m.appendChild(body);
   var ft=document.createElement('div'); ft.style.cssText='display:flex;justify-content:flex-end;gap:8px;padding:14px 20px;border-top:1px solid var(--border);';
   var cancel=document.createElement('button'); cancel.className='btn btn-g'; cancel.textContent='Cancel'; cancel.addEventListener('click',function(){ document.body.removeChild(ov); });
@@ -12780,6 +12826,7 @@ function quickAddProspect(){
     var addr=(ain.value||'').trim(); if(!addr){ alert('Enter an address (or use your location).'); return; }
     var p=prospectDefault(); p.contact_id=csel.value?parseInt(csel.value):null;
     p.data.address_full=addr; p.data.notes=(nin.value||'').trim(); p.name=addr;
+    if(qd.photos&&qd.photos.length) p.data.photos=qd.photos;
     if(geo.city) p.data.city=geo.city; if(geo.state) p.data.state=geo.state; if(geo.zip) p.data.zip=geo.zip;
     if(geo.lat!=null) p.data.lat=geo.lat; if(geo.lon!=null) p.data.lon=geo.lon;
     CPROS.push(p); saveProspect(p); document.body.removeChild(ov); renderCommercial();
@@ -12829,7 +12876,8 @@ function renderCommercial(){
       var row=document.createElement('div'); row.style.cssText='display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 14px;cursor:pointer;'+(arch?'opacity:.7;':'');
       var badge='<span class="c-badge" style="background:'+cproStatusColor(d.status)+';">'+_esc(cproStatusLabel(d.status||'spotted'))+'</span>';
       var sub=[ (c?fn(c):'(no client)'), cproSpecLine(d) ].filter(Boolean).join('  ·  ');
-      row.innerHTML='<div style="min-width:0;"><div style="font-weight:600;overflow:hidden;text-overflow:ellipsis;">'+_esc(d.address_full||p.name||'(no address)')+' '+badge+(arch?' <span class="c-badge" style="background:#888;">ARCHIVED</span>':'')+'</div><div style="font-size:12px;color:var(--text3);">'+_esc(sub)+'</div></div>';
+      var thumb=(Array.isArray(d.photos)&&d.photos.length)?'<img src="'+d.photos[0]+'" style="width:46px;height:46px;object-fit:cover;border-radius:6px;border:1px solid var(--border);flex-shrink:0;">':'';
+      row.innerHTML='<div style="display:flex;align-items:center;gap:10px;min-width:0;">'+thumb+'<div style="min-width:0;"><div style="font-weight:600;overflow:hidden;text-overflow:ellipsis;">'+_esc(d.address_full||p.name||'(no address)')+' '+badge+(arch?' <span class="c-badge" style="background:#888;">ARCHIVED</span>':'')+'</div><div style="font-size:12px;color:var(--text3);">'+_esc(sub)+'</div></div></div>';
       var btns=document.createElement('div'); btns.style.cssText='display:flex;gap:6px;flex-shrink:0;';
       var ab=document.createElement('button'); ab.className='cbtn g'; ab.style.cssText='font-size:12px;padding:3px 9px;'; ab.textContent=arch?'Unarchive':'Archive';
       ab.addEventListener('click',function(e){ e.stopPropagation(); if(!p.data)p.data={}; p.data.archived=!arch; saveProspect(p); draw(); });
@@ -12867,7 +12915,8 @@ function openProspect(p, isNew){
       +(cproSpecLine(d)?('<div style="margin:6px 0;font-weight:600;">'+_esc(cproSpecLine(d))+'</div>'):'')
       +(occ?('<div style="font-size:13px;color:var(--text2);">'+_esc(occ)+'</div>'):'')
       +(d.zoning?('<div style="font-size:12px;color:var(--text3);margin-top:4px;">Zoning: '+_esc(d.zoning)+'</div>'):'')
-      +(d.notes?('<div style="font-size:13px;margin-top:8px;">'+_esc(d.notes).replace(/\n/g,'<br>')+'</div>'):'');
+      +(d.notes?('<div style="font-size:13px;margin-top:8px;">'+_esc(d.notes).replace(/\n/g,'<br>')+'</div>'):'')
+      +((Array.isArray(d.photos)&&d.photos.length)?('<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;">'+d.photos.map(function(s){return '<img src="'+s+'" style="width:70px;height:70px;object-fit:cover;border-radius:6px;border:1px solid var(--border);">';}).join('')+'</div>'):'');
   }
   function sec(t){ var w=document.createElement('div'); w.className='c-sec'; w.textContent=t; form.appendChild(w); }
   function fld(key,label,type,wide){ var w=document.createElement('div'); if(wide)w.className='c-wide'; var l=document.createElement('label'); l.textContent=label; w.appendChild(l);
@@ -12880,6 +12929,7 @@ function openProspect(p, isNew){
   fld('address_full','Address','text',true);
   (function(){ var w=document.createElement('div'); w.className='c-wide'; var b=document.createElement('button'); b.className='cbtn g'; b.type='button'; b.textContent='📍 Use my location'; b.style.cssText='font-size:12px;padding:5px 12px;'; b.addEventListener('click',function(){ cproGeolocate(b,function(j){ if(j.address) d.address_full=j.address; if(j.city) d.city=j.city; if(j.state) d.state=j.state; if(j.zip) d.zip=j.zip; if(j.lat!=null) d.lat=j.lat; if(j.lon!=null) d.lon=j.lon; openProspect(p,isNew); }); }); w.appendChild(b); form.appendChild(w); })();
   fld('city','City'); fld('state','State'); fld('zip','ZIP');
+  sec('Photos'); form.appendChild(cproPhotoBlock(d, refresh));
   sec('Property & zoning');
   fld('use_type','Use / property type (retail, office, industrial…)','text',true);
   fld('zoning','Zoning'); fld('rentable_sqft','Rentable SF','number'); fld('lot_size','Lot size'); fld('year_built','Year built','number'); fld('parking','Parking');
@@ -12919,8 +12969,12 @@ function cproSheetHTML(c, items){
     if(d.pros) tr('Fit', d.pros);
     if(d.cons) tr('Concerns', d.cons);
     if(d.notes) tr('Notes', d.notes);
+    var photoHtml=(Array.isArray(d.photos)&&d.photos.length)
+      ? ('<div style="margin:6px 0 8px;">'+d.photos.slice(0,2).map(function(s){return '<img src="'+s+'" style="max-width:320px;max-height:220px;border-radius:6px;margin:0 8px 8px 0;border:1px solid #ccc;">';}).join('')+'</div>')
+      : '';
     return '<div class="cp-card"><div class="cp-addr">'+_esc(d.address_full||'(no address)')+'</div>'
       +(cproSpecLine(d)?('<div class="cp-spec">'+_esc(cproSpecLine(d))+'</div>'):'')
+      +photoHtml
       +'<table class="cp-t">'+lines.join('')+'</table></div>';
   }).join('');
   return css
@@ -12970,16 +13024,22 @@ function ncDefault(){ return { id:Date.now()+Math.floor(Math.random()*100000), b
   url:'', source:'manual', email_ref:'', notes:'', archived:false } }; }
 function ncKey(builder,name){ return String(builder||'').trim().toLowerCase()+'|'+String(name||'').trim().toLowerCase(); }
 function ncFind(builder,name){ var k=ncKey(builder,name); for(var i=0;i<NC.length;i++){ if(ncKey(NC[i].builder,NC[i].name)===k) return NC[i]; } return null; }
-// Some builders use a clean, predictable community-page URL (just the community name slugified), so we
-// can build the link from the name alone — no need for the copied page to include the href. Used as a
-// fallback when a paste came through as plain text with the links stripped.
-function ncGuessUrl(builder,name){
-  var b=String(builder||'').toLowerCase();
-  var slug=String(name||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
-  if(!slug) return '';
-  if(/edge/.test(b))  return 'https://www.edgehomes.com/communities/'+slug+'/';
-  if(/ivory/.test(b)) return 'https://ivoryhomes.com/community-details/'+slug;
-  return '';
+// Build a community's page link from what we already know (builder + name + city), so a link never
+// depends on the copied page including the href. Most builders use a predictable URL; for the ones whose
+// URL needs an ID or a region we can't derive (Richmond, Fieldstone, or anything unrecognized), fall back
+// to a web search that reliably lands on the community page. This runs at render time, so every
+// community — old or new — is clickable with no stored data and no re-paste needed.
+function _ncSlug(s){ return String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,''); }
+function ncGuessUrl(builder,name,city){
+  var b=String(builder||'').toLowerCase(), ns=_ncSlug(name), cs=_ncSlug(city);
+  if(!ns && !name) return '';
+  if(/edge/.test(b) && ns)        return 'https://www.edgehomes.com/communities/'+ns+'/';
+  if(/ivory/.test(b) && ns)       return 'https://ivoryhomes.com/community-details/'+ns;
+  if(/lennar/.test(b) && ns && cs)return 'https://www.lennar.com/new-homes/utah/salt-lake-city/'+cs+'/'+ns+'/';
+  if(/horton/.test(b) && ns && cs)return 'https://www.drhorton.com/utah/salt-lake-city/'+cs+'/'+ns;
+  // Fallback: a web search for "<builder> <community> <city> Utah new homes" — always resolves, never 404s.
+  var q=[builder,name,city,'Utah new homes'].filter(Boolean).join(' ');
+  return 'https://www.google.com/search?q='+encodeURIComponent(q);
 }
 // ---- builder-sender list (settings key 'nc_builders') ----
 async function loadNcBuilders(){
@@ -13043,14 +13103,15 @@ function renderNewConstruction(){
     var sub=[d.city, d.home_types, ncPrice(d)].filter(Boolean).join('  ·  ');
     var promo=d.promo?('<div style="font-size:12px;color:#1f9d55;margin-top:2px;">'+_esc(d.promo)+'</div>'):'';
     var nm=_esc(x.name||'(community)');
-    // When we have the builder's community page, the name itself is a link straight to it. The whole row
-    // opens the page too; the Edit button is how you get to the fields.
-    var nameHtml = d.url ? '<a class="nc-link" href="'+_esc(d.url)+'" target="_blank" rel="noopener" style="color:#b8912f;text-decoration:none;">'+nm+' <span style="font-size:11px;">↗</span></a>' : nm;
+    // The link is computed from builder+name+city (with any captured URL taking precedence), so every
+    // community is clickable without depending on the pasted page including links.
+    var pageUrl=(d.url||'').trim() || ncGuessUrl(x.builder, x.name, d.city);
+    var nameHtml = pageUrl ? '<a class="nc-link" href="'+_esc(pageUrl)+'" target="_blank" rel="noopener" style="color:#b8912f;text-decoration:none;">'+nm+' <span style="font-size:11px;">↗</span></a>' : nm;
     row.innerHTML='<div style="min-width:0;"><div style="font-weight:600;overflow:hidden;text-overflow:ellipsis;">'+nameHtml+' '+badge+fresh+(arch?' <span class="nc-badge" style="background:#888;">ARCHIVED</span>':'')+'</div><div style="font-size:12px;color:var(--text3);">'+_esc(sub)+'</div>'+promo+'</div>';
     var _a=row.querySelector('a.nc-link'); if(_a) _a.addEventListener('click',function(e){ e.stopPropagation(); });
     var btns=document.createElement('div'); btns.style.cssText='display:flex;gap:6px;flex-shrink:0;';
-    if(d.url){ var ob=document.createElement('button'); ob.className='ncbtn'; ob.style.cssText='font-size:12px;padding:3px 9px;'; ob.textContent='Open ↗';
-      ob.addEventListener('click',function(e){ e.stopPropagation(); try{ window.open(d.url,'_blank','noopener'); }catch(err){} }); btns.appendChild(ob); }
+    if(pageUrl){ var ob=document.createElement('button'); ob.className='ncbtn'; ob.style.cssText='font-size:12px;padding:3px 9px;'; ob.textContent='Open ↗';
+      ob.addEventListener('click',function(e){ e.stopPropagation(); try{ window.open(pageUrl,'_blank','noopener'); }catch(err){} }); btns.appendChild(ob); }
     var eb=document.createElement('button'); eb.className='ncbtn g'; eb.style.cssText='font-size:12px;padding:3px 9px;'; eb.textContent='Edit';
     eb.addEventListener('click',function(e){ e.stopPropagation(); openNC(x,false); });
     var ab=document.createElement('button'); ab.className='ncbtn g'; ab.style.cssText='font-size:12px;padding:3px 9px;'; ab.textContent=arch?'Unarchive':'Archive';
@@ -13058,7 +13119,7 @@ function renderNewConstruction(){
     var del=document.createElement('button'); del.className='ncbtn g'; del.style.cssText='font-size:12px;padding:3px 9px;'; del.textContent='Delete';
     (function(id){ del.addEventListener('click',function(e){ e.stopPropagation(); if(confirm('Delete this community?')){ delNC(id); draw(); } }); })(x.id);
     btns.appendChild(eb); btns.appendChild(ab); btns.appendChild(del);
-    row.addEventListener('click',function(){ if(d.url){ try{ window.open(d.url,'_blank','noopener'); }catch(e){} } else { openNC(x,false); } });
+    row.addEventListener('click',function(){ if(pageUrl){ try{ window.open(pageUrl,'_blank','noopener'); }catch(e){} } else { openNC(x,false); } });
     row.appendChild(btns); return row;
   }
   function cmp(a,b){
@@ -13112,7 +13173,8 @@ function openNC(x, isNew){
   var tb=document.createElement('div'); tb.style.cssText='display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;';
   var back=document.createElement('button'); back.className='ncbtn g'; back.textContent='‹ Back'; back.addEventListener('click',renderNewConstruction); tb.appendChild(back);
   var saveB=document.createElement('button'); saveB.className='ncbtn'; saveB.textContent='Save'; saveB.addEventListener('click',function(){ if(!x.name) x.name='(community)'; if(!NC.some(function(y){return String(y.id)===String(x.id);})) NC.push(x); saveNC(x); saveB.textContent='Saved ✓'; setTimeout(function(){saveB.textContent='Save';},1500); }); tb.appendChild(saveB);
-  if(d.url){ var open=document.createElement('button'); open.className='ncbtn g'; open.textContent='Open listing ↗'; open.addEventListener('click',function(){ try{ window.open(d.url,'_blank','noopener'); }catch(e){} }); tb.appendChild(open); }
+  var _openUrl=(d.url||'').trim() || ncGuessUrl(x.builder, x.name, d.city);
+  if(_openUrl){ var open=document.createElement('button'); open.className='ncbtn g'; open.textContent='Open listing ↗'; open.addEventListener('click',function(){ try{ window.open(_openUrl,'_blank','noopener'); }catch(e){} }); tb.appendChild(open); }
   root.appendChild(tb);
   var form=document.createElement('div'); form.className='nc-form';
   function fld(get,set,label,type,wide){ var w=document.createElement('div'); if(wide)w.className='nc-wide'; var l=document.createElement('label'); l.textContent=label; w.appendChild(l);
@@ -13214,7 +13276,6 @@ function ncApplyExtracted(arr, sourceLabel){
       // Heal builder spelling/casing to the incoming (canonical) name — matching is case-insensitive, so
       // a re-paste of "D.R. Horton" over an old "d.r. horton" record fixes the label in place.
       if(builder && rec.builder!==builder){ rec.builder=builder; changed=true; }
-      if(!d.url){ var _gu=ncGuessUrl(builder||rec.builder,name); if(_gu){ d.url=_gu; changed=true; } }
       if(it.price_min!=null){ d.price_min=it.price_min; } if(it.price_max!=null){ d.price_max=it.price_max; }
       if(it.status && it.status!==d.status){ d.status=it.status; changed=true; }
       d.last_seen=today; if(changed){ updated++; saveNC(rec); }
@@ -13222,7 +13283,7 @@ function ncApplyExtracted(arr, sourceLabel){
       var nrec={ id:Date.now()+Math.floor(Math.random()*100000)+added, builder:builder, name:name, data:{
         city:(it.city||'').trim(), state:(it.state||'UT').trim(), home_types:(it.home_types||'').trim(),
         price_text:(it.price_text||'').trim(), price_min:(it.price_min!=null?it.price_min:''), price_max:(it.price_max!=null?it.price_max:''),
-        promo:(it.promo||'').trim(), status:(it.status||'active'), url:((it.url||'').trim()||ncGuessUrl(builder,name)), source:sourceLabel||'manual', email_ref:'', notes:'',
+        promo:(it.promo||'').trim(), status:(it.status||'active'), url:(it.url||'').trim(), source:sourceLabel||'manual', email_ref:'', notes:'',
         first_seen:today, last_seen:today, archived:false } };
       NC.push(nrec); saveNC(nrec); added++;
     }
