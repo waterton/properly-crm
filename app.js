@@ -13038,6 +13038,8 @@ function renderNewConstruction(){
     row.innerHTML='<div style="min-width:0;"><div style="font-weight:600;overflow:hidden;text-overflow:ellipsis;">'+nameHtml+' '+badge+fresh+(arch?' <span class="nc-badge" style="background:#888;">ARCHIVED</span>':'')+'</div><div style="font-size:12px;color:var(--text3);">'+_esc(sub)+'</div>'+promo+'</div>';
     var _a=row.querySelector('a.nc-link'); if(_a) _a.addEventListener('click',function(e){ e.stopPropagation(); });
     var btns=document.createElement('div'); btns.style.cssText='display:flex;gap:6px;flex-shrink:0;';
+    if(d.url){ var ob=document.createElement('button'); ob.className='ncbtn'; ob.style.cssText='font-size:12px;padding:3px 9px;'; ob.textContent='Open ↗';
+      ob.addEventListener('click',function(e){ e.stopPropagation(); try{ window.open(d.url,'_blank','noopener'); }catch(err){} }); btns.appendChild(ob); }
     var eb=document.createElement('button'); eb.className='ncbtn g'; eb.style.cssText='font-size:12px;padding:3px 9px;'; eb.textContent='Edit';
     eb.addEventListener('click',function(e){ e.stopPropagation(); openNC(x,false); });
     var ab=document.createElement('button'); ab.className='ncbtn g'; ab.style.cssText='font-size:12px;padding:3px 9px;'; ab.textContent=arch?'Unarchive':'Archive';
@@ -13340,7 +13342,7 @@ function ncParseRichmond(text){
   }
   var out=[];
   order.forEach(function(k){ var c=comm[k];
-    out.push({ builder:'Richmond American', community:c.name, city:c.city, state:'UT',
+    out.push({ builder:'Richmond American Homes', community:c.name, city:c.city, state:'UT',
       home_types:ncGuessType(c.name), price_text:(c.min!=null?('From $'+c.min.toLocaleString('en-US')):''),
       promo:'', url:c.url||'', status:'active' });
   });
@@ -13351,7 +13353,13 @@ function ncParseRichmond(text){
 // each community by its Name / TYPE / City, ST ZIP / Price pattern, with an optional incentive line.
 // Fast and free; the AI is only a fallback for formats this doesn't recognize.
 function ncLocalParse(text, builderHint){
-  var norm=String(text||'').replace(/\r/g,'').replace(/\[([^\]]*)\]\([^)]*\)/g,'$1');
+  var raw=String(text||'').replace(/\r/g,'');
+  // Capture community-page URLs by slug before stripping the links (Edge: every field links to the
+  // community page; Ivory: the [View] link). Attached to each parsed community via its name's slug.
+  var urlBySlug={};
+  (function(){ var lr=/\]\((https?:\/\/[^)]+)\)/g, lm; while((lm=lr.exec(raw))){ var mm=lm[1].match(/\/(?:communities|community-details)\/([^\/?#)]+)/i); if(mm) urlBySlug[mm[1].toLowerCase()]=lm[1].replace(/[)#].*$/,''); } })();
+  function _slug(s){ return String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,''); }
+  var norm=raw.replace(/\[([^\]]*)\]\([^)]*\)/g,'$1');
   var typeRe='SINGLE FAMILY|TOWNHOMES?|CONDOS?|TWINHOMES?|TWIN HOME|MULTI-?FAMILY|DUPLEX';
   var priceRe="From the \\$[\\d,]+'?s|From \\$[\\d,]+|Starting (?:at|in|in the) \\$[\\d,'s]+|\\$[\\d,]+'?s|Limited Lots|Coming Soon|Sold Out|Now Selling|Call for [Pp]ricing";
   var re=new RegExp("(?:([^\\n]*(?:limited.?time|incentive|toward|buydown|%\\s*(?:interest|rate)|design options)[^\\n]*)\\n)?([^\\n]+?)[\\n ]+("+typeRe+")[\\n ]+(.+?,\\s*[A-Z]{2},?\\s*\\d{5}(?:/\\d{5})?)[\\n ]+("+priceRe+")","gi");
@@ -13360,7 +13368,7 @@ function ncLocalParse(text, builderHint){
     var promo=(m[1]||'').trim(), name=(m[2]||'').trim(), type=(m[3]||'').trim(), cityBlob=(m[4]||'').trim(), price=(m[5]||'').trim();
     if(!name || name.length>60) continue;
     var cm=cityBlob.match(/^(.+?),\s*([A-Z]{2})/); var city=cm?cm[1].trim():cityBlob, state=cm?cm[2]:'';
-    out.push({ builder:builderHint||'', community:name, city:city, state:state, home_types:type, price_text:price, promo:promo, url:'', status:/sold out/i.test(price)?'sold_out':(/coming soon/i.test(price)?'coming_soon':'active') });
+    out.push({ builder:builderHint||'', community:name, city:city, state:state, home_types:type, price_text:price, promo:promo, url:urlBySlug[_slug(name)]||'', status:/sold out/i.test(price)?'sold_out':(/coming soon/i.test(price)?'coming_soon':'active') });
   }
   if(out.length) return out;
   // Format B: label-based (e.g. Ivory) — Name / Location: / City: / Homes Starting at:$XXXk|M / [View].
@@ -13368,7 +13376,7 @@ function ncLocalParse(text, builderHint){
   while((m2=re2.exec(norm))){
     var nm=(m2[1]||'').trim(), cty=(m2[2]||'').trim(), pr=(m2[3]||'').trim(), st=(m2[4]||'').trim();
     if(!nm || nm.length>70) continue;
-    out.push({ builder:builderHint||'', community:nm, city:cty, state:'UT', home_types:ncGuessType(nm), price_text:pr?('From '+pr):'', promo:'', url:'', status:/upcoming|coming/i.test(st)?'coming_soon':(/sold/i.test(st)?'sold_out':'active') });
+    out.push({ builder:builderHint||'', community:nm, city:cty, state:'UT', home_types:ncGuessType(nm), price_text:pr?('From '+pr):'', promo:'', url:urlBySlug[_slug(nm)]||'', status:/upcoming|coming/i.test(st)?'coming_soon':(/sold/i.test(st)?'sold_out':'active') });
   }
   return out;
 }
