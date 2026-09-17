@@ -12970,6 +12970,17 @@ function ncDefault(){ return { id:Date.now()+Math.floor(Math.random()*100000), b
   url:'', source:'manual', email_ref:'', notes:'', archived:false } }; }
 function ncKey(builder,name){ return String(builder||'').trim().toLowerCase()+'|'+String(name||'').trim().toLowerCase(); }
 function ncFind(builder,name){ var k=ncKey(builder,name); for(var i=0;i<NC.length;i++){ if(ncKey(NC[i].builder,NC[i].name)===k) return NC[i]; } return null; }
+// Some builders use a clean, predictable community-page URL (just the community name slugified), so we
+// can build the link from the name alone — no need for the copied page to include the href. Used as a
+// fallback when a paste came through as plain text with the links stripped.
+function ncGuessUrl(builder,name){
+  var b=String(builder||'').toLowerCase();
+  var slug=String(name||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+  if(!slug) return '';
+  if(/edge/.test(b))  return 'https://www.edgehomes.com/communities/'+slug+'/';
+  if(/ivory/.test(b)) return 'https://ivoryhomes.com/community-details/'+slug;
+  return '';
+}
 // ---- builder-sender list (settings key 'nc_builders') ----
 async function loadNcBuilders(){
   if(!supaReady) return NC_BUILDERS;
@@ -13203,6 +13214,7 @@ function ncApplyExtracted(arr, sourceLabel){
       // Heal builder spelling/casing to the incoming (canonical) name — matching is case-insensitive, so
       // a re-paste of "D.R. Horton" over an old "d.r. horton" record fixes the label in place.
       if(builder && rec.builder!==builder){ rec.builder=builder; changed=true; }
+      if(!d.url){ var _gu=ncGuessUrl(builder||rec.builder,name); if(_gu){ d.url=_gu; changed=true; } }
       if(it.price_min!=null){ d.price_min=it.price_min; } if(it.price_max!=null){ d.price_max=it.price_max; }
       if(it.status && it.status!==d.status){ d.status=it.status; changed=true; }
       d.last_seen=today; if(changed){ updated++; saveNC(rec); }
@@ -13210,7 +13222,7 @@ function ncApplyExtracted(arr, sourceLabel){
       var nrec={ id:Date.now()+Math.floor(Math.random()*100000)+added, builder:builder, name:name, data:{
         city:(it.city||'').trim(), state:(it.state||'UT').trim(), home_types:(it.home_types||'').trim(),
         price_text:(it.price_text||'').trim(), price_min:(it.price_min!=null?it.price_min:''), price_max:(it.price_max!=null?it.price_max:''),
-        promo:(it.promo||'').trim(), status:(it.status||'active'), url:(it.url||'').trim(), source:sourceLabel||'manual', email_ref:'', notes:'',
+        promo:(it.promo||'').trim(), status:(it.status||'active'), url:((it.url||'').trim()||ncGuessUrl(builder,name)), source:sourceLabel||'manual', email_ref:'', notes:'',
         first_seen:today, last_seen:today, archived:false } };
       NC.push(nrec); saveNC(nrec); added++;
     }
