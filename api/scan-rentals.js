@@ -185,6 +185,12 @@ function payeeFor(fromField, bodyText, payees) {
   }
   return null;
 }
+// A reply/forward in a thread is correspondence, not an incoming statement — an owner statement always
+// arrives as a fresh email from the property manager, never as a "Re:".
+function isReply(subject) { return /^\s*(re|fwd|fw)\s*:/i.test(String(subject || '')); }
+// Mail sent by the mailbox owner (their own replies showing up in the scan) is never an incoming charge.
+function senderIsOwner(fromField) { return String(fromField || '').toLowerCase().indexOf(RENTAL_MAILBOX) >= 0;
+}
 function parseArr(txt) {
   try { return JSON.parse(txt); } catch (e) {}
   const a = txt.indexOf('['), b = txt.lastIndexOf(']');
@@ -232,8 +238,8 @@ async function logScan(trigger, ok, r, note) {
 }
 
 export default async function handler(req, res) {
-  const result = { mailbox: RENTAL_MAILBOX, scanned: 0, added: 0, skipped: 0, unmatched: 0, freshStartPending: 0, errors: [],
-    recorded: [], ignored: [], noPdf: [] };   // review details (from/subject) for the in-app triage view
+  const result = { mailbox: RENTAL_MAILBOX, scanned: 0, added: 0, skipped: 0, unmatched: 0, correspondence: 0, freshStartPending: 0, errors: [],
+    recorded: [], ignored: [], corr: [], noPdf: [] };   // review details (from/subject) for the in-app triage view
   const brief = (m, extra) => Object.assign({ from: m.from || '', subject: m.subject || '', date: m.received || '' }, extra || {});
   let trigger = 'manual';
   try {
@@ -283,6 +289,11 @@ export default async function handler(req, res) {
       const payee = payeeFor(m.from, (m.subject || '') + ' \n ' + m.text, payees);
       if (!payee) { result.unmatched++; if (result.ignored.length < 100) result.ignored.push(brief(m)); continue; }   // not an approved sender
       if (payee.kind === 'rent') {
+        // A reply/forward, or the owner's own mail in the thread, is correspondence — never a statement
+        // to split. Skip it quietly instead of parking it as a pending statement that needs review.
+        if (isReply(m.subject) || senderIsOwner(m.from)) {
+          result.correspondence++; if (result.corr.length < 100) result.corr.push(brief(m, { payee: payee.name })); continue;
+        }
         // Fresh Start rent statement: the money is split per property from the attached PDF.
         if (processedMsg[m.messageId]) { result.skipped++; if (result.recorded.length < 100) result.recorded.push(brief(m, { payee: payee.name })); continue; }
         const pdf = (m.attachments || []).find(a => /pdf/i.test(a.mimeType) || /\.pdf$/i.test(a.filename || ''));
