@@ -12893,21 +12893,29 @@ function renderCommercial(){
       if(arch) return false;
       if(_cproView==='active') return true;
       return d.status===_cproView;
-    }).sort(function(a,b){ return String(b.updated_at||'').localeCompare(String(a.updated_at||'')); });
+    }).sort(function(a,b){
+      var pa=(a.data&&a.data.status==='passed')?1:0, pb=(b.data&&b.data.status==='passed')?1:0;
+      if(pa!==pb) return pa-pb;   // "won't work" sink to the bottom, active stay on top
+      return String(b.updated_at||'').localeCompare(String(a.updated_at||''));
+    });
     if(!items.length){ list.appendChild(mkDivSafe('color:var(--text3);padding:16px 0;','Nothing matches.')); return; }
     items.forEach(function(p){
       var d=p.data||{}, arch=cproArchived(p), c=gc(p.contact_id);
-      var row=document.createElement('div'); row.style.cssText='display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 14px;cursor:pointer;'+(arch?'opacity:.7;':'');
+      var passed=(d.status==='passed');   // "won't work" — kept visible but depreciated so we don't re-scout it
+      var row=document.createElement('div'); row.style.cssText='display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 14px;cursor:pointer;'+((arch||passed)?'opacity:.6;':'');
       var badge='<span class="c-badge" style="background:'+cproStatusColor(d.status)+';">'+_esc(cproStatusLabel(d.status||'spotted'))+'</span>';
       var sub=[ (c?fn(c):'(no client)'), cproSpecLine(d) ].filter(Boolean).join('  ·  ');
-      var thumb=(Array.isArray(d.photos)&&d.photos.length)?'<img src="'+d.photos[0]+'" style="width:46px;height:46px;object-fit:cover;border-radius:6px;border:1px solid var(--border);flex-shrink:0;">':'';
-      row.innerHTML='<div style="display:flex;align-items:center;gap:10px;min-width:0;">'+thumb+'<div style="min-width:0;"><div style="font-weight:600;overflow:hidden;text-overflow:ellipsis;">'+_esc(d.address_full||p.name||'(no address)')+' '+badge+(arch?' <span class="c-badge" style="background:#888;">ARCHIVED</span>':'')+'</div><div style="font-size:12px;color:var(--text3);">'+_esc(sub)+'</div></div></div>';
+      var thumb=(Array.isArray(d.photos)&&d.photos.length)?'<img src="'+d.photos[0]+'" style="width:46px;height:46px;object-fit:cover;border-radius:6px;border:1px solid var(--border);flex-shrink:0;'+(passed?'filter:grayscale(1);':'')+'">':'';
+      var addrStyle='font-weight:600;overflow:hidden;text-overflow:ellipsis;'+(passed?'text-decoration:line-through;color:var(--text3);':'');
+      row.innerHTML='<div style="display:flex;align-items:center;gap:10px;min-width:0;">'+thumb+'<div style="min-width:0;"><div style="'+addrStyle+'">'+_esc(d.address_full||p.name||'(no address)')+' '+badge+(arch?' <span class="c-badge" style="background:#888;">ARCHIVED</span>':'')+'</div><div style="font-size:12px;color:var(--text3);">'+_esc(sub)+'</div></div></div>';
       var btns=document.createElement('div'); btns.style.cssText='display:flex;gap:6px;flex-shrink:0;';
+      var pb=document.createElement('button'); pb.className='cbtn g'; pb.style.cssText='font-size:12px;padding:3px 9px;'+(passed?'':'color:#c0392b;'); pb.textContent=passed?'Reactivate':'Won’t work';
+      pb.addEventListener('click',function(e){ e.stopPropagation(); if(!p.data)p.data={}; p.data.status=passed?'spotted':'passed'; saveProspect(p); draw(); });
       var ab=document.createElement('button'); ab.className='cbtn g'; ab.style.cssText='font-size:12px;padding:3px 9px;'; ab.textContent=arch?'Unarchive':'Archive';
       ab.addEventListener('click',function(e){ e.stopPropagation(); if(!p.data)p.data={}; p.data.archived=!arch; saveProspect(p); draw(); });
       var del=document.createElement('button'); del.className='cbtn g'; del.style.cssText='font-size:12px;padding:3px 9px;'; del.textContent='Delete';
       (function(id){ del.addEventListener('click',function(e){ e.stopPropagation(); if(confirm('Delete this prospect?')){ delProspect(id); draw(); } }); })(p.id);
-      btns.appendChild(ab); btns.appendChild(del);
+      btns.appendChild(pb); btns.appendChild(ab); btns.appendChild(del);
       row.addEventListener('click',function(){ openProspect(p,false); }); row.appendChild(btns); list.appendChild(row);
     });
   }
