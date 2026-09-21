@@ -12731,11 +12731,22 @@ function cproCompressImage(file, cb){
     reader.onerror=function(){ cb(null); }; reader.readAsDataURL(file);
   }catch(err){ cb(null); }
 }
-// Full-screen photo viewer (tap a thumbnail).
-function cproViewPhoto(src){
-  var ov=document.createElement('div'); ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:2000;display:flex;align-items:center;justify-content:center;padding:16px;';
-  var im=document.createElement('img'); im.src=src; im.style.cssText='max-width:96vw;max-height:92vh;border-radius:8px;';
-  ov.appendChild(im); ov.addEventListener('click',function(){ try{ document.body.removeChild(ov); }catch(e){} }); document.body.appendChild(ov);
+// Save a photo (a data URL) to the device as a JPEG so it can be attached to an email or text.
+function cproDownloadPhoto(dataUrl, filename){
+  try{ var a=document.createElement('a'); a.href=dataUrl; a.download=filename||'photo.jpg'; document.body.appendChild(a); a.click(); setTimeout(function(){ try{ document.body.removeChild(a); }catch(e){} },150); }
+  catch(e){ alert('Could not start the download.'); }
+}
+function cproPhotoName(d, idx){ var base=String((d&&d.address_full)||'property').replace(/[^a-z0-9]+/gi,'_').replace(/^_+|_+$/g,'').slice(0,50)||'property'; return base+'_photo'+((idx||0)+1)+'.jpg'; }
+// Full-screen photo viewer with a Download button (tap a thumbnail).
+function cproViewPhoto(src, filename){
+  var ov=document.createElement('div'); ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:2000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:16px;';
+  var im=document.createElement('img'); im.src=src; im.style.cssText='max-width:96vw;max-height:82vh;border-radius:8px;';
+  im.addEventListener('click',function(e){ e.stopPropagation(); });
+  var dl=document.createElement('button'); dl.textContent='⤓ Download photo'; dl.style.cssText='background:var(--accent,#b8912f);color:#fff;border:none;border-radius:8px;padding:11px 20px;font-family:inherit;font-size:15px;cursor:pointer;';
+  dl.addEventListener('click',function(e){ e.stopPropagation(); cproDownloadPhoto(src, filename||'photo.jpg'); });
+  var hint=document.createElement('div'); hint.textContent='Tap outside to close'; hint.style.cssText='color:#bbb;font-size:12px;';
+  ov.appendChild(im); ov.appendChild(dl); ov.appendChild(hint);
+  ov.addEventListener('click',function(){ try{ document.body.removeChild(ov); }catch(e){} }); document.body.appendChild(ov);
 }
 // Reusable "Photos" block: thumbnails with remove buttons + an "Add photo" control (camera on mobile).
 function cproPhotoBlock(d, onChange){
@@ -12748,10 +12759,12 @@ function cproPhotoBlock(d, onChange){
     d.photos.forEach(function(src,idx){
       var cell=document.createElement('div'); cell.style.cssText='position:relative;';
       var im=document.createElement('img'); im.src=src; im.style.cssText='width:84px;height:84px;object-fit:cover;border-radius:8px;border:1px solid var(--border);cursor:pointer;';
-      im.addEventListener('click',function(){ cproViewPhoto(src); });
+      im.addEventListener('click',function(){ cproViewPhoto(src, cproPhotoName(d, idx)); });
       var rm=document.createElement('button'); rm.type='button'; rm.textContent='×'; rm.title='Remove'; rm.style.cssText='position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;border:none;background:#c0392b;color:#fff;font-size:13px;line-height:1;cursor:pointer;';
       rm.addEventListener('click',function(e){ e.stopPropagation(); d.photos.splice(idx,1); redraw(); if(onChange)onChange(); });
-      cell.appendChild(im); cell.appendChild(rm); strip.appendChild(cell);
+      var dl=document.createElement('button'); dl.type='button'; dl.textContent='⤓'; dl.title='Download'; dl.style.cssText='position:absolute;bottom:-6px;right:-6px;width:22px;height:22px;border-radius:50%;border:none;background:var(--accent,#b8912f);color:#fff;font-size:12px;line-height:1;cursor:pointer;';
+      (function(s,i){ dl.addEventListener('click',function(e){ e.stopPropagation(); cproDownloadPhoto(s, cproPhotoName(d, i)); }); })(src, idx);
+      cell.appendChild(im); cell.appendChild(rm); cell.appendChild(dl); strip.appendChild(cell);
     });
     var add=document.createElement('button'); add.type='button'; add.className='cbtn g'; add.textContent='📷 Add photo'; add.style.cssText='font-size:12px;padding:6px 12px;height:84px;';
     var inp=document.createElement('input'); inp.type='file'; inp.accept='image/*'; inp.setAttribute('capture','environment'); inp.style.display='none';
