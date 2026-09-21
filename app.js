@@ -12737,16 +12737,27 @@ function cproDownloadPhoto(dataUrl, filename){
   catch(e){ alert('Could not start the download.'); }
 }
 function cproPhotoName(d, idx){ var base=String((d&&d.address_full)||'property').replace(/[^a-z0-9]+/gi,'_').replace(/^_+|_+$/g,'').slice(0,50)||'property'; return base+'_photo'+((idx||0)+1)+'.jpg'; }
-// Full-screen photo viewer with a Download button (tap a thumbnail).
+// Full-screen photo viewer with a Download button (tap a thumbnail). It registers a history entry when
+// it opens, so the phone/browser Back button just closes the photo and returns you to the property
+// (instead of navigating the whole app back to the dashboard or exiting).
 function cproViewPhoto(src, filename){
   var ov=document.createElement('div'); ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:2000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:16px;';
-  var im=document.createElement('img'); im.src=src; im.style.cssText='max-width:96vw;max-height:82vh;border-radius:8px;';
+  var closeBtn=document.createElement('button'); closeBtn.textContent='✕'; closeBtn.style.cssText='position:absolute;top:14px;right:16px;background:rgba(0,0,0,.45);color:#fff;border:none;border-radius:50%;width:40px;height:40px;font-size:20px;line-height:1;cursor:pointer;';
+  var im=document.createElement('img'); im.src=src; im.style.cssText='max-width:96vw;max-height:80vh;border-radius:8px;';
   im.addEventListener('click',function(e){ e.stopPropagation(); });
   var dl=document.createElement('button'); dl.textContent='⤓ Download photo'; dl.style.cssText='background:var(--accent,#b8912f);color:#fff;border:none;border-radius:8px;padding:11px 20px;font-family:inherit;font-size:15px;cursor:pointer;';
   dl.addEventListener('click',function(e){ e.stopPropagation(); cproDownloadPhoto(src, filename||'photo.jpg'); });
-  var hint=document.createElement('div'); hint.textContent='Tap outside to close'; hint.style.cssText='color:#bbb;font-size:12px;';
-  ov.appendChild(im); ov.appendChild(dl); ov.appendChild(hint);
-  ov.addEventListener('click',function(){ try{ document.body.removeChild(ov); }catch(e){} }); document.body.appendChild(ov);
+  var hint=document.createElement('div'); hint.textContent='Tap outside, ✕, or Back to close'; hint.style.cssText='color:#bbb;font-size:12px;';
+  ov.appendChild(closeBtn); ov.appendChild(im); ov.appendChild(dl); ov.appendChild(hint);
+  var closed=false;
+  function teardown(){ if(closed) return; closed=true; window.removeEventListener('popstate', onPop); try{ document.body.removeChild(ov); }catch(e){} }
+  function onPop(){ teardown(); }            // hardware/browser Back -> consume our entry and just close
+  function dismiss(){ if(closed) return; if(history.state && history.state.cproPhoto){ history.back(); } else { teardown(); } }
+  closeBtn.addEventListener('click',function(e){ e.stopPropagation(); dismiss(); });
+  ov.addEventListener('click', dismiss);
+  window.addEventListener('popstate', onPop);
+  try{ history.pushState({ cproPhoto:true }, ''); }catch(e){}
+  document.body.appendChild(ov);
 }
 // Reusable "Photos" block: thumbnails with remove buttons + an "Add photo" control (camera on mobile).
 function cproPhotoBlock(d, onChange){
