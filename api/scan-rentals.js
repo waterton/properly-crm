@@ -104,6 +104,14 @@ async function gmailGetAttachment(token, msgId, attId) {
   const d = await r.json();
   return d.data ? String(d.data).replace(/-/g, '+').replace(/_/g, '/') : '';   // base64url -> base64
 }
+// fetch + JSON with a hard timeout, so one slow Gemini/Gmail call can't hang the whole scan past the
+// serverless limit. Aborts after ms (default 22s) and throws, which the callers already catch.
+async function fetchJSONTimeout(url, opts, ms) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), ms || 22000);
+  try { const r = await fetch(url, Object.assign({}, opts || {}, { signal: ctrl.signal })); return await r.json(); }
+  finally { clearTimeout(t); }
+}
 // Hand the owner-statement PDF straight to Gemini (reads text-based OR scanned PDFs natively - no
 // separate OCR). Returns one object per property with its figures.
 async function geminiReadStatementPdf(b64pdf, propList) {
@@ -111,8 +119,7 @@ async function geminiReadStatementPdf(b64pdf, propList) {
     + 'Return ONLY a JSON array: [{"property":"<address or name exactly as printed>","unit":"<unit label if the statement distinguishes one, e.g. Upstairs / Downstairs / a unit number; empty string if it does not>","rent":<gross monthly rent, number>,"management":<management fee, number>,"parking":<parking or other income, number or 0>,"repairs":[{"desc":"<short label>","amount":<number>}],"deposit":<net amount deposited to the owner, number>}]. '
     + 'Use 0 when a value is absent and [] when there are no repair/maintenance line items. Known properties: ' + propList + '.';
   const body = { contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: 'application/pdf', data: b64pdf } }] }], generationConfig: { temperature: 0.1, maxOutputTokens: 4096, responseMimeType: 'application/json' } };
-  const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + GEMINI_KEY, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-  const d = await r.json();
+  const d = await fetchJSONTimeout('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + GEMINI_KEY, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }, 24000);
   const txt = d.candidates && d.candidates[0] && d.candidates[0].content && d.candidates[0].content.parts && d.candidates[0].content.parts[0] ? d.candidates[0].content.parts[0].text : '';
   return parseArr(txt || '') || [];
 }
@@ -123,8 +130,7 @@ async function geminiReadStatementText(emailText, propList) {
     + 'Return ONLY a JSON array: [{"property":"<address or name as written>","unit":"<unit label if distinguished, else empty>","rent":<gross rent number>,"management":<mgmt fee number>,"parking":<parking/other income or 0>,"repairs":[{"desc":"<label>","amount":<number>}],"deposit":<net amount deposited to the owner, number>}]. '
     + 'If the email only states a total amount deposited (no rent/fee breakdown), put that amount in "deposit" and use 0 for rent/management/parking and [] for repairs. Use 0 for any absent value. Known properties: ' + propList + '.';
   const body = { contents: [{ parts: [{ text: prompt + '\n\nEMAIL:\n' + String(emailText || '').slice(0, 8000) }] }], generationConfig: { temperature: 0.1, maxOutputTokens: 4096, responseMimeType: 'application/json' } };
-  const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + GEMINI_KEY, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-  const d = await r.json();
+  const d = await fetchJSONTimeout('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + GEMINI_KEY, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }, 20000);
   const txt = d.candidates && d.candidates[0] && d.candidates[0].content && d.candidates[0].content.parts && d.candidates[0].content.parts[0] ? d.candidates[0].content.parts[0].text : '';
   return parseArr(txt || '') || [];
 }
@@ -238,8 +244,10 @@ async function logScan(trigger, ok, r, note) {
 }
 
 export default async function handler(req, res) {
-  const result = { mailbox: RENTAL_MAILBOX, scanned: 0, added: 0, skipped: 0, unmatched: 0, correspondence: 0, freshStartPending: 0, errors: [],
+  const result = { mailbox: RENTAL_MAILBOX, scanned: 0, added: 0, skipped: 0, unmatched: 0, correspondence: 0, freshStartPending: 0, deferred: 0, errors: [],
     recorded: [], ignored: [], corr: [], noPdf: [] };   // review details (from/subject) for the in-app triage view
+  const T0 = Date.now();                    // wall clock, to stay under the serverless time limit
+  const BUDGET_MS = 42000;                  // stop starting new statement reads after this; the rest wait for next run
   const brief = (m, extra) => Object.assign({ from: m.from || '', subject: m.subject || '', date: m.received || '' }, extra || {});
   let trigger = 'manual';
   try {
@@ -259,6 +267,13 @@ export default async function handler(req, res) {
     }
     const seen = {}, processedMsg = {};
     (ledger || []).forEach(l => { if (l.email_ref) seen[l.email_ref] = true; if (l.message_id) processedMsg[l.message_id] = true; });
+    // Rent/statement emails that we've already examined and that produced no bookable rows (e.g. a
+    // manager's plain correspondence, or a note with no statement PDF). Remembering them means we don't
+    // re-run a slow Gemini read on the same dead-end email every single scan - the old timeout cause.
+    let examinedIds = [];
+    try { const exRow = await supaGet('settings?key=eq.inv_scan_examined&select=value'); if (exRow && exRow[0] && Array.isArray(exRow[0].value)) examinedIds = exRow[0].value; } catch (e) {}
+    const examinedSet = new Set(examinedIds);
+    const newlyExamined = [];
 
     // Pick the ONE approved mailbox. Prefer the stored email; fall back to the live profile.
     let rec = (tokens || []).find(t => String(t.email || '').toLowerCase() === RENTAL_MAILBOX);
@@ -296,6 +311,8 @@ export default async function handler(req, res) {
         }
         // Fresh Start rent statement: the money is split per property from the attached PDF.
         if (processedMsg[m.messageId]) { result.skipped++; if (result.recorded.length < 100) result.recorded.push(brief(m, { payee: payee.name })); continue; }
+        // Already examined once and it had nothing to book - don't Gemini it again.
+        if (examinedSet.has(m.messageId)) { result.skipped++; continue; }
         const pdf = (m.attachments || []).find(a => /pdf/i.test(a.mimeType) || /\.pdf$/i.test(a.filename || ''));
         // PDF statement -> split from the PDF; no PDF -> read the deposit from the email body.
         rentJobs.push({ msg: m, payee: payee, pdf: pdf || null });
@@ -314,11 +331,10 @@ export default async function handler(req, res) {
         + 'Return ONLY a JSON array: [{"i": <index number>, "amount": <number, no symbols>, "dueDate": "YYYY-MM-DD or empty", "category": "Utilities|HOA|Property Tax|Management|Insurance|Mortgage|Repairs|Other"}]. '
         + 'amount is the total amount due or charged. Omit an index only if there is no dollar amount at all.\n\n' + corpus;
       try {
-        const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + GEMINI_KEY, {
+        const d = await fetchJSONTimeout('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + GEMINI_KEY, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.1, maxOutputTokens: 4096, responseMimeType: 'application/json' } })
-        });
-        const d = await r.json();
+        }, 22000);
         const txt = d.candidates && d.candidates[0] && d.candidates[0].content && d.candidates[0].content.parts && d.candidates[0].content.parts[0] ? d.candidates[0].content.parts[0].text : '';
         extracted = parseArr(txt || '') || [];
       } catch (e) { result.errors.push('gemini: ' + e.message); }
@@ -351,7 +367,11 @@ export default async function handler(req, res) {
 
     // ---- Fresh Start owner statements: read the attached PDF and split per property. ----
     const propList = props.map(p => (p.name || '') + (p.address ? (' (' + p.address + ')') : '')).join('; ');
-    for (const j of rentJobs) {
+    for (let ri = 0; ri < rentJobs.length; ri++) {
+      const j = rentJobs[ri];
+      // Out of time budget: leave the remaining statements for the next run. They aren't marked
+      // processed, so the next scan (or a manual one) picks them up — nothing is lost.
+      if (Date.now() - T0 > BUDGET_MS) { result.deferred = rentJobs.length - ri; break; }
       let statement = [];
       if (j.pdf) {
         let b64 = '';
@@ -362,7 +382,7 @@ export default async function handler(req, res) {
         // No PDF: read the deposit line(s) straight from the email body.
         try { statement = await geminiReadStatementText((j.msg.subject || '') + '\n' + (j.msg.text || ''), propList); } catch (e) { result.errors.push('body-gemini: ' + e.message); }
       }
-      if (!Array.isArray(statement) || !statement.length) { result.freshStartPending++; if (result.noPdf.length < 100) result.noPdf.push(brief(j.msg, { payee: j.payee.name })); continue; }
+      if (!Array.isArray(statement) || !statement.length) { result.freshStartPending++; if (j.msg.messageId) newlyExamined.push(j.msg.messageId); if (result.noPdf.length < 100) result.noPdf.push(brief(j.msg, { payee: j.payee.name })); continue; }
       let slotN = 0;
       const post = async (pid, uid, hoaId, cat, dir, amt, note, slot) => {
         if (num(amt) <= 0) return;
@@ -411,6 +431,11 @@ export default async function handler(req, res) {
         }
         await post(pid, uid, null, 'Repairs', 'expense', repTotal, (repNote || 'Repairs — statement') + ul, 'repairs');
       }
+    }
+    // Remember the dead-end emails so future scans skip them (keep the most recent 300).
+    if (newlyExamined.length) {
+      const merged = examinedIds.concat(newlyExamined).slice(-300);
+      try { await fetch(SUPA_URL + '/rest/v1/settings', { method: 'POST', headers: supaHeaders({ Prefer: 'resolution=merge-duplicates' }), body: JSON.stringify([{ key: 'inv_scan_examined', value: merged }]) }); } catch (e) {}
     }
     await logScan(trigger, true, result, (result.errors && result.errors.length) ? result.errors.join(' | ').slice(0, 200) : '');
     return res.status(200).json({ ok: true, ...result });
