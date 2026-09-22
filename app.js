@@ -12715,7 +12715,44 @@ function prospectDefault(){ return { id:Date.now()+Math.floor(Math.random()*1000
   status:'spotted', address_full:'', city:'', state:'UT', zip:'',
   deal_type:'lease', use_type:'', zoning:'', rentable_sqft:'', lot_size:'', year_built:'', parking:'',
   lease_type:'NNN', rate_per_sf:'', cam_per_sf:'', price:'', availability:'',
-  listing_url:'', listing_source:'', agent:'', pros:'', cons:'', notes:'', lat:'', lon:'', photos:[], archived:false } }; }
+  listing_url:'', listing_source:'', agent:'', pros:'', cons:'', notes:'', lat:'', lon:'', photos:[], comms:[], archived:false } }; }
+// Manual communication log for a prospect: each entry is { when, who, result }. Rendered as editable
+// rows with a "+" to add another and an "×" to remove. Internal only (not on the client PDF).
+function cproCommsBlock(d, onChange){
+  if(!Array.isArray(d.comms)) d.comms=[];
+  function nowLocal(){ var dt=new Date(); dt.setMinutes(dt.getMinutes()-dt.getTimezoneOffset()); return dt.toISOString().slice(0,16); }
+  var wrap=document.createElement('div'); wrap.className='c-wide';
+  var lab=document.createElement('label'); lab.textContent='Communication log'; wrap.appendChild(lab);
+  var tbl=document.createElement('div'); tbl.style.cssText='display:flex;flex-direction:column;gap:6px;margin-top:4px;'; wrap.appendChild(tbl);
+  function redraw(){
+    tbl.innerHTML='';
+    if(!d.comms.length){
+      var add0=document.createElement('button'); add0.type='button'; add0.className='cbtn g'; add0.style.cssText='font-size:12px;padding:6px 12px;align-self:flex-start;'; add0.textContent='+ Log a contact';
+      add0.addEventListener('click',function(){ d.comms.push({ when:nowLocal(), who:'', result:'' }); redraw(); if(onChange)onChange(); });
+      tbl.appendChild(add0); return;
+    }
+    var hd=document.createElement('div'); hd.style.cssText='display:flex;gap:6px;font-size:11px;color:var(--text3);';
+    hd.innerHTML='<div style="flex:0 0 172px;">When</div><div style="flex:1;">With whom</div><div style="flex:1.5;">Result / notes</div><div style="flex:0 0 60px;"></div>';
+    tbl.appendChild(hd);
+    d.comms.forEach(function(entry,idx){
+      var r=document.createElement('div'); r.style.cssText='display:flex;gap:6px;align-items:center;';
+      function inp(val,ph,flex,type){ var i=document.createElement('input'); i.type=type||'text'; i.value=val||''; if(ph)i.placeholder=ph; i.style.flex=flex; return i; }
+      var when=inp(entry.when,'','0 0 172px','datetime-local');
+      when.addEventListener('input',function(){ entry.when=when.value; if(onChange)onChange(); });
+      var who=inp(entry.who,'Name / role','1'); who.addEventListener('input',function(){ entry.who=who.value; if(onChange)onChange(); });
+      var res=inp(entry.result,'e.g. Left VM · emailed info · spoke, wants tour','1.5'); res.addEventListener('input',function(){ entry.result=res.value; if(onChange)onChange(); });
+      var add=document.createElement('button'); add.type='button'; add.className='cbtn'; add.textContent='+'; add.title='Add a row'; add.style.cssText='flex:0 0 28px;padding:3px 0;font-size:16px;line-height:1;';
+      add.addEventListener('click',function(){ d.comms.splice(idx+1,0,{ when:nowLocal(), who:'', result:'' }); redraw(); if(onChange)onChange(); });
+      var rm=document.createElement('button'); rm.type='button'; rm.className='cbtn g'; rm.textContent='×'; rm.title='Remove'; rm.style.cssText='flex:0 0 28px;padding:3px 0;font-size:16px;line-height:1;';
+      rm.addEventListener('click',function(){ d.comms.splice(idx,1); redraw(); if(onChange)onChange(); });
+      r.appendChild(when); r.appendChild(who); r.appendChild(res); r.appendChild(add); r.appendChild(rm);
+      tbl.appendChild(r);
+    });
+  }
+  redraw(); return wrap;
+}
+// The most recent logged contact date (YYYY-MM-DD) for a prospect, or '' if none.
+function cproLastContact(d){ var latest=''; (Array.isArray(d&&d.comms)?d.comms:[]).forEach(function(x){ if(x&&x.when&&x.when>latest) latest=x.when; }); return latest?latest.slice(0,10):''; }
 // Read a photo from the camera/gallery, downscale it (longest side 1400px) and return a compressed JPEG
 // data URL so it fits comfortably inside the prospect's JSON and syncs like any other field.
 function cproCompressImage(file, cb){
@@ -12904,7 +12941,8 @@ function renderCommercial(){
       var passed=(d.status==='passed');   // "won't work" — kept visible but depreciated so we don't re-scout it
       var row=document.createElement('div'); row.style.cssText='display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 14px;cursor:pointer;'+((arch||passed)?'opacity:.6;':'');
       var badge='<span class="c-badge" style="background:'+cproStatusColor(d.status)+';">'+_esc(cproStatusLabel(d.status||'spotted'))+'</span>';
-      var sub=[ (c?fn(c):'(no client)'), cproSpecLine(d) ].filter(Boolean).join('  ·  ');
+      var _lc=cproLastContact(d);
+      var sub=[ (c?fn(c):'(no client)'), cproSpecLine(d), (_lc?('☎ '+_lc):'') ].filter(Boolean).join('  ·  ');
       var thumb=(Array.isArray(d.photos)&&d.photos.length)?'<img src="'+d.photos[0]+'" style="width:46px;height:46px;object-fit:cover;border-radius:6px;border:1px solid var(--border);flex-shrink:0;'+(passed?'filter:grayscale(1);':'')+'">':'';
       var addrStyle='font-weight:600;overflow:hidden;text-overflow:ellipsis;'+(passed?'text-decoration:line-through;color:var(--text3);':'');
       row.innerHTML='<div style="display:flex;align-items:center;gap:10px;min-width:0;">'+thumb+'<div style="min-width:0;"><div style="'+addrStyle+'">'+_esc(d.address_full||p.name||'(no address)')+' '+badge+(arch?' <span class="c-badge" style="background:#888;">ARCHIVED</span>':'')+'</div><div style="font-size:12px;color:var(--text3);">'+_esc(sub)+'</div></div></div>';
@@ -12962,6 +13000,7 @@ function openProspect(p, isNew){
   (function(){ var w=document.createElement('div'); w.className='c-wide'; var b=document.createElement('button'); b.className='cbtn g'; b.type='button'; b.textContent='📍 Use my location'; b.style.cssText='font-size:12px;padding:5px 12px;'; b.addEventListener('click',function(){ cproGeolocate(b,function(j){ if(j.address) d.address_full=j.address; if(j.city) d.city=j.city; if(j.state) d.state=j.state; if(j.zip) d.zip=j.zip; if(j.lat!=null) d.lat=j.lat; if(j.lon!=null) d.lon=j.lon; openProspect(p,isNew); }); }); w.appendChild(b); form.appendChild(w); })();
   fld('city','City'); fld('state','State'); fld('zip','ZIP');
   sec('Photos'); form.appendChild(cproPhotoBlock(d, refresh));
+  sec('Communication log'); form.appendChild(cproCommsBlock(d, refresh));
   sec('Property & zoning');
   fld('use_type','Use / property type (retail, office, industrial…)','text',true);
   fld('zoning','Zoning'); fld('rentable_sqft','Rentable SF','number'); fld('lot_size','Lot size'); fld('year_built','Year built','number'); fld('parking','Parking');
