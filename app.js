@@ -555,6 +555,9 @@ function _postRows(table, cleanRows){
 }
 function dbSave(table, rows){
   if(!supaReady) return Promise.resolve();
+  // Hold the 30s background poll for a few seconds so it can't reload and paint over the record we're
+  // about to write before the write is globally visible.
+  try{ pausePoll(8000); }catch(e){}
   var cleanRows = JSON.parse(JSON.stringify(rows)).map(function(r){ return stripForDB(table, r); });
   return _postRows(table, cleanRows).then(function(r){
     if(!r.ok){ return r.text().then(function(t){ _onSaveFail(table, cleanRows, r.status + ' ' + String(t).slice(0,160)); }); }
@@ -634,7 +637,9 @@ function fetchAllRows(base, path, headers){
   function nextPage(offset){
     var sep = path.indexOf('?') >= 0 ? '&' : '?';
     var url = base + path + sep + 'limit=' + pageSize + '&offset=' + offset;
-    return fetch(url, {headers: headers}).then(function(r){ return r.json(); }).then(function(j){
+    // no-store: the 30s poll must read the live DB, never a browser-cached copy from a poll that ran
+    // just before a save — a stale copy would overwrite freshly-saved edits (e.g. a new comms row).
+    return fetch(url, {headers: headers, cache: 'no-store'}).then(function(r){ return r.json(); }).then(function(j){
       if(!Array.isArray(j)) return j;
       all = all.concat(j);
       if(j.length < pageSize) return all;
@@ -13000,7 +13005,9 @@ function openProspect(p, isNew){
   (function(){ var w=document.createElement('div'); w.className='c-wide'; var b=document.createElement('button'); b.className='cbtn g'; b.type='button'; b.textContent='📍 Use my location'; b.style.cssText='font-size:12px;padding:5px 12px;'; b.addEventListener('click',function(){ cproGeolocate(b,function(j){ if(j.address) d.address_full=j.address; if(j.city) d.city=j.city; if(j.state) d.state=j.state; if(j.zip) d.zip=j.zip; if(j.lat!=null) d.lat=j.lat; if(j.lon!=null) d.lon=j.lon; openProspect(p,isNew); }); }); w.appendChild(b); form.appendChild(w); })();
   fld('city','City'); fld('state','State'); fld('zip','ZIP');
   sec('Photos'); form.appendChild(cproPhotoBlock(d, refresh));
-  sec('Communication log'); form.appendChild(cproCommsBlock(d, refresh));
+  sec('Communication log');
+  var _commsSaveT;   // the contact log auto-saves ~1s after an edit, so a logged call is never lost
+  form.appendChild(cproCommsBlock(d, function(){ refresh(); clearTimeout(_commsSaveT); _commsSaveT=setTimeout(function(){ if(!p.name) p.name=d.address_full||'Prospect'; if(!CPROS.some(function(x){return String(x.id)===String(p.id);})) CPROS.push(p); saveProspect(p); },1000); }));
   sec('Property & zoning');
   fld('use_type','Use / property type (retail, office, industrial…)','text',true);
   fld('zoning','Zoning'); fld('rentable_sqft','Rentable SF','number'); fld('lot_size','Lot size'); fld('year_built','Year built','number'); fld('parking','Parking');
