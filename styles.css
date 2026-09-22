@@ -1,4 +1,8 @@
 :root{--bg:#FFFFFF;--surface:#FFFFFF;--surface2:#F4F4F2;--surface3:#ECECEA;--border:#E2E2E0;--accent:#1E4C84;--accent2:#2F6FB3;--text:#1A1A1A;--text2:#6A6A6A;--text3:#9A9A9A;--buyer:#4c8ec9;--seller:#c96b4c;--lead:#6bc97a;--danger:#c94c4c;--warn:#E08A1E;--radius:10px;}
+/* Dark theme: the whole app draws from these variables, so overriding them flips it. Applied when
+   <html data-theme="dark"> is set (see the theme controller in index.html). Print/PDF sheets use their
+   own inline white styles and are unaffected. */
+[data-theme="dark"]{--bg:#0f1216;--surface:#171c23;--surface2:#1e242c;--surface3:#272e39;--border:#333b47;--accent:#5b93d6;--accent2:#7aabe4;--text:#e9ecf2;--text2:#aab2bf;--text3:#7f8896;--buyer:#5b9bd6;--seller:#d68a6b;--lead:#5ec272;--danger:#e06b6b;--warn:#e3a93c;color-scheme:dark;}
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden;font-size:16px !important;}
 

@@ -10,7 +10,29 @@
 <link rel="manifest" href="site.webmanifest">
 <meta name="theme-color" content="#b8912f">
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="styles.css?v=20260922b">
+<script>
+// Theme controller (Light / Dark / Auto). Runs before the body paints so there's no flash. Choice is
+// remembered per device in localStorage. "Auto" follows the device's light/dark setting live.
+(function(){
+  var KEY='crm_theme';
+  function sysDark(){ try{ return !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches); }catch(e){ return false; } }
+  function pref(){ try{ return localStorage.getItem(KEY)||'light'; }catch(e){ return 'light'; } }
+  function apply(p){ var mode=(p==='auto')?(sysDark()?'dark':'light'):p; if(mode==='dark') document.documentElement.setAttribute('data-theme','dark'); else document.documentElement.removeAttribute('data-theme'); }
+  function icon(p){ return p==='dark'?'🌙':(p==='auto'?'🌗':'☀️'); }
+  function label(p){ return p==='dark'?'Dark':(p==='auto'?'Auto (follows device)':'Light'); }
+  window.__crmTheme={ pref:pref, apply:apply, icon:icon, label:label,
+    set:function(p){ try{ localStorage.setItem(KEY,p); }catch(e){} apply(p); },
+    cycle:function(){ var nxt={light:'dark',dark:'auto',auto:'light'}; var n=nxt[pref()]||'dark'; this.set(n); return n; } };
+  apply(pref());
+  try{ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',function(){ if(pref()==='auto') apply('auto'); }); }catch(e){}
+  document.addEventListener('DOMContentLoaded',function(){
+    var b=document.getElementById('themeToggle'); if(!b) return;
+    function upd(){ b.textContent=window.__crmTheme.icon(pref()); b.title='Theme: '+window.__crmTheme.label(pref())+' — click to change'; }
+    upd(); b.addEventListener('click',function(){ window.__crmTheme.cycle(); upd(); });
+  });
+})();
+</script>
 </head>
 <body>
 <!-- LOGIN SCREEN -->
@@ -113,7 +135,8 @@
         <input class="sbox" type="text" placeholder="Search..." id="searchBox">
         <div id="globalSearchResults" style="display:none;position:fixed;top:52px;right:12px;width:min(460px,92vw);max-height:74vh;overflow:auto;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:0 10px 34px rgba(0,0,0,0.45);z-index:1200;padding:6px;"></div>
         <button class="btn btn-p" id="btnAdd" style="display:none;">+ Add</button>
-        <div style="font-size:11px;color:var(--text3);margin-right:4px;">v18.4</div>
+        <button id="themeToggle" title="Theme" style="background:none;border:none;cursor:pointer;font-size:17px;line-height:1;padding:4px 6px;border-radius:6px;">☀️</button>
+        <div style="font-size:11px;color:var(--text3);margin-right:4px;">v18.5</div>
         <div class="topbar-user" id="topbarUser" title="Click to sign out" style="cursor:pointer;position:relative;" id="topbarUserBtn">RE</div>
       </div>
     </div>
