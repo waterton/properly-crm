@@ -12972,11 +12972,15 @@ function openProspect(p, isNew){
   var tb=document.createElement('div'); tb.style.cssText='display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;';
   var back=document.createElement('button'); back.className='cbtn g'; back.textContent='‹ Back'; back.addEventListener('click',renderCommercial); tb.appendChild(back);
   var cWrap=document.createElement('div'); cWrap.style.cssText='min-width:240px;'; tb.appendChild(cWrap);
-  var picker=buildContactPicker(cWrap,'cpro_client','Client (search name / address)…',function(){ var id=picker.hidden.value; if(!id) return; p.contact_id=parseInt(id); openProspect(p,isNew); });
+  var clientLine=document.createElement('div'); clientLine.style.cssText='color:var(--text3);font-size:12px;margin:-6px 0 12px;';
+  function renderClientLine(){ if(p.contact_id!=null){ var cc=gc(p.contact_id); clientLine.textContent=cc?('Client: '+fn(cc)):''; clientLine.style.display=cc?'':'none'; } else { clientLine.style.display='none'; } }
+  // Pick a client without rebuilding the whole form: set it, show it, and save it in place.
+  var picker=buildContactPicker(cWrap,'cpro_client','Client (search name / address)…',function(c){ p.contact_id = c ? parseInt(c.id) : null; renderClientLine(); if(CPROS.some(function(x){return String(x.id)===String(p.id);})) saveProspect(p); });
+  if(p.contact_id!=null){ var _cc0=gc(p.contact_id); if(_cc0){ picker.input.value=fn(_cc0)+(_cc0.email?(' ('+_cc0.email+')'):''); picker.hidden.value=String(_cc0.id); } }
   var saveB=document.createElement('button'); saveB.className='cbtn'; saveB.textContent='Save'; saveB.addEventListener('click',function(){ if(!p.name) p.name=d.address_full||'Prospect'; if(!CPROS.some(function(x){return String(x.id)===String(p.id);})) CPROS.push(p); saveProspect(p); saveB.textContent='Saved ✓'; setTimeout(function(){saveB.textContent='Save';},1500); }); tb.appendChild(saveB);
   var pdfB=document.createElement('button'); pdfB.className='cbtn g'; pdfB.textContent='Export client PDF'; pdfB.addEventListener('click',function(){ if(p.contact_id==null){ alert('Link a client first.'); return; } cproExportPdf(p.contact_id, pdfB); }); tb.appendChild(pdfB);
   root.appendChild(tb);
-  if(p.contact_id!=null){ var c=gc(p.contact_id); if(c) root.appendChild(mkDivSafe('color:var(--text3);font-size:12px;margin:-6px 0 12px;','Client: '+_esc(fn(c)))); }
+  root.appendChild(clientLine); renderClientLine();
 
   var prev=document.createElement('div'); prev.style.cssText='background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;';
   var form=document.createElement('div'); form.className='c-form';
