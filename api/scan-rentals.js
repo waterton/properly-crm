@@ -119,7 +119,7 @@ async function geminiReadStatementPdf(b64pdf, propList) {
     + 'Return ONLY a JSON array: [{"property":"<address or name exactly as printed>","unit":"<unit label if the statement distinguishes one, e.g. Upstairs / Downstairs / a unit number; empty string if it does not>","rent":<gross monthly rent, number>,"management":<management fee, number>,"parking":<parking or other income, number or 0>,"repairs":[{"desc":"<short label>","amount":<number>}],"deposit":<net amount deposited to the owner, number>}]. '
     + 'Use 0 when a value is absent and [] when there are no repair/maintenance line items. Known properties: ' + propList + '.';
   const body = { contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: 'application/pdf', data: b64pdf } }] }], generationConfig: { temperature: 0.1, maxOutputTokens: 4096, responseMimeType: 'application/json' } };
-  const d = await fetchJSONTimeout('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + GEMINI_KEY, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }, 24000);
+  const d = await fetchJSONTimeout('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + GEMINI_KEY, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }, 17000);
   const txt = d.candidates && d.candidates[0] && d.candidates[0].content && d.candidates[0].content.parts && d.candidates[0].content.parts[0] ? d.candidates[0].content.parts[0].text : '';
   return parseArr(txt || '') || [];
 }
@@ -246,13 +246,16 @@ async function logScan(trigger, ok, r, note) {
 export default async function handler(req, res) {
   const result = { mailbox: RENTAL_MAILBOX, scanned: 0, added: 0, skipped: 0, unmatched: 0, correspondence: 0, freshStartPending: 0, deferred: 0, errors: [],
     recorded: [], ignored: [], corr: [], noPdf: [] };   // review details (from/subject) for the in-app triage view
-  const T0 = Date.now();                    // wall clock, to stay under the serverless time limit
-  const BUDGET_MS = 42000;                  // stop starting new statement reads after this; the rest wait for next run
+  const T0 = Date.now();                    // wall clock, to stay under the serverless / cron timeout
+  let BUDGET_MS = 26000;                     // stop starting new statement reads after this; the rest wait for next run
+  let MAX_STMT_PER_RUN = 1;                  // auto/cron: one slow statement read per run so it always finishes fast
   const brief = (m, extra) => Object.assign({ from: m.from || '', subject: m.subject || '', date: m.received || '' }, extra || {});
   let trigger = 'manual';
   try {
     if (!(await authorized(req))) return res.status(401).json({ error: 'Unauthorized' });
     trigger = cronOk(req) ? 'auto' : 'manual';   // cron vs the in-app button
+    // A manual scan (you're watching, no cron timeout) may work through more statements per run.
+    if (trigger === 'manual') { BUDGET_MS = 50000; MAX_STMT_PER_RUN = 3; }
     if (!GEMINI_KEY) return res.status(500).json({ error: 'GEMINI_API_KEY not set' });
     const [props, units, payees, ledger, tokens] = await Promise.all([
       supaGet('inv_properties?select=*'),
@@ -274,6 +277,12 @@ export default async function handler(req, res) {
     try { const exRow = await supaGet('settings?key=eq.inv_scan_examined&select=value'); if (exRow && exRow[0] && Array.isArray(exRow[0].value)) examinedIds = exRow[0].value; } catch (e) {}
     const examinedSet = new Set(examinedIds);
     const newlyExamined = [];
+    // How many times each statement email has failed to process (timed-out Gemini read). After a few
+    // tries we give up on it so a genuinely unreadable PDF can't retry (and re-time-out) forever.
+    let attempts = {};
+    try { const atRow = await supaGet('settings?key=eq.inv_scan_attempts&select=value'); if (atRow && atRow[0] && atRow[0].value && typeof atRow[0].value === 'object') attempts = atRow[0].value; } catch (e) {}
+    let attemptsChanged = false;
+    let stmtCalls = 0;
 
     // Pick the ONE approved mailbox. Prefer the stored email; fall back to the live profile.
     let rec = (tokens || []).find(t => String(t.email || '').toLowerCase() === RENTAL_MAILBOX);
@@ -369,20 +378,39 @@ export default async function handler(req, res) {
     const propList = props.map(p => (p.name || '') + (p.address ? (' (' + p.address + ')') : '')).join('; ');
     for (let ri = 0; ri < rentJobs.length; ri++) {
       const j = rentJobs[ri];
-      // Out of time budget: leave the remaining statements for the next run. They aren't marked
-      // processed, so the next scan (or a manual one) picks them up — nothing is lost.
-      if (Date.now() - T0 > BUDGET_MS) { result.deferred = rentJobs.length - ri; break; }
-      let statement = [];
+      const mid = j.msg.messageId;
+      // Cap the slow work per run: out of time budget, or already did our one statement read this run.
+      // The rest aren't marked processed, so the next run picks them up — nothing is lost.
+      if (Date.now() - T0 > BUDGET_MS || stmtCalls >= MAX_STMT_PER_RUN) { result.deferred = rentJobs.length - ri; break; }
+      let statement = [], failed = false;
       if (j.pdf) {
         let b64 = '';
-        try { b64 = await gmailGetAttachment(at.accessToken, j.msg.gmailId, j.pdf.attachmentId); } catch (e) { result.errors.push('attach: ' + e.message); }
-        if (!b64) { result.errors.push('empty PDF for ' + j.msg.messageId); continue; }
-        try { statement = await geminiReadStatementPdf(b64, propList); } catch (e) { result.errors.push('pdf-gemini: ' + e.message); }
+        try { b64 = await gmailGetAttachment(at.accessToken, j.msg.gmailId, j.pdf.attachmentId); } catch (e) { result.errors.push('attach: ' + e.message); failed = true; }
+        if (!b64) { if (!failed) { result.errors.push('empty PDF for ' + mid); failed = true; } }
+        else { stmtCalls++; try { statement = await geminiReadStatementPdf(b64, propList); } catch (e) { result.errors.push('pdf-gemini: ' + e.message); failed = true; } }
       } else {
         // No PDF: read the deposit line(s) straight from the email body.
-        try { statement = await geminiReadStatementText((j.msg.subject || '') + '\n' + (j.msg.text || ''), propList); } catch (e) { result.errors.push('body-gemini: ' + e.message); }
+        stmtCalls++;
+        try { statement = await geminiReadStatementText((j.msg.subject || '') + '\n' + (j.msg.text || ''), propList); } catch (e) { result.errors.push('body-gemini: ' + e.message); failed = true; }
       }
-      if (!Array.isArray(statement) || !statement.length) { result.freshStartPending++; if (j.msg.messageId) newlyExamined.push(j.msg.messageId); if (result.noPdf.length < 100) result.noPdf.push(brief(j.msg, { payee: j.payee.name })); continue; }
+      if (!Array.isArray(statement) || !statement.length) {
+        result.freshStartPending++;
+        if (result.noPdf.length < 100) result.noPdf.push(brief(j.msg, { payee: j.payee.name }));
+        if (failed) {
+          // Timed out / errored — retry on a later run, but give up after 3 tries so an unreadable PDF
+          // can't loop forever. Only then do we mark it examined (and surface it for manual entry).
+          const n = (attempts[mid] || 0) + 1;
+          if (n >= 3) { if (mid) newlyExamined.push(mid); if (mid) delete attempts[mid]; result.gaveUp = (result.gaveUp || 0) + 1; }
+          else if (mid) { attempts[mid] = n; }
+          attemptsChanged = true;
+        } else if (mid) {
+          // Gemini answered cleanly with nothing to book — a non-statement email. Never re-scan it.
+          newlyExamined.push(mid);
+          if (attempts[mid] != null) { delete attempts[mid]; attemptsChanged = true; }
+        }
+        continue;
+      }
+      if (attempts[mid] != null) { delete attempts[mid]; attemptsChanged = true; }
       let slotN = 0;
       const post = async (pid, uid, hoaId, cat, dir, amt, note, slot) => {
         if (num(amt) <= 0) return;
@@ -436,6 +464,10 @@ export default async function handler(req, res) {
     if (newlyExamined.length) {
       const merged = examinedIds.concat(newlyExamined).slice(-300);
       try { await fetch(SUPA_URL + '/rest/v1/settings', { method: 'POST', headers: supaHeaders({ Prefer: 'resolution=merge-duplicates' }), body: JSON.stringify([{ key: 'inv_scan_examined', value: merged }]) }); } catch (e) {}
+    }
+    // Persist the retry counters for statements still being attempted.
+    if (attemptsChanged) {
+      try { await fetch(SUPA_URL + '/rest/v1/settings', { method: 'POST', headers: supaHeaders({ Prefer: 'resolution=merge-duplicates' }), body: JSON.stringify([{ key: 'inv_scan_attempts', value: attempts }]) }); } catch (e) {}
     }
     await logScan(trigger, true, result, (result.errors && result.errors.length) ? result.errors.join(' | ').slice(0, 200) : '');
     return res.status(200).json({ ok: true, ...result });
