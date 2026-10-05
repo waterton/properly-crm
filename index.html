@@ -76,6 +76,16 @@
       </div>
     </div>
 
+    <!-- Two-factor code step (shown after password/Google when 2FA is enabled on the account) -->
+    <div id="loginMfaForm" style="display:none;">
+      <div style="font-size:14px;color:var(--text2);margin-bottom:12px;">Enter the 6-digit code from your authenticator app.</div>
+      <div class="fg"><label class="fl">Authentication code</label><input class="fi" id="mfaCode" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="123456"></div>
+      <button class="btn btn-p" id="btnMfaVerify" style="width:100%;justify-content:center;padding:12px;font-size:16px;margin-top:4px;">Verify</button>
+      <div style="text-align:center;margin-top:12px;">
+        <button id="btnMfaCancel" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:13px;font-family:DM Sans,sans-serif;text-decoration:underline;">Cancel</button>
+      </div>
+    </div>
+
     <div class="login-footer">Palacios Baker Real Estate &mdash; Private &amp; Confidential</div>
   </div>
 </div>
@@ -136,7 +146,7 @@
         <div id="globalSearchResults" style="display:none;position:fixed;top:52px;right:12px;width:min(460px,92vw);max-height:74vh;overflow:auto;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:0 10px 34px rgba(0,0,0,0.45);z-index:1200;padding:6px;"></div>
         <button class="btn btn-p" id="btnAdd" style="display:none;">+ Add</button>
         <button id="themeToggle" title="Theme" style="background:none;border:none;cursor:pointer;font-size:17px;line-height:1;padding:4px 6px;border-radius:6px;">☀️</button>
-        <div style="font-size:11px;color:var(--text3);margin-right:4px;">v19.1</div>
+        <div style="font-size:11px;color:var(--text3);margin-right:4px;">v19.2</div>
         <div class="topbar-user" id="topbarUser" title="Click to sign out" style="cursor:pointer;position:relative;" id="topbarUserBtn">RE</div>
       </div>
     </div>
@@ -1215,6 +1225,6 @@
 </div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="app.js?v=20260923a"></script>
+<script src="app.js?v=20261005a"></script>
 </body>
 </html>

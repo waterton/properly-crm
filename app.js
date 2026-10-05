@@ -10475,7 +10475,7 @@ function showApp(user){
   var tm = TM.find(function(m){ return m.email && m.email.toLowerCase() === user.email.toLowerCase(); });
   if(tm) initials = (tm.first.charAt(0) + tm.last.charAt(0)).toUpperCase();
   ge('topbarUser').textContent = initials;
-  ge('topbarUser').title = user.email + ' (click to sign out)';
+  ge('topbarUser').title = user.email + ' — account & security';
   try{ setupCollapsibleNav(); }catch(e){}   // regroup + collapsible sidebar (per-user state)
   applyRestrictions();
   try{ openActiveNavSection(); }catch(e){}
@@ -10569,9 +10569,25 @@ async function signOut(){
 }
 
 var authInitDone = false;
+// ===== Two-factor (Supabase TOTP MFA) login gate =====
+var mfaPending=false, mfaPendingUser=null;
 function onAuthSuccess(user){
-  if(authInitDone) return; // prevent double-fire from SIGNED_IN + INITIAL_SESSION
-  authInitDone = true;
+  if(authInitDone || mfaPending) return; // prevent double-fire from SIGNED_IN + INITIAL_SESSION
+  // If this account has a verified authenticator app, require a 6-digit code before entering.
+  if(supa && supa.auth && supa.auth.mfa){
+    mfaPending = true;   // hold the double-fire guard while we check / prompt
+    supa.auth.mfa.getAuthenticatorAssuranceLevel().then(function(aal){
+      if(aal && aal.data && aal.data.currentLevel==='aal1' && aal.data.nextLevel==='aal2'){
+        mfaPendingUser = user; showMfaLoginPrompt();   // wait for the code
+      } else { mfaPending=false; finishAuth(user); }
+    }).catch(function(){ mfaPending=false; finishAuth(user); });   // never lock out on a check failure
+    return;
+  }
+  finishAuth(user);
+}
+function finishAuth(user){
+  if(authInitDone) return;
+  authInitDone = true; mfaPending=false;
   showApp(user);
   updateSupaBanner(supaReady);
   loadFromDB().then(function(ok){
@@ -10592,6 +10608,106 @@ function onAuthSuccess(user){
     // the Gmail tab - enrolling and sending need this everywhere.
     try{ checkConnectedAccounts(); }catch(e){}
   });
+}
+function showMfaLoginPrompt(){
+  ge('loginScreen').classList.add('visible');
+  ge('mainApp').style.display='none';
+  clearLoginMessages();
+  ['loginEmailForm','loginResetForm','btnGoogleLogin'].forEach(function(id){ var e=ge(id); if(e) e.style.display='none'; });
+  var dv=document.querySelector('#loginScreen .login-divider'); if(dv) dv.style.display='none';
+  var mf=ge('loginMfaForm'); if(mf) mf.style.display='block';
+  var ci=ge('mfaCode'); if(ci){ ci.value=''; setTimeout(function(){ try{ ci.focus(); }catch(e){} },60); }
+}
+function hideMfaLoginPrompt(){
+  var mf=ge('loginMfaForm'); if(mf) mf.style.display='none';
+  ['loginEmailForm','btnGoogleLogin'].forEach(function(id){ var e=ge(id); if(e) e.style.display=''; });
+  var dv=document.querySelector('#loginScreen .login-divider'); if(dv) dv.style.display='';
+}
+async function verifyMfaLogin(){
+  clearLoginMessages();
+  var code=(ge('mfaCode').value||'').trim();
+  if(!/^\d{6}$/.test(code)){ showLoginErr('Enter the 6-digit code from your authenticator app.'); return; }
+  var btn=ge('btnMfaVerify'); var ot=btn.textContent; btn.disabled=true; btn.textContent='Verifying...';
+  try{
+    var fl=await supa.auth.mfa.listFactors();
+    var totp=(fl.data&&fl.data.totp)||[];
+    var f=totp.find(function(x){return x.status==='verified';})||totp[0];
+    if(!f) throw new Error('No authenticator is set up for this account.');
+    var ch=await supa.auth.mfa.challenge({factorId:f.id}); if(ch.error) throw ch.error;
+    var v=await supa.auth.mfa.verify({factorId:f.id, challengeId:ch.data.id, code:code}); if(v.error) throw v.error;
+    hideMfaLoginPrompt(); mfaPending=false;
+    finishAuth((v.data&&v.data.user)||mfaPendingUser||currentUser);
+  }catch(e){ showLoginErr('That code didn’t work: '+(e.message||e)); btn.disabled=false; btn.textContent=ot; }
+}
+async function cancelMfaLogin(){
+  hideMfaLoginPrompt(); mfaPending=false; mfaPendingUser=null; authInitDone=false; currentUser=null;
+  try{ await supa.auth.signOut(); }catch(e){}
+}
+// ===== Two-factor management (enroll / disable) =====
+async function openSecurityModal(){
+  if(!(supa && supa.auth && supa.auth.mfa)){ alert('Two-factor needs the cloud connection to be active.'); return; }
+  var ov=document.createElement('div'); ov.className='modal-ov open'; ov.style.zIndex='1400';
+  var m=document.createElement('div'); m.className='modal'; m.style.maxWidth='460px';
+  var h=document.createElement('div'); h.style.cssText='padding:16px 20px;border-bottom:1px solid var(--border);font-weight:700;font-size:17px;'; h.textContent='Two-factor authentication'; m.appendChild(h);
+  var body=document.createElement('div'); body.style.cssText='padding:18px 20px;'; m.appendChild(body);
+  var ft=document.createElement('div'); ft.style.cssText='padding:12px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;';
+  var closeB=document.createElement('button'); closeB.className='btn btn-g'; closeB.textContent='Close'; closeB.addEventListener('click',function(){ try{document.body.removeChild(ov);}catch(e){} }); ft.appendChild(closeB); m.appendChild(ft);
+  ov.appendChild(m); ov.addEventListener('click',function(e){ if(e.target===ov) try{document.body.removeChild(ov);}catch(e2){} }); document.body.appendChild(ov);
+  body.innerHTML='<div style="color:var(--text3);">Checking status…</div>';
+  var fl; try{ fl=await supa.auth.mfa.listFactors(); }catch(e){ body.innerHTML='<div style="color:var(--danger);">Could not reach the auth service.</div>'; return; }
+  var totp=(fl.data&&fl.data.totp)||[];
+  var verified=totp.find(function(f){return f.status==='verified';});
+  if(verified){
+    body.innerHTML='<div style="font-size:15px;color:#1f9d55;font-weight:600;margin-bottom:8px;">✓ Two-factor is ON</div>'
+      +'<div style="font-size:13px;color:var(--text3);margin-bottom:16px;">Signing in to this account requires a code from your authenticator app.</div>';
+    var off=document.createElement('button'); off.className='btn'; off.style.cssText='background:rgba(201,76,76,0.15);color:var(--danger);border:1px solid rgba(201,76,76,0.3);border-radius:7px;padding:8px 14px;cursor:pointer;font-family:inherit;';
+    off.textContent='Turn off two-factor';
+    off.addEventListener('click',async function(){ if(!confirm('Turn off two-factor for your account? Logins will no longer require a code.')) return; off.disabled=true; var r=await supa.auth.mfa.unenroll({factorId:verified.id}); if(r.error){ alert('Could not turn off: '+r.error.message); off.disabled=false; } else { try{document.body.removeChild(ov);}catch(e){} alert('Two-factor turned off.'); } });
+    body.appendChild(off);
+  } else {
+    _mfaRenderEnroll(body, ov, totp);
+  }
+}
+function _mfaRenderEnroll(body, ov, existing){
+  body.innerHTML='<div style="font-size:13px;color:var(--text3);margin-bottom:12px;">Protect your account with an authenticator app (Google Authenticator, Authy, 1Password, etc.). You scan a code once, then enter a 6-digit code at each sign-in.</div>';
+  var startB=document.createElement('button'); startB.className='btn btn-p'; startB.textContent='Set up two-factor'; body.appendChild(startB);
+  startB.addEventListener('click',async function(){
+    startB.disabled=true; startB.textContent='Starting…';
+    try{ for(var i=0;i<(existing||[]).length;i++){ if(existing[i].status!=='verified') await supa.auth.mfa.unenroll({factorId:existing[i].id}); } }catch(e){}
+    var en=await supa.auth.mfa.enroll({factorType:'totp'});
+    if(en.error){ body.innerHTML='<div style="color:var(--danger);">Could not start: '+_esc(en.error.message)+'</div><div style="font-size:12px;color:var(--text3);margin-top:8px;">If it says MFA is disabled, enable TOTP in Supabase → Authentication settings, then try again.</div>'; return; }
+    var factorId=en.data.id, qr=en.data.totp.qr_code, secret=en.data.totp.secret;
+    body.innerHTML='';
+    body.appendChild(mkDivSafe('font-size:13px;color:var(--text2);margin-bottom:10px;','1) Scan this with your authenticator app:'));
+    var img=document.createElement('img'); img.src=qr; img.style.cssText='width:190px;height:190px;display:block;margin:0 auto 10px;background:#fff;border-radius:8px;padding:6px;'; body.appendChild(img);
+    body.appendChild(mkDivSafe('font-size:12px;color:var(--text3);text-align:center;margin-bottom:4px;','Can’t scan? Enter this key by hand:'));
+    var sc=document.createElement('div'); sc.textContent=secret; sc.style.cssText='font-family:monospace;font-size:13px;text-align:center;word-break:break-all;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:6px;margin-bottom:14px;'; body.appendChild(sc);
+    body.appendChild(mkDivSafe('font-size:13px;color:var(--text2);margin-bottom:6px;','2) Enter the 6-digit code it shows:'));
+    var inp=document.createElement('input'); inp.type='text'; inp.inputMode='numeric'; inp.maxLength=6; inp.placeholder='123456'; inp.className='fi'; inp.style.cssText='width:100%;box-sizing:border-box;margin-bottom:10px;'; body.appendChild(inp);
+    var vb=document.createElement('button'); vb.className='btn btn-p'; vb.textContent='Verify & turn on'; body.appendChild(vb);
+    var msg=document.createElement('div'); msg.style.cssText='font-size:13px;margin-top:8px;'; body.appendChild(msg);
+    inp.addEventListener('keydown',function(e){ if(e.key==='Enter') vb.click(); });
+    vb.addEventListener('click',async function(){
+      var code=(inp.value||'').trim(); if(!/^\d{6}$/.test(code)){ msg.style.color='var(--danger)'; msg.textContent='Enter the 6-digit code.'; return; }
+      vb.disabled=true; vb.textContent='Verifying…';
+      var ch=await supa.auth.mfa.challenge({factorId:factorId});
+      if(ch.error){ msg.style.color='var(--danger)'; msg.textContent=ch.error.message; vb.disabled=false; vb.textContent='Verify & turn on'; return; }
+      var v=await supa.auth.mfa.verify({factorId:factorId, challengeId:ch.data.id, code:code});
+      if(v.error){ msg.style.color='var(--danger)'; msg.textContent='That code didn’t match — use the current one and try again.'; vb.disabled=false; vb.textContent='Verify & turn on'; return; }
+      body.innerHTML='<div style="font-size:15px;color:#1f9d55;font-weight:600;">✓ Two-factor is now ON.</div><div style="font-size:13px;color:var(--text3);margin-top:8px;">You’ll enter a code next time you sign in. Keep your authenticator app safe — you need it to log in.</div>';
+    });
+  });
+}
+// Account menu on the top-bar avatar (two-factor + sign out).
+function toggleAccountMenu(){
+  var ex=ge('acctMenu'); if(ex){ try{document.body.removeChild(ex);}catch(e){} return; }
+  var menu=document.createElement('div'); menu.id='acctMenu'; menu.style.cssText='position:fixed;top:52px;right:12px;z-index:1300;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,0.4);padding:6px;min-width:230px;';
+  if(currentUser&&currentUser.email){ menu.appendChild(mkDivSafe('font-size:12px;color:var(--text3);padding:6px 12px 8px;', currentUser.email)); }
+  function item(label,fn,danger){ var b=document.createElement('button'); b.textContent=label; b.style.cssText='display:block;width:100%;text-align:left;background:none;border:none;color:'+(danger?'var(--danger)':'var(--text)')+';padding:9px 12px;font-size:14px;font-family:inherit;cursor:pointer;border-radius:7px;'; b.addEventListener('mouseenter',function(){b.style.background='var(--surface2)';}); b.addEventListener('mouseleave',function(){b.style.background='none';}); b.addEventListener('click',function(e){ e.stopPropagation(); try{document.body.removeChild(menu);}catch(er){} fn(); }); return b; }
+  menu.appendChild(item('🔐 Two-factor authentication', openSecurityModal));
+  menu.appendChild(item('Sign out', signOut, true));
+  document.body.appendChild(menu);
+  setTimeout(function(){ document.addEventListener('click', function h(ev){ if(!menu.contains(ev.target)){ try{document.body.removeChild(menu);}catch(e){} } document.removeEventListener('click',h); }); }, 10);
 }
 
 // ---- Briefing Schedule ----
@@ -10950,7 +11066,10 @@ ge('btnBackToLogin').addEventListener('click', function(){
   clearLoginMessages();
 });
 ge('btnSendReset').addEventListener('click', sendPasswordReset);
-ge('topbarUser').addEventListener('click', signOut);
+ge('topbarUser').addEventListener('click', function(e){ e.stopPropagation(); toggleAccountMenu(); });
+ge('btnMfaVerify') && ge('btnMfaVerify').addEventListener('click', verifyMfaLogin);
+ge('btnMfaCancel') && ge('btnMfaCancel').addEventListener('click', cancelMfaLogin);
+ge('mfaCode') && ge('mfaCode').addEventListener('keydown', function(e){ if(e.key==='Enter') verifyMfaLogin(); });
 
 // Card Scanner listeners
 ge('btnCardUpload').addEventListener('click', function(){ ge('cardFileInput').click(); });
