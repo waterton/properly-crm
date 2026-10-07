@@ -664,7 +664,14 @@ export default async function handler(req, res) {
           enr.status = 'completed'; enr.nextSendAt = null; result.drips.completed++;
         } else {
           const nextDelay = parseInt(camp.steps[enr.stepIndex].delayDays) || 0;
-          enr.nextSendAt = new Date(Date.now() + nextDelay * DAY_MS).toISOString();
+          // Schedule the next step for the START of its target day (00:00 UTC), not a rolling
+          // 24h clock. The cron runs once a day at 14:00 UTC; if we scheduled "now + 24h" and
+          // this send happened in the afternoon, the next day's run would be too early and the
+          // step would slip an extra day. Anchoring to midnight guarantees the next daily run
+          // on/after the target date picks it up, so "1 day apart" lands on consecutive days.
+          const nd = new Date(Date.now() + nextDelay * DAY_MS);
+          nd.setUTCHours(0, 0, 0, 0);
+          enr.nextSendAt = nd.toISOString();
         }
         await supaUpsert('enrollments', [enr]);
         result.drips.sent++;

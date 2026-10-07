@@ -11329,16 +11329,54 @@ function autoEnrollOnStage(c, stage){
   updateDripBadges();
 }
 
-// ---- process due steps (called on open, manual run, and 30s poll) ----
+// ---- badge/state refresh (called on open and 30s poll) ----
+// NOTE: the browser does NOT send drip emails. Sending happens ONLY in the
+// server cron (api/run-drips.js), which honors Sending Controls + test mode.
+// A client-side sender used to fire here on page-load/poll and bypassed the
+// kill switch entirely — that is why mail could go out with the drip control
+// unchecked. This now only refreshes the on-screen counts.
 function processDrips(){
-  var due = ENR.filter(function(e){
-    return e.status==='active' && e.nextSendAt && new Date(e.nextSendAt) <= new Date();
-  });
-  due.forEach(function(e){ dripFireStep(e); });
   updateDripBadges();
 }
 
+// Ask the server to run a drip pass now (respects Sending Controls + test mode).
+// Used by the "Run drips now" button. The server rejects the call unless the
+// caller is a signed-in CRM user, so CRON_SECRET never reaches the browser.
+function runDripsNow(){
+  var btn = ge('btnRunDripsNow');
+  if(btn){ btn.disabled = true; var _t = btn.textContent; btn.textContent = 'Running…'; btn.dataset._t = _t; }
+  postApi('/api/run-drips', {}).then(function(r){ return r.json().catch(function(){ return {}; }); })
+    .then(function(res){
+      if(res && res.paused){
+        alert('Nothing sent — outbound sending is off.\n\nTurn on Settings → Sending Controls (Master + Drips) and Save, then try again.');
+      } else if(res && res.result && res.result.drips){
+        var d = res.result.drips;
+        var msg = 'Drip run complete.\nSent: '+d.sent+'   Completed: '+d.completed+'   Failed: '+d.failed+'   Skipped: '+d.skipped;
+        if(d.errors && d.errors.length) msg += '\n\n'+d.errors.slice(0,5).join('\n');
+        alert(msg);
+      } else if(res && res.error){
+        alert('Could not run drips: '+res.error);
+      } else {
+        alert('Drip run finished.');
+      }
+    })
+    .catch(function(e){ alert('Could not run drips: '+(e&&e.message||e)); })
+    .then(function(){
+      if(supaReady) loadFromDB();   // pull the updated enrollments / send log the cron just wrote
+      if(btn){ btn.disabled = false; btn.textContent = btn.dataset._t || 'Run drips now'; }
+      renderDrips();
+    });
+}
+
+// DISABLED: the browser must never send drip mail directly — it bypassed the
+// Sending Controls kill switch. Sending now lives only in api/run-drips.js.
+// Kept as a guarded no-op so any stray caller routes to the controlled server
+// path instead of emailing a client.
 function dripFireStep(enr){
+  if(typeof console!=='undefined') console.warn('dripFireStep is disabled; drips send server-side via /api/run-drips');
+  return;
+}
+function _dripFireStep_DISABLED(enr){
   var camp = CAMP.find(function(x){ return String(x.id)===String(enr.campaignId); });
   var c = gc(typeof enr.contactId==='string' ? (parseInt(enr.contactId)||enr.contactId) : enr.contactId);
   if(!camp || !c){ enr.status='stopped'; dripSave('enrollments',[enr]); return; }
@@ -11694,7 +11732,7 @@ ge('nav-drips') && (function(){
   ge('btnAddStep') && ge('btnAddStep').addEventListener('click', addCampaignStep);
   ge('btnSaveCampaign') && ge('btnSaveCampaign').addEventListener('click', saveCampaign);
   ge('btnConfirmEnroll') && ge('btnConfirmEnroll').addEventListener('click', confirmEnroll);
-  ge('btnRunDripsNow') && ge('btnRunDripsNow').addEventListener('click', function(){ processDrips(); renderDrips(); });
+  ge('btnRunDripsNow') && ge('btnRunDripsNow').addEventListener('click', function(){ runDripsNow(); });
   ['campaigns','enrollments','log'].forEach(function(t){
     var btn = ge('dripTab'+t.charAt(0).toUpperCase()+t.slice(1));
     if(btn) btn.addEventListener('click', function(){ dripSwitchTab(t); });
