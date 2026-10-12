@@ -10,6 +10,8 @@
 //   BRIEFING_EMAILS   - comma-separated recipient emails
 //                       (defaults to all connected Gmail accounts)
 
+import crypto from 'crypto';
+
 export const config = { api: { bodyParser: false } };
 
 const SUPA_URL = process.env.SUPA_URL || 'https://fgkilooomlozhwfnvjze.supabase.co';
@@ -19,6 +21,34 @@ const CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
 const AGENT_NAME = process.env.DRIP_AGENT_NAME || 'Randy Baker';
 const DAY_MS = 86400000;
+
+// Where the unsubscribe link points, and the secret that signs it. Must match
+// api/unsubscribe.js exactly. SITE_URL lets us move domains without a code change.
+const SITE_URL = (process.env.SITE_URL || 'https://properly-crm.vercel.app').replace(/\/+$/, '');
+const UNSUB_SECRET = process.env.UNSUB_SECRET || SUPA_SERVICE_KEY;
+
+function unsubToken(contactId) {
+  return crypto.createHmac('sha256', UNSUB_SECRET)
+    .update('unsub:' + String(contactId)).digest('hex').slice(0, 32);
+}
+function unsubUrl(contactId) {
+  return SITE_URL + '/api/unsubscribe?c=' + encodeURIComponent(contactId) + '&t=' + unsubToken(contactId);
+}
+// Put a working unsubscribe link in every marketing email. If the design uses a
+// {{unsubscribe}} tag we swap the URL in there; otherwise we append a small
+// footer so the link is always present.
+function applyUnsubscribe(html, contactId) {
+  const url = unsubUrl(contactId);
+  let out = String(html || '');
+  if (/\{\{\s*unsubscribe\s*\}\}/i.test(out)) {
+    return out.replace(/\{\{\s*unsubscribe\s*\}\}/gi, url);
+  }
+  const footer = '<div style="margin-top:24px;padding-top:14px;border-top:1px solid #e5e5e5;'
+    + 'font-size:12px;color:#999;text-align:center;font-family:Arial,sans-serif;">'
+    + 'You received this because you are a contact of Palacios Baker Real Estate.<br>'
+    + '<a href="' + url + '" style="color:#999;">Unsubscribe from these emails</a></div>';
+  return out + footer;
+}
 
 function supaHeaders(extra) {
   return Object.assign({
@@ -76,6 +106,30 @@ function encodeSubject(s) {
   return /^[\x00-\x7F]*$/.test(s) ? s : '=?UTF-8?B?' + Buffer.from(s, 'utf8').toString('base64') + '?=';
 }
 
+// Pull any base64 data: images out of an HTML body and turn them into inline
+// (CID) attachments. Gmail and most webmail strip data: URIs in the body, so a
+// finished email that embeds its images as base64 has to be rewritten this way
+// to actually display. Remote (https) images are left untouched. Returns the
+// rewritten HTML plus the list of images to attach.
+function extractInlineImages(html) {
+  const images = [];
+  if (!html) return { html: '', images: images };
+  let n = 0;
+  const rewritten = String(html).replace(
+    /src\s*=\s*(["'])data:([^;,"']+);base64,([^"']+)\1/gi,
+    function (_m, q, mime, b64) {
+      n += 1;
+      const cid = 'img' + n + '@properlycrm';
+      images.push({ cid: cid, mime: mime.trim(), b64: b64.replace(/\s+/g, '') });
+      return 'src=' + q + 'cid:' + cid + q;
+    }
+  );
+  return { html: rewritten, images: images };
+}
+
+function wrap76(s) { return s.replace(/.{1,76}/g, '$&\r\n').trim(); }
+function b64(str) { return Buffer.from(str, 'utf8').toString('base64'); }
+
 // Per-request outbound controls (loaded from the settings row). Test mode redirects every message to
 // the test address and tags the subject, so nothing reaches real clients while testing.
 let SEND_CTRL = null;
@@ -85,16 +139,38 @@ async function gmailSend(accessToken, to, subject, htmlBody, cc) {
     cc = undefined;
     subject = '[TEST] ' + subject;
   }
-  const lines = ['To: ' + to];
-  if (cc) lines.push('Cc: ' + cc);
-  lines.push(
-    'Subject: ' + encodeSubject(subject),
-    'Content-Type: text/html; charset=utf-8',
-    'MIME-Version: 1.0',
-    '',
-    htmlBody || ''
-  );
-  const raw = Buffer.from(lines.join('\r\n')).toString('base64')
+
+  const { html, images } = extractInlineImages(htmlBody || '');
+  const headerLines = ['To: ' + to];
+  if (cc) headerLines.push('Cc: ' + cc);
+  headerLines.push('Subject: ' + encodeSubject(subject), 'MIME-Version: 1.0');
+
+  let mime;
+  if (images.length) {
+    // multipart/related: the HTML part references each image by cid:.
+    const boundary = 'pbx_' + Date.now() + '_' + Math.floor(Math.random() * 1e9);
+    const parts = [];
+    parts.push('--' + boundary);
+    parts.push('Content-Type: text/html; charset=utf-8');
+    parts.push('Content-Transfer-Encoding: base64');
+    parts.push('');
+    parts.push(wrap76(Buffer.from(html, 'utf8').toString('base64')));
+    images.forEach(function (img) {
+      parts.push('--' + boundary);
+      parts.push('Content-Type: ' + (img.mime || 'image/png'));
+      parts.push('Content-Transfer-Encoding: base64');
+      parts.push('Content-ID: <' + img.cid + '>');
+      parts.push('Content-Disposition: inline');
+      parts.push('');
+      parts.push(wrap76(img.b64));
+    });
+    parts.push('--' + boundary + '--');
+    mime = headerLines.concat(['Content-Type: multipart/related; boundary="' + boundary + '"', '', parts.join('\r\n')]).join('\r\n');
+  } else {
+    mime = headerLines.concat(['Content-Type: text/html; charset=utf-8', '', html]).join('\r\n');
+  }
+
+  const raw = Buffer.from(mime).toString('base64')
     .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   const resp = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
     method: 'POST',
@@ -585,6 +661,17 @@ export default async function handler(req, res) {
         campById[String(c.id)] = c;
       });
 
+      // Message Library: steps may reference a finished email by id instead of
+      // carrying inline subject/body. Preload them once.
+      const msgs = await supaGet('drip_messages?limit=500');
+      const msgById = {};
+      (Array.isArray(msgs) ? msgs : []).forEach(m => { msgById[String(m.id)] = m; });
+
+      // Opt-outs: contacts who clicked unsubscribe. Never email these again.
+      const unsubs = await supaGet('drip_unsubs?select=contact_id&limit=5000');
+      const unsubSet = {};
+      (Array.isArray(unsubs) ? unsubs : []).forEach(u => { unsubSet[String(u.contact_id)] = true; });
+
       const tokenCache = {};
 
       for (let i = 0; i < due.length; i++) {
@@ -599,6 +686,12 @@ export default async function handler(req, res) {
         if (!step) {
           enr.status = 'completed'; enr.nextSendAt = null;
           await supaUpsert('enrollments', [enr]); result.drips.completed++; continue;
+        }
+
+        // Honor unsubscribes: stop the enrollment, send nothing.
+        if (unsubSet[String(enr.contactId)]) {
+          enr.status = 'stopped'; enr.nextSendAt = null;
+          await supaUpsert('enrollments', [enr]); result.drips.skipped++; continue;
         }
 
         const contacts = await supaGet('contacts?id=eq.' + encodeURIComponent(enr.contactId) + '&limit=1');
@@ -637,9 +730,31 @@ export default async function handler(req, res) {
           result.drips.errors.push(tok.error); continue;
         }
 
-        const subject = mergeTags(step.subject, c);
-        const htmlBody = mergeTags(step.body, c).replace(/\n/g, '<br>');
+        // A step either points at a Library message (finished HTML w/ graphics)
+        // or carries inline plain-text subject/body. Library wins when set.
+        let subject, htmlBody;
+        const libMsg = step.messageId != null ? msgById[String(step.messageId)] : null;
+        if (step.messageId != null && !libMsg) {
+          // The message was deleted after the campaign was built — don't send a
+          // blank email. Hold and surface it rather than advancing past it.
+          logBase.status = 'queued'; logBase.error = 'Library message ' + step.messageId + ' not found';
+          await supaUpsert('send_log', [logBase]);
+          enr.nextSendAt = new Date(Date.now() + 3600000).toISOString();
+          await supaUpsert('enrollments', [enr]); result.drips.skipped++;
+          result.drips.errors.push('Missing library message ' + step.messageId + ' for campaign ' + camp.id);
+          continue;
+        }
+        if (libMsg) {
+          subject = mergeTags(libMsg.subject, c);
+          htmlBody = mergeTags(libMsg.html || '', c);   // already HTML — no newline conversion
+        } else {
+          subject = mergeTags(step.subject, c);
+          htmlBody = mergeTags(step.body, c).replace(/\n/g, '<br>');
+        }
         logBase.subject = subject;
+
+        // Every marketing email gets a working, per-recipient unsubscribe link.
+        htmlBody = applyUnsubscribe(htmlBody, enr.contactId);
 
         const sent = await gmailSend(tok.accessToken, to, subject, htmlBody);
         if (sent.error) {

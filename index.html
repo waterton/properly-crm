@@ -146,7 +146,7 @@
         <div id="globalSearchResults" style="display:none;position:fixed;top:52px;right:12px;width:min(460px,92vw);max-height:74vh;overflow:auto;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:0 10px 34px rgba(0,0,0,0.45);z-index:1200;padding:6px;"></div>
         <button class="btn btn-p" id="btnAdd" style="display:none;">+ Add</button>
         <button id="themeToggle" title="Theme" style="background:none;border:none;cursor:pointer;font-size:17px;line-height:1;padding:4px 6px;border-radius:6px;">☀️</button>
-        <div style="font-size:11px;color:var(--text3);margin-right:4px;">v19.3</div>
+        <div style="font-size:11px;color:var(--text3);margin-right:4px;">v19.5</div>
         <div class="topbar-user" id="topbarUser" title="Click to sign out" style="cursor:pointer;position:relative;" id="topbarUserBtn">RE</div>
       </div>
     </div>
@@ -934,6 +934,7 @@
         <div style="display:flex;gap:10px;margin-bottom:18px;border-bottom:1px solid var(--border);">
           <button class="drip-tab active" id="dripTabCampaigns" data-drip-tab="campaigns" style="background:none;border:none;border-bottom:2px solid var(--accent);color:var(--accent);font-family:'DM Sans',sans-serif;font-size:16px;font-weight:600;padding:10px 14px;cursor:pointer;">Campaigns</button>
           <button class="drip-tab" id="dripTabEnrollments" data-drip-tab="enrollments" style="background:none;border:none;border-bottom:2px solid transparent;color:var(--text3);font-family:'DM Sans',sans-serif;font-size:16px;font-weight:600;padding:10px 14px;cursor:pointer;">Active Enrollments<span class="nbadge" id="nbEnrollments" style="margin-left:6px;">0</span></button>
+          <button class="drip-tab" id="dripTabMessages" data-drip-tab="messages" style="background:none;border:none;border-bottom:2px solid transparent;color:var(--text3);font-family:'DM Sans',sans-serif;font-size:16px;font-weight:600;padding:10px 14px;cursor:pointer;">Message Library</button>
           <button class="drip-tab" id="dripTabLog" data-drip-tab="log" style="background:none;border:none;border-bottom:2px solid transparent;color:var(--text3);font-family:'DM Sans',sans-serif;font-size:16px;font-weight:600;padding:10px 14px;cursor:pointer;">Send Log</button>
         </div>
         <div id="dripPaneCampaigns">
@@ -946,6 +947,13 @@
           <div class="card">
             <div class="card-hdr"><div class="card-title">Active Enrollments</div></div>
             <div id="dripEnrollmentList" style="padding:8px 16px 16px;"></div>
+          </div>
+        </div>
+        <div id="dripPaneMessages" style="display:none;">
+          <div class="card">
+            <div class="card-hdr"><div class="card-title">Message Library</div><button class="btn btn-p" id="btnNewMessage">+ New Message</button></div>
+            <div style="padding:0 16px 8px;font-size:15px;color:var(--text3);">Finished marketing emails (header, graphics, copy) live here. Campaign steps pick a message to send. Images are embedded so they display in any mail app.</div>
+            <div id="dripMessageList" style="padding:8px 16px 16px;"></div>
           </div>
         </div>
         <div id="dripPaneLog" style="display:none;">
@@ -1072,6 +1080,28 @@
       <div style="font-size:14px;color:var(--text3);line-height:1.5;">First email sends immediately. Later steps follow the delay per step.</div>
     </div>
     <div class="mftr"><button class="btn btn-g" data-close="enrollModal">Cancel</button><button class="btn btn-p" id="btnConfirmEnroll">Enroll</button></div>
+  </div>
+</div>
+<div class="modal-ov" id="messageModal">
+  <div class="modal" style="max-width:860px;">
+    <div class="mhdr"><div class="mtitle" id="msgModalTitle">New Message</div><button class="mx" data-close="messageModal">&#x2715;</button></div>
+    <div class="mbody">
+      <div class="frow">
+        <div class="fg" style="flex:2;"><label class="fl">Message name <span style="color:var(--text3);font-weight:400;">(internal label)</span></label><input class="fi" id="msgName" placeholder="Past-client check-in"></div>
+        <div class="fg"><label class="fl">Status</label><select class="fsel" id="msgActive"><option value="true">Active</option><option value="false">Archived</option></select></div>
+      </div>
+      <div class="fg"><label class="fl">Subject line</label><input class="fi" id="msgSubject" placeholder="Hi {{first}}, a quick thought on your home"></div>
+      <div class="fg"><label class="fl">Email HTML <span style="color:var(--text3);font-weight:400;">(paste the finished email; images may be embedded as base64 &mdash; they'll display in every mail app)</span></label>
+        <textarea class="fi" id="msgHtml" rows="10" style="font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;" placeholder="<!-- paste the finished HTML email here --></table>"></textarea>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin:4px 0 6px;">
+        <label class="fl" style="margin:0;">Live preview</label>
+        <button class="btn btn-g" id="btnMsgPreview" style="padding:4px 10px;font-size:14px;">Refresh preview</button>
+      </div>
+      <iframe id="msgPreview" style="width:100%;height:320px;border:1px solid var(--border);border-radius:8px;background:#fff;"></iframe>
+      <div style="font-size:14px;color:var(--text3);margin-top:10px;line-height:1.5;">Merge tags you can use in the subject or body: <b style="color:var(--accent);">{{first}}</b> <b style="color:var(--accent);">{{last}}</b> <b style="color:var(--accent);">{{property}}</b> <b style="color:var(--accent);">{{agent}}</b> <b style="color:var(--accent);">{{price}}</b>. Optional: put <b style="color:var(--accent);">{{unsubscribe}}</b> where you want the unsubscribe link &mdash; if you leave it out, one is added to the footer automatically.</div>
+    </div>
+    <div class="mftr"><button class="btn btn-g" data-close="messageModal">Cancel</button><button class="btn btn-p" id="btnSaveMessage">Save Message</button></div>
   </div>
 </div>
 <div class="modal-ov" id="emailIntelModal">
@@ -1225,6 +1255,6 @@
 </div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="app.js?v=20261007a"></script>
+<script src="app.js?v=20261012b"></script>
 </body>
 </html>

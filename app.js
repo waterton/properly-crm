@@ -65,6 +65,7 @@ function postApi(path, bodyObj){
 
 var C=[],N=[],F=[],D=[],TX=[],TM=[],A=[],curDet=null,curFilter='all',curPage='dashboard';
 var CAMP=[],ENR=[],SENDLOG=[],DOCS=[];
+var DMSG=[]; // drip_messages: reusable, fully-designed marketing emails (subject + HTML w/ embedded images)
 var CH=[]; // tx_changes: audit trail of field changes applied from scanned documents
 var RS=[]; // reminder_settings: how many days before each deadline type to remind (cron reads these)
 var RL=[]; // reminder_log: which reminders the cron has already sent (used to hide sent personal reminders)
@@ -116,6 +117,7 @@ var DB_COLS = {
   campaigns: null,
   enrollments: null,
   send_log: null,
+  drip_messages: ['id','name','subject','html','active','created_at','updated_at'],
   gmail_tokens: null,
   documents: ['id','contact_id','transaction_id','file_path','file_name','doc_type','summary','mime_type','size','created_at'],
   tx_changes: ['id','transactionId','contactId','field','oldValue','newValue','docType','addendumNo','effectiveDate','documentId','appliedAt'],
@@ -685,7 +687,8 @@ async function loadFromDB(){
       fetchAllRows(base, 'listings?order=updated_at.desc', headers).catch(function(){return []; }),
       fetchAllRows(base, 'inv_recurring?order=id.asc', headers).catch(function(){return []; }),
       fetchAllRows(base, 'commercial_prospects?order=updated_at.desc', headers).catch(function(){return []; }),
-      fetchAllRows(base, 'nc_communities?order=updated_at.desc', headers).catch(function(){return []; })
+      fetchAllRows(base, 'nc_communities?order=updated_at.desc', headers).catch(function(){return []; }),
+      fetchAllRows(base, 'drip_messages?order=updated_at.desc', headers).catch(function(){return []; })
     ]);
     var rc = results[0], rn = results[1], rf = results[2], rd = results[3], rtx = results[4];
 
@@ -729,6 +732,7 @@ async function loadFromDB(){
     if(Array.isArray(results[24])) INVREC = results[24];
     if(Array.isArray(results[25])) CPROS = results[25];
     if(Array.isArray(results[26])) NC = results[26];
+    if(Array.isArray(results[27])) DMSG = results[27];
     try{ materializeRecurring(); }catch(e){}
     DOCS.forEach(function(d){
       d.id = typeof d.id === 'string' ? parseInt(d.id)||d.id : d.id;
@@ -11450,7 +11454,7 @@ function updateDripBadges(){
 
 // ---- tab switching ----
 function dripSwitchTab(tab){
-  ['campaigns','enrollments','log'].forEach(function(t){
+  ['campaigns','enrollments','messages','log'].forEach(function(t){
     var btn = ge('dripTab'+t.charAt(0).toUpperCase()+t.slice(1));
     var pane = ge('dripPane'+t.charAt(0).toUpperCase()+t.slice(1));
     var on = (t===tab);
@@ -11464,8 +11468,105 @@ function dripSwitchTab(tab){
 function renderDrips(){
   renderCampaignList();
   renderEnrollmentList();
+  renderMessageList();
   renderSendLog();
   updateDripBadges();
+}
+
+// ===================== MESSAGE LIBRARY =====================
+// Reusable, finished marketing emails. A campaign step points at one of these
+// by id; the server cron (api/run-drips.js) embeds its images and sends it.
+function dripMsgById(id){ return DMSG.find(function(m){ return String(m.id)===String(id); }); }
+
+function renderMessageList(){
+  var wrap = ge('dripMessageList'); if(!wrap) return;
+  wrap.textContent='';
+  var list = DMSG.slice().sort(function(a,b){ return String(b.updated_at||'').localeCompare(String(a.updated_at||'')); });
+  if(!list.length){
+    wrap.appendChild(mkDiv('color:var(--text3);font-size:15px;padding:12px 0;','No messages yet. Click "+ New Message" to add a finished marketing email to the library.'));
+    return;
+  }
+  list.forEach(function(m){
+    var row = mkDiv('display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);');
+    var archived = (m.active===false || m.active==='false');
+    var info = mkDiv('flex:1;min-width:0;');
+    var title = mkDiv('font-size:16px;font-weight:700;color:'+(archived?'var(--text3)':'var(--text)')+';', (m.name||'(untitled)') + (archived?'  ·  archived':''));
+    var sub = mkDiv('font-size:14px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;', 'Subject: ' + (m.subject||'(none)'));
+    info.appendChild(title); info.appendChild(sub);
+    row.appendChild(info);
+    var bEdit = mkBtnEl('btn btn-g','Edit','padding:4px 10px;font-size:14px;');
+    bEdit.addEventListener('click', function(){ openMessageModal(m.id); });
+    var bDup = mkBtnEl('btn btn-g','Duplicate','padding:4px 10px;font-size:14px;');
+    bDup.addEventListener('click', function(){ duplicateMessage(m.id); });
+    var bDel = mkBtnEl('btn btn-g','Delete','padding:4px 10px;font-size:14px;color:var(--danger);');
+    bDel.addEventListener('click', function(){ deleteMessage(m.id); });
+    row.appendChild(bEdit); row.appendChild(bDup); row.appendChild(bDel);
+    wrap.appendChild(row);
+  });
+}
+
+function _msgPreviewRender(){
+  var fr = ge('msgPreview'); if(!fr) return;
+  var html = (ge('msgHtml').value)||'';
+  try{ fr.srcdoc = html; }catch(e){ try{ var d=fr.contentWindow.document; d.open(); d.write(html); d.close(); }catch(_){} }
+}
+
+function openMessageModal(id){
+  ge('btnSaveMessage').setAttribute('data-edit-id', id||'');
+  if(id){
+    var m = dripMsgById(id);
+    ge('msgModalTitle').textContent='Edit Message';
+    ge('msgName').value = m.name||'';
+    ge('msgSubject').value = m.subject||'';
+    ge('msgHtml').value = m.html||'';
+    ge('msgActive').value = (m.active===false||m.active==='false') ? 'false' : 'true';
+  }else{
+    ge('msgModalTitle').textContent='New Message';
+    ge('msgName').value=''; ge('msgSubject').value=''; ge('msgHtml').value=''; ge('msgActive').value='true';
+  }
+  om('messageModal');
+  _msgPreviewRender();
+}
+
+function saveMessage(){
+  var name = (ge('msgName').value||'').trim();
+  var subject = (ge('msgSubject').value||'').trim();
+  var html = ge('msgHtml').value||'';
+  if(!name){ alert('Give the message a name so you can find it later.'); return; }
+  if(!subject){ alert('Add a subject line.'); return; }
+  if(!html.trim()){ alert('Paste the email HTML.'); return; }
+  var editId = ge('btnSaveMessage').getAttribute('data-edit-id');
+  var m;
+  if(editId){
+    m = dripMsgById(editId);
+    m.name=name; m.subject=subject; m.html=html; m.active=(ge('msgActive').value==='true'); m.updated_at=nowISO();
+  }else{
+    m = { id: Date.now(), name:name, subject:subject, html:html, active:(ge('msgActive').value==='true'), created_at:nowISO(), updated_at:nowISO() };
+    DMSG.push(m);
+  }
+  dripSave('drip_messages', [JSON.parse(JSON.stringify(m))]);
+  cm('messageModal');
+  renderMessageList();
+}
+
+function duplicateMessage(id){
+  var m = dripMsgById(id); if(!m) return;
+  var copy = { id: Date.now(), name:(m.name||'Message')+' (copy)', subject:m.subject||'', html:m.html||'', active:true, created_at:nowISO(), updated_at:nowISO() };
+  DMSG.push(copy);
+  dripSave('drip_messages', [JSON.parse(JSON.stringify(copy))]);
+  renderMessageList();
+}
+
+function deleteMessage(id){
+  var m = dripMsgById(id); if(!m) return;
+  // Warn if any active campaign step still points at this message.
+  var used = CAMP.filter(function(c){ return (c.steps||[]).some(function(s){ return String(s.messageId)===String(id); }); });
+  var warn = 'Delete message "'+(m.name||'')+'"?';
+  if(used.length) warn += '\n\nIt is used by '+used.length+' campaign'+(used.length>1?'s':'')+'. Those steps will have no message to send until you pick another.';
+  if(!confirm(warn)) return;
+  DMSG = DMSG.filter(function(x){ return String(x.id)!==String(id); });
+  dripDel('drip_messages', id);
+  renderMessageList();
 }
 
 function mkBtnEl(cls, txt, style){ var b=document.createElement('button'); b.className=cls; b.textContent=txt; if(style)b.style.cssText=style; return b; }
@@ -11587,6 +11688,18 @@ function buildStepRow(step, idx){
   var delayInp = document.createElement('input'); delayInp.className='fi drip-step-delay'; delayInp.type='number'; delayInp.min='0'; delayInp.value=(step.delayDays!=null?step.delayDays:(idx===0?0:3)); delayInp.style.cssText='width:120px;';
   delayFg.appendChild(delayLbl); delayFg.appendChild(delayInp); box.appendChild(delayFg);
 
+  // Library message selector. Picking one means this step sends that finished
+  // email (with its embedded graphics); the custom subject/body below are then
+  // ignored. Leave as "Write custom below" to type a plain-text email inline.
+  var msgFg = mkDiv('margin-bottom:8px;');
+  var msgLbl = document.createElement('label'); msgLbl.className='fl'; msgLbl.textContent='Email to send';
+  var msgSel = document.createElement('select'); msgSel.className='fsel drip-step-message';
+  var optCustom = document.createElement('option'); optCustom.value=''; optCustom.textContent='— Write custom below —'; msgSel.appendChild(optCustom);
+  DMSG.filter(function(m){ return !(m.active===false||m.active==='false'); })
+      .sort(function(a,b){ return String(a.name||'').localeCompare(String(b.name||'')); })
+      .forEach(function(m){ var o=document.createElement('option'); o.value=String(m.id); o.textContent='📧 '+(m.name||'(untitled)'); if(String(step.messageId)===String(m.id)) o.selected=true; msgSel.appendChild(o); });
+  msgFg.appendChild(msgLbl); msgFg.appendChild(msgSel); box.appendChild(msgFg);
+
   var subjFg = mkDiv('margin-bottom:8px;');
   var subjLbl = document.createElement('label'); subjLbl.className='fl'; subjLbl.textContent='Subject';
   var subjInp = document.createElement('input'); subjInp.className='fi drip-step-subject'; subjInp.placeholder='Hi {{first}}, following up'; subjInp.value=step.subject||'';
@@ -11596,6 +11709,18 @@ function buildStepRow(step, idx){
   var bodyLbl = document.createElement('label'); bodyLbl.className='fl'; bodyLbl.textContent='Body';
   var bodyTA = document.createElement('textarea'); bodyTA.className='fi drip-step-body'; bodyTA.rows=5; bodyTA.placeholder='Hi {{first}},\n\nThanks for your interest in {{property}}...\n\n- {{agent}}'; bodyTA.value=step.body||'';
   bodyFg.appendChild(bodyLbl); bodyFg.appendChild(bodyTA); box.appendChild(bodyFg);
+
+  // When a library message is chosen, grey out the custom fields so it's clear
+  // they won't be used.
+  function syncCustomState(){
+    var usingLib = !!msgSel.value;
+    subjFg.style.opacity = usingLib ? '0.4' : '1';
+    bodyFg.style.opacity = usingLib ? '0.4' : '1';
+    subjInp.disabled = usingLib; bodyTA.disabled = usingLib;
+    subjLbl.textContent = usingLib ? 'Subject (from library message)' : 'Subject';
+  }
+  msgSel.addEventListener('change', syncCustomState);
+  syncCustomState();
 
   return box;
 }
@@ -11644,8 +11769,13 @@ function saveCampaign(){
     var subj = boxes[i].querySelector('.drip-step-subject').value.trim();
     var body = boxes[i].querySelector('.drip-step-body').value.trim();
     var delay = parseInt(boxes[i].querySelector('.drip-step-delay').value)||0;
-    if(!subj && !body) continue;
-    steps.push({subject:subj, body:body, delayDays:delay});
+    var mSel = boxes[i].querySelector('.drip-step-message');
+    var messageId = (mSel && mSel.value) ? (parseInt(mSel.value)||mSel.value) : null;
+    // A step is valid if it points at a library message OR has custom subject/body.
+    if(!messageId && !subj && !body) continue;
+    var st = {subject:subj, body:body, delayDays:delay};
+    if(messageId) st.messageId = messageId;
+    steps.push(st);
   }
   if(!steps.length){ alert('Add at least one email step with a subject or body.'); return; }
   var editId = ge('btnSaveCampaign').getAttribute('data-edit-id');
@@ -11733,7 +11863,11 @@ ge('nav-drips') && (function(){
   ge('btnSaveCampaign') && ge('btnSaveCampaign').addEventListener('click', saveCampaign);
   ge('btnConfirmEnroll') && ge('btnConfirmEnroll').addEventListener('click', confirmEnroll);
   ge('btnRunDripsNow') && ge('btnRunDripsNow').addEventListener('click', function(){ runDripsNow(); });
-  ['campaigns','enrollments','log'].forEach(function(t){
+  ge('btnNewMessage') && ge('btnNewMessage').addEventListener('click', function(){ openMessageModal(null); });
+  ge('btnSaveMessage') && ge('btnSaveMessage').addEventListener('click', saveMessage);
+  ge('btnMsgPreview') && ge('btnMsgPreview').addEventListener('click', _msgPreviewRender);
+  (function(){ var mm=ge('messageModal'); if(mm) mm.addEventListener('click', function(e){ if(e.target===mm) cm('messageModal'); }); })();
+  ['campaigns','enrollments','messages','log'].forEach(function(t){
     var btn = ge('dripTab'+t.charAt(0).toUpperCase()+t.slice(1));
     if(btn) btn.addEventListener('click', function(){ dripSwitchTab(t); });
   });
