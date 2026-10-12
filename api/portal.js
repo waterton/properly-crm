@@ -26,6 +26,44 @@ module.exports = async function (req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(200).end();
+
+  // ── Unsubscribe from marketing drips ──────────────────────────────────────
+  // Public GET from the "Unsubscribe" link in a drip email. Kept here (rather
+  // than its own function) to stay under the serverless-function limit. It uses
+  // its OWN signed token (service key based), so it does not depend on the
+  // portal's PORTAL_SECRET being configured.
+  if ((req.query && req.query.action) === 'unsubscribe') {
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    const cid = req.query.c != null ? String(req.query.c) : '';
+    const tok = req.query.t != null ? String(req.query.t) : '';
+    if (!cid || !tok || tok !== unsubToken(cid)) {
+      return res.status(400).send(unsubPage('Unsubscribe',
+        'This unsubscribe link is invalid or incomplete. If you want to stop receiving our emails, just reply to one and let us know.'));
+    }
+    try {
+      let email = '';
+      try {
+        const rows = await supa('contacts?select=email&id=eq.' + encodeURIComponent(cid) + '&limit=1');
+        if (Array.isArray(rows) && rows[0] && rows[0].email) email = rows[0].email;
+      } catch (e) {}
+      await fetch(`${SUPA_URL}/rest/v1/drip_unsubs`, {
+        method: 'POST', headers: svcHeaders({ 'Prefer': 'resolution=merge-duplicates' }),
+        body: JSON.stringify([{ contact_id: Number(cid) || cid, email: email, created_at: new Date().toISOString() }])
+      });
+      await fetch(`${SUPA_URL}/rest/v1/enrollments?contactId=eq.` + encodeURIComponent(cid) + `&status=eq.active`, {
+        method: 'PATCH', headers: svcHeaders({ 'Prefer': 'return=minimal' }),
+        body: JSON.stringify({ status: 'stopped', nextSendAt: null })
+      });
+      return res.status(200).send(unsubPage('Unsubscribed',
+        (email ? email.replace(/[<>&]/g, '') + ' ' : 'You ')
+        + 'will no longer receive our marketing emails. If this was a mistake, reply to any of our emails and we\'ll add you back.',
+        'You\'re unsubscribed.'));
+    } catch (e) {
+      return res.status(500).send(unsubPage('Unsubscribe',
+        'Something went wrong on our end. Please reply to one of our emails to be removed and we\'ll take care of it.'));
+    }
+  }
+
   // Fail closed: never sign/verify tokens without a real secret configured.
   if (!SECRET) return res.status(500).json({ ok: false, error: 'server_misconfigured' });
 
@@ -157,6 +195,26 @@ async function supa(path) {
   if (!r.ok) throw new Error(`Supabase ${path}: ${r.status} ${text}`);
   if (!text || text === 'null') return [];
   try { return JSON.parse(text); } catch (e) { throw new Error(`JSON parse failed: ${text.slice(0, 100)}`); }
+}
+
+// Service-key headers for writes (unsubscribe records the opt-out + stops enrollments).
+function svcHeaders(extra) {
+  return Object.assign({ apikey: SUPA_SERVICE_KEY, Authorization: `Bearer ${SUPA_SERVICE_KEY}`, 'Content-Type': 'application/json' }, extra || {});
+}
+// Unsubscribe token — MUST match api/run-drips.js (same secret + scheme).
+function unsubToken(cid) {
+  return crypto.createHmac('sha256', process.env.UNSUB_SECRET || SUPA_SERVICE_KEY)
+    .update('unsub:' + String(cid)).digest('hex').slice(0, 32);
+}
+function unsubPage(title, msg, heading) {
+  return '<!DOCTYPE html><html><head><meta charset="utf-8">'
+    + '<meta name="viewport" content="width=device-width, initial-scale=1"><title>' + title + '</title></head>'
+    + '<body style="font-family:-apple-system,\'Segoe UI\',Arial,sans-serif;background:#f4f4f4;margin:0;padding:0;">'
+    + '<div style="max-width:520px;margin:48px auto;background:#fff;border-radius:12px;padding:36px 32px;box-shadow:0 2px 14px rgba(0,0,0,0.08);text-align:center;">'
+    + '<div style="color:#c9a84c;font-size:22px;font-weight:700;margin-bottom:12px;">Palacios Baker Real Estate</div>'
+    + (heading ? '<p style="color:#333;font-size:17px;margin-bottom:8px;font-weight:600;">' + heading + '</p>' : '')
+    + '<p style="color:#666;font-size:15px;line-height:1.5;">' + msg + '</p>'
+    + '</div></body></html>';
 }
 
 // ── Send the magic-link email via a connected Gmail account ──────────────────

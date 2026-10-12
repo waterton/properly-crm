@@ -32,7 +32,9 @@ function unsubToken(contactId) {
     .update('unsub:' + String(contactId)).digest('hex').slice(0, 32);
 }
 function unsubUrl(contactId) {
-  return SITE_URL + '/api/unsubscribe?c=' + encodeURIComponent(contactId) + '&t=' + unsubToken(contactId);
+  // Unsubscribe is handled inside /api/portal (action=unsubscribe) to stay under
+  // the serverless-function limit; the token scheme matches portal.js exactly.
+  return SITE_URL + '/api/portal?action=unsubscribe&c=' + encodeURIComponent(contactId) + '&t=' + unsubToken(contactId);
 }
 // Put a working unsubscribe link in every marketing email. If the design uses a
 // {{unsubscribe}} tag we swap the URL in there; otherwise we append a small
