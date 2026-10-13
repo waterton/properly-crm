@@ -146,7 +146,7 @@
         <div id="globalSearchResults" style="display:none;position:fixed;top:52px;right:12px;width:min(460px,92vw);max-height:74vh;overflow:auto;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:0 10px 34px rgba(0,0,0,0.45);z-index:1200;padding:6px;"></div>
         <button class="btn btn-p" id="btnAdd" style="display:none;">+ Add</button>
         <button id="themeToggle" title="Theme" style="background:none;border:none;cursor:pointer;font-size:17px;line-height:1;padding:4px 6px;border-radius:6px;">☀️</button>
-        <div style="font-size:11px;color:var(--text3);margin-right:4px;">v19.7</div>
+        <div style="font-size:11px;color:var(--text3);margin-right:4px;">v19.8</div>
         <div class="topbar-user" id="topbarUser" title="Click to sign out" style="cursor:pointer;position:relative;" id="topbarUserBtn">RE</div>
       </div>
     </div>
@@ -1065,7 +1065,7 @@
         <button class="btn btn-g" id="btnAddStep" style="padding:5px 11px;font-size:16px;">+ Add Step</button>
       </div>
       <div id="campStepsWrap"></div>
-      <div style="font-size:14px;color:var(--text3);margin-top:10px;line-height:1.5;">Merge tags: <b style="color:var(--accent);">{{first}}</b> <b style="color:var(--accent);">{{last}}</b> <b style="color:var(--accent);">{{property}}</b> <b style="color:var(--accent);">{{agent}}</b> <b style="color:var(--accent);">{{price}}</b></div>
+      <div style="font-size:14px;color:var(--text3);margin-top:10px;line-height:1.5;">Use the <b style="color:var(--accent);">Personalize</b> buttons under each step to drop in a contact's name, property, or price — those are filled in automatically with the real details when the email sends.</div>
     </div>
     <div class="mftr"><button class="btn btn-g" data-close="campaignModal">Cancel</button><button class="btn btn-p" id="btnSaveCampaign">Save Campaign</button></div>
   </div>
@@ -1090,9 +1090,9 @@
         <div class="fg" style="flex:2;"><label class="fl">Message name <span style="color:var(--text3);font-weight:400;">(internal label)</span></label><input class="fi" id="msgName" placeholder="Past-client check-in"></div>
         <div class="fg"><label class="fl">Status</label><select class="fsel" id="msgActive"><option value="true">Active</option><option value="false">Archived</option></select></div>
       </div>
-      <div class="fg"><label class="fl">Subject line</label><input class="fi" id="msgSubject" placeholder="Hi {{first}}, a quick thought on your home"></div>
-      <div class="fg"><label class="fl">Email HTML <span style="color:var(--text3);font-weight:400;">(paste the finished email; images may be embedded as base64 &mdash; they'll display in every mail app)</span></label>
-        <textarea class="fi" id="msgHtml" rows="10" style="font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;" placeholder="<!-- paste the finished HTML email here --></table>"></textarea>
+      <div class="fg"><label class="fl">Subject line</label><input class="fi" id="msgSubject" placeholder="Subject line"></div>
+      <div class="fg"><label class="fl">Email content <span style="color:var(--text3);font-weight:400;">(paste your finished email here; if it has images, they'll show up correctly when it's sent)</span></label>
+        <textarea class="fi" id="msgHtml" rows="10" style="font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;" placeholder="Paste your finished email here…"></textarea>
       </div>
       <div style="display:flex;align-items:center;justify-content:space-between;margin:4px 0 6px;">
         <label class="fl" style="margin:0;">Live preview</label>
@@ -1255,6 +1255,6 @@
 </div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="app.js?v=20261013a"></script>
+<script src="app.js?v=20261013b"></script>
 </body>
 </html>

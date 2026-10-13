@@ -66,6 +66,7 @@ function postApi(path, bodyObj){
 var C=[],N=[],F=[],D=[],TX=[],TM=[],A=[],curDet=null,curFilter='all',curPage='dashboard';
 var CAMP=[],ENR=[],SENDLOG=[],DOCS=[];
 var DMSG=[]; // drip_messages: reusable, fully-designed marketing emails (subject + HTML w/ embedded images)
+var SCTRL=null; // in-memory copy of Sending Controls (settings.sending_controls) so the UI can explain why a drip is/ isn't sending
 var CH=[]; // tx_changes: audit trail of field changes applied from scanned documents
 var RS=[]; // reminder_settings: how many days before each deadline type to remind (cron reads these)
 var RL=[]; // reminder_log: which reminders the cron has already sent (used to hide sent personal reminders)
@@ -10812,9 +10813,11 @@ async function loadSendingControls(){
   try{
     var headers = await getAuthHeaders();
     var r = await fetch(SUPA_URL+'/rest/v1/settings?key=eq.sending_controls&select=value',{ headers: headers });
-    var text = await r.text(); if(!text) return;
-    var rows = JSON.parse(text); if(!rows.length) return;
+    var text = await r.text(); if(!text){ SCTRL = { master:false, drips:false, reminders:false, briefing:false, testMode:true, testEmail:'' }; return; }
+    var rows = JSON.parse(text);
+    if(!rows.length){ SCTRL = { master:false, drips:false, reminders:false, briefing:false, testMode:true, testEmail:'' }; return; }
     var v = rows[0].value||{};
+    SCTRL = v;
     if(ge('scMaster')) ge('scMaster').checked = !!v.master;
     if(ge('scReminders')) ge('scReminders').checked = !!v.reminders;
     if(ge('scDrips')) ge('scDrips').checked = !!v.drips;
@@ -10834,7 +10837,7 @@ async function saveSendingControls(){
   try{
     var headers = await getAuthHeaders({'Prefer':'resolution=merge-duplicates'});
     var r = await fetch(SUPA_URL+'/rest/v1/settings',{ method:'POST', headers: headers, body: JSON.stringify({ key:'sending_controls', value: val }) });
-    if(r.ok){ ge('sendingControlsStatus').textContent='Saved!'; setTimeout(function(){ ge('sendingControlsStatus').textContent=''; },3000); }
+    if(r.ok){ SCTRL = val; ge('sendingControlsStatus').textContent='Saved!'; setTimeout(function(){ ge('sendingControlsStatus').textContent=''; },3000); if(curPage==='drips') renderEnrollmentList(); }
     else { alert('Save failed: '+(await r.text())); }
   }catch(e){ alert('Save failed: '+e.message); }
 }
@@ -11441,8 +11444,58 @@ function _dripFireStep_DISABLED(enr){
 function stopEnrollment(id){
   var e = ENR.find(function(x){ return String(x.id)===String(id); });
   if(!e) return;
+  if(!confirm('Remove this enrollment? It will stop and drop off the list.')) return;
   e.status='stopped'; e.nextSendAt=null;
   dripSave('enrollments',[e]); renderDrips(); updateDripBadges();
+}
+
+// ---- enrollment management (edit a running enrollment) ----
+function _enrById(id){ return ENR.find(function(x){ return String(x.id)===String(id); }); }
+
+function restartEnrollment(id){
+  var e = _enrById(id); if(!e) return;
+  if(!confirm('Restart this enrollment from the first email?')) return;
+  e.stepIndex = 0; e.status = 'active'; e.nextSendAt = new Date().toISOString();
+  dripSave('enrollments',[e]); renderDrips(); updateDripBadges();
+}
+
+function setEnrollmentStep(id, idx){
+  var e = _enrById(id); if(!e) return;
+  var camp = CAMP.find(function(x){ return String(x.id)===String(e.campaignId); });
+  var total = (camp&&camp.steps)?camp.steps.length:0;
+  idx = parseInt(idx); if(isNaN(idx)||idx<0||idx>=total) return;
+  e.stepIndex = idx; e.status='active'; e.nextSendAt = new Date().toISOString();
+  dripSave('enrollments',[e]); renderDrips(); updateDripBadges();
+}
+
+function rescheduleEnrollment(id, dateStr){
+  var e = _enrById(id); if(!e || !dateStr) return;
+  // dateStr is YYYY-MM-DD from a date input; schedule for the start of that day.
+  e.nextSendAt = new Date(dateStr + 'T00:00:00').toISOString();
+  e.status = 'active';
+  dripSave('enrollments',[e]); renderDrips(); updateDripBadges();
+}
+
+function pauseEnrollment(id){
+  var e = _enrById(id); if(!e) return;
+  e.status = 'paused';
+  dripSave('enrollments',[e]); renderDrips(); updateDripBadges();
+}
+function resumeEnrollment(id){
+  var e = _enrById(id); if(!e) return;
+  e.status = 'active';
+  if(!e.nextSendAt) e.nextSendAt = new Date().toISOString();
+  dripSave('enrollments',[e]); renderDrips(); updateDripBadges();
+}
+
+function sendEnrollmentNow(id){
+  var e = _enrById(id); if(!e) return;
+  if(SCTRL && (!SCTRL.master || !SCTRL.drips)){
+    if(!confirm('Sending is turned off in Sending Controls, so nothing will go out.\n\nTurn it on first (Settings → Sending Controls), then use Send now. Continue anyway?')) return;
+  }
+  e.status='active'; e.nextSendAt = new Date().toISOString();
+  dripSave('enrollments',[e]);
+  if(typeof runDripsNow==='function') runDripsNow(); else renderDrips();
 }
 
 // ---- badges ----
@@ -11609,28 +11662,90 @@ function renderCampaignList(){
   });
 }
 
+// Explain, in plain language, whether a drip will actually send right now -
+// and if not, why. Returns {text, color} or null when everything's clear.
+function enrollmentSendNote(e){
+  if(e.status==='paused') return { text:'Paused by you — won\'t send until you resume', color:'var(--accent)' };
+  if(SCTRL){
+    if(!SCTRL.master) return { text:'Sending is turned OFF (master switch) — nothing will send. Turn it on in Settings → Sending Controls.', color:'var(--danger)' };
+    if(!SCTRL.drips)  return { text:'Drip sending is turned OFF — turn on "Drips" in Settings → Sending Controls.', color:'var(--danger)' };
+    if(SCTRL.testMode) return { text:'Test mode is ON — this will go to your test address ('+(SCTRL.testEmail||'not set')+'), not the real contact.', color:'var(--accent)' };
+  }
+  return null;
+}
+
 function renderEnrollmentList(){
   var wrap = ge('dripEnrollmentList'); if(!wrap) return;
   wrap.textContent='';
-  var active = ENR.filter(function(e){ return e.status==='active'; });
-  if(!active.length){
+  // Show both active and paused so a paused one can be resumed.
+  var list = ENR.filter(function(e){ return e.status==='active' || e.status==='paused'; });
+  if(!list.length){
     wrap.appendChild(mkDiv('font-size:16px;color:var(--text3);padding:20px;text-align:center;','No active enrollments.'));
     return;
   }
-  active.sort(function(a,b){ return new Date(a.nextSendAt||0)-new Date(b.nextSendAt||0); });
-  active.forEach(function(e){
+  list.sort(function(a,b){ return new Date(a.nextSendAt||0)-new Date(b.nextSendAt||0); });
+  list.forEach(function(e){
     var camp = CAMP.find(function(x){ return String(x.id)===String(e.campaignId); });
     var c = gc(typeof e.contactId==='string'?(parseInt(e.contactId)||e.contactId):e.contactId);
-    var row = mkRow('li'); row.style.cssText='align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);';
-    var info = mkDiv('flex:1;');
-    info.appendChild(mkDiv('font-size:17px;font-weight:600;color:var(--text);', (c?fn(c):'Unknown contact')));
     var total = camp&&camp.steps?camp.steps.length:0;
+
+    var row = mkDiv('padding:14px 0;border-bottom:1px solid var(--border);');
+
+    // Line 1: name + campaign/step/next
+    var top = mkDiv('display:flex;align-items:center;gap:12px;');
+    var info = mkDiv('flex:1;min-width:0;');
+    info.appendChild(mkDiv('font-size:17px;font-weight:600;color:var(--text);', (c?fn(c):'Unknown contact')+(e.status==='paused'?'  ·  paused':'')));
     var when = e.nextSendAt ? fmtDripWhen(e.nextSendAt) : '-';
-    info.appendChild(mkDiv('font-size:15px;color:var(--text3);margin-top:3px;', (camp?camp.name:'(deleted)')+'  -  step '+(e.stepIndex+1)+' of '+total+'  -  next: '+when));
-    row.appendChild(info);
-    var bStop = mkBtnEl('btn btn-g','Stop','padding:5px 11px;font-size:15px;color:var(--danger);');
-    (function(id){ bStop.addEventListener('click', function(){ stopEnrollment(id); }); })(e.id);
-    row.appendChild(bStop);
+    info.appendChild(mkDiv('font-size:15px;color:var(--text3);margin-top:3px;', (camp?camp.name:'(deleted campaign)')+'  ·  step '+(e.stepIndex+1)+' of '+total+'  ·  next: '+when));
+    top.appendChild(info);
+    row.appendChild(top);
+
+    // Line 2: honest "why it is / isn't sending" note
+    var note = enrollmentSendNote(e);
+    if(note) row.appendChild(mkDiv('font-size:14px;margin-top:6px;color:'+note.color+';', note.text));
+
+    // Line 3: management controls
+    var ctrls = mkDiv('display:flex;flex-wrap:wrap;gap:7px;align-items:center;margin-top:10px;');
+
+    // Jump to step
+    if(total>1){
+      var sel = document.createElement('select'); sel.className='fsel'; sel.style.cssText='width:auto;padding:4px 8px;font-size:14px;';
+      for(var i=0;i<total;i++){ var o=document.createElement('option'); o.value=String(i); o.textContent='Step '+(i+1); if(i===e.stepIndex)o.selected=true; sel.appendChild(o); }
+      (function(id){ sel.addEventListener('change', function(){ setEnrollmentStep(id, this.value); }); })(e.id);
+      var jumpWrap = mkDiv('display:flex;align-items:center;gap:5px;'); jumpWrap.appendChild(mkDiv('font-size:13px;color:var(--text3);','Jump to:')); jumpWrap.appendChild(sel);
+      ctrls.appendChild(jumpWrap);
+    }
+
+    // Reschedule next send
+    var dateInp = document.createElement('input'); dateInp.type='date'; dateInp.className='fi'; dateInp.style.cssText='width:auto;padding:4px 8px;font-size:14px;';
+    if(e.nextSendAt){ try{ dateInp.value = new Date(e.nextSendAt).toISOString().slice(0,10); }catch(x){} }
+    (function(id){ dateInp.addEventListener('change', function(){ rescheduleEnrollment(id, this.value); }); })(e.id);
+    var dWrap = mkDiv('display:flex;align-items:center;gap:5px;'); dWrap.appendChild(mkDiv('font-size:13px;color:var(--text3);','Next:')); dWrap.appendChild(dateInp);
+    ctrls.appendChild(dWrap);
+
+    var bSend = mkBtnEl('btn btn-p','Send now','padding:5px 11px;font-size:14px;');
+    (function(id){ bSend.addEventListener('click', function(){ sendEnrollmentNow(id); }); })(e.id);
+    ctrls.appendChild(bSend);
+
+    var bRestart = mkBtnEl('btn btn-g','Restart','padding:5px 11px;font-size:14px;');
+    (function(id){ bRestart.addEventListener('click', function(){ restartEnrollment(id); }); })(e.id);
+    ctrls.appendChild(bRestart);
+
+    if(e.status==='paused'){
+      var bResume = mkBtnEl('btn btn-g','Resume','padding:5px 11px;font-size:14px;');
+      (function(id){ bResume.addEventListener('click', function(){ resumeEnrollment(id); }); })(e.id);
+      ctrls.appendChild(bResume);
+    } else {
+      var bPause = mkBtnEl('btn btn-g','Pause','padding:5px 11px;font-size:14px;');
+      (function(id){ bPause.addEventListener('click', function(){ pauseEnrollment(id); }); })(e.id);
+      ctrls.appendChild(bPause);
+    }
+
+    var bRemove = mkBtnEl('btn btn-g','Remove','padding:5px 11px;font-size:14px;color:var(--danger);');
+    (function(id){ bRemove.addEventListener('click', function(){ stopEnrollment(id); }); })(e.id);
+    ctrls.appendChild(bRemove);
+
+    row.appendChild(ctrls);
     wrap.appendChild(row);
   });
 }
@@ -11702,13 +11817,37 @@ function buildStepRow(step, idx){
 
   var subjFg = mkDiv('margin-bottom:8px;');
   var subjLbl = document.createElement('label'); subjLbl.className='fl'; subjLbl.textContent='Subject';
-  var subjInp = document.createElement('input'); subjInp.className='fi drip-step-subject'; subjInp.placeholder='Hi {{first}}, following up'; subjInp.value=step.subject||'';
+  var subjInp = document.createElement('input'); subjInp.className='fi drip-step-subject'; subjInp.placeholder='Subject line'; subjInp.value=step.subject||'';
   subjFg.appendChild(subjLbl); subjFg.appendChild(subjInp); box.appendChild(subjFg);
 
   var bodyFg = mkDiv('');
-  var bodyLbl = document.createElement('label'); bodyLbl.className='fl'; bodyLbl.textContent='Body';
-  var bodyTA = document.createElement('textarea'); bodyTA.className='fi drip-step-body'; bodyTA.rows=5; bodyTA.placeholder='Hi {{first}},\n\nThanks for your interest in {{property}}...\n\n- {{agent}}'; bodyTA.value=step.body||'';
+  var bodyLbl = document.createElement('label'); bodyLbl.className='fl'; bodyLbl.textContent='Message';
+  var bodyTA = document.createElement('textarea'); bodyTA.className='fi drip-step-body'; bodyTA.rows=5; bodyTA.placeholder='Write your email here…'; bodyTA.value=step.body||'';
   bodyFg.appendChild(bodyLbl); bodyFg.appendChild(bodyTA); box.appendChild(bodyFg);
+
+  // Personalize helper: plain-language buttons that drop a merge field into
+  // whichever box (subject or message) you last clicked in. No need to know the
+  // {{...}} syntax. The field is replaced with the contact's real details when sent.
+  var lastField = bodyTA;
+  subjInp.addEventListener('focus', function(){ lastField = subjInp; });
+  bodyTA.addEventListener('focus', function(){ lastField = bodyTA; });
+  function insertField(tag){
+    var el = lastField || bodyTA;
+    if(el.disabled) return;
+    var s = el.selectionStart!=null ? el.selectionStart : el.value.length;
+    var e = el.selectionEnd!=null ? el.selectionEnd : el.value.length;
+    el.value = el.value.slice(0,s) + tag + el.value.slice(e);
+    var pos = s + tag.length; el.focus(); try{ el.setSelectionRange(pos,pos); }catch(x){}
+  }
+  var pz = mkDiv('display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:8px;');
+  pz.appendChild(mkDiv('font-size:13px;color:var(--text3);','Personalize:'));
+  [['First name','{{first}}'],['Last name','{{last}}'],['Property','{{property}}'],['Price','{{price}}'],['Your name','{{agent}}']].forEach(function(pair){
+    var b = mkBtnEl('btn btn-g','+ '+pair[0],'padding:3px 9px;font-size:13px;');
+    b.type='button';
+    b.addEventListener('click', function(){ insertField(pair[1]); });
+    pz.appendChild(b);
+  });
+  box.appendChild(pz);
 
   // When a library message is chosen, grey out the custom fields so it's clear
   // they won't be used.
@@ -11716,6 +11855,7 @@ function buildStepRow(step, idx){
     var usingLib = !!msgSel.value;
     subjFg.style.opacity = usingLib ? '0.4' : '1';
     bodyFg.style.opacity = usingLib ? '0.4' : '1';
+    pz.style.display = usingLib ? 'none' : 'flex';
     subjInp.disabled = usingLib; bodyTA.disabled = usingLib;
     subjLbl.textContent = usingLib ? 'Subject (from library message)' : 'Subject';
   }
