@@ -1,5 +1,8 @@
 {
   "rewrites": [
+    { "source": "/api/geocode", "destination": "/api/tools?action=geocode" },
+    { "source": "/api/send-csv", "destination": "/api/tools?action=send-csv" },
+    { "source": "/api/rental-sheet", "destination": "/api/tools?action=rental-sheet" },
     { "source": "/portal", "destination": "/portal.html" },
     { "source": "/((?!api/|portal).*)", "destination": "/index.html" }
   ],
