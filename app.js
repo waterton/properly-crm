@@ -13232,11 +13232,56 @@ function dsTitlePolicy(price){ if(price<=0) return 0; var fee=0; for(var i=0;i<D
 function dsDaysInYear(y){ return Math.round((new Date(y,11,31)-new Date(y,0,1))/86400000)+1; }
 function dsDayOfYear(d){ return Math.round((d-new Date(d.getFullYear(),0,1))/86400000)+1; }
 function dsScenarioDefault(){ return { salesPrice:'', mtg1:'', mtg2:'', otherLiens:'', commissionPct:5, otherFees:'', homeWarranty:'', utilities:'', concessions:'', otherLabel:'Other', otherAmount:'' }; }
-function dsDefault(){ return { id: Date.now()+Math.floor(Math.random()*100000), contact_id:null, name:'',
-  data:{ seller:'', address:'', annualTaxes:'', hoaFees:'', closingDate:'',
-    agent:'Elda Palacios Baker & Randy Baker', agentPhone:'801-706-3806 & 801-910-2296',
-    brokerage:'Wise Choice Real Estate', brokerageAddr:'193 E Fort Union Blvd #202, Midvale, UT 84047', email:'eldarealtor@gmail.com & randyknowsutah@gmail.com',
-    scenarios:[ dsScenarioDefault(), dsScenarioDefault() ] } }; }
+// Seller-financing scenario carries the carry-back terms on top of the usual cost fields.
+function dsSellerScenarioDefault(saleType, downPct, rate, amortY, balloonY){
+  return { saleType:saleType||'Seller Financed', salesPrice:'',
+    downPct:(downPct!=null?downPct:50), noteRate:(rate!=null?rate:7),
+    amortYears:(amortY!=null?amortY:30), balloonYears:(balloonY!=null?balloonY:5),
+    mtg1:'', mtg2:'', otherLiens:'', commissionPct:5, otherFees:'', homeWarranty:'', utilities:'', concessions:'',
+    notePrep:'', secureStorage:'', otherLabel:'Other', otherAmount:'' }; }
+function dsDefault(type){
+  type = type || 'conventional';
+  return { id: Date.now()+Math.floor(Math.random()*100000), contact_id:null, name:'',
+    data:{ sheetType:type, seller:'', address:'', annualTaxes:'', hoaFees:'', closingDate:'',
+      agent:'Elda Palacios Baker & Randy Baker', agentPhone:'801-706-3806 & 801-910-2296',
+      brokerage:'Wise Choice Real Estate', brokerageAddr:'193 E Fort Union Blvd #202, Midvale, UT 84047', email:'eldarealtor@gmail.com & randyknowsutah@gmail.com',
+      scenarios:( type==='seller_finance'
+        ? [ dsSellerScenarioDefault('Seller Financed',50,7,30,5), dsSellerScenarioDefault('Cash Sale',100,0,0,0) ]
+        : [ dsScenarioDefault(), dsScenarioDefault() ] ) } }; }
+
+// Per-scenario figures for a SELLER-FINANCING sheet (amortized carry-back + balloon).
+// Net at closing uses the DOWN PAYMENT as cash in (the note is received over time),
+// so it can be negative when the down payment doesn't cover payoffs + costs.
+function dsComputeSeller(sh){
+  var d=sh.data||{}; var annualTax=dsNum(d.annualTaxes), hoaMonthly=dsNum(d.hoaFees);
+  var cd=d.closingDate? new Date(d.closingDate+'T00:00:00'):null; if(cd&&isNaN(cd.getTime()))cd=null;
+  var rows=(d.scenarios||[]).map(function(s){
+    var price=dsNum(s.salesPrice); var r={price:price};
+    var downPct=dsNum(s.downPct); var downAmt=price>0? price*downPct/100 : 0;
+    var note=price>0? Math.max(0, price-downAmt) : 0;
+    var rate=dsNum(s.noteRate), amortY=dsNum(s.amortYears), balloonY=dsNum(s.balloonYears);
+    var mr=rate/100/12, n=amortY*12;
+    var pmt = (note>0 && n>0) ? (mr>0 ? note*mr/(1-Math.pow(1+mr,-n)) : note/n) : 0;
+    var bm = balloonY*12;
+    var balloon = (note>0 && bm>0) ? (mr>0 ? note*Math.pow(1+mr,bm)-pmt*((Math.pow(1+mr,bm)-1)/mr) : note-pmt*bm) : 0;
+    if(balloon<0) balloon=0;
+    var totalPI = pmt*bm;
+    var interest = totalPI - (note - balloon);
+    var commission = price>0? price*(dsNum(s.commissionPct)/100):0;
+    var proTax=0, proHOA=0;
+    if(price>0 && cd){ var y=cd.getFullYear(); proTax=annualTax/dsDaysInYear(y)*dsDayOfYear(cd); proHOA=hoaMonthly>0?(hoaMonthly/new Date(y,cd.getMonth()+1,0).getDate())*cd.getDate():0; }
+    var settlement=price>0?400:0; var title=price>0?dsTitlePolicy(price):0; var recon=price>0?(95+(dsNum(s.mtg2)>0?75:0)):0; var secure=dsNum(s.secureStorage);
+    var costs=dsNum(s.mtg1)+dsNum(s.mtg2)+dsNum(s.otherLiens)+commission+dsNum(s.otherFees)+proTax+proHOA+settlement+title+recon+secure+dsNum(s.homeWarranty)+dsNum(s.utilities)+dsNum(s.concessions)+dsNum(s.notePrep)+dsNum(s.otherAmount);
+    var netClose = price>0 ? downAmt-costs : 0;
+    var totalCash = price>0 ? netClose + totalPI + balloon : 0;
+    r.downAmt=downAmt; r.note=note; r.pmt=pmt; r.balloonMonths=bm; r.balloon=balloon; r.totalPI=totalPI; r.interest=interest;
+    r.commission=commission; r.proTax=proTax; r.proHOA=proHOA; r.settlement=settlement; r.title=title; r.recon=recon; r.secure=secure;
+    r.costs=costs; r.netClose=netClose; r.totalCash=totalCash;
+    return r;
+  });
+  if(rows.length>=2){ rows[0].diff=rows[0].totalCash-rows[1].totalCash; rows[1].diff=rows[1].totalCash-rows[0].totalCash; }
+  return rows;
+}
 // Per-scenario calculated figures (mirrors the Excel formulas exactly).
 function dsCompute(sh){
   var d=sh.data||{}; var annualTax=dsNum(d.annualTaxes), hoaMonthly=dsNum(d.hoaFees);
@@ -13288,14 +13333,22 @@ function renderDealSheets(){
   _dsStyle(); var root=ge('dsRoot'); if(!root) return; root.innerHTML=''; _dsCur=null;
   var bar=document.createElement('div'); bar.style.cssText='display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;';
   bar.appendChild(mkDivSafe('font-size:22px;font-weight:600;','Seller Net Sheets'));
-  var nb=document.createElement('button'); nb.className='dsbtn'; nb.textContent='+ New sheet'; nb.addEventListener('click',function(){ openDealSheet(dsDefault(), true); });
-  bar.appendChild(nb); root.appendChild(bar);
+  var nbWrap=document.createElement('div'); nbWrap.style.cssText='position:relative;';
+  var nb=document.createElement('button'); nb.className='dsbtn'; nb.textContent='+ New sheet';
+  var menu=document.createElement('div'); menu.style.cssText='display:none;position:absolute;right:0;top:112%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px;z-index:40;min-width:240px;box-shadow:0 8px 22px rgba(0,0,0,.28);';
+  function mkOpt(label, type){ var b=document.createElement('button'); b.className='dsbtn g'; b.style.cssText='display:block;width:100%;text-align:left;margin:3px 0;'; b.textContent=label; b.addEventListener('click',function(e){ e.stopPropagation(); menu.style.display='none'; openDealSheet(dsDefault(type), true); }); return b; }
+  menu.appendChild(mkOpt('Conventional / FHA net sheet','conventional'));
+  menu.appendChild(mkOpt('Seller financing net sheet','seller_finance'));
+  nb.addEventListener('click',function(e){ e.stopPropagation(); menu.style.display = (menu.style.display==='none'?'block':'none'); });
+  nbWrap.appendChild(nb); nbWrap.appendChild(menu);
+  bar.appendChild(nbWrap); root.appendChild(bar);
   if(!DSHEET.length){ root.appendChild(mkDivSafe('color:var(--text3);padding:20px 0;','No saved sheets yet. Create one, fill it in, and export a PDF to send your client.')); return; }
   var list=document.createElement('div'); list.style.cssText='display:flex;flex-direction:column;gap:8px;';
   DSHEET.slice().sort(function(a,b){ return String(b.updated_at||'').localeCompare(String(a.updated_at||'')); }).forEach(function(sh){
     var c=gc(sh.contact_id);
     var row=document.createElement('div'); row.style.cssText='display:flex;justify-content:space-between;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 14px;cursor:pointer;';
-    row.innerHTML='<div><div style="font-weight:600;">'+_esc(sh.name||(sh.data&&sh.data.address)||'Untitled sheet')+'</div><div style="font-size:12px;color:var(--text3);">'+_esc((c?fn(c):(sh.data&&sh.data.seller)||'')+(sh.updated_at?(' · updated '+fd(sh.updated_at)):''))+'</div></div>';
+    var typeLbl=(sh.data&&sh.data.sheetType==='seller_finance')?'Seller financing':'Conventional / FHA';
+    row.innerHTML='<div><div style="font-weight:600;">'+_esc(sh.name||(sh.data&&sh.data.address)||'Untitled sheet')+' <span style="font-size:11px;font-weight:600;color:var(--accent);border:1px solid var(--accent);border-radius:10px;padding:1px 8px;margin-left:6px;">'+_esc(typeLbl)+'</span></div><div style="font-size:12px;color:var(--text3);">'+_esc((c?fn(c):(sh.data&&sh.data.seller)||'')+(sh.updated_at?(' · updated '+fd(sh.updated_at)):''))+'</div></div>';
     var del=document.createElement('button'); del.className='dsbtn g'; del.style.cssText='font-size:12px;padding:3px 9px;'; del.textContent='Delete';
     (function(id){ del.addEventListener('click',function(e){ e.stopPropagation(); if(confirm('Delete this sheet?')){ delDealSheet(id); renderDealSheets(); } }); })(sh.id);
     row.addEventListener('click',function(){ openDealSheet(sh, false); });
@@ -13304,6 +13357,7 @@ function renderDealSheets(){
   root.appendChild(list);
 }
 function openDealSheet(sh, isNew){
+  if(sh && sh.data && sh.data.sheetType==='seller_finance'){ return openDealSheetSeller(sh, isNew); }
   _dsStyle(); _dsCur=sh; var root=ge('dsRoot'); if(!root) return; root.innerHTML='';
   var d=sh.data; d.scenarios = d.scenarios && d.scenarios.length ? d.scenarios : [dsScenarioDefault(),dsScenarioDefault()];
   // Toolbar
@@ -13400,6 +13454,141 @@ function dsRefresh(sh){
     set('title',dsM(r.title)); set('recon',dsM(r.recon)); set('secure',dsM(r.secure));
     var cs=ge('ds_c'+idx+'_commission'); if(cs) cs.textContent = r.price>0 ? dsM(r.commission) : '';
     var nt=ge('ds_c'+idx+'_net'); if(nt) nt.textContent = r.price>0 ? dsM(r.net) : '';
+  });
+}
+
+// ---- SELLER FINANCING net sheet ----
+function openDealSheetSeller(sh, isNew){
+  _dsStyle(); _dsCur=sh; var root=ge('dsRoot'); if(!root) return; root.innerHTML='';
+  var d=sh.data;
+  d.scenarios = (d.scenarios && d.scenarios.length) ? d.scenarios
+    : [ dsSellerScenarioDefault('Seller Financed',50,7,30,5), dsSellerScenarioDefault('Cash Sale',100,0,0,0) ];
+
+  // Toolbar (same as the conventional sheet).
+  var tb=document.createElement('div'); tb.style.cssText='display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;';
+  var back=document.createElement('button'); back.className='dsbtn g'; back.textContent='‹ Back'; back.addEventListener('click',renderDealSheets); tb.appendChild(back);
+  var cWrap=document.createElement('div'); cWrap.style.cssText='min-width:240px;'; tb.appendChild(cWrap);
+  var picker=buildContactPicker(cWrap,'ds_client_sf','Load client (search name / address)…',function(){
+    var id=picker.hidden.value; if(!id) return; var c=gc(parseInt(id)); if(!c) return;
+    sh.contact_id=parseInt(id); d.seller=fn(c); d.address=c.property||c.address||d.address;
+    if(!sh.name) sh.name=d.address||d.seller;
+    openDealSheetSeller(sh,isNew);
+  });
+  var saveB=document.createElement('button'); saveB.className='dsbtn'; saveB.textContent='Save'; saveB.addEventListener('click',function(){
+    if(!sh.name) sh.name=d.address||d.seller||'Seller Financing Net Sheet';
+    if(!DSHEET.some(function(x){return String(x.id)===String(sh.id);})) DSHEET.push(sh);
+    saveDealSheet(sh); saveB.textContent='Saved ✓'; setTimeout(function(){saveB.textContent='Save';},1500);
+  }); tb.appendChild(saveB);
+  var pdfB=document.createElement('button'); pdfB.className='dsbtn'; pdfB.textContent='Export PDF'; pdfB.addEventListener('click',function(){ dsExportPDF(sh, pdfB); }); tb.appendChild(pdfB);
+  var pngB=document.createElement('button'); pngB.className='dsbtn g'; pngB.textContent='Save PNG'; pngB.addEventListener('click',function(){ dsExportPNG(sh, pngB); }); tb.appendChild(pngB);
+  root.appendChild(tb);
+
+  var sheet=document.createElement('div'); sheet.id='dsSheet';
+  var hdr=document.createElement('div'); hdr.className='ds-hdr';
+  hdr.innerHTML='<img class="l1" src="pbre-logo.png" alt="Palacios Baker Real Estate">'
+    +'<div class="ds-agent"><span class="nm">'+_esc(d.agent)+'</span>'+_esc(d.brokerage)+'<br>'+_esc(d.brokerageAddr||'')+'<br>'+_esc(d.agentPhone)+'<br>'+_esc(d.email)+'</div>'
+    +'<img class="l2" src="pbre-logo2.png" alt="">';
+  sheet.appendChild(hdr);
+  sheet.appendChild(mkDivSafe('','<div class="ds-title">Seller Financing Net Sheet</div>'));
+  sheet.appendChild(mkDivSafe('','<div class="ds-disc">This is an estimate. Payments shown are principal &amp; interest only, before income taxes. Replace sample terms with the negotiated terms. Installment-sale tax treatment varies — consult a CPA.</div>'));
+
+  function field(key, ph, type){ var i=document.createElement('input'); i.className='dsi'; i.type=type||'text'; i.value=(d[key]!=null?d[key]:''); if(ph)i.placeholder=ph; i.style.flex='1';
+    i.addEventListener('input',function(){ d[key]=i.value; dsRefreshSeller(sh); }); return i; }
+  function rowLbl(lbl, el, lbl2, el2){ var r=document.createElement('div'); r.className='ds-row'; var l=document.createElement('span'); l.className='ds-lbl'; l.textContent=lbl; l.style.minWidth='130px'; r.appendChild(l); if(el)r.appendChild(el);
+    if(lbl2){ var l2=document.createElement('span'); l2.className='ds-lbl'; l2.textContent=lbl2; l2.style.marginLeft='10px'; r.appendChild(l2);} if(el2)r.appendChild(el2); return r; }
+  sheet.appendChild(rowLbl('Seller:', field('seller','Seller name')));
+  sheet.appendChild(rowLbl('Property Address:', field('address','Property address')));
+  var taxI=field('annualTaxes','',''); taxI.style.maxWidth='120px'; var hoaI=field('hoaFees','',''); hoaI.style.maxWidth='120px';
+  sheet.appendChild(rowLbl('Annual Taxes:', taxI, 'HOA/Condo Fees (monthly):', hoaI));
+  var cdI=field('closingDate','','date'); cdI.style.maxWidth='170px';
+  sheet.appendChild(rowLbl('Est. Closing Date:', cdI));
+
+  var tbl=document.createElement('table'); tbl.className='ds-t';
+  function si(idx, key, w){ var i=document.createElement('input'); i.className='dsi'; i.type='text'; i.value=(d.scenarios[idx][key]!=null?d.scenarios[idx][key]:''); i.style.width=(w||90)+'px'; i.style.textAlign='center';
+    i.addEventListener('input',function(){ d.scenarios[idx][key]=i.value; dsRefreshSeller(sh); }); return i; }
+  function cid(idx,f){ return 'ds_c'+idx+'_'+f; }
+  function computedTd(idx,f){ var td=document.createElement('td'); td.className='c'; td.id=cid(idx,f); return td; }
+  function inputTd(el){ var td=document.createElement('td'); td.className='c'; td.appendChild(el); return td; }
+  function trLabel(lbl){ var tr=document.createElement('tr'); var td=document.createElement('td'); td.className='lbl'; td.textContent=lbl; tr.appendChild(td); return tr; }
+  function sectionRow(lbl){ var tr=document.createElement('tr'); var td=document.createElement('td'); td.colSpan=3; td.textContent=lbl; td.style.cssText='background:#eef2f8;font-weight:700;color:#1F497D;padding:6px 8px 6px 14px;font-size:12px;letter-spacing:.5px;'; tr.appendChild(td); tbl.appendChild(tr); }
+  function inputRow(lbl,key,w){ var tr=trLabel(lbl); tr.appendChild(inputTd(si(0,key,w))); tr.appendChild(inputTd(si(1,key,w))); tbl.appendChild(tr); }
+  function calcRow(lbl,f){ var tr=trLabel(lbl); tr.appendChild(computedTd(0,f)); tr.appendChild(computedTd(1,f)); tbl.appendChild(tr); }
+
+  var thr=document.createElement('tr'); thr.innerHTML='<td></td><td class="ds-scenhdr">SCENARIO 1</td><td class="ds-scenhdr">SCENARIO 2</td>'; tbl.appendChild(thr);
+  inputRow('Sale Type','saleType',120);
+  inputRow('Sales Price','salesPrice',110);
+  // Down payment %: input + computed $
+  (function(){ var tr=trLabel('Down Payment (%)');
+    function cell(idx){ var td=document.createElement('td'); td.className='c'; var pi=si(idx,'downPct',46); pi.style.width='46px';
+      var span=document.createElement('span'); span.id=cid(idx,'downAmt'); span.style.marginLeft='6px';
+      td.appendChild(pi); td.appendChild(document.createTextNode('% ')); td.appendChild(span); return td; }
+    tr.appendChild(cell(0)); tr.appendChild(cell(1)); tbl.appendChild(tr); })();
+  calcRow('Seller Carry-Back Note','note');
+  inputRow('Note Interest Rate (%)','noteRate',46);
+  inputRow('Amortization (years)','amortYears',46);
+  inputRow('Balloon Due (yrs, 0 = none)','balloonYears',46);
+
+  sectionRow('PAYOFFS & CLOSING COSTS');
+  inputRow('1st Mortgage Payoff','mtg1');
+  inputRow('2nd Mortgage Payoff','mtg2');
+  inputRow('Other Liens','otherLiens');
+  (function(){ var tr=trLabel('Listing Commission Fees');
+    function cell(idx){ var td=document.createElement('td'); td.className='c'; var pi=si(idx,'commissionPct',46); pi.style.width='46px';
+      var span=document.createElement('span'); span.id=cid(idx,'commission'); span.style.marginLeft='6px';
+      td.appendChild(pi); td.appendChild(document.createTextNode('% ')); td.appendChild(span); return td; }
+    tr.appendChild(cell(0)); tr.appendChild(cell(1)); tbl.appendChild(tr); })();
+  inputRow('Other Fees','otherFees');
+  calcRow('Prorated Taxes*','proTax');
+  calcRow('Prorated HOA/Condo Fees*','proHOA');
+  calcRow('Settlement/Closing Fee','settlement');
+  calcRow("Homeowner's Title Policy**",'title');
+  calcRow('Reconveyance Fee***','recon');
+  inputRow('Secure Document Storage','secureStorage');
+  inputRow('Home Warranty','homeWarranty');
+  inputRow('Utilities/Assessments','utilities');
+  inputRow('Seller Concessions','concessions');
+  inputRow('Note/Deed Prep & Servicing','notePrep');
+  (function(){ var tr=document.createElement('tr'); var td=document.createElement('td'); td.className='lbl';
+    var otherLbl=document.createElement('input'); otherLbl.className='dsi'; otherLbl.value=d.scenarios[0].otherLabel||'Other'; otherLbl.style.width='150px';
+    otherLbl.addEventListener('input',function(){ d.scenarios[0].otherLabel=otherLbl.value; d.scenarios[1].otherLabel=otherLbl.value; });
+    td.appendChild(document.createTextNode('Other - ')); td.appendChild(otherLbl); tr.appendChild(td);
+    tr.appendChild(inputTd(si(0,'otherAmount'))); tr.appendChild(inputTd(si(1,'otherAmount'))); tbl.appendChild(tr); })();
+  calcRow('Total Payoffs & Closing Costs','costs');
+  var ntr=document.createElement('tr'); ntr.className='ds-net'; var ntd=document.createElement('td'); ntd.className='lbl'; ntd.textContent='Estimated Net Cash to Seller at Closing'; ntr.appendChild(ntd);
+  ntr.appendChild(computedTd(0,'netClose')); ntr.appendChild(computedTd(1,'netClose')); tbl.appendChild(ntr);
+
+  sectionRow('SELLER FINANCING RESULTS');
+  calcRow('Monthly P&I Payment from Buyer','pmt');
+  calcRow('Payments Before Balloon (months)','balloonMonths');
+  calcRow('Balloon Payment Due','balloon');
+  calcRow('Total P&I Payments Received','totalPI');
+  calcRow('Total Interest Earned','interest');
+  var ttr=document.createElement('tr'); ttr.className='ds-net'; var ttd=document.createElement('td'); ttd.className='lbl'; ttd.textContent='Total Cash to Seller (Closing + Payments + Balloon)'; ttr.appendChild(ttd);
+  ttr.appendChild(computedTd(0,'totalCash')); ttr.appendChild(computedTd(1,'totalCash')); tbl.appendChild(ttr);
+  calcRow('Difference vs. Other Scenario','diff');
+
+  sheet.appendChild(tbl);
+  sheet.appendChild(mkDivSafe('','<div class="ds-foot">*Prorated taxes and/or HOA/Condo fees are assumed to be the seller’s responsibility unless otherwise specified.<br>**Title Policy is an Owner’s Policy based on the sales price.<br>*** Recon fees vary based on the actual number of liens to be released.<br>Net Cash at Closing is the down payment minus payoffs and closing costs — the carry-back note is received over time via payments and the balloon. It can be negative when the down payment doesn’t cover payoffs and closing costs.</div>'));
+  root.appendChild(sheet);
+  dsRefreshSeller(sh);
+}
+function dsRefreshSeller(sh){
+  var comp=dsComputeSeller(sh);
+  comp.forEach(function(r,idx){
+    var has=r.price>0;
+    function set(f,val){ var el=ge('ds_c'+idx+'_'+f); if(el) el.textContent = has ? val : ''; }
+    var da=ge('ds_c'+idx+'_downAmt'); if(da) da.textContent = has ? dsM(r.downAmt) : '';
+    var cm=ge('ds_c'+idx+'_commission'); if(cm) cm.textContent = has ? dsM(r.commission) : '';
+    set('note',dsM(r.note));
+    set('proTax',dsM(r.proTax)); set('proHOA',dsM(r.proHOA)); set('settlement',dsM(r.settlement));
+    set('title',dsM(r.title)); set('recon',dsM(r.recon));
+    set('costs',dsM(r.costs)); set('netClose',dsM(r.netClose));
+    set('pmt',dsM(r.pmt));
+    var bmel=ge('ds_c'+idx+'_balloonMonths'); if(bmel) bmel.textContent = has ? String(r.balloonMonths) : '';
+    set('balloon', r.balloon>0 ? dsM(r.balloon) : (has?'$0.00':''));
+    set('totalPI',dsM(r.totalPI)); set('interest',dsM(r.interest));
+    set('totalCash',dsM(r.totalCash));
+    var df=ge('ds_c'+idx+'_diff'); if(df) df.textContent = has ? ((r.diff>=0?'+':'')+dsM(r.diff)) : '';
   });
 }
 function dsLoadScript(src){ return new Promise(function(res,rej){ if(document.querySelector('script[src="'+src+'"]')){ res(); return; } var s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=rej; document.head.appendChild(s); }); }
