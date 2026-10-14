@@ -13237,6 +13237,9 @@ function dsSellerScenarioDefault(saleType, downPct, rate, amortY, balloonY){
   return { saleType:saleType||'Seller Financed', salesPrice:'',
     downPct:(downPct!=null?downPct:50), noteRate:(rate!=null?rate:7),
     amortYears:(amortY!=null?amortY:30), balloonYears:(balloonY!=null?balloonY:5),
+    escrowFromBuyer:'', hoaFromBuyer:'',
+    // Existing / underlying mortgage (seller's own loan) — informational disclosure.
+    exLender:'', exLoanType:'', exBalance:'', exRate:'', exPayment:'', exEscrow:'', exHOA:'', exTerm:'', exDueOnSale:'', exAtClosing:'',
     mtg1:'', mtg2:'', otherLiens:'', commissionPct:5, otherFees:'', homeWarranty:'', utilities:'', concessions:'',
     notePrep:'', secureStorage:'', otherLabel:'Other', otherAmount:'' }; }
 function dsDefault(type){
@@ -13517,16 +13520,26 @@ function openDealSheetSeller(sh, isNew){
   var thr=document.createElement('tr'); thr.innerHTML='<td></td><td class="ds-scenhdr">SCENARIO 1</td><td class="ds-scenhdr">SCENARIO 2</td>'; tbl.appendChild(thr);
   inputRow('Sale Type','saleType',120);
   inputRow('Sales Price','salesPrice',110);
-  // Down payment %: input + computed $
-  (function(){ var tr=trLabel('Down Payment (%)');
-    function cell(idx){ var td=document.createElement('td'); td.className='c'; var pi=si(idx,'downPct',46); pi.style.width='46px';
-      var span=document.createElement('span'); span.id=cid(idx,'downAmt'); span.style.marginLeft='6px';
-      td.appendChild(pi); td.appendChild(document.createTextNode('% ')); td.appendChild(span); return td; }
-    tr.appendChild(cell(0)); tr.appendChild(cell(1)); tbl.appendChild(tr); })();
+  inputRow('Down Payment (%)','downPct',46);
+  calcRow('Down Payment ($)','downAmt');
   calcRow('Seller Carry-Back Note','note');
   inputRow('Note Interest Rate (%)','noteRate',46);
   inputRow('Amortization (years)','amortYears',46);
   inputRow('Balloon Due (yrs, 0 = none)','balloonYears',46);
+  inputRow('Monthly Escrow from Buyer (Taxes, Ins., etc.)','escrowFromBuyer');
+  inputRow('Monthly HOA from Buyer','hoaFromBuyer');
+
+  sectionRow("EXISTING / UNDERLYING MORTGAGE (SELLER'S LOAN — MAY DIFFER FROM BUYER'S NOTE)");
+  inputRow('Lender / Servicer','exLender',130);
+  inputRow('Loan Type (Conv/FHA/VA)','exLoanType',110);
+  inputRow('Current Balance (Payoff)','exBalance');
+  inputRow('Interest Rate','exRate',60);
+  inputRow('Monthly Payment (P&I)','exPayment');
+  inputRow('Monthly Escrow (Taxes, Ins., MI)','exEscrow');
+  inputRow('Monthly HOA/Condo Fee','exHOA');
+  inputRow('Remaining Term (months)','exTerm',70);
+  inputRow('Due-on-Sale Clause?','exDueOnSale',70);
+  inputRow('At Closing','exAtClosing',100);
 
   sectionRow('PAYOFFS & CLOSING COSTS');
   inputRow('1st Mortgage Payoff','mtg1');
@@ -13577,7 +13590,7 @@ function dsRefreshSeller(sh){
   comp.forEach(function(r,idx){
     var has=r.price>0;
     function set(f,val){ var el=ge('ds_c'+idx+'_'+f); if(el) el.textContent = has ? val : ''; }
-    var da=ge('ds_c'+idx+'_downAmt'); if(da) da.textContent = has ? dsM(r.downAmt) : '';
+    set('downAmt',dsM(r.downAmt));
     var cm=ge('ds_c'+idx+'_commission'); if(cm) cm.textContent = has ? dsM(r.commission) : '';
     set('note',dsM(r.note));
     set('proTax',dsM(r.proTax)); set('proHOA',dsM(r.proHOA)); set('settlement',dsM(r.settlement));
