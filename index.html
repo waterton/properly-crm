@@ -146,7 +146,7 @@
         <div id="globalSearchResults" style="display:none;position:fixed;top:52px;right:12px;width:min(460px,92vw);max-height:74vh;overflow:auto;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:0 10px 34px rgba(0,0,0,0.45);z-index:1200;padding:6px;"></div>
         <button class="btn btn-p" id="btnAdd" style="display:none;">+ Add</button>
         <button id="themeToggle" title="Theme" style="background:none;border:none;cursor:pointer;font-size:17px;line-height:1;padding:4px 6px;border-radius:6px;">☀️</button>
-        <div style="font-size:11px;color:var(--text3);margin-right:4px;">v19.8</div>
+        <div style="font-size:11px;color:var(--text3);margin-right:4px;">v20.0</div>
         <div class="topbar-user" id="topbarUser" title="Click to sign out" style="cursor:pointer;position:relative;" id="topbarUserBtn">RE</div>
       </div>
     </div>
@@ -981,7 +981,7 @@
     <div class="mbody">
       <div id="csvStep1">
         <p style="font-size:16px;color:var(--text2);margin-bottom:16px;">Upload a CSV file with your contacts. The first row should be headers.</p>
-        <p style="font-size:16px;color:var(--text3);margin-bottom:16px;">Expected columns (any order): <b style="color:var(--accent);">First Name, Last Name, Type, Phone, Email, Property, Stage, Price, Notes</b></p>
+        <p style="font-size:16px;color:var(--text3);margin-bottom:16px;">Recognized columns (any order): <b style="color:var(--accent);">First Name, Last Name, Type, Phone, Email, Property, Stage, Price, Notes, Category, WhatsApp, Email 2, Phone 2, Master ID, Language</b></p>
         <div id="csvDropZone" style="border:2px dashed var(--border);border-radius:9px;padding:32px;text-align:center;cursor:pointer;transition:border 0.2s;">
           <div style="font-size:32px;margin-bottom:8px;">&#128462;</div>
           <div style="font-size:16px;color:var(--text2);margin-bottom:6px;">Drop your CSV file here</div>
@@ -1091,15 +1091,34 @@
         <div class="fg"><label class="fl">Status</label><select class="fsel" id="msgActive"><option value="true">Active</option><option value="false">Archived</option></select></div>
       </div>
       <div class="fg"><label class="fl">Subject line</label><input class="fi" id="msgSubject" placeholder="Subject line"></div>
-      <div class="fg"><label class="fl">Email content <span style="color:var(--text3);font-weight:400;">(paste your finished email here; if it has images, they'll show up correctly when it's sent)</span></label>
-        <textarea class="fi" id="msgHtml" rows="10" style="font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;" placeholder="Paste your finished email here…"></textarea>
+
+      <!-- Visual builder (default). Stack image / text / button blocks; no HTML needed. -->
+      <div id="msgBuilderWrap">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:4px 0 10px;">
+          <label class="fl" style="margin:0;">Build your email</label>
+          <button type="button" class="btn btn-g" id="btnAddImage" style="padding:5px 11px;font-size:14px;">+ Image</button>
+          <button type="button" class="btn btn-g" id="btnAddText" style="padding:5px 11px;font-size:14px;">+ Text</button>
+          <button type="button" class="btn btn-g" id="btnAddButton" style="padding:5px 11px;font-size:14px;">+ Button</button>
+        </div>
+        <div id="msgBuilder"></div>
       </div>
-      <div style="display:flex;align-items:center;justify-content:space-between;margin:4px 0 6px;">
+
+      <!-- Advanced escape hatch: paste finished HTML (e.g. from a designer). -->
+      <div id="msgRawWrap" style="display:none;">
+        <div class="fg"><label class="fl">Email HTML <span style="color:var(--text3);font-weight:400;">(paste a finished HTML email; images in it will display correctly when sent)</span></label>
+          <textarea class="fi" id="msgHtml" rows="10" style="font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;" placeholder="Paste your finished HTML email here…"></textarea>
+        </div>
+      </div>
+
+      <div style="display:flex;align-items:center;justify-content:space-between;margin:10px 0 6px;flex-wrap:wrap;gap:8px;">
         <label class="fl" style="margin:0;">Live preview</label>
-        <button class="btn btn-g" id="btnMsgPreview" style="padding:4px 10px;font-size:14px;">Refresh preview</button>
+        <div style="display:flex;gap:8px;">
+          <button type="button" class="btn btn-g" id="btnMsgMode" style="padding:4px 10px;font-size:13px;">Paste HTML instead</button>
+          <button type="button" class="btn btn-g" id="btnMsgPreview" style="padding:4px 10px;font-size:14px;">Refresh preview</button>
+        </div>
       </div>
       <iframe id="msgPreview" style="width:100%;height:320px;border:1px solid var(--border);border-radius:8px;background:#fff;"></iframe>
-      <div style="font-size:14px;color:var(--text3);margin-top:10px;line-height:1.5;">Merge tags you can use in the subject or body: <b style="color:var(--accent);">{{first}}</b> <b style="color:var(--accent);">{{last}}</b> <b style="color:var(--accent);">{{property}}</b> <b style="color:var(--accent);">{{agent}}</b> <b style="color:var(--accent);">{{price}}</b>. Optional: put <b style="color:var(--accent);">{{unsubscribe}}</b> where you want the unsubscribe link &mdash; if you leave it out, one is added to the footer automatically.</div>
+      <div style="font-size:14px;color:var(--text3);margin-top:10px;line-height:1.5;">To personalize, type <b style="color:var(--accent);">{{first}}</b>, <b style="color:var(--accent);">{{last}}</b>, <b style="color:var(--accent);">{{property}}</b>, <b style="color:var(--accent);">{{price}}</b>, or <b style="color:var(--accent);">{{agent}}</b> in any text — it's replaced with the real details when the email sends. An unsubscribe link is added to the footer automatically.</div>
     </div>
     <div class="mftr"><button class="btn btn-g" data-close="messageModal">Cancel</button><button class="btn btn-p" id="btnSaveMessage">Save Message</button></div>
   </div>
@@ -1255,6 +1274,6 @@
 </div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="app.js?v=20261013b"></script>
+<script src="app.js?v=20261014a"></script>
 </body>
 </html>

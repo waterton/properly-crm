@@ -105,7 +105,7 @@ function sv(){
 // Supabase sync functions
 // Known columns per table — strips unknown fields before sending to Supabase
 var DB_COLS = {
-  contacts: ['id','first','last','type','phone','email','property','stage','price','notes','added','closeDate','assignedTo','emails','phones','addresses','whatsapp','closedAt','lang'],
+  contacts: ['id','first','last','type','phone','email','property','stage','price','notes','added','closeDate','assignedTo','emails','phones','addresses','whatsapp','closedAt','lang','category','master_id'],
   notes: ['id','contactId','transactionId','text','date','category','textEs'],
   followups: ['id','contactId','transactionId','label','date','pri','done','assignedTo'],
   deadlines: ['id','contactId','transactionId','type','date','assignedTo','time','stepKey','owner'],
@@ -118,7 +118,7 @@ var DB_COLS = {
   campaigns: null,
   enrollments: null,
   send_log: null,
-  drip_messages: ['id','name','subject','html','active','created_at','updated_at'],
+  drip_messages: ['id','name','subject','html','blocks','active','created_at','updated_at'],
   gmail_tokens: null,
   documents: ['id','contact_id','transaction_id','file_path','file_name','doc_type','summary','mime_type','size','created_at'],
   tx_changes: ['id','transactionId','contactId','field','oldValue','newValue','docType','addendumNo','effectiveDate','documentId','appliedAt'],
@@ -1823,9 +1823,11 @@ function vc(id){
   getCMethods(c.emails, c.email, true).forEach(function(e){ isec.appendChild(mkContactRow('Email', e.value, e.label, [{txt:'Email',href:'mailto:'+e.value}])); });
   getCMethods(c.addresses, c.property, false).forEach(function(a){ isec.appendChild(mkContactRow('Address', a.value, a.label, [])); });
   if(c.whatsapp){ isec.appendChild(mkContactRow('WhatsApp', c.whatsapp, '', [{txt:'WhatsApp',href:waLink(c.whatsapp)}])); }
+  if(c.category)isec.appendChild(mkfld('Category',c.category,null,'color:var(--accent);'));
   if(c.price)isec.appendChild(mkfld('Price',c.price,null,'color:var(--accent);font-family:monospace;'));
   if(c.notes)isec.appendChild(mkfld('Notes',c.notes,null,''));
   if(c.closeDate)isec.appendChild(mkfld('Closing Date',fd(c.closeDate),null,'color:var(--accent);'));
+  if(c.master_id)isec.appendChild(mkfld('Master ID',c.master_id,null,'color:var(--text3);font-family:monospace;font-size:13px;'));
   body.appendChild(isec);
   var tsec=mksec('Type');var tr=mkRow('stage-row');tr.style.flexWrap='wrap';
   [['prospect','Prospect'],['buyer','Buyer'],['seller','Seller'],['agent','Agent'],['lender','Lender'],['title','Title'],['vendor','Vendor'],['other','Other']].forEach(function(pair){
@@ -3040,19 +3042,42 @@ function openImport(){
   om('csvModal');
 }
 
+// Tokenize a whole CSV document into rows of fields, correctly handling quoted
+// fields that contain commas OR line breaks. The old parser split on newlines
+// first, so any contact whose Notes had a line break broke into pieces and got
+// dropped — which is why a 2,100-row import previously landed only ~665.
+function csvRows(text){
+  text = (text||'').replace(/\r\n/g,'\n').replace(/\r/g,'\n');
+  var rows = [], row = [], cur = '', inQ = false;
+  for(var i = 0; i < text.length; i++){
+    var ch = text[i];
+    if(inQ){
+      if(ch === '"'){ if(text[i+1] === '"'){ cur += '"'; i++; } else inQ = false; }
+      else cur += ch;
+    } else {
+      if(ch === '"') inQ = true;
+      else if(ch === ','){ row.push(cur); cur = ''; }
+      else if(ch === '\n'){ row.push(cur); rows.push(row); row = []; cur = ''; }
+      else cur += ch;
+    }
+  }
+  row.push(cur); rows.push(row);
+  // drop a trailing empty line
+  if(rows.length && rows[rows.length-1].length === 1 && rows[rows.length-1][0] === '') rows.pop();
+  return rows;
+}
+
 function parseCSV(text){
-  // Normalize line endings
-  var lines = text.trim().replace(/\r\n/g,'\n').replace(/\r/g,'\n').split('\n');
-  if(lines.length < 2) return [];
-  var headers = csvSplit(lines[0]).map(function(h){ return h.trim().toLowerCase().replace(/"/g,''); });
+  var rows = csvRows(text);
+  if(rows.length < 2) return [];
+  var headers = rows[0].map(function(h){ return String(h||'').trim().toLowerCase().replace(/"/g,''); });
   var results = [];
   var idSeed = Date.now();
-  for(var i = 1; i < lines.length; i++){
-    var line = lines[i].trim();
-    if(!line) continue;
-    var cols = csvSplit(line);
+  for(var i = 1; i < rows.length; i++){
+    var cols = rows[i];
+    if(!cols || !cols.length) continue;
     var obj = {};
-    headers.forEach(function(h, idx){ obj[h] = (cols[idx]||'').trim(); });
+    headers.forEach(function(h, idx){ obj[h] = String(cols[idx]==null?'':cols[idx]).trim(); });
 
     // ---- Name: handle Google (Given Name/Family Name), FUB, plain First/Last ----
     var first = obj['given name'] || obj['first name'] || obj['firstname'] || obj['first'] || '';
@@ -3106,6 +3131,12 @@ function parseCSV(text){
     var addresses = address ? [{value: address, label: ''}] : [];
     var propertyVal = obj['property'] || obj['interest'] || address;
 
+    // ---- Extra columns from the master contact list ----
+    var whatsapp = obj['whatsapp'] || obj['whats app'] || obj['wa'] || '';
+    var category = obj['category'] || '';
+    var masterId = obj['master id'] || obj['masterid'] || obj['master_id'] || '';
+    var lang = (function(l){ l=(l||'').toLowerCase().trim(); if(l==='es'||l.indexOf('span')===0) return 'es'; if(l==='en'||l.indexOf('eng')===0) return 'en'; return ''; })(obj['language'] || obj['lang']);
+
     var c = {
       id: idSeed + i,
       first: first,
@@ -3121,6 +3152,10 @@ function parseCSV(text){
       stage: stage,
       price: obj['price'] || obj['budget'] || '',
       notes: notes,
+      whatsapp: whatsapp,
+      category: category,
+      master_id: masterId,
+      lang: lang,
       added: new Date().toISOString()
     };
     results.push(c);
@@ -3223,7 +3258,7 @@ function showCSVPreview(contacts){
   var thead = document.createElement('thead');
   var hrow = document.createElement('tr');
   hrow.style.background = 'var(--surface2)';
-  ['Name','Type','Phone','Status','Action'].forEach(function(h){
+  ['Name','Category','Type','Phone','Status','Action'].forEach(function(h){
     var th = document.createElement('th');
     th.style.cssText = 'padding:8px 10px;text-align:left;color:var(--text3);font-weight:600;font-size:13px;';
     th.textContent = h;
@@ -3245,6 +3280,9 @@ function showCSVPreview(contacts){
       dupNote.textContent='Matches: '+(dupe.first+' '+dupe.last).trim()+(dupe.email?' ('+dupe.email+')':'');
       td1.appendChild(dupNote);
     }
+
+    var tdCat=document.createElement('td'); tdCat.style.cssText='padding:8px 10px;color:var(--text2);font-size:13px;';
+    tdCat.textContent=c.category||'-';
 
     var td2=document.createElement('td'); td2.style.padding='8px 10px';
     ctypes(c).forEach(function(_t){ var tg=document.createElement('span'); tg.className='tag tag-'+_t; tg.style.cssText='font-size:12px;margin-right:3px;'; tg.textContent=_t; td2.appendChild(tg); });
@@ -3274,7 +3312,7 @@ function showCSVPreview(contacts){
       td5.appendChild(badge);
     }
 
-    tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td3); tr.appendChild(td4); tr.appendChild(td5);
+    tr.appendChild(td1); tr.appendChild(tdCat); tr.appendChild(td2); tr.appendChild(td3); tr.appendChild(td4); tr.appendChild(td5);
     tbody.appendChild(tr);
   });
 
@@ -11558,25 +11596,200 @@ function renderMessageList(){
   });
 }
 
+// ===== Visual email builder (no HTML required) =====
+// A message is a stack of blocks (image / text / button). We keep the blocks as
+// the editable source of truth and generate email-safe HTML from them on save,
+// so the existing send path (which embeds images) is unchanged. Messages that
+// came in as raw HTML (e.g. from a designer) have no blocks and use the raw box.
+var _msgBlocks = [];   // working copy while the modal is open
+var _msgRaw = false;   // true = raw-HTML mode (advanced)
+
+function _msgEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+function _msgGenHtml(blocks){
+  var inner = (blocks||[]).map(function(b){
+    if(b.type==='image'){
+      if(!b.src) return '';
+      var img = '<img src="'+b.src+'" alt="" style="display:block;width:100%;max-width:100%;height:auto;border:0;border-radius:6px;">';
+      if(b.link) img = '<a href="'+_msgEsc(b.link)+'" target="_blank" style="text-decoration:none;">'+img+'</a>';
+      return '<tr><td style="padding:6px 0;">'+img+'</td></tr>';
+    }
+    if(b.type==='text'){
+      return '<tr><td style="padding:8px 2px;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:1.5;color:#222222;">'+(b.html||'')+'</td></tr>';
+    }
+    if(b.type==='button'){
+      return '<tr><td align="center" style="padding:14px 0;"><a href="'+_msgEsc(b.url||'#')+'" target="_blank" style="display:inline-block;background:#c9a84c;color:#ffffff;text-decoration:none;font-family:Arial,Helvetica,sans-serif;font-size:16px;font-weight:700;padding:12px 28px;border-radius:8px;">'+_msgEsc(b.label||'Click here')+'</a></td></tr>';
+    }
+    return '';
+  }).join('');
+  return '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>'
+    +'<body style="margin:0;padding:0;background:#f4f4f4;">'
+    +'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f4;"><tr><td align="center" style="padding:18px 12px;">'
+    +'<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:10px;padding:16px 22px;">'
+    + inner
+    +'</table></td></tr></table></body></html>';
+}
+
+function _msgCurrentHtml(){ return _msgRaw ? (ge('msgHtml').value||'') : _msgGenHtml(_msgBlocks); }
+
 function _msgPreviewRender(){
   var fr = ge('msgPreview'); if(!fr) return;
-  var html = (ge('msgHtml').value)||'';
+  var html = _msgCurrentHtml();
   try{ fr.srcdoc = html; }catch(e){ try{ var d=fr.contentWindow.document; d.open(); d.write(html); d.close(); }catch(_){} }
+}
+
+function _msgCompressImage(file, cb){
+  var reader = new FileReader();
+  reader.onload = function(ev){
+    var img = new Image();
+    img.onload = function(){
+      var maxW = 1000; var scale = Math.min(1, maxW/(img.width||maxW));
+      var w = Math.max(1,Math.round(img.width*scale)), h = Math.max(1,Math.round(img.height*scale));
+      try{
+        var cv = document.createElement('canvas'); cv.width=w; cv.height=h;
+        cv.getContext('2d').drawImage(img,0,0,w,h);
+        var mime = (file.type==='image/png') ? 'image/png' : 'image/jpeg';
+        cb(cv.toDataURL(mime, mime==='image/jpeg'?0.85:undefined));
+      }catch(e){ cb(ev.target.result); }
+    };
+    img.onerror = function(){ cb(ev.target.result); };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function msgAddBlock(type){
+  if(type==='image') _msgBlocks.push({type:'image', src:'', link:''});
+  else if(type==='button') _msgBlocks.push({type:'button', label:'Learn more', url:''});
+  else _msgBlocks.push({type:'text', html:''});
+  renderMsgBuilder(); _msgPreviewRender();
+}
+function msgMoveBlock(i, dir){
+  var j=i+dir; if(j<0||j>=_msgBlocks.length) return;
+  var t=_msgBlocks[i]; _msgBlocks[i]=_msgBlocks[j]; _msgBlocks[j]=t;
+  renderMsgBuilder(); _msgPreviewRender();
+}
+function msgDeleteBlock(i){ _msgBlocks.splice(i,1); renderMsgBuilder(); _msgPreviewRender(); }
+
+function _msgExec(cmd, val){
+  try{ document.execCommand('styleWithCSS', false, true); }catch(e){}
+  document.execCommand(cmd, false, val||null);
+}
+
+function renderMsgBuilder(){
+  var wrap = ge('msgBuilder'); if(!wrap) return;
+  wrap.textContent='';
+  if(!_msgBlocks.length){
+    wrap.appendChild(mkDiv('color:var(--text3);font-size:15px;padding:14px;text-align:center;border:1px dashed var(--border);border-radius:8px;','Empty. Use + Image, + Text, or + Button above to build your email.'));
+    return;
+  }
+  _msgBlocks.forEach(function(b, i){
+    var card = mkDiv('border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:10px;background:var(--surface2);');
+    var hd = mkDiv('display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;');
+    hd.appendChild(mkDiv('font-size:13px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.5px;', b.type));
+    var tools = mkDiv('display:flex;gap:5px;');
+    var up=mkBtnEl('btn btn-g','↑','padding:2px 8px;font-size:14px;'); up.type='button'; (function(k){up.addEventListener('click',function(){msgMoveBlock(k,-1);});})(i);
+    var dn=mkBtnEl('btn btn-g','↓','padding:2px 8px;font-size:14px;'); dn.type='button'; (function(k){dn.addEventListener('click',function(){msgMoveBlock(k,1);});})(i);
+    var rm=mkBtnEl('btn btn-g','Remove','padding:2px 8px;font-size:13px;color:var(--danger);'); rm.type='button'; (function(k){rm.addEventListener('click',function(){msgDeleteBlock(k);});})(i);
+    tools.appendChild(up); tools.appendChild(dn); tools.appendChild(rm);
+    hd.appendChild(tools); card.appendChild(hd);
+
+    if(b.type==='image'){
+      var fileInp = document.createElement('input'); fileInp.type='file'; fileInp.accept='image/*'; fileInp.className='fi'; fileInp.style.cssText='padding:6px;font-size:14px;';
+      (function(k){ fileInp.addEventListener('change', function(){ var f=this.files&&this.files[0]; if(!f) return; _msgCompressImage(f, function(url){ _msgBlocks[k].src=url; renderMsgBuilder(); _msgPreviewRender(); }); }); })(i);
+      card.appendChild(fileInp);
+      if(b.src){ var th=document.createElement('img'); th.src=b.src; th.style.cssText='display:block;max-width:100%;max-height:160px;margin:8px 0;border-radius:6px;'; card.appendChild(th); }
+      var lk = document.createElement('input'); lk.className='fi'; lk.placeholder='Optional link when the image is clicked (https://...)'; lk.value=b.link||''; lk.style.cssText='font-size:14px;margin-top:4px;';
+      (function(k){ lk.addEventListener('input', function(){ _msgBlocks[k].link=this.value; _msgPreviewRender(); }); })(i);
+      card.appendChild(lk);
+
+    } else if(b.type==='text'){
+      // Formatting toolbar
+      var tb = mkDiv('display:flex;flex-wrap:wrap;gap:5px;align-items:center;margin-bottom:6px;');
+      function tbtn(label, title, fn){ var b2=mkBtnEl('btn btn-g',label,'padding:3px 9px;font-size:14px;'); b2.type='button'; b2.title=title||''; b2.addEventListener('mousedown',function(e){ e.preventDefault(); }); b2.addEventListener('click',function(e){ e.preventDefault(); fn(); }); return b2; }
+      tb.appendChild(tbtn('B','Bold',function(){ _msgExec('bold'); syncText(); }));
+      var ital=tbtn('i','Italic',function(){ _msgExec('italic'); syncText(); }); ital.style.fontStyle='italic'; tb.appendChild(ital);
+      tb.appendChild(tbtn('U','Underline',function(){ _msgExec('underline'); syncText(); }));
+      // size dropdown
+      var sz=document.createElement('select'); sz.className='fsel'; sz.style.cssText='width:auto;padding:3px 6px;font-size:13px;';
+      [['Size',''],['Small','2'],['Normal','3'],['Large','5'],['Huge','7']].forEach(function(p){ var o=document.createElement('option'); o.value=p[1]; o.textContent=p[0]; sz.appendChild(o); });
+      sz.addEventListener('mousedown',function(e){ /* keep selection */ }); sz.addEventListener('change',function(){ if(this.value){ _msgExec('fontSize', this.value); syncText(); this.selectedIndex=0; } });
+      tb.appendChild(sz);
+      // font dropdown
+      var fnt=document.createElement('select'); fnt.className='fsel'; fnt.style.cssText='width:auto;padding:3px 6px;font-size:13px;';
+      [['Font',''],['Arial','Arial, Helvetica, sans-serif'],['Georgia','Georgia, serif'],['Times','\'Times New Roman\', Times, serif'],['Verdana','Verdana, Geneva, sans-serif'],['Trebuchet','\'Trebuchet MS\', sans-serif'],['Courier','\'Courier New\', monospace']].forEach(function(p){ var o=document.createElement('option'); o.value=p[1]; o.textContent=p[0]; fnt.appendChild(o); });
+      fnt.addEventListener('change',function(){ if(this.value){ _msgExec('fontName', this.value); syncText(); this.selectedIndex=0; } });
+      tb.appendChild(fnt);
+      // color swatches
+      ['#222222','#c9a84c','#777777','#b3261e','#1a7f37','#1a66c9','#ffffff'].forEach(function(col){
+        var sw=document.createElement('button'); sw.type='button'; sw.title='Text color'; sw.style.cssText='width:20px;height:20px;border-radius:4px;border:1px solid var(--border);background:'+col+';cursor:pointer;padding:0;';
+        sw.addEventListener('mousedown',function(e){ e.preventDefault(); }); sw.addEventListener('click',function(e){ e.preventDefault(); _msgExec('foreColor', col); syncText(); });
+        tb.appendChild(sw);
+      });
+      tb.appendChild(tbtn('A◄','Align left',function(){ _msgExec('justifyLeft'); syncText(); }));
+      tb.appendChild(tbtn('A▬','Center',function(){ _msgExec('justifyCenter'); syncText(); }));
+      tb.appendChild(tbtn('🔗','Add link',function(){ var u=prompt('Link URL (https://...)'); if(u){ _msgExec('createLink', u); syncText(); } }));
+      card.appendChild(tb);
+
+      var ed = document.createElement('div'); ed.contentEditable='true'; ed.className='fi';
+      ed.style.cssText='min-height:90px;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:1.5;color:var(--text);background:var(--surface);padding:10px;overflow:auto;';
+      ed.innerHTML = b.html||'';
+      function syncText(){ _msgBlocks[i].html = ed.innerHTML; _msgPreviewRender(); }
+      ed.addEventListener('input', syncText);
+      ed.addEventListener('blur', syncText);
+      card.appendChild(ed);
+      card.appendChild(mkDiv('font-size:12px;color:var(--text3);margin-top:4px;','Tip: type {{first}} to drop in the contact’s first name (also {{last}}, {{property}}, {{price}}, {{agent}}).'));
+
+    } else if(b.type==='button'){
+      var lb=document.createElement('input'); lb.className='fi'; lb.placeholder='Button text (e.g. See the listing)'; lb.value=b.label||''; lb.style.cssText='font-size:14px;margin-bottom:6px;';
+      (function(k){ lb.addEventListener('input', function(){ _msgBlocks[k].label=this.value; _msgPreviewRender(); }); })(i);
+      card.appendChild(lb);
+      var ur=document.createElement('input'); ur.className='fi'; ur.placeholder='Link (https://...)'; ur.value=b.url||''; ur.style.cssText='font-size:14px;';
+      (function(k){ ur.addEventListener('input', function(){ _msgBlocks[k].url=this.value; _msgPreviewRender(); }); })(i);
+      card.appendChild(ur);
+    }
+    wrap.appendChild(card);
+  });
+}
+
+function msgSetMode(raw){
+  _msgRaw = !!raw;
+  ge('msgBuilderWrap').style.display = _msgRaw ? 'none' : 'block';
+  ge('msgRawWrap').style.display = _msgRaw ? 'block' : 'none';
+  var toggle = ge('btnMsgMode');
+  if(toggle) toggle.textContent = _msgRaw ? 'Use the visual builder' : 'Paste HTML instead';
+  if(_msgRaw && !(ge('msgHtml').value||'').trim() && _msgBlocks.length){
+    // carry the built design into the raw box so nothing is lost
+    ge('msgHtml').value = _msgGenHtml(_msgBlocks);
+  }
+  _msgPreviewRender();
 }
 
 function openMessageModal(id){
   ge('btnSaveMessage').setAttribute('data-edit-id', id||'');
+  _msgBlocks = [];
   if(id){
     var m = dripMsgById(id);
     ge('msgModalTitle').textContent='Edit Message';
     ge('msgName').value = m.name||'';
     ge('msgSubject').value = m.subject||'';
-    ge('msgHtml').value = m.html||'';
     ge('msgActive').value = (m.active===false||m.active==='false') ? 'false' : 'true';
+    if(Array.isArray(m.blocks) && m.blocks.length){
+      _msgBlocks = JSON.parse(JSON.stringify(m.blocks));
+      ge('msgHtml').value = '';
+      msgSetMode(false);
+    }else{
+      // No blocks -> it's a raw-HTML message (pasted / from a designer).
+      ge('msgHtml').value = m.html||'';
+      msgSetMode(true);
+    }
   }else{
     ge('msgModalTitle').textContent='New Message';
     ge('msgName').value=''; ge('msgSubject').value=''; ge('msgHtml').value=''; ge('msgActive').value='true';
+    _msgBlocks = [{type:'text', html:''}];
+    msgSetMode(false);
   }
+  renderMsgBuilder();
   om('messageModal');
   _msgPreviewRender();
 }
@@ -11584,17 +11797,31 @@ function openMessageModal(id){
 function saveMessage(){
   var name = (ge('msgName').value||'').trim();
   var subject = (ge('msgSubject').value||'').trim();
-  var html = ge('msgHtml').value||'';
   if(!name){ alert('Give the message a name so you can find it later.'); return; }
   if(!subject){ alert('Add a subject line.'); return; }
-  if(!html.trim()){ alert('Paste the email HTML.'); return; }
+
+  var html, blocks;
+  if(_msgRaw){
+    html = ge('msgHtml').value||'';
+    blocks = null;
+    if(!html.trim()){ alert('Paste the email HTML, or switch to the visual builder.'); return; }
+  }else{
+    // require some real content
+    var hasContent = _msgBlocks.some(function(b){
+      return (b.type==='image'&&b.src) || (b.type==='text'&&(b.html||'').replace(/<[^>]*>/g,'').trim()) || (b.type==='button'&&(b.label||b.url));
+    });
+    if(!hasContent){ alert('Add an image or some text first.'); return; }
+    blocks = _msgBlocks;
+    html = _msgGenHtml(_msgBlocks);
+  }
+
   var editId = ge('btnSaveMessage').getAttribute('data-edit-id');
   var m;
   if(editId){
     m = dripMsgById(editId);
-    m.name=name; m.subject=subject; m.html=html; m.active=(ge('msgActive').value==='true'); m.updated_at=nowISO();
+    m.name=name; m.subject=subject; m.html=html; m.blocks=blocks; m.active=(ge('msgActive').value==='true'); m.updated_at=nowISO();
   }else{
-    m = { id: Date.now(), name:name, subject:subject, html:html, active:(ge('msgActive').value==='true'), created_at:nowISO(), updated_at:nowISO() };
+    m = { id: Date.now(), name:name, subject:subject, html:html, blocks:blocks, active:(ge('msgActive').value==='true'), created_at:nowISO(), updated_at:nowISO() };
     DMSG.push(m);
   }
   dripSave('drip_messages', [JSON.parse(JSON.stringify(m))]);
@@ -11604,7 +11831,7 @@ function saveMessage(){
 
 function duplicateMessage(id){
   var m = dripMsgById(id); if(!m) return;
-  var copy = { id: Date.now(), name:(m.name||'Message')+' (copy)', subject:m.subject||'', html:m.html||'', active:true, created_at:nowISO(), updated_at:nowISO() };
+  var copy = { id: Date.now(), name:(m.name||'Message')+' (copy)', subject:m.subject||'', html:m.html||'', blocks:(m.blocks?JSON.parse(JSON.stringify(m.blocks)):null), active:true, created_at:nowISO(), updated_at:nowISO() };
   DMSG.push(copy);
   dripSave('drip_messages', [JSON.parse(JSON.stringify(copy))]);
   renderMessageList();
@@ -12006,6 +12233,10 @@ ge('nav-drips') && (function(){
   ge('btnNewMessage') && ge('btnNewMessage').addEventListener('click', function(){ openMessageModal(null); });
   ge('btnSaveMessage') && ge('btnSaveMessage').addEventListener('click', saveMessage);
   ge('btnMsgPreview') && ge('btnMsgPreview').addEventListener('click', _msgPreviewRender);
+  ge('btnAddImage') && ge('btnAddImage').addEventListener('click', function(){ msgAddBlock('image'); });
+  ge('btnAddText') && ge('btnAddText').addEventListener('click', function(){ msgAddBlock('text'); });
+  ge('btnAddButton') && ge('btnAddButton').addEventListener('click', function(){ msgAddBlock('button'); });
+  ge('btnMsgMode') && ge('btnMsgMode').addEventListener('click', function(){ msgSetMode(!_msgRaw); });
   (function(){ var mm=ge('messageModal'); if(mm) mm.addEventListener('click', function(e){ if(e.target===mm) cm('messageModal'); }); })();
   ['campaigns','enrollments','messages','log'].forEach(function(t){
     var btn = ge('dripTab'+t.charAt(0).toUpperCase()+t.slice(1));
