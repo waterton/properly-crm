@@ -13548,11 +13548,22 @@ function openDealSheetSeller(sh, isNew){
 
   function field(key, ph, type){ var i=document.createElement('input'); i.className='dsi'; i.type=type||'text'; i.value=(d[key]!=null?d[key]:''); if(ph)i.placeholder=ph; i.style.flex='1';
     i.addEventListener('input',function(){ d[key]=i.value; dsRefreshSeller(sh); }); return i; }
+  // Money fields: show $X,XXX.XX when not focused, raw number while editing.
+  function _fmtMoney(el){ var raw=String(el.value).replace(/[^0-9.\-]/g,''); if(raw===''||raw==='-'||raw==='.') return; var n=parseFloat(raw); if(isNaN(n)) return; el.value='$'+n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+  function _rawMoney(el){ el.value=String(el.value).replace(/[^0-9.\-]/g,''); }
+  function fieldMoney(key, w){ var i=document.createElement('input'); i.className='dsi'; i.type='text'; var v=(d[key]!=null?String(d[key]):''); i.value=v; if(w)i.style.maxWidth=w+'px'; if(v!=='')_fmtMoney(i);
+    i.addEventListener('focus',function(){ _rawMoney(i); });
+    i.addEventListener('input',function(){ d[key]=i.value; dsRefreshSeller(sh); });
+    i.addEventListener('blur',function(){ _fmtMoney(i); d[key]=i.value; }); return i; }
+  function siMoney(idx, key, w){ var i=document.createElement('input'); i.className='dsi'; i.type='text'; var v=(d.scenarios[idx][key]!=null?String(d.scenarios[idx][key]):''); i.value=v; i.style.width=(w||90)+'px'; i.style.textAlign='center'; if(v!=='')_fmtMoney(i);
+    i.addEventListener('focus',function(){ _rawMoney(i); });
+    i.addEventListener('input',function(){ d.scenarios[idx][key]=i.value; dsRefreshSeller(sh); });
+    i.addEventListener('blur',function(){ _fmtMoney(i); d.scenarios[idx][key]=i.value; }); return i; }
   function rowLbl(lbl, el, lbl2, el2){ var r=document.createElement('div'); r.className='ds-row'; var l=document.createElement('span'); l.className='ds-lbl'; l.textContent=lbl; l.style.minWidth='130px'; r.appendChild(l); if(el)r.appendChild(el);
     if(lbl2){ var l2=document.createElement('span'); l2.className='ds-lbl'; l2.textContent=lbl2; l2.style.marginLeft='10px'; r.appendChild(l2);} if(el2)r.appendChild(el2); return r; }
   sheet.appendChild(rowLbl('Seller:', field('seller','Seller name')));
   sheet.appendChild(rowLbl('Property Address:', field('address','Property address')));
-  var taxI=field('annualTaxes','',''); taxI.style.maxWidth='120px'; var hoaI=field('hoaFees','',''); hoaI.style.maxWidth='120px';
+  var taxI=fieldMoney('annualTaxes',130); var hoaI=fieldMoney('hoaFees',130);
   sheet.appendChild(rowLbl('Annual Taxes:', taxI, 'HOA/Condo Fees (monthly):', hoaI));
   var cdI=field('closingDate','','date'); cdI.style.maxWidth='170px';
   sheet.appendChild(rowLbl('Est. Closing Date:', cdI));
@@ -13566,6 +13577,7 @@ function openDealSheetSeller(sh, isNew){
   function trLabel(lbl){ var tr=document.createElement('tr'); var td=document.createElement('td'); td.className='lbl'; td.textContent=lbl; tr.appendChild(td); return tr; }
   function sectionRow(lbl){ var tr=document.createElement('tr'); var td=document.createElement('td'); td.colSpan=3; td.textContent=lbl; td.style.cssText='background:#eef2f8;font-weight:700;color:#1F497D;padding:6px 8px 6px 14px;font-size:12px;letter-spacing:.5px;'; tr.appendChild(td); tbl.appendChild(tr); }
   function inputRow(lbl,key,w){ var tr=trLabel(lbl); tr.appendChild(inputTd(si(0,key,w))); tr.appendChild(inputTd(si(1,key,w))); tbl.appendChild(tr); }
+  function inputRowM(lbl,key,w){ var tr=trLabel(lbl); tr.appendChild(inputTd(siMoney(0,key,w))); tr.appendChild(inputTd(siMoney(1,key,w))); tbl.appendChild(tr); }
   function calcRow(lbl,f){ var tr=trLabel(lbl); tr.appendChild(computedTd(0,f)); tr.appendChild(computedTd(1,f)); tbl.appendChild(tr); }
 
   function netRow(lbl,f){ var tr=document.createElement('tr'); tr.className='ds-net'; var td=document.createElement('td'); td.className='lbl'; td.textContent=lbl; tr.appendChild(td); tr.appendChild(computedTd(0,f)); tr.appendChild(computedTd(1,f)); tbl.appendChild(tr); }
@@ -13580,7 +13592,7 @@ function openDealSheetSeller(sh, isNew){
   var thr=document.createElement('tr'); thr.innerHTML='<td></td><td class="ds-scenhdr">SCENARIO 1</td><td class="ds-scenhdr">SCENARIO 2</td>'; tbl.appendChild(thr);
   // R27–R34 financing terms
   inputRow('Sale Type:','saleType',120);
-  inputRow('Sales Price:','salesPrice',110);
+  inputRowM('Sales Price:','salesPrice',110);
   inputRow('Down Payment (%):','downPct',46);
   calcRow('Down Payment ($):','downAmt');
   calcRow('Seller Carry-Back Note:','note');
@@ -13594,33 +13606,33 @@ function openDealSheetSeller(sh, isNew){
   sectionRow("EXISTING / UNDERLYING MORTGAGE (SELLER'S LOAN - MAY DIFFER FROM BUYER'S NOTE)");
   inputRow('Lender / Servicer:','exLender',130);
   inputRow('Loan Type (Conv/FHA/VA):','exLoanType',110);
-  inputRow('Current Balance (Payoff):','exBalance');
+  inputRowM('Current Balance (Payoff):','exBalance');
   inputRow('Interest Rate:','exRate',60);
-  inputRow('Monthly Payment (P&I):','exPayment');
-  inputRow('Monthly Escrow (Taxes, Ins., MI):','exEscrow');
-  inputRow('Monthly HOA/Condo Fee:','exHOA');
+  inputRowM('Monthly Payment (P&I):','exPayment');
+  inputRowM('Monthly Escrow (Taxes, Ins., MI):','exEscrow');
+  inputRowM('Monthly HOA/Condo Fee:','exHOA');
   inputRow('Remaining Term (months):','exTerm',70);
   inputRow('Due-on-Sale Clause?','exDueOnSale',70);
   inputRow('At Closing:','exAtClosing',110);
   // R48–R67 payoffs & closing costs
   sectionRow('PAYOFFS & CLOSING COSTS');
   calcRow('1st Mortgage Payoff (from above):','mtg1');
-  inputRow('2nd Mortgage Payoff:','mtg2');
-  inputRow('Other Liens:','otherLiens');
+  inputRowM('2nd Mortgage Payoff:','mtg2');
+  inputRowM('Other Liens:','otherLiens');
   commissionRow();
-  inputRow('Other Fees:','otherFees');
+  inputRowM('Other Fees:','otherFees');
   calcRow('Prorated Taxes*:','proTax');
   calcRow('Prorated HOA/Condo Fees*:','proHOA');
-  inputRow('Settlement/Closing Fee:','settlement');
+  inputRowM('Settlement/Closing Fee:','settlement');
   calcRow("Homeowner's Title Policy**:",'title');
-  inputRow('Reconveyance Fee***:','recon');
-  inputRow('Secure Document Storage','secure');
-  inputRow('Home Warranty:','homeWarranty');
-  inputRow('Utilities/Assessments:','utilities');
-  inputRow('Seller Concessions','concessions');
-  inputRow('HOA Transfer Fee:','hoaTransfer');
-  inputRow('Note/Deed Prep & Servicing Setup:','notePrep');
-  inputRow('Other:','otherAmount');
+  inputRowM('Reconveyance Fee***:','recon');
+  inputRowM('Secure Document Storage','secure');
+  inputRowM('Home Warranty:','homeWarranty');
+  inputRowM('Utilities/Assessments:','utilities');
+  inputRowM('Seller Concessions','concessions');
+  inputRowM('HOA Transfer Fee:','hoaTransfer');
+  inputRowM('Note/Deed Prep & Servicing Setup:','notePrep');
+  inputRowM('Other:','otherAmount');
   subRow('Total Payoffs & Closing Costs:','costs');
   netRow('Estimated Net to Seller at Closing','netClose');
   // R69–R74 seller financing results
