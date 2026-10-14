@@ -12195,6 +12195,18 @@ async function openEnrollModal(presetCampaignId, presetContactId){
   var enPick = buildContactPicker(enCP, 'enrollContact', 'Search contact by name, email, phone...');
   if(presetContactId){ var _pc = gc(presetContactId); if(_pc) enPick.setContact(_pc); }
 
+  // Category options (distinct categories present on contacts, with counts).
+  var catSel = ge('enrollCategory');
+  if(catSel){
+    catSel.textContent='';
+    var cats={}; C.forEach(function(x){ var k=(x.category||'').trim(); if(k) cats[k]=(cats[k]||0)+1; });
+    var keysC=Object.keys(cats).sort();
+    if(!keysC.length){ var o0=document.createElement('option'); o0.value=''; o0.textContent='(no categories on contacts yet)'; catSel.appendChild(o0); }
+    keysC.forEach(function(k){ var o=document.createElement('option'); o.value=k; o.textContent=k+' ('+cats[k]+')'; catSel.appendChild(o); });
+  }
+  if(ge('enrollMode')) ge('enrollMode').value='single';
+  enrollModeChange();
+
   var fs = ge('enrollFrom'); fs.textContent='';
   var accts = (typeof gmailState!=='undefined' && gmailState.connectedAccounts) ? gmailState.connectedAccounts : {};
   var keys = Object.keys(accts);
@@ -12207,11 +12219,69 @@ async function openEnrollModal(presetCampaignId, presetContactId){
   om('enrollModal');
 }
 
+function enrollModeChange(){
+  var m = ge('enrollMode') ? ge('enrollMode').value : 'single';
+  if(ge('enrollContactWrap')) ge('enrollContactWrap').style.display = (m==='category') ? 'none' : 'block';
+  if(ge('enrollCategoryWrap')) ge('enrollCategoryWrap').style.display = (m==='category') ? 'block' : 'none';
+  if(m==='category') updateEnrollCategoryCount();
+}
+function updateEnrollCategoryCount(){
+  var el=ge('enrollCategoryCount'); if(!el) return;
+  var cat = ge('enrollCategory') ? ge('enrollCategory').value : '';
+  var matches = C.filter(function(x){ return String((x.category||'').trim())===String(cat); });
+  var noEmail = matches.filter(function(x){ return !x.email; }).length;
+  el.textContent = matches.length
+    ? (matches.length+' contact'+(matches.length===1?'':'s')+' will be enrolled'+(noEmail?'  ·  '+noEmail+' have no email (those steps will fail until one is added)':''))
+    : 'No contacts in this category.';
+}
+
+// Enroll every contact in a category into a campaign (batched save).
+function enrollByCategory(campaignId, cat, fromMember){
+  var camp = CAMP.find(function(x){ return String(x.id)===String(campaignId); });
+  if(!camp || !camp.steps || !camp.steps.length) return {error:'no steps'};
+  var firstDelay = parseInt(camp.steps[0].delayDays)||0;
+  var matches = C.filter(function(x){ return String((x.category||'').trim())===String(cat); });
+  var batch=[], created=0, already=0, noEmail=0;
+  matches.forEach(function(x){
+    if(!x.email) noEmail++;
+    var dup = ENR.find(function(e){ return String(e.campaignId)===String(campaignId) && String(e.contactId)===String(x.id) && e.status==='active'; });
+    if(dup){ already++; return; }
+    var enr = {
+      id: Date.now() + Math.floor(Math.random()*1000000) + created,
+      campaignId: campaignId, contactId: x.id,
+      fromMemberId: fromMember || (typeof gmailState!=='undefined' ? gmailState.activeMemberId : null) || null,
+      stepIndex: 0, status: 'active',
+      nextSendAt: new Date(Date.now() + firstDelay*dripDayMs()).toISOString(),
+      created_at: nowISO()
+    };
+    ENR.push(enr); batch.push(enr); created++;
+  });
+  if(batch.length){ try{ pausePoll(60000); }catch(e){} dripSave('enrollments', batch); }
+  return {total:matches.length, created:created, already:already, noEmail:noEmail};
+}
+
 function confirmEnroll(){
   var campaignId = ge('enrollCampaign').value;
-  var contactId = ge('enrollContact').value;
   var fromMember = ge('enrollFrom').value || null;
   if(!campaignId){ alert('Select a campaign.'); return; }
+
+  // Bulk: enroll an entire category.
+  if(ge('enrollMode') && ge('enrollMode').value==='category'){
+    var cat = ge('enrollCategory') ? ge('enrollCategory').value : '';
+    if(!cat){ alert('Pick a category.'); return; }
+    var count = C.filter(function(x){ return String((x.category||'').trim())===String(cat); }).length;
+    if(!count){ alert('No contacts in that category.'); return; }
+    if(!confirm('Enroll all '+count+' contact'+(count===1?'':'s')+' in "'+cat+'" into this campaign?')) return;
+    var res = enrollByCategory(campaignId, cat, fromMember);
+    if(res.error){ alert('Could not enroll — that campaign has no steps.'); return; }
+    cm('enrollModal'); renderDrips(); updateDripBadges();
+    alert('Enrolled '+res.created+' contact'+(res.created===1?'':'s')+' in "'+cat+'".'
+      + (res.already?'\n'+res.already+' were already enrolled (skipped).':'')
+      + (res.noEmail?'\n'+res.noEmail+' have no email — those will fail until an email is added.':''));
+    return;
+  }
+
+  var contactId = ge('enrollContact').value;
   if(!contactId){ alert('Select a contact.'); return; }
   var cid = parseInt(contactId)||contactId;
   var c = gc(cid);
@@ -12229,6 +12299,8 @@ ge('nav-drips') && (function(){
   ge('btnAddStep') && ge('btnAddStep').addEventListener('click', addCampaignStep);
   ge('btnSaveCampaign') && ge('btnSaveCampaign').addEventListener('click', saveCampaign);
   ge('btnConfirmEnroll') && ge('btnConfirmEnroll').addEventListener('click', confirmEnroll);
+  ge('enrollMode') && ge('enrollMode').addEventListener('change', enrollModeChange);
+  ge('enrollCategory') && ge('enrollCategory').addEventListener('change', updateEnrollCategoryCount);
   ge('btnRunDripsNow') && ge('btnRunDripsNow').addEventListener('click', function(){ runDripsNow(); });
   ge('btnNewMessage') && ge('btnNewMessage').addEventListener('click', function(){ openMessageModal(null); });
   ge('btnSaveMessage') && ge('btnSaveMessage').addEventListener('click', saveMessage);
