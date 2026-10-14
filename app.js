@@ -13240,7 +13240,9 @@ function dsSellerScenarioDefault(saleType, downPct, rate, amortY, balloonY){
     // Existing / underlying mortgage (seller's own loan).
     exLender:'', exLoanType:'', exBalance:'', exRate:'', exPayment:'', exEscrow:'', exHOA:'', exTerm:'', exDueOnSale:'', exAtClosing:'Pay Off',
     mtg2:'', otherLiens:'', commissionPct:5, otherFees:'', homeWarranty:'', utilities:'', concessions:'',
-    hoaTransfer:'', notePrep:'', otherAmount:'' }; }
+    hoaTransfer:'', notePrep:'', otherAmount:'',
+    // Editable with sensible defaults (user can override per deal).
+    settlement:'400', recon:'95', secure:'0' }; }
 function dsDefault(type){
   type = type || 'conventional';
   return { id: Date.now()+Math.floor(Math.random()*100000), contact_id:null, name:'',
@@ -13283,11 +13285,18 @@ function dsComputeSeller(sh){
     var mtg1 = price>0 ? (keep ? 0 : exBalance) : 0;                               // R49 (from above)
     var commission = price>0 ? price*(dsNum(s.commissionPct)/100) : 0;             // R52
     var proTax=0, proHOA=0;                                                        // R54/R55
-    if(price>0 && cd){ var y=cd.getFullYear(); proTax=annualTax/dsDaysInYear(y)*dsDayOfYear(cd); proHOA=hoaMonthly>0?(hoaMonthly/new Date(y,cd.getMonth()+1,0).getDate())*cd.getDate():0; }
-    var settlement=price>0?400:0;                                                  // R56
+    // Prorate the MONTHLY HOA by the day of the closing month. Use the header
+    // "HOA/Condo Fees (monthly)" value; fall back to the Monthly HOA/Condo Fee
+    // entered in the mortgage section so either field drives it.
+    var hoaForPro = hoaMonthly>0 ? hoaMonthly : dsNum(s.exHOA);
+    if(price>0 && cd){ var y=cd.getFullYear();
+      proTax=annualTax/dsDaysInYear(y)*dsDayOfYear(cd);
+      proHOA=hoaForPro>0?(hoaForPro/new Date(y,cd.getMonth()+1,0).getDate())*cd.getDate():0; }
+    // Editable fields (defaults live in dsSellerScenarioDefault); user can override.
+    var settlement=price>0?dsNum(s.settlement):0;                                  // R56
     var title=price>0?dsTitlePolicy(price):0;                                      // R57
-    var recon=price>0?(95+(!dsBlank(s.mtg2)?75:0)):0;                              // R58
-    var secure=0;                                                                 // R59
+    var recon=price>0?dsNum(s.recon):0;                                            // R58
+    var secure=price>0?dsNum(s.secure):0;                                          // R59
     var costs = mtg1 + dsNum(s.mtg2) + dsNum(s.otherLiens) + commission + dsNum(s.otherFees)
       + proTax + proHOA + settlement + title + recon + secure
       + dsNum(s.homeWarranty) + dsNum(s.utilities) + dsNum(s.concessions)
@@ -13602,10 +13611,10 @@ function openDealSheetSeller(sh, isNew){
   inputRow('Other Fees:','otherFees');
   calcRow('Prorated Taxes*:','proTax');
   calcRow('Prorated HOA/Condo Fees*:','proHOA');
-  calcRow('Settlement/Closing Fee:','settlement');
+  inputRow('Settlement/Closing Fee:','settlement');
   calcRow("Homeowner's Title Policy**:",'title');
-  calcRow('Reconveyance Fee***:','recon');
-  calcRow('Secure Document Storage','secure');
+  inputRow('Reconveyance Fee***:','recon');
+  inputRow('Secure Document Storage','secure');
   inputRow('Home Warranty:','homeWarranty');
   inputRow('Utilities/Assessments:','utilities');
   inputRow('Seller Concessions','concessions');
@@ -13662,15 +13671,21 @@ function dsRefreshSeller(sh){
     function money(f){ set(f, dsM(r[f])); }
     // commission lives in a span, not a td id
     var cm=ge('ds_c'+idx+'_commission'); if(cm) cm.textContent = has ? dsM(r.commission) : '';
-    // dollar figures
-    ['downAmt','note','escrowFromBuyer','hoaFromBuyer','mtg1','proTax','proHOA','settlement','title','recon','secure',
+    // dollar figures (settlement, recon, secure are now editable inputs, not computed)
+    ['downAmt','note','escrowFromBuyer','hoaFromBuyer','mtg1','proTax','proHOA','title',
      'costs','netClose','pmt','balloon','totalPI','interest',
      'uP','uE','uH','uTotal','newPI','escrowColl','hoaColl','buyerTotal','netMonthly',
      'uKept','spread','uPaid','uBalloonBal','totalCash'].forEach(money);
     // months = integer, no $
     var bmel=ge('ds_c'+idx+'_balloonMonths'); if(bmel) bmel.textContent = has ? String(Math.round(r.balloonMonths)) : '';
-    // difference only shows when both scenarios have a price
-    var df=ge('ds_c'+idx+'_diff'); if(df) df.textContent = (has && r.hasDiff) ? ((r.diff>=0?'+':'')+dsM(r.diff)) : '';
+    // difference only shows when both scenarios have a price; red when negative
+    var df=ge('ds_c'+idx+'_diff');
+    if(df){
+      var showDiff = (has && r.hasDiff);
+      df.textContent = showDiff ? ((r.diff>=0?'+':'')+dsM(r.diff)) : '';
+      df.style.color = (showDiff && r.diff<0) ? '#cc0000' : '';
+      df.style.fontWeight = showDiff ? '700' : '';
+    }
   });
 }
 function dsLoadScript(src){ return new Promise(function(res,rej){ if(document.querySelector('script[src="'+src+'"]')){ res(); return; } var s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=rej; document.head.appendChild(s); }); }
