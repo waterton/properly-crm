@@ -209,6 +209,21 @@ function todayMtn() {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Denver' });
 }
 
+// When should the NEXT drip step go out? Anchor to the target MOUNTAIN calendar
+// date (today + delayDays) at 13:00 UTC — about 7am Mountain, a morning time on
+// the right local day. Using midnight UTC instead lands at ~6pm Mountain the day
+// BEFORE (Mountain is UTC-6/7), which is why a "1 day" step was arriving the same
+// evening. 13:00 UTC is after Mountain midnight and before the 14:00 UTC daily
+// cron, so the morning run on the target day sends it.
+function nextSendIso(delayDays) {
+  const base = new Date(todayMtn() + 'T00:00:00Z');                 // today's Mountain date @ 00:00 UTC
+  const target = new Date(base.getTime() + (parseInt(delayDays) || 0) * DAY_MS);
+  const y = target.getUTCFullYear();
+  const m = String(target.getUTCMonth() + 1).padStart(2, '0');
+  const d = String(target.getUTCDate()).padStart(2, '0');
+  return y + '-' + m + '-' + d + 'T13:00:00.000Z';
+}
+
 function daysUntil(dateStr) {
   if (!dateStr) return null;
   const today = new Date(todayMtn() + 'T00:00:00');
@@ -781,14 +796,7 @@ export default async function handler(req, res) {
           enr.status = 'completed'; enr.nextSendAt = null; result.drips.completed++;
         } else {
           const nextDelay = parseInt(camp.steps[enr.stepIndex].delayDays) || 0;
-          // Schedule the next step for the START of its target day (00:00 UTC), not a rolling
-          // 24h clock. The cron runs once a day at 14:00 UTC; if we scheduled "now + 24h" and
-          // this send happened in the afternoon, the next day's run would be too early and the
-          // step would slip an extra day. Anchoring to midnight guarantees the next daily run
-          // on/after the target date picks it up, so "1 day apart" lands on consecutive days.
-          const nd = new Date(Date.now() + nextDelay * DAY_MS);
-          nd.setUTCHours(0, 0, 0, 0);
-          enr.nextSendAt = nd.toISOString();
+          enr.nextSendAt = nextSendIso(nextDelay);
         }
         await supaUpsert('enrollments', [enr]);
         result.drips.sent++;
