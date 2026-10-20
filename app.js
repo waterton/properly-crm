@@ -11338,6 +11338,17 @@ function dripMerge(text, c){
 
 function dripDayMs(){ return 86400000; }
 function nowISO(){ return new Date().toISOString(); }
+// When should a step scheduled "delayDays" from today go out? Anchor to the
+// MOUNTAIN calendar date (today + delayDays) at 13:00 UTC (~7am Mountain), so a
+// delay lands on a predictable local morning N days out — never the same evening.
+// Matches nextSendIso() in api/run-drips.js so client + server agree.
+function dripNextSendIso(delayDays){
+  var todayMtn = new Date().toLocaleDateString('en-CA', { timeZone:'America/Denver' });
+  var base = new Date(todayMtn + 'T00:00:00Z');
+  var target = new Date(base.getTime() + (parseInt(delayDays)||0)*86400000);
+  var y=target.getUTCFullYear(), m=String(target.getUTCMonth()+1).padStart(2,'0'), d=String(target.getUTCDate()).padStart(2,'0');
+  return y+'-'+m+'-'+d+'T13:00:00.000Z';
+}
 
 // ---- enrollment creation ----
 function enrollContact(campaignId, contactId, fromMemberId){
@@ -11354,7 +11365,7 @@ function enrollContact(campaignId, contactId, fromMemberId){
     fromMemberId: fromMemberId || (typeof gmailState!=='undefined' ? gmailState.activeMemberId : null) || null,
     stepIndex: 0,
     status: 'active',
-    nextSendAt: new Date(Date.now() + firstDelay*dripDayMs()).toISOString(),
+    nextSendAt: dripNextSendIso(firstDelay),
     created_at: nowISO()
   };
   ENR.push(enr);
@@ -12251,7 +12262,7 @@ function enrollByCategory(campaignId, cat, fromMember){
       campaignId: campaignId, contactId: x.id,
       fromMemberId: fromMember || (typeof gmailState!=='undefined' ? gmailState.activeMemberId : null) || null,
       stepIndex: 0, status: 'active',
-      nextSendAt: new Date(Date.now() + firstDelay*dripDayMs()).toISOString(),
+      nextSendAt: dripNextSendIso(firstDelay),
       created_at: nowISO()
     };
     ENR.push(enr); batch.push(enr); created++;
