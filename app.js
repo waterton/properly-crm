@@ -652,7 +652,7 @@ function fetchAllRows(base, path, headers){
   return nextPage(0);
 }
 
-async function loadFromDB(){
+async function loadFromDB(light){
   if(!supaReady) return false;
   try{
     showSyncStatus('loading');
@@ -660,6 +660,13 @@ async function loadFromDB(){
     // Use direct fetch to Supabase REST API to avoid DataCloneError
     var headers = await getAuthHeaders();
     var base = SUPA_URL + '/rest/v1/';
+
+    // "light" reloads (the background poll) skip the big, rarely-changing tables
+    // — prospect photos, drip images, investments, documents, listings, etc. —
+    // to keep database egress tiny. Their globals keep their last loaded value
+    // (the assignment lines guard on Array.isArray, so a null is ignored). A full
+    // load (startup) still pulls everything.
+    function heavy(p){ return light ? Promise.resolve(null) : p; }
 
     var results = await Promise.all([
       fetchAllRows(base, 'contacts?order=added.asc,id.asc', headers),
@@ -670,26 +677,26 @@ async function loadFromDB(){
       fetchAllRows(base, 'campaigns?order=created_at.asc,id.asc', headers).catch(function(){return [];}),
       fetchAllRows(base, 'enrollments?order=created_at.asc,id.asc', headers).catch(function(){return [];}),
       fetchAllRows(base, 'send_log?order=created_at.asc,id.asc', headers).catch(function(){return []; }),
-      fetchAllRows(base, 'documents?order=created_at.asc,id.asc', headers).catch(function(){return []; }),
+      heavy(light ? null : fetchAllRows(base, 'documents?order=created_at.asc,id.asc', headers).catch(function(){return []; })),
       fetchAllRows(base, 'tx_changes?order=id.asc', headers).catch(function(){return []; }),
       fetchAllRows(base, 'reminder_settings?order=id.asc', headers).catch(function(){return []; }),
       fetchAllRows(base, 'team?order=id.asc', headers).catch(function(){return []; }),
       fetchAllRows(base, 'reminder_log?order=id.desc', headers).catch(function(){return []; }),
-      fetchAllRows(base, 'inv_hoa?order=id.asc', headers).catch(function(){return []; }),
-      fetchAllRows(base, 'inv_properties?order=id.asc', headers).catch(function(){return []; }),
-      fetchAllRows(base, 'inv_units?order=id.asc', headers).catch(function(){return []; }),
-      fetchAllRows(base, 'inv_ledger?order=date.asc,id.asc', headers).catch(function(){return []; }),
-      fetchAllRows(base, 'inv_loans?order=id.asc', headers).catch(function(){return []; }),
-      fetchAllRows(base, 'inv_loan_payments?order=id.asc', headers).catch(function(){return []; }),
-      fetchAllRows(base, 'inv_payees?order=id.asc', headers).catch(function(){return []; }),
-      fetchAllRows(base, 'inv_scan_log?order=ran_at.desc&limit=25', headers).catch(function(){return []; }),
-      fetchAllRows(base, 'deal_sheets?order=updated_at.desc', headers).catch(function(){return []; }),
-      fetchAllRows(base, 'loi_letters?order=updated_at.desc', headers).catch(function(){return []; }),
-      fetchAllRows(base, 'listings?order=updated_at.desc', headers).catch(function(){return []; }),
-      fetchAllRows(base, 'inv_recurring?order=id.asc', headers).catch(function(){return []; }),
-      fetchAllRows(base, 'commercial_prospects?order=updated_at.desc', headers).catch(function(){return []; }),
-      fetchAllRows(base, 'nc_communities?order=updated_at.desc', headers).catch(function(){return []; }),
-      fetchAllRows(base, 'drip_messages?order=updated_at.desc', headers).catch(function(){return []; })
+      heavy(light ? null : fetchAllRows(base, 'inv_hoa?order=id.asc', headers).catch(function(){return []; })),
+      heavy(light ? null : fetchAllRows(base, 'inv_properties?order=id.asc', headers).catch(function(){return []; })),
+      heavy(light ? null : fetchAllRows(base, 'inv_units?order=id.asc', headers).catch(function(){return []; })),
+      heavy(light ? null : fetchAllRows(base, 'inv_ledger?order=date.asc,id.asc', headers).catch(function(){return []; })),
+      heavy(light ? null : fetchAllRows(base, 'inv_loans?order=id.asc', headers).catch(function(){return []; })),
+      heavy(light ? null : fetchAllRows(base, 'inv_loan_payments?order=id.asc', headers).catch(function(){return []; })),
+      heavy(light ? null : fetchAllRows(base, 'inv_payees?order=id.asc', headers).catch(function(){return []; })),
+      heavy(light ? null : fetchAllRows(base, 'inv_scan_log?order=ran_at.desc&limit=25', headers).catch(function(){return []; })),
+      heavy(light ? null : fetchAllRows(base, 'deal_sheets?order=updated_at.desc', headers).catch(function(){return []; })),
+      heavy(light ? null : fetchAllRows(base, 'loi_letters?order=updated_at.desc', headers).catch(function(){return []; })),
+      heavy(light ? null : fetchAllRows(base, 'listings?order=updated_at.desc', headers).catch(function(){return []; })),
+      heavy(light ? null : fetchAllRows(base, 'inv_recurring?order=id.asc', headers).catch(function(){return []; })),
+      heavy(light ? null : fetchAllRows(base, 'commercial_prospects?order=updated_at.desc', headers).catch(function(){return []; })),
+      heavy(light ? null : fetchAllRows(base, 'nc_communities?order=updated_at.desc', headers).catch(function(){return []; })),
+      heavy(light ? null : fetchAllRows(base, 'drip_messages?order=updated_at.desc', headers).catch(function(){return []; }))
     ]);
     var rc = results[0], rn = results[1], rf = results[2], rd = results[3], rtx = results[4];
 
@@ -959,25 +966,42 @@ function pausePoll(ms){
   _pollPaused = true;
   setTimeout(function(){ _pollPaused = false; }, ms||10000);
 }
+function _pollRefreshCurrent(ok){
+  if(ok && curPage){
+    if(curPage==='dashboard') rd();
+    else if(curPage==='contacts') rc();
+    else if(curPage==='followups') rfu();
+    else if(curPage==='notes') rn();
+    else if(curPage==='deadlines') rdl();
+    else if(curPage==='briefing') rb();
+    else if(curPage==='tc') renderTC();
+    else if(curPage==='drips'){ processDrips(); renderDrips(); }
+  }
+}
 function subscribeRealtime(){
   if(!supaReady) return;
   if(_pollInterval) clearInterval(_pollInterval);
+  // Background sync every 5 minutes (was 30 seconds) — and only when the tab is
+  // actually visible. The poll is a LIGHT reload (skips the big tables), which
+  // together cut database egress by ~95%. A full reload still happens at startup.
   _pollInterval = setInterval(function(){
     if(_pollPaused) return;
-    loadFromDB().then(function(ok){
-      if(ok && curPage){
-        if(curPage==='dashboard') rd();
-        else if(curPage==='contacts') rc();
-        else if(curPage==='followups') rfu();
-        else if(curPage==='notes') rn();
-        else if(curPage==='deadlines') rdl();
-        else if(curPage==='briefing') rb();
-        else if(curPage==='tc') renderTC();
-        else if(curPage==='drips'){ processDrips(); renderDrips(); }
-      }
+    if(typeof document!=='undefined' && document.hidden) return;   // don't sync a hidden tab
+    loadFromDB(true).then(_pollRefreshCurrent);
+  }, 300000); // 5 minutes
+  // When the user comes back to a tab that was hidden a while, do one light sync.
+  if(typeof document!=='undefined' && !_visWired){
+    _visWired = true;
+    document.addEventListener('visibilitychange', function(){
+      if(document.hidden) return;
+      if(_pollPaused) return;
+      if(Date.now() - _lastVisSync < 120000) return;   // at most once every 2 min
+      _lastVisSync = Date.now();
+      loadFromDB(true).then(_pollRefreshCurrent);
     });
-  }, 30000); // Poll every 30 seconds
+  }
 }
+var _visWired = false, _lastVisSync = 0;
 function demo(){
   var t=Date.now();
   C=[
