@@ -2471,7 +2471,7 @@ function _dlTypeToField(type){
 // steps auto-check on import (they mean "tracking", not "done"), so hiding UPCOMING deadlines by
 // them would wrongly remove live deadlines. Only overdue + checked is safe to hide.
 function _stepForField(tx, field){
-  var tmpl = (typeof TC_TEMPLATES !== 'undefined') ? (TC_TEMPLATES[tx.type] || TC_TEMPLATES['buyer']) : null;
+  var tmpl = (typeof TC_TEMPLATES !== 'undefined') ? (tcTemplateFor(tx)) : null;
   if(!tmpl) return null;
   for(var i=0;i<tmpl.length;i++){ var st=tmpl[i].steps||[]; for(var j=0;j<st.length;j++){ if(st[j].dateField===field) return st[j]; } }
   return null;
@@ -3483,8 +3483,51 @@ var TC_TEMPLATES = {
       {label:'Long-term nurture campaign started',key:'s4_nurture',desc:'Post-sale value-add communication sequence activated.'},
       {label:'Milestone follow-ups',key:'s4_milestones',desc:'Follow-up schedule systematically initiated across standard milestones.'}
     ]}
+  ],
+  // Short sale: seller-side, but the LENDER drives the timeline. The important
+  // beats are the hardship package, the lender short-sale package, and the
+  // approval letter (and its expiration). Most steps are plain checklist items
+  // because the dates are lender-controlled; the Short Sale panel + risk review
+  // track the approval letter and expiration.
+  short_sale: [
+    {phase:'Phase 1 - Listing & Hardship Intake', steps:[
+      {label:'Listing agreement & short-sale addendum signed',key:'ss1_agreement',desc:'Exclusive listing agreement plus the short-sale listing addendum completed and signed.'},
+      {label:'Seller hardship package assembled',key:'ss1_hardship',desc:'Hardship letter, income/financial worksheet, recent bank statements, pay stubs, and tax returns gathered from the seller.'},
+      {label:'Authorization to release information signed',key:'ss1_auth',desc:'Signed third-party authorization so the lender(s) will discuss the loan with you.'},
+      {label:'Lienholder(s) & payoff balances identified',key:'ss1_liens',desc:'All mortgages/liens, servicers, and approximate payoff balances recorded in the Short Sale panel.'}
+    ]},
+    {phase:'Phase 2 - List & Market', steps:[
+      {label:'Pricing set with market data',key:'ss2_price',desc:'List price supported by a CMA and positioned to attract an offer the lender is likely to accept.'},
+      {label:'MLS active with short-sale disclosure',key:'ss2_mls',desc:'Listing active on the MLS and disclosed as a short sale subject to lender approval.'},
+      {label:'Marketing launched',key:'ss2_marketing',desc:'Standard marketing deployed.'}
+    ]},
+    {phase:'Phase 3 - Offer & Lender Package', steps:[
+      {label:'Offer accepted & arms-length affidavit signed',key:'ss3_offer',owner:'agent',desc:"Buyer's offer accepted by the seller; arm's-length affidavit signed by all parties."},
+      {label:'Complete short-sale package submitted to lender(s)',key:'ss3_submit',desc:'Full package (hardship docs, listing agreement, offer, estimated settlement statement, authorization) submitted to each lienholder. Record the submission date in the Short Sale panel.'},
+      {label:"Lender's BPO / appraisal completed",key:'ss3_bpo',desc:'Lender-ordered broker price opinion or appraisal completed.'}
+    ]},
+    {phase:'Phase 4 - Lender Review & Approval', steps:[
+      {label:'Negotiator assigned & file acknowledged',key:'ss4_negotiator',desc:'Lender assigned a short-sale negotiator and confirmed receipt of the file.'},
+      {label:'Respond to lender document requests',key:'ss4_requests',desc:'Updated pay stubs/statements and any conditions supplied promptly to keep the file moving.'},
+      {label:'Approval letter received',key:'ss4_approval',completion:true,desc:'Written short-sale approval received from each lienholder. Record the approval date and EXPIRATION in the Short Sale panel.'},
+      {label:'Approval terms reviewed',key:'ss4_terms',desc:'Approved price, seller contribution, commission, and any deficiency/waiver language reviewed and acceptable.'}
+    ]},
+    {phase:'Phase 5 - Close (within the approval window)', steps:[
+      {label:'Title opened / payoffs confirmed',key:'ss5_title',desc:'Escrow opened and payoffs confirmed against the approval.'},
+      {label:'Buyer financing finalized',key:'ss5_financing',desc:"Buyer's loan cleared to close inside the approval window."},
+      {label:'Signing scheduled',key:'ss5_signing',owner:'tc',due:{anchor:'closingDate',offset:-3},desc:'Settlement appointment set inside the approval-letter window.'},
+      {label:'Final walkthrough completed',key:'ss5_walkthrough',owner:'agent',due:{anchor:'closingDate',offset:-1},desc:'Buyer final walkthrough completed.'},
+      {label:'Recording confirmed & liens released per approval',key:'ss5_recording',owner:'tc',due:{anchor:'closingDate',offset:1},desc:'Recording confirmed; lienholders paid and releases issued per the approval terms.'}
+    ]},
+    {phase:'Phase 6 - Post-Close', steps:[
+      {label:'Settlement statement reviewed & uploaded',key:'ss6_settlement',owner:'tc',due:{anchor:'closingDate',offset:1},desc:'Final settlement statement matches the lender approval; uploaded to storage.'},
+      {label:'CRM updated & follow-ups set',key:'ss6_crm',desc:'Client tagged as past client; follow-up / nurture sequence initiated.'}
+    ]}
   ]
 };
+// Pick the workflow template for a transaction: a category-specific one (short
+// sale) wins, else the buyer/seller template, else buyer.
+function tcTemplateFor(tx){ return (tx && TC_TEMPLATES[tx.category]) || (tx && TC_TEMPLATES[tx.type]) || TC_TEMPLATES['buyer']; }
 
 // ── Templated workflow: turn TC_TEMPLATES steps that carry a `due` rule into dated deadline
 //    records so they inherit reminders, priorities, and the portal. Idempotent (deduped by
@@ -3539,7 +3582,7 @@ function materializeWorkflowTasks(txArg){
   })();
   list.forEach(function(tx){
     if(!tx || tx.status==='closed') return;
-    var tmpl = TC_TEMPLATES[tx.type] || TC_TEMPLATES['buyer'];
+    var tmpl = tcTemplateFor(tx);
     tmpl.forEach(function(phase){
       (phase.steps||[]).forEach(function(step){
         if(!step.due) return;                                    // only date-drivable steps
@@ -3625,7 +3668,7 @@ function updateNbTC(){
 }
 
 function tcProgress(tx){
-  var template = TC_TEMPLATES[tx.type] || TC_TEMPLATES['buyer'];
+  var template = tcTemplateFor(tx);
   var total = 0, done = 0;
   template.forEach(function(phase){
     phase.steps.forEach(function(step){
@@ -3637,7 +3680,7 @@ function tcProgress(tx){
 }
 
 function tcNextSteps(tx){
-  var template = TC_TEMPLATES[tx.type] || TC_TEMPLATES['buyer'];
+  var template = tcTemplateFor(tx);
   var next = [];
   for(var i=0;i<template.length;i++){
     var phase = template[i];
@@ -3664,7 +3707,7 @@ function _riskFieldLabel(f){
 // has been handled and must not flag. This stops "earnest money deadline is in the past" from
 // nagging every day once the earnest money is received and the step is marked complete.
 function _dateHandled(tx, field){
-  var tmpl = (typeof TC_TEMPLATES !== 'undefined') ? (TC_TEMPLATES[tx.type] || TC_TEMPLATES['buyer']) : null;
+  var tmpl = (typeof TC_TEMPLATES !== 'undefined') ? (tcTemplateFor(tx)) : null;
   if(!tmpl || !tx.steps) return false;
   for(var i=0;i<tmpl.length;i++){
     var steps = tmpl[i].steps || [];
@@ -3681,6 +3724,36 @@ function computeTxRisks(tx){
   // commercial lease has none of those, so skip them - lease-specific risk checks are a later add.
   if(tx.category === 'commercial_lease') return risks;
   function add(sev, msg){ risks.push({sev: sev, msg: msg, key: 'risk:'+msg}); }
+
+  // Short sale: the risks that matter are about the LENDER approval, not the
+  // usual bank-loan/appraisal contingencies (which shouldn't even run until the
+  // lender approves). Reads the Short Sale panel (tx.details.shortSale).
+  if(tx.category === 'short_sale'){
+    var ss = (tx.details && tx.details.shortSale) || {};
+    var _t = tod();
+    if(!ss.approvalDate){
+      add('caution', 'Lender short-sale approval not received yet — hold buyer appraisal/inspection spend until the lender approves.');
+    }
+    if(!ss.lien1 && !ss.bal1){
+      add('caution', 'No lienholder / payoff balance recorded — add them in the Short Sale panel.');
+    }
+    if(ss.expirationDate){
+      if(ss.expirationDate < _t){
+        add('red', 'Lender approval letter EXPIRED (' + fd(ss.expirationDate) + ') — the short sale must be re-approved before it can close.');
+      } else {
+        var _de = Math.round((pld(ss.expirationDate) - pld(_t)) / 864e5);
+        if(_de >= 0 && _de <= 14) add('caution', 'Lender approval letter expires in ' + _de + ' day' + (_de===1?'':'s') + ' (' + fd(ss.expirationDate) + ') — push to close.');
+      }
+      if(tx.closingDate && tx.closingDate > ss.expirationDate){
+        add('red', 'Closing date (' + fd(tx.closingDate) + ') is AFTER the approval-letter expiration (' + fd(ss.expirationDate) + ').');
+      }
+    } else if(ss.approvalDate){
+      add('caution', 'Approval received, but no expiration date recorded — enter it so the deadline is tracked.');
+    }
+    var _hasArms = DOCS.some(function(d){ var h=((d.doc_type||'')+' '+((d.extracted&&d.extracted.docType)||'')+' '+(d.file_name||'')).toLowerCase(); return /arm.?s.?length|affidavit of arm/.test(h); });
+    if(!_hasArms) add('caution', "No arm's-length affidavit on file — required for most short-sale approvals.");
+    return risks;
+  }
   var today = tod();
   var cd = tx.contractDate, close = tx.closingDate;
   var deadlines = [
@@ -4574,6 +4647,19 @@ function renderEmailIntel(result, tx, c){
 // scanned document matches its type keywords, or when the user manually marks it present. The user
 // can mark anything N/A. No AI at render time - the scanner already classified the docs on import.
 function requiredDocs(tx){
+  if(tx.category === 'short_sale'){
+    return [
+      {key:'ss_repc',       label:'Purchase Contract (REPC)',                   kw:['repc','purchase contract','real estate purchase']},
+      {key:'ss_addendum',   label:'Short Sale Addendum',                        kw:['short sale','short-sale']},
+      {key:'ss_hardship',   label:'Seller Hardship Letter',                     kw:['hardship']},
+      {key:'ss_auth',       label:'Authorization to Release Information',        kw:['authorization','3rd party','third party','third-party']},
+      {key:'ss_financials', label:'Seller Financials (statements / pay stubs / tax returns)', kw:['bank statement','pay stub','paystub','tax return','financial worksheet']},
+      {key:'ss_package',    label:'Lender Short Sale Package',                   kw:['short sale package','lender package','short-sale package']},
+      {key:'ss_arms',       label:"Arm's-Length Affidavit",                     kw:['arms length','arm\'s length','arm’s length','affidavit']},
+      {key:'ss_approval',   label:'Lender Approval Letter',                     kw:['approval letter','short sale approval','approval']},
+      {key:'ss_settlement', label:'Settlement Statement / Closing Disclosure',  kw:['settlement','closing disclosure','hud']}
+    ];
+  }
   if(tx.category === 'commercial_lease'){
     return [
       {key:'lease',    label:'Signed Lease',              kw:['lease']},
@@ -4761,6 +4847,49 @@ function renderLeasePanel(tx){
     grid.appendChild(cell);
   });
   if(!any) grid.appendChild(mkDiv('font-size:15px;color:var(--text3);', 'No lease terms captured yet.'));
+  sec.appendChild(grid);
+  return sec;
+}
+
+// Editable short-sale panel: the lender-approval details that drive the deal.
+// Saved on tx.details.shortSale. Changing a field re-renders so the Risk Review
+// (approval-letter expiration, etc.) updates live.
+function renderShortSalePanel(tx){
+  tx.details = tx.details || {};
+  var ss = tx.details.shortSale = tx.details.shortSale || {};
+  var sec = document.createElement('div');
+  sec.style.cssText = 'padding:14px 20px;border-bottom:1px solid var(--border);';
+  sec.appendChild(mkDiv('font-size:14px;text-transform:uppercase;letter-spacing:1.2px;color:var(--seller);font-weight:700;margin-bottom:4px;', 'Short Sale — Lender Approval'));
+  sec.appendChild(mkDiv('font-size:13px;color:var(--text3);margin-bottom:10px;', 'The lender controls the timeline. Record the lienholders, the approval letter, and especially its expiration.'));
+  var grid = document.createElement('div');
+  grid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:11px 18px;';
+  function fld(label, key, type, highlight){
+    var wrap = document.createElement('div');
+    wrap.appendChild(mkDiv('font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:'+(highlight?'var(--danger)':'var(--text3)')+';', label));
+    var inp = document.createElement('input'); inp.className='fi'; inp.type=type||'text'; inp.value=(ss[key]!=null?ss[key]:'');
+    inp.style.cssText='width:100%;font-size:15px;margin-top:3px;'+(highlight?'border:1px solid var(--danger);':'');
+    inp.addEventListener('change', function(){ ss[key]=inp.value; saveTX(tx); openTCDetail(tx.id); });
+    wrap.appendChild(inp); return wrap;
+  }
+  function sel(label, key, opts){
+    var wrap=document.createElement('div');
+    wrap.appendChild(mkDiv('font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text3);', label));
+    var s=document.createElement('select'); s.className='fsel'; s.style.cssText='width:100%;font-size:15px;margin-top:3px;';
+    opts.forEach(function(o){ var op=document.createElement('option'); op.value=o[0]; op.textContent=o[1]; if(String(ss[key]||'')===o[0]) op.selected=true; s.appendChild(op); });
+    s.addEventListener('change', function(){ ss[key]=s.value; saveTX(tx); openTCDetail(tx.id); });
+    wrap.appendChild(s); return wrap;
+  }
+  grid.appendChild(fld('Lienholder 1 (servicer)','lien1'));
+  grid.appendChild(fld('Loan 1 payoff balance','bal1'));
+  grid.appendChild(fld('Lienholder 2 (if any)','lien2'));
+  grid.appendChild(fld('Loan 2 payoff balance','bal2'));
+  grid.appendChild(fld('Negotiator / processor (name, phone)','negotiator'));
+  grid.appendChild(fld('Package submitted','submittedDate','date'));
+  grid.appendChild(fld('Approval letter received','approvalDate','date'));
+  grid.appendChild(fld('Approval letter EXPIRATION','expirationDate','date', true));
+  grid.appendChild(fld('Approved sale price','approvedPrice'));
+  grid.appendChild(fld('Approved seller contribution / net','approvedNet'));
+  grid.appendChild(sel("Arm's-length affidavit signed",'armsLength',[['','—'],['yes','Yes'],['no','No']]));
   sec.appendChild(grid);
   return sec;
 }
@@ -5008,6 +5137,8 @@ function openTCDetail(id){
 
   // Commercial lease terms panel (only for lease transactions).
   if(tx.category === 'commercial_lease'){ body.appendChild(renderLeasePanel(tx)); }
+  // Short-sale lender-approval panel (only for short-sale transactions).
+  if(tx.category === 'short_sale'){ body.appendChild(renderShortSalePanel(tx)); }
 
   // Document completeness checklist (deterministic - required docs per deal type).
   if(tx.status !== 'closed'){ body.appendChild(renderDocChecklist(tx)); }
@@ -5212,7 +5343,7 @@ function openTCDetail(id){
   body.appendChild(progSec);
 
   // Checklist phases
-  var template = TC_TEMPLATES[tx.type] || TC_TEMPLATES['buyer'];
+  var template = tcTemplateFor(tx);
   template.forEach(function(phase){
     var doneInPhase = phase.steps.filter(function(s){ return tx.steps && tx.steps[s.key]; }).length;
     var phaseHdr = document.createElement('div');
@@ -5361,7 +5492,7 @@ async function askTCQuestion(){
   ge('tcAiResponse').style.display = 'block';
   ge('tcAiResponse').textContent = 'Thinking...';
 
-  var template = TC_TEMPLATES[tx.type] || TC_TEMPLATES['buyer'];
+  var template = tcTemplateFor(tx);
   var doneItems = [], pendingItems = [], urgentItems = [];
   template.forEach(function(phase){
     phase.steps.forEach(function(step){
@@ -5425,6 +5556,7 @@ function openNewTxModal(){
   ge('tcModalTitle').textContent = 'New Transaction';
   ge('btnSaveTransaction').setAttribute('data-edit-id','');
   ge('tcType').value = 'buyer';
+  if(ge('tcCategory')) ge('tcCategory').value = '';
   var txCP = ge('tcContactPick'); txCP.innerHTML = '';
   buildContactPicker(txCP, 'tcContact', 'Search contact by name, email, phone...');
   ['tcAddress','tcPrice','tcMLS','tcLender','tcTitle','tcNotes','tcListCommPct','tcBuyerCommPct','tcListCommAmt','tcBuyerCommAmt'].forEach(function(x){ if(ge(x)) ge(x).value=''; });
@@ -5447,6 +5579,7 @@ function saveTransaction(){
     TX.push(tx);
   }
   tx.type = ge('tcType').value;
+  if(ge('tcCategory')) tx.category = ge('tcCategory').value || null;
   tx.contactId = pickedContactId;
   tx.address = ge('tcAddress').value.trim();
   tx.price = ge('tcPrice').value.trim();
@@ -7357,7 +7490,7 @@ async function commitScanImport(r, btn){
   // Residential checklist auto-completion doesn't apply to commercial leases (different lifecycle).
   if(!isLease){
     // ---- Gap B: auto-check date-tracked checklist steps ----
-    var template = TC_TEMPLATES[tx.type] || TC_TEMPLATES['buyer'];
+    var template = tcTemplateFor(tx);
     if(!tx.steps) tx.steps = {};
     template.forEach(function(phase){
       phase.steps.forEach(function(step){
@@ -11270,6 +11403,7 @@ ge('tcDetEdit').addEventListener('click', function(){
   ge('tcModalTitle').textContent = 'Edit Transaction';
   ge('btnSaveTransaction').setAttribute('data-edit-id', tx.id);
   ge('tcType').value = tx.type||'buyer';
+  if(ge('tcCategory')) ge('tcCategory').value = tx.category||'';
   var txCPe = ge('tcContactPick'); txCPe.innerHTML = '';
   var txPick = buildContactPicker(txCPe, 'tcContact', 'Search contact by name, email, phone...');
   if(tx.contactId){ var txC = gc(tx.contactId); if(txC) txPick.setContact(txC); }
