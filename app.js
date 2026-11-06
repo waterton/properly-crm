@@ -11462,6 +11462,7 @@ var DV = { view:'list', campId:null, tab:'steps', obFilter:'all' };
 var DRIP_TZ = 'America/Denver';
 var DRIP_DEFAULT_RULES = { reply:true, pause:true, pauseDays:10, weekends:true, time:'07:00', oneADay:true, fromMemberId:null };
 
+function nowISO(){ return new Date().toISOString(); }
 function dripSave(table, rows){ sv(); if(supaReady) dbSave(table, rows); }
 function dripDel(table, id){ if(supaReady) dbDelete(table, id); }
 function dvEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
