@@ -11898,7 +11898,7 @@ function dvDoAdd(){
   targets.forEach(function(ct,k){
     var old=ENR.find(function(e){ return String(e.campaignId)===String(c.id) && String(e.contactId)===String(ct.id); });
     var e = old || { id: base+k, campaignId:c.id, contactId:ct.id, created_at:nowISO() };
-    e.stepIndex=0; e.status='active'; e.nextSendAt=first; e.pausedUntil=null; e.reason=null; e.addedBy=me; e.fromMemberId=null; e.updated_at=nowISO();
+    e.stepIndex=0; e.status='active'; e.nextSendAt=first; e.pausedUntil=null; e.reason=null; e.addedBy=me; e.fromMemberId=null; e.updated_at=nowISO(); e.created_at=nowISO();
     if(!old) ENR.push(e);
     batch.push(JSON.parse(JSON.stringify(e)));
   });
@@ -11927,7 +11927,18 @@ function dvRulesHtml(c){
 function dvSetRule(id,k,v){
   var c=dvCamp(id), r=dripRules(c); r[k]=v; c.rules=r; dvSaveCamp(c);
   if(k==='time'||k==='weekends'){   // re-time everyone's next step to the new schedule
-    ENR.forEach(function(e){ if(String(e.campaignId)===String(id) && e.status==='active' && e.nextSendAt){ e.nextSendAt=dripNextSend(dvDateOf(e.nextSendAt),0,r, Date.now()-60000); dvSaveEnr(e); } });
+    var st=dripSteps(c), moved=0;
+    ENR.forEach(function(e){
+      if(String(e.campaignId)!==String(id) || e.status!=='active' || !st[e.stepIndex]) return;
+      // Recalculate from when they reached this step (their last step, or when they were added),
+      // not from the old send date — otherwise "skip weekends" off would still leave Monday.
+      var last=SENDLOG.filter(function(l){ return String(l.enrollmentId)===String(e.id) && ((l.kind==='email'&&l.status==='sent')||l.kind==='task'||l.kind==='skipped'); })
+        .map(function(l){ return Date.parse(l.sentAt||l.created_at); }).sort(function(a,b){ return b-a; })[0];
+      var base = last ? dvDateOf(new Date(last).toISOString()) : dvDateOf(e.created_at||nowISO());
+      var next = dripNextSend(base, st[e.stepIndex].wait, r);
+      if(next!==e.nextSendAt){ e.nextSendAt=next; dvSaveEnr(e); moved++; }
+    });
+    if(moved){ renderDrips(); dvToast('Saved — '+moved+' scheduled step'+(moved===1?'':'s')+' re-timed to the new rule'); return; }
   }
   renderDrips(); dvToast('Saved');
 }
