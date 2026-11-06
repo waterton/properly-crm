@@ -460,7 +460,9 @@ async function processReminders(result) {
 
     // Optional per-reminder time: on the send-day, hold until the clock reaches it. Earlier
     // cron runs skip (staying pending); a later run at/after the time sends it. Blank = send now.
-    if (dl.time && nowHmMtn() < String(dl.time).slice(0, 5)) { result.reminders.skipped++; continue; }
+    // Reminders with no time of their own wait until 7:00 am Mountain. This job now runs every
+    // 15 minutes, and without this they'd go out just after midnight.
+    if (nowHmMtn() < (dl.time ? String(dl.time).slice(0, 5) : '07:00')) { result.reminders.skipped++; continue; }
 
     // Closed deals don't need reminding.
     let tx = null;
