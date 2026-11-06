@@ -643,6 +643,14 @@ async function getSendControls() {
   } catch (e) {}
   return def;
 }
+// The sending account to use for a drip when the enrollment didn't record one.
+async function getDefaultDripSender() {
+  try {
+    const rows = await supaGet('settings?key=eq.default_drip_sender&select=value');
+    if (Array.isArray(rows) && rows[0] && rows[0].value && rows[0].value.memberId) return String(rows[0].value.memberId);
+  } catch (e) {}
+  return null;
+}
 
 export default async function handler(req, res) {
   if (!(await authorized(req))) return res.status(401).json({ error: 'Unauthorized' });
@@ -670,6 +678,7 @@ export default async function handler(req, res) {
     ) : [];
 
     if (Array.isArray(due) && due.length) {
+      const defaultSender = await getDefaultDripSender();   // used when an enrollment has no sender
       const campaigns = await supaGet('campaigns?limit=500');
       const campById = {};
       (campaigns || []).forEach(c => {
@@ -729,7 +738,7 @@ export default async function handler(req, res) {
           await supaUpsert('enrollments', [enr]); result.drips.failed++; continue;
         }
 
-        const memberId = enr.fromMemberId;
+        const memberId = enr.fromMemberId || defaultSender;
         if (!memberId) {
           logBase.status = 'queued'; logBase.error = 'No sending account';
           await supaUpsert('send_log', [logBase]);

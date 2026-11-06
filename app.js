@@ -67,6 +67,7 @@ var C=[],N=[],F=[],D=[],TX=[],TM=[],A=[],curDet=null,curFilter='all',curPage='da
 var CAMP=[],ENR=[],SENDLOG=[],DOCS=[];
 var DMSG=[]; // drip_messages: reusable, fully-designed marketing emails (subject + HTML w/ embedded images)
 var SCTRL=null; // in-memory copy of Sending Controls (settings.sending_controls) so the UI can explain why a drip is/ isn't sending
+var DRIP_SENDER_MEMBER=null; // default "send from" account (member id) for drips, from settings.default_drip_sender
 var CH=[]; // tx_changes: audit trail of field changes applied from scanned documents
 var RS=[]; // reminder_settings: how many days before each deadline type to remind (cron reads these)
 var RL=[]; // reminder_log: which reminders the cron has already sent (used to hide sent personal reminders)
@@ -11007,6 +11008,12 @@ async function loadSendingControls(){
   if(!supaReady) return;
   try{
     var headers = await getAuthHeaders();
+    // Default drip sender (the Workspace account) — loaded alongside the controls.
+    try{
+      var dr = await fetch(SUPA_URL+'/rest/v1/settings?key=eq.default_drip_sender&select=value',{ headers: headers });
+      var dt = await dr.text();
+      if(dt){ var drows = JSON.parse(dt); if(drows.length && drows[0].value && drows[0].value.memberId) DRIP_SENDER_MEMBER = String(drows[0].value.memberId); }
+    }catch(e){}
     var r = await fetch(SUPA_URL+'/rest/v1/settings?key=eq.sending_controls&select=value',{ headers: headers });
     var text = await r.text(); if(!text){ SCTRL = { master:false, drips:false, reminders:false, briefing:false, testMode:true, testEmail:'' }; return; }
     var rows = JSON.parse(text);
@@ -11520,7 +11527,7 @@ function enrollContact(campaignId, contactId, fromMemberId){
     id: Date.now() + Math.floor(Math.random()*1000),
     campaignId: campaignId,
     contactId: contactId,
-    fromMemberId: fromMemberId || (typeof gmailState!=='undefined' ? gmailState.activeMemberId : null) || null,
+    fromMemberId: fromMemberId || DRIP_SENDER_MEMBER || (typeof gmailState!=='undefined' ? gmailState.activeMemberId : null) || null,
     stepIndex: 0,
     status: 'active',
     nextSendAt: dripNextSendIso(firstDelay),
@@ -12383,7 +12390,9 @@ async function openEnrollModal(presetCampaignId, presetContactId){
     var o=document.createElement('option'); o.value=''; o.textContent='No Gmail connected (will queue)'; fs.appendChild(o);
   }else{
     keys.forEach(function(k){ var o=document.createElement('option'); o.value=k; o.textContent=(accts[k].email||accts[k].name||k); fs.appendChild(o); });
-    if(gmailState.activeMemberId) fs.value=gmailState.activeMemberId;
+    // Default to the configured drip sender (Workspace account) when it's connected.
+    if(DRIP_SENDER_MEMBER && accts[DRIP_SENDER_MEMBER]) fs.value=DRIP_SENDER_MEMBER;
+    else if(gmailState.activeMemberId) fs.value=gmailState.activeMemberId;
   }
   om('enrollModal');
 }
@@ -12418,7 +12427,7 @@ function enrollByCategory(campaignId, cat, fromMember){
     var enr = {
       id: Date.now() + Math.floor(Math.random()*1000000) + created,
       campaignId: campaignId, contactId: x.id,
-      fromMemberId: fromMember || (typeof gmailState!=='undefined' ? gmailState.activeMemberId : null) || null,
+      fromMemberId: fromMember || DRIP_SENDER_MEMBER || (typeof gmailState!=='undefined' ? gmailState.activeMemberId : null) || null,
       stepIndex: 0, status: 'active',
       nextSendAt: dripNextSendIso(firstDelay),
       created_at: nowISO()
