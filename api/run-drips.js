@@ -1,18 +1,29 @@
-// /api/run-drips.js
-// Combined daily cron: processes drip enrollments + sends morning briefing.
-// Triggered by Vercel Cron at 0 14 * * * (7am Mountain / 2pm UTC).
+// /api/run-drips.js — Drip campaign engine (v2) + transaction deadline reminders.
 //
-// Env vars required:
-//   SUPA_URL, SUPA_KEY, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
-// Optional:
-//   CRON_SECRET       - security token Vercel sends automatically
-//   DRIP_AGENT_NAME   - defaults to 'Randy Baker'
-//   BRIEFING_EMAILS   - comma-separated recipient emails
-//                       (defaults to all connected Gmail accounts)
+// Meant to be called every ~15 minutes (cron-job.org: /api/run-drips?secret=CRON_SECRET).
+// Each run:
+//   1. Inbound check (always, read-only): looks at new mail in every connected Gmail account and
+//      - stops a campaign when the contact replies to one of its emails (+ a task for the whole team)
+//      - pauses campaigns when someone on the team emails an enrolled contact personally, or the
+//        contact starts a new email to us
+//      - notes out-of-office auto-replies without stopping anything
+//      - unsubscribes "stop / remove me" replies (+ a task so a person double-checks)
+//      - puts an enrollment on hold when its email bounces
+//   2. Sends campaign steps that are due (only when Sending Controls: master + drips are on), following
+//      each campaign's rules: send time, skip weekends, one campaign email per person per day, the
+//      contact's language (English / Spanish version of each email).
+//      Reminder steps (call / text / card) become a task instead of an email.
+//   3. Transaction deadline reminders (unchanged, only when Sending Controls: reminders is on).
+//   4. Writes a health record (settings.drip_health) that the CRM shows as a banner.
+//
+// POST {action:'test', messageId, lang, first}  -> sends a test of one email to the signed-in user.
+//
+// Env: SUPA_URL, SUPA_SERVICE_KEY, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, CRON_SECRET
+// Optional: DRIP_AGENT_NAME, SITE_URL, UNSUB_SECRET
 
 import crypto from 'crypto';
 
-export const config = { api: { bodyParser: false } };
+export const config = { api: { bodyParser: false }, maxDuration: 60 };
 
 const SUPA_URL = process.env.SUPA_URL || 'https://fgkilooomlozhwfnvjze.supabase.co';
 const SUPA_KEY = process.env.SUPA_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZna2lsb29vbWxvemh3Zm52anplIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA3NTc0NTIsImV4cCI6MjA5NjMzMzQ1Mn0.owQk8Vy3Vcs8n8c0sI0fXQYmjpAy14hev8lDt4g5iZE';
@@ -21,219 +32,247 @@ const CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
 const AGENT_NAME = process.env.DRIP_AGENT_NAME || 'Randy Baker';
 const DAY_MS = 86400000;
+const TZ = 'America/Denver';
+const MAX_SENDS_PER_RUN = 40;          // keeps one run well inside the function time limit
 
-// Where the unsubscribe link points, and the secret that signs it. Must match
-// api/unsubscribe.js exactly. SITE_URL lets us move domains without a code change.
 const SITE_URL = (process.env.SITE_URL || 'https://properly-crm.vercel.app').replace(/\/+$/, '');
 const UNSUB_SECRET = process.env.UNSUB_SECRET || SUPA_SERVICE_KEY;
 
+const DEFAULT_RULES = { reply: true, pause: true, pauseDays: 10, weekends: true, time: '07:00', oneADay: true, fromMemberId: null };
+function rulesOf(camp) {
+  const r = Object.assign({}, DEFAULT_RULES, (camp && camp.rules) || {});
+  if (!/^\d{1,2}:\d{2}$/.test(String(r.time))) r.time = '07:00';
+  r.pauseDays = parseInt(r.pauseDays) || 10;
+  return r;
+}
+
+// Steps: {type:'email', wait, messageId} | {type:'task', wait, kind, who, note}
+// Older campaigns stored {delayDays, messageId, subject, body}; normalize those.
+function normSteps(steps) {
+  if (typeof steps === 'string') { try { steps = JSON.parse(steps); } catch (e) { steps = []; } }
+  if (!Array.isArray(steps)) return [];
+  return steps.map(s => {
+    s = s || {};
+    const wait = s.wait != null ? (parseInt(s.wait) || 0) : (parseInt(s.delayDays) || 0);
+    if (s.type === 'task') return { type: 'task', wait: wait, kind: s.kind || 'Call', who: s.who == null ? 'all' : s.who, note: s.note || '' };
+    return { type: 'email', wait: wait, messageId: s.messageId != null ? s.messageId : null };
+  });
+}
+
+// ---------- unsubscribe + click tracking ----------
 function unsubToken(contactId) {
-  return crypto.createHmac('sha256', UNSUB_SECRET)
-    .update('unsub:' + String(contactId)).digest('hex').slice(0, 32);
+  return crypto.createHmac('sha256', UNSUB_SECRET).update('unsub:' + String(contactId)).digest('hex').slice(0, 32);
 }
 function unsubUrl(contactId) {
-  // Unsubscribe is handled inside /api/portal (action=unsubscribe) to stay under
-  // the serverless-function limit; the token scheme matches portal.js exactly.
   return SITE_URL + '/api/portal?action=unsubscribe&c=' + encodeURIComponent(contactId) + '&t=' + unsubToken(contactId);
 }
-// Put a working unsubscribe link in every marketing email. If the design uses a
-// {{unsubscribe}} tag we swap the URL in there; otherwise we append a small
-// footer so the link is always present.
-function applyUnsubscribe(html, contactId) {
-  const url = unsubUrl(contactId);
+function applyUnsubscribe(html, contactId, lang) {
+  const url = contactId != null ? unsubUrl(contactId) : '#';
   let out = String(html || '');
-  if (/\{\{\s*unsubscribe\s*\}\}/i.test(out)) {
-    return out.replace(/\{\{\s*unsubscribe\s*\}\}/gi, url);
-  }
+  if (/\{\{\s*unsubscribe\s*\}\}/i.test(out)) return out.replace(/\{\{\s*unsubscribe\s*\}\}/gi, url);
+  const es = lang === 'es';
   const footer = '<div style="margin-top:24px;padding-top:14px;border-top:1px solid #e5e5e5;'
     + 'font-size:12px;color:#999;text-align:center;font-family:Arial,sans-serif;">'
-    + 'You received this because you are a contact of Palacios Baker Real Estate.<br>'
-    + '<a href="' + url + '" style="color:#999;">Unsubscribe from these emails</a></div>';
+    + (es ? 'Recibe este correo porque es contacto de Palacios Baker Real Estate.<br>' : 'You received this because you are a contact of Palacios Baker Real Estate.<br>')
+    + '<a href="' + url + '" style="color:#999;">' + (es ? 'Cancelar la suscripción' : 'Unsubscribe from these emails') + '</a></div>';
   return out + footer;
 }
-
-function supaHeaders(extra) {
-  return Object.assign({
-    'apikey': SUPA_SERVICE_KEY,
-    'Authorization': 'Bearer ' + SUPA_SERVICE_KEY,
-    'Content-Type': 'application/json',
-    'Accept': 'application/json'
-  }, extra || {});
+// Must match api/portal.js (action=click).
+function clickToken(logId, url) {
+  return crypto.createHmac('sha256', UNSUB_SECRET).update('click:' + String(logId) + ':' + url).digest('hex').slice(0, 24);
+}
+// Route every http(s) link through /api/portal?action=click so clicks are counted. Unsubscribe,
+// mailto: and tel: links are left alone.
+function trackLinks(html, logId) {
+  return String(html || '').replace(/href\s*=\s*(["'])(https?:\/\/[^"']+)\1/gi, function (m, q, url) {
+    if (/action=unsubscribe/.test(url)) return m;
+    const real = url.replace(/&amp;/g, '&');
+    return 'href=' + q + SITE_URL + '/api/portal?action=click&l=' + encodeURIComponent(logId)
+      + '&u=' + encodeURIComponent(real) + '&t=' + clickToken(logId, real) + q;
+  });
 }
 
+// ---------- Supabase ----------
+function supaHeaders(extra) {
+  return Object.assign({
+    'apikey': SUPA_SERVICE_KEY, 'Authorization': 'Bearer ' + SUPA_SERVICE_KEY,
+    'Content-Type': 'application/json', 'Accept': 'application/json'
+  }, extra || {});
+}
 async function supaGet(path) {
   const r = await fetch(SUPA_URL + '/rest/v1/' + path, { headers: supaHeaders() });
   const t = await r.text();
   try { return JSON.parse(t); } catch (e) { return []; }
 }
-
 async function supaUpsert(table, rows) {
   return fetch(SUPA_URL + '/rest/v1/' + table, {
-    method: 'POST',
-    headers: supaHeaders({ 'Prefer': 'resolution=merge-duplicates' }),
-    body: JSON.stringify(rows)
+    method: 'POST', headers: supaHeaders({ 'Prefer': 'resolution=merge-duplicates' }), body: JSON.stringify(rows)
   });
 }
+async function supaPatch(path, body, returnRows) {
+  const r = await fetch(SUPA_URL + '/rest/v1/' + path, {
+    method: 'PATCH', headers: supaHeaders({ 'Prefer': returnRows ? 'return=representation' : 'return=minimal' }), body: JSON.stringify(body)
+  });
+  if (!returnRows) return r.ok;
+  try { return await r.json(); } catch (e) { return []; }
+}
+async function getSetting(key) {
+  const rows = await supaGet('settings?key=eq.' + encodeURIComponent(key) + '&select=value');
+  return (Array.isArray(rows) && rows[0]) ? rows[0].value : null;
+}
+async function setSetting(key, value) { return supaUpsert('settings', [{ key: key, value: value }]); }
+// Ids: ms timestamp * 1000 + a counter — unique across runs and never collides with the app's Date.now() ids.
+let _idSeq = Math.floor(Math.random() * 1000);
+function newSmallId() { _idSeq = (_idSeq + 1) % 1000; return Date.now() * 1000 + _idSeq; }
+function inList(ids) { return '(' + ids.map(x => encodeURIComponent(String(x))).join(',') + ')'; }
 
+// ---------- Gmail ----------
 async function getAccessToken(memberId) {
   const rows = await supaGet('gmail_tokens?member_id=eq.' + encodeURIComponent(memberId));
-  if (!Array.isArray(rows) || !rows[0]) return { error: 'Gmail not connected for member ' + memberId };
-  let rec = rows[0];
+  if (!Array.isArray(rows) || !rows[0]) return { error: 'Gmail not connected for this account' };
+  const rec = rows[0];
   let accessToken = rec.access_token;
   if (!accessToken || Date.now() >= (rec.expires_at - 60000)) {
-    if (!rec.refresh_token) return { error: 'No refresh token for member ' + memberId };
+    if (!rec.refresh_token) return { error: 'Gmail connection expired — reconnect ' + (rec.email || 'the account'), email: rec.email };
     const rr = await fetch('https://oauth2.googleapis.com/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        refresh_token: rec.refresh_token,
-        client_id: CLIENT_ID,
-        client_secret: CLIENT_SECRET,
-        grant_type: 'refresh_token'
-      }).toString()
+      method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ refresh_token: rec.refresh_token, client_id: CLIENT_ID, client_secret: CLIENT_SECRET, grant_type: 'refresh_token' }).toString()
     });
     const nt = await rr.json();
-    if (nt.error) return { error: 'Token refresh failed: ' + (nt.error_description || nt.error) };
+    if (nt.error) return { error: 'Gmail connection expired for ' + (rec.email || 'the account') + ' — reconnect it (' + (nt.error_description || nt.error) + ')', email: rec.email };
     accessToken = nt.access_token;
     rec.access_token = accessToken;
     rec.expires_at = Date.now() + ((nt.expires_in || 3600) * 1000);
     await supaUpsert('gmail_tokens', [rec]);
   }
-  return { accessToken: accessToken, email: rec.email, memberId: memberId };
+  return { accessToken: accessToken, email: rec.email, memberId: memberId, name: rec.name };
+}
+async function gmailGet(accessToken, path) {
+  const r = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/' + path, { headers: { 'Authorization': 'Bearer ' + accessToken } });
+  return r.json();
 }
 
-// Subject headers must be RFC 2047 encoded or non-ASCII (Spanish accents) arrives mangled.
 function encodeSubject(s) {
   s = String(s || '');
   return /^[\x00-\x7F]*$/.test(s) ? s : '=?UTF-8?B?' + Buffer.from(s, 'utf8').toString('base64') + '?=';
 }
-
-// Pull any base64 data: images out of an HTML body and turn them into inline
-// (CID) attachments. Gmail and most webmail strip data: URIs in the body, so a
-// finished email that embeds its images as base64 has to be rewritten this way
-// to actually display. Remote (https) images are left untouched. Returns the
-// rewritten HTML plus the list of images to attach.
+// Base64 data: images become inline CID attachments (webmail strips data: URIs).
 function extractInlineImages(html) {
   const images = [];
   if (!html) return { html: '', images: images };
   let n = 0;
-  const rewritten = String(html).replace(
-    /src\s*=\s*(["'])data:([^;,"']+);base64,([^"']+)\1/gi,
-    function (_m, q, mime, b64) {
-      n += 1;
-      const cid = 'img' + n + '@properlycrm';
-      images.push({ cid: cid, mime: mime.trim(), b64: b64.replace(/\s+/g, '') });
-      return 'src=' + q + 'cid:' + cid + q;
-    }
-  );
+  const rewritten = String(html).replace(/src\s*=\s*(["'])data:([^;,"']+);base64,([^"']+)\1/gi, function (_m, q, mime, b64) {
+    n += 1;
+    const cid = 'img' + n + '@properlycrm';
+    images.push({ cid: cid, mime: mime.trim(), b64: b64.replace(/\s+/g, '') });
+    return 'src=' + q + 'cid:' + cid + q;
+  });
   return { html: rewritten, images: images };
 }
-
 function wrap76(s) { return s.replace(/.{1,76}/g, '$&\r\n').trim(); }
-function b64(str) { return Buffer.from(str, 'utf8').toString('base64'); }
 
-// Per-request outbound controls (loaded from the settings row). Test mode redirects every message to
-// the test address and tags the subject, so nothing reaches real clients while testing.
 let SEND_CTRL = null;
 async function gmailSend(accessToken, to, subject, htmlBody, cc) {
-  if (SEND_CTRL && SEND_CTRL.testMode) {
-    to = SEND_CTRL.testEmail || to;
-    cc = undefined;
-    subject = '[TEST] ' + subject;
-  }
-
+  if (SEND_CTRL && SEND_CTRL.testMode) { to = SEND_CTRL.testEmail || to; cc = undefined; subject = '[TEST] ' + subject; }
   const { html, images } = extractInlineImages(htmlBody || '');
   const headerLines = ['To: ' + to];
   if (cc) headerLines.push('Cc: ' + cc);
   headerLines.push('Subject: ' + encodeSubject(subject), 'MIME-Version: 1.0');
-
   let mime;
   if (images.length) {
-    // multipart/related: the HTML part references each image by cid:.
     const boundary = 'pbx_' + Date.now() + '_' + Math.floor(Math.random() * 1e9);
-    const parts = [];
-    parts.push('--' + boundary);
-    parts.push('Content-Type: text/html; charset=utf-8');
-    parts.push('Content-Transfer-Encoding: base64');
-    parts.push('');
-    parts.push(wrap76(Buffer.from(html, 'utf8').toString('base64')));
+    const parts = ['--' + boundary, 'Content-Type: text/html; charset=utf-8', 'Content-Transfer-Encoding: base64', '', wrap76(Buffer.from(html, 'utf8').toString('base64'))];
     images.forEach(function (img) {
-      parts.push('--' + boundary);
-      parts.push('Content-Type: ' + (img.mime || 'image/png'));
-      parts.push('Content-Transfer-Encoding: base64');
-      parts.push('Content-ID: <' + img.cid + '>');
-      parts.push('Content-Disposition: inline');
-      parts.push('');
-      parts.push(wrap76(img.b64));
+      parts.push('--' + boundary, 'Content-Type: ' + (img.mime || 'image/png'), 'Content-Transfer-Encoding: base64',
+        'Content-ID: <' + img.cid + '>', 'Content-Disposition: inline', '', wrap76(img.b64));
     });
     parts.push('--' + boundary + '--');
     mime = headerLines.concat(['Content-Type: multipart/related; boundary="' + boundary + '"', '', parts.join('\r\n')]).join('\r\n');
   } else {
-    mime = headerLines.concat(['Content-Type: text/html; charset=utf-8', '', html]).join('\r\n');
+    mime = headerLines.concat(['Content-Type: text/html; charset=utf-8', 'Content-Transfer-Encoding: base64', '', wrap76(Buffer.from(html, 'utf8').toString('base64'))]).join('\r\n');
   }
-
-  const raw = Buffer.from(mime).toString('base64')
-    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const raw = Buffer.from(mime).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   const resp = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
-    method: 'POST',
-    headers: { 'Authorization': 'Bearer ' + accessToken, 'Content-Type': 'application/json' },
+    method: 'POST', headers: { 'Authorization': 'Bearer ' + accessToken, 'Content-Type': 'application/json' },
     body: JSON.stringify({ raw: raw })
   });
   const data = await resp.json();
   if (data.error) return { error: data.error.message };
-  return { messageId: data.id };
+  return { messageId: data.id, threadId: data.threadId };
 }
 
+// {first} and {{first}} both work.
 function mergeTags(text, c) {
   if (!text) return '';
+  const t = (name) => new RegExp('\\{\\{?\\s*' + name + '\\s*\\}?\\}', 'gi');
   return String(text)
-    .replace(/\{\{\s*first\s*\}\}/gi, (c && c.first) || 'there')
-    .replace(/\{\{\s*last\s*\}\}/gi, (c && c.last) || '')
-    .replace(/\{\{\s*property\s*\}\}/gi, (c && c.property) || 'your property search')
-    .replace(/\{\{\s*price\s*\}\}/gi, (c && c.price) || '')
-    .replace(/\{\{\s*agent\s*\}\}/gi, AGENT_NAME);
+    .replace(t('first'), (c && c.first) || (c && c.lang === 'es' ? 'amigo' : 'there'))
+    .replace(t('last'), (c && c.last) || '')
+    .replace(t('property'), (c && c.property) || '')
+    .replace(t('price'), (c && c.price) || '')
+    .replace(t('agent'), AGENT_NAME);
 }
 
-function fmtDate(iso) {
-  if (!iso) return '-';
-  const d = new Date(iso + 'T12:00:00');
-  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+// ---------- Mountain-time scheduling (mirrored in app.js: dripNextSend) ----------
+function todayMtn() { return new Date().toLocaleDateString('en-CA', { timeZone: TZ }); }
+function addDaysStr(ds, n) {
+  const d = new Date(ds + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+function dowStr(ds) { return new Date(ds + 'T12:00:00Z').getUTCDay(); }
+function tzOffsetMin(utcMs) {   // Mountain wall clock minus UTC, in minutes (e.g. -420)
+  const p = new Intl.DateTimeFormat('en-US', { timeZone: TZ, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+    .formatToParts(new Date(utcMs)).reduce((o, x) => { o[x.type] = x.value; return o; }, {});
+  const wall = Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour % 24, +p.minute);
+  return Math.round((wall - utcMs) / 60000);
+}
+function mtnToUtcMs(ds, hm) {
+  const [h, m] = String(hm).split(':').map(Number);
+  const guess = Date.UTC(+ds.slice(0, 4), +ds.slice(5, 7) - 1, +ds.slice(8, 10), h, m);
+  let t = guess - tzOffsetMin(guess) * 60000;
+  t = guess - tzOffsetMin(t) * 60000;
+  return t;
+}
+function mtnDateOf(ms) { return new Date(ms).toLocaleDateString('en-CA', { timeZone: TZ }); }
+// The send moment for "wait N days after fromDate", honoring send time + skip weekends, never in the past.
+function nextSendAt(fromDate, waitDays, rules) {
+  let ds = addDaysStr(fromDate, parseInt(waitDays) || 0);
+  const ok = (d) => !(rules.weekends && (dowStr(d) === 0 || dowStr(d) === 6));
+  while (!ok(ds)) ds = addDaysStr(ds, 1);
+  let t = mtnToUtcMs(ds, rules.time);
+  let guard = 0;
+  while (t < Date.now() - 60000 && guard++ < 10) { ds = addDaysStr(ds, 1); while (!ok(ds)) ds = addDaysStr(ds, 1); t = mtnToUtcMs(ds, rules.time); }
+  return new Date(t).toISOString();
+}
+function fmtShort(ms) { return new Date(ms).toLocaleDateString('en-US', { timeZone: TZ, month: 'short', day: 'numeric' }); }
+
+function cName(c) { if (!c) return 'Unknown'; return ((c.first || '') + ' ' + (c.last || '')).trim() || c.email || 'Unknown'; }
+function addrList(h) { return String(h || '').toLowerCase().match(/[a-z0-9._%+\-']+@[a-z0-9.\-]+\.[a-z]{2,}/g) || []; }
+function hdr(msg, name) {
+  const hs = (msg && msg.payload && msg.payload.headers) || [];
+  const h = hs.find(x => String(x.name).toLowerCase() === name.toLowerCase());
+  return h ? String(h.value || '') : '';
 }
 
-// Current wall-clock time in Mountain, as "HH:MM" (24h) - for holding timed reminders until due.
-function nowHmMtn() {
-  return new Date().toLocaleTimeString('en-GB', { timeZone: 'America/Denver', hour: '2-digit', minute: '2-digit' });
+async function logEvent(row) {
+  const r = Object.assign({ id: newSmallId(), status: 'ok', created_at: new Date().toISOString() }, row);
+  await supaUpsert('send_log', [r]);
+  return r;
+}
+// A task (follow-up) for the whole team (assignedTo = null) or one member.
+async function createTask(contactId, label, notes, pri, assignedTo) {
+  await supaUpsert('followups', [{
+    id: newSmallId(), contactId: contactId, transactionId: null, label: label, date: todayMtn(),
+    pri: pri || 'hot', done: false, assignedTo: assignedTo == null || assignedTo === 'all' ? null : Number(assignedTo), notes: notes || ''
+  }]);
 }
 
-function todayMtn() {
-  return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Denver' });
-}
-
-// When should the NEXT drip step go out? Anchor to the target MOUNTAIN calendar
-// date (today + delayDays) at 13:00 UTC — about 7am Mountain, a morning time on
-// the right local day. Using midnight UTC instead lands at ~6pm Mountain the day
-// BEFORE (Mountain is UTC-6/7), which is why a "1 day" step was arriving the same
-// evening. 13:00 UTC is after Mountain midnight and before the 14:00 UTC daily
-// cron, so the morning run on the target day sends it.
-function nextSendIso(delayDays) {
-  const base = new Date(todayMtn() + 'T00:00:00Z');                 // today's Mountain date @ 00:00 UTC
-  const target = new Date(base.getTime() + (parseInt(delayDays) || 0) * DAY_MS);
-  const y = target.getUTCFullYear();
-  const m = String(target.getUTCMonth() + 1).padStart(2, '0');
-  const d = String(target.getUTCDate()).padStart(2, '0');
-  return y + '-' + m + '-' + d + 'T13:00:00.000Z';
-}
-
+function nowHmMtn() { return new Date().toLocaleTimeString('en-GB', { timeZone: TZ, hour: '2-digit', minute: '2-digit' }); }
 function daysUntil(dateStr) {
   if (!dateStr) return null;
   const today = new Date(todayMtn() + 'T00:00:00');
   const target = new Date(dateStr + 'T00:00:00');
   return Math.round((target - today) / DAY_MS);
-}
-
-function cName(c) {
-  if (!c) return 'Unknown';
-  return ((c.first || '') + ' ' + (c.last || '')).trim() || c.email || 'Unknown';
 }
 
 // ===================== TRANSACTION REMINDERS =====================
@@ -496,331 +535,392 @@ async function processReminders(result) {
   }
 }
 
-async function buildBriefing() {
+// ===================== DRIP: INBOUND (replies, bounces, personal emails) =====================
+const AUTO_SUBJ = /(out of (the )?office|automatic reply|auto[- ]?reply|autoreply|away from (my|the) (desk|office)|on vacation|respuesta autom[aá]tica|fuera de (la )?oficina|ausente)/i;
+const STOP_RE = /^\W*(stop|unsubscribe|remove me|take me off|please remove|no more emails|do not email|don'?t email|baja|cancelar|ya no me (env[ií]en|manden)|no me (env[ií]en|manden))/i;
+const BOUNCE_FROM = /(mailer-daemon|postmaster|mail delivery (subsystem|system))/i;
+
+async function processInbound(result, health) {
+  const R = result.inbound;
+  // Who is enrolled (active or paused) — only their mail matters.
+  const live = await supaGet('enrollments?status=in.(active,paused)&select=id,campaignId,contactId,status,stepIndex,nextSendAt,pausedUntil&limit=5000');
+  const threads = await supaGet('send_log?kind=eq.email&status=eq.sent&threadId=not.is.null&created_at=gte.' + encodeURIComponent(new Date(Date.now() - 180 * DAY_MS).toISOString()) + '&select=id,threadId,enrollmentId,contactId,campaignId,fromEmail,subject&limit=10000');
+  const enrolled = Array.isArray(live) ? live : [];
+  const threadMap = {};
+  (Array.isArray(threads) ? threads : []).forEach(t => { threadMap[t.threadId] = t; });
+
+  const tokens = await supaGet('gmail_tokens?select=member_id,email,name&limit=50');
+  const cursor = (await getSetting('drip_inbound_cursor')) || {};
+  const nowSec = Math.floor(Date.now() / 1000);
+  if (!enrolled.length && !Object.keys(threadMap).length) {
+    (Array.isArray(tokens) ? tokens : []).forEach(t => { cursor[t.member_id] = nowSec; });
+    await setSetting('drip_inbound_cursor', cursor);
+    return;
+  }
+
+  const contactIds = Array.from(new Set(enrolled.map(e => String(e.contactId)).concat(Object.values(threadMap).map(t => String(t.contactId)))));
+  const contacts = [];
+  for (let i = 0; i < contactIds.length; i += 150) {
+    const chunk = await supaGet('contacts?id=in.' + inList(contactIds.slice(i, i + 150)) + '&select=id,first,last,email,emails,lang');
+    if (Array.isArray(chunk)) contacts.push.apply(contacts, chunk);
+  }
+  const cById = {}, cByEmail = {};
+  contacts.forEach(c => { cById[String(c.id)] = c; contactEmails(c).forEach(e => { cByEmail[e.toLowerCase()] = c; }); });
+  const enrByContact = {};
+  enrolled.forEach(e => { (enrByContact[String(e.contactId)] = enrByContact[String(e.contactId)] || []).push(e); });
+
+  const camps = await supaGet('campaigns?select=id,name,rules&limit=500');
+  const campById = {};
+  (Array.isArray(camps) ? camps : []).forEach(c => { campById[String(c.id)] = c; });
+
+  const team = await supaGet('team?select=id,first,last,email&limit=50');
+  const teamEmails = {};
+  (Array.isArray(team) ? team : []).forEach(t => { if (t.email) teamEmails[t.email.toLowerCase()] = t; });
+  (Array.isArray(tokens) ? tokens : []).forEach(t => { if (t.email) teamEmails[t.email.toLowerCase()] = teamEmails[t.email.toLowerCase()] || { first: t.name || t.email }; });
+
   const today = todayMtn();
-  const in7  = new Date(Date.now() +  7 * DAY_MS).toLocaleDateString('en-CA', { timeZone: 'America/Denver' });
-  const in14 = new Date(Date.now() + 14 * DAY_MS).toLocaleDateString('en-CA', { timeZone: 'America/Denver' });
-  const in30 = new Date(Date.now() + 30 * DAY_MS).toLocaleDateString('en-CA', { timeZone: 'America/Denver' });
+  const pauseContact = async (cid, why, exceptEnrId) => {
+    const list = enrByContact[String(cid)] || [];
+    for (const e of list) {
+      if (String(e.id) === String(exceptEnrId)) continue;
+      const rules = rulesOf(campById[String(e.campaignId)]);
+      if (!rules.pause || e.status !== 'active') continue;
+      const until = new Date(mtnToUtcMs(addDaysStr(today, rules.pauseDays), rules.time)).toISOString();
+      await supaPatch('enrollments?id=eq.' + e.id, { status: 'paused', pausedUntil: until, reason: why + ' — paused until ' + fmtShort(Date.parse(until)), updated_at: new Date().toISOString() });
+      e.status = 'paused';
+      R.paused++;
+    }
+  };
 
-  const [contacts, followups, deadlines, transactions, activeEnr] = await Promise.all([
-    supaGet('contacts?limit=500'),
-    supaGet('followups?done=eq.false&order=date.asc&limit=200'),
-    supaGet('deadlines?order=date.asc&limit=200'),
-    supaGet('transactions?order=closingDate.asc&limit=100'),
-    supaGet('enrollments?status=eq.active&limit=200')
-  ]);
+  for (const tk of (Array.isArray(tokens) ? tokens : [])) {
+    const tok = await getAccessToken(tk.member_id);
+    if (tok.error) { R.errors.push(tok.error); continue; }
+    const since = (cursor[tk.member_id] || (nowSec - 3600)) - 300;   // 5 min overlap; duplicates are filtered below
+    let ids = [], pageToken = '', pages = 0;
+    do {
+      const q = encodeURIComponent('after:' + since + ' -in:drafts -in:spam -in:trash -in:chats');
+      const lst = await gmailGet(tok.accessToken, 'messages?maxResults=100&q=' + q + (pageToken ? '&pageToken=' + pageToken : ''));
+      if (lst.error) { R.errors.push('Gmail list (' + tk.email + '): ' + (lst.error.message || '')); break; }
+      (lst.messages || []).forEach(m => ids.push(m));
+      pageToken = lst.nextPageToken || '';
+    } while (pageToken && ++pages < 4);
+    cursor[tk.member_id] = nowSec;
+    if (!ids.length) continue;
 
-  const cMap = {};
-  (contacts || []).forEach(c => { cMap[String(c.id)] = c; });
+    // Skip messages we already handled (and the campaign emails we sent ourselves).
+    const seen = {};
+    for (let i = 0; i < ids.length; i += 100) {
+      const rows = await supaGet('send_log?gmailId=in.' + inList(ids.slice(i, i + 100).map(m => m.id)) + '&select=gmailId');
+      (Array.isArray(rows) ? rows : []).forEach(r => { seen[r.gmailId] = true; });
+    }
 
-  const fuDue  = (followups || []).filter(f => f.date && f.date <= today);
-  const fuSoon = (followups || []).filter(f => f.date && f.date > today && f.date <= in7);
-  const dlSoon = (deadlines || []).filter(d => d.date && d.date >= today && d.date <= in14);
-  const txClose = (transactions || []).filter(t => t.closingDate && t.closingDate >= today && t.closingDate <= in30);
-  const pipeline = (transactions || []).filter(t => t.stage !== 'Closed');
+    for (const ref of ids) {
+      if (seen[ref.id]) continue;
+      R.checked++;
+      const m = await gmailGet(tok.accessToken, 'messages/' + ref.id + '?format=metadata&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Cc&metadataHeaders=Subject&metadataHeaders=Auto-Submitted&metadataHeaders=X-Autoreply&metadataHeaders=X-Autorespond&metadataHeaders=Precedence');
+      if (!m || m.error) continue;
+      const labels = m.labelIds || [];
+      const thread = threadMap[m.threadId];
+      const subject = hdr(m, 'Subject');
+      const snippet = String(m.snippet || '').replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&').slice(0, 240);
+      const fromAddr = (addrList(hdr(m, 'From'))[0]) || '';
 
-  const dayName = new Date().toLocaleDateString('en-US', {
-    weekday: 'long', month: 'long', day: 'numeric', timeZone: 'America/Denver'
-  });
+      if (labels.indexOf('SENT') !== -1) {
+        // Automated mail (deadline reminders, tests) isn't a personal conversation.
+        if (/^(\[TEST\]|Reminder:|Recordatorio:)/i.test(subject)) continue;
+        // Someone on the team emailed people personally -> pause their campaigns.
+        const rcpts = addrList(hdr(m, 'To') + ',' + hdr(m, 'Cc'));
+        const who = (teamEmails[(tok.email || '').toLowerCase()] || {}).first || tok.email;
+        const done = {};
+        for (const a of rcpts) {
+          const c = cByEmail[a];
+          if (!c || done[c.id]) continue;
+          done[c.id] = true;
+          if (!(enrByContact[String(c.id)] || []).some(e => e.status === 'active')) continue;
+          await pauseContact(c.id, who + ' emailed them ' + fmtShort(Date.now()));
+          await logEvent({ kind: 'pause', contactId: c.id, gmailId: ref.id, threadId: m.threadId, subject: subject, note: who + ' emailed them personally — campaigns paused', fromEmail: tok.email });
+        }
+        continue;
+      }
 
-  const css = `
-    body{font-family:-apple-system,'Segoe UI',Arial,sans-serif;background:#f4f4f4;margin:0;padding:0;}
-    .wrap{max-width:600px;margin:20px auto;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.1);}
-    .hdr{background:#1a1d24;padding:26px 28px 18px;}
-    .hdr h1{color:#c9a84c;font-size:20px;margin:0 0 4px;}
-    .hdr p{color:#9a8f7a;font-size:13px;margin:0;}
-    .counts{display:flex;gap:12px;padding:16px 28px;background:#f9f8f5;border-bottom:1px solid #eee;flex-wrap:wrap;}
-    .cbox{flex:1;min-width:100px;text-align:center;background:#fff;border-radius:8px;padding:10px;border:1px solid #eee;}
-    .cnum{font-size:22px;font-weight:700;color:#c9a84c;}
-    .clbl{font-size:11px;color:#999;margin-top:2px;}
-    .sec{padding:18px 28px;border-bottom:1px solid #eee;}
-    .sec:last-of-type{border-bottom:none;}
-    .stitle{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:#999;margin:0 0 10px;}
-    .item{padding:7px 0;border-bottom:1px solid #f5f5f5;display:flex;gap:9px;align-items:flex-start;}
-    .item:last-child{border-bottom:none;}
-    .dot{width:7px;height:7px;border-radius:50%;margin-top:5px;flex-shrink:0;}
-    .dr{background:#c94c4c;} .dg{background:#c9a84c;} .db{background:#6bc97a;}
-    .im{font-size:13px;color:#1a1d24;font-weight:600;line-height:1.3;}
-    .is{font-size:12px;color:#888;margin-top:1px;}
-    .empty{color:#bbb;font-size:13px;font-style:italic;}
-    .ftr{background:#f9f8f5;padding:14px 28px;text-align:center;font-size:11px;color:#bbb;}
-    a{color:#c9a84c;}
-  `;
+      // Bounce for one of our campaign emails.
+      if (BOUNCE_FROM.test(hdr(m, 'From')) && thread) {
+        await supaPatch('enrollments?id=eq.' + thread.enrollmentId, { status: 'bounced', nextSendAt: null, reason: 'Email bounced — the address may be wrong', updated_at: new Date().toISOString() });
+        await logEvent({ kind: 'bounce', contactId: thread.contactId, campaignId: thread.campaignId, enrollmentId: thread.enrollmentId, gmailId: ref.id, threadId: m.threadId, subject: subject, note: snippet, status: 'failed' });
+        R.bounced++;
+        continue;
+      }
 
-  function sec(title, body) {
-    return '<div class="sec"><div class="stitle">' + title + '</div>' + body + '</div>';
+      const c = thread ? cById[String(thread.contactId)] : cByEmail[fromAddr];
+      if (!c) continue;
+      if (teamEmails[fromAddr]) continue;   // our own address replying in the thread
+
+      const auto = (hdr(m, 'Auto-Submitted') && !/^no$/i.test(hdr(m, 'Auto-Submitted'))) || hdr(m, 'X-Autoreply') || hdr(m, 'X-Autorespond')
+        || /auto_reply|auto-reply/i.test(hdr(m, 'Precedence')) || AUTO_SUBJ.test(subject);
+      if (auto) {
+        await logEvent({ kind: 'autoreply', contactId: c.id, campaignId: thread ? thread.campaignId : null, enrollmentId: thread ? thread.enrollmentId : null, gmailId: ref.id, threadId: m.threadId, subject: subject, note: 'Automatic reply (out of office) — campaign continues' });
+        R.autoreplies++;
+        continue;
+      }
+
+      if (STOP_RE.test(snippet)) {
+        await supaUpsert('drip_unsubs', [{ contact_id: c.id, email: fromAddr || c.email || '', created_at: new Date().toISOString() }]);
+        await supaPatch('enrollments?contactId=eq.' + c.id + '&status=in.(active,paused)', { status: 'unsubscribed', nextSendAt: null, reason: 'Replied asking to stop', updated_at: new Date().toISOString() });
+        await logEvent({ kind: 'unsubscribe', contactId: c.id, campaignId: thread ? thread.campaignId : null, enrollmentId: thread ? thread.enrollmentId : null, gmailId: ref.id, threadId: m.threadId, subject: subject, note: snippet });
+        await createTask(c.id, cName(c) + ' asked to stop campaign emails — please double-check', '“' + snippet + '”', 'warn', null);
+        R.unsubscribed++;
+        continue;
+      }
+
+      if (thread) {
+        const camp = campById[String(thread.campaignId)];
+        const rules = rulesOf(camp);
+        if (rules.reply) {
+          await supaPatch('enrollments?id=eq.' + thread.enrollmentId + '&status=in.(active,paused)', { status: 'stopped', nextSendAt: null, reason: 'Replied ' + fmtShort(Date.now()) + ': “' + snippet.slice(0, 120) + '”', updated_at: new Date().toISOString() });
+        }
+        await pauseContact(c.id, 'Replied to another campaign', thread.enrollmentId);
+        await logEvent({ kind: 'reply', contactId: c.id, campaignId: thread.campaignId, enrollmentId: thread.enrollmentId, gmailId: ref.id, threadId: m.threadId, subject: subject, note: snippet, fromEmail: fromAddr });
+        await createTask(c.id, cName(c) + ' replied to “' + (camp ? camp.name : 'a campaign') + '” — follow up', '“' + snippet + '” (reply is in ' + (thread.fromEmail || tok.email) + ')', 'hot', null);
+        R.replies++;
+        continue;
+      }
+
+      // A brand-new email from an enrolled contact: a real conversation -> pause their campaigns.
+      if ((enrByContact[String(c.id)] || []).some(e => e.status === 'active')) {
+        await pauseContact(c.id, 'They emailed us ' + fmtShort(Date.now()));
+        await logEvent({ kind: 'conversation', contactId: c.id, gmailId: ref.id, threadId: m.threadId, subject: subject, note: snippet, fromEmail: fromAddr });
+        R.conversations++;
+      }
+    }
   }
-  function itm(dotCls, main, sub) {
-    return '<div class="item"><div class="dot ' + dotCls + '"></div><div><div class="im">' + main + '</div>' + (sub ? '<div class="is">' + sub + '</div>' : '') + '</div></div>';
-  }
-
-  const counts = '<div class="counts">'
-    + '<div class="cbox"><div class="cnum">' + fuDue.length + '</div><div class="clbl">Due / Overdue</div></div>'
-    + '<div class="cbox"><div class="cnum">' + pipeline.length + '</div><div class="clbl">Active Deals</div></div>'
-    + '<div class="cbox"><div class="cnum">' + txClose.length + '</div><div class="clbl">Closing Soon</div></div>'
-    + '<div class="cbox"><div class="cnum">' + (Array.isArray(activeEnr) ? activeEnr.length : 0) + '</div><div class="clbl">Drip Enrolled</div></div>'
-    + '</div>';
-
-  const fuDueBody = fuDue.length === 0
-    ? '<div class="empty">No overdue reminders.</div>'
-    : fuDue.slice(0, 8).map(f => {
-        const c = cMap[String(f.contactId)];
-        const d = daysUntil(f.date);
-        const tag = d < 0 ? ' <b style="color:#c94c4c">[' + Math.abs(d) + 'd overdue]</b>' : ' <b style="color:#c9a84c">[Today]</b>';
-        return itm('dr', f.label + tag, cName(c) + (f.notes ? ' — ' + f.notes : ''));
-      }).join('');
-
-  const fuSoonBody = fuSoon.length === 0
-    ? '<div class="empty">Nothing else due this week.</div>'
-    : fuSoon.slice(0, 6).map(f => {
-        const c = cMap[String(f.contactId)];
-        return itm('dg', f.label, cName(c) + ' — ' + fmtDate(f.date));
-      }).join('');
-
-  const dlBody = dlSoon.length === 0
-    ? '<div class="empty">No deadlines in the next 14 days.</div>'
-    : dlSoon.slice(0, 8).map(d => {
-        const c = cMap[String(d.contactId)];
-        const days = daysUntil(d.date);
-        return itm(days <= 3 ? 'dr' : 'dg', (d.type || 'Deadline') + ' — ' + fmtDate(d.date), cName(c) + (days === 0 ? ' (TODAY)' : ' (' + days + 'd)'));
-      }).join('');
-
-  const txBody = txClose.length === 0
-    ? '<div class="empty">No closings in the next 30 days.</div>'
-    : txClose.slice(0, 8).map(t => {
-        const c = cMap[String(t.contactId)];
-        const days = daysUntil(t.closingDate);
-        return itm(days <= 7 ? 'dr' : days <= 14 ? 'dg' : 'db',
-          (t.address || 'Transaction') + (t.price ? ' &mdash; ' + t.price : ''),
-          cName(c) + ' &mdash; Closes ' + fmtDate(t.closingDate) + ' (' + days + 'd)');
-      }).join('');
-
-  return '<!DOCTYPE html><html><head><meta charset="utf-8"><style>' + css + '</style></head><body>'
-    + '<div class="wrap">'
-    + '<div class="hdr"><h1>Good morning &mdash; Here\'s Your Day</h1><p>' + dayName + ' &nbsp;&middot;&nbsp; Palacios Baker Real Estate</p></div>'
-    + counts
-    + sec('Follow-ups Due Today &amp; Overdue', fuDueBody)
-    + sec('Coming Up This Week', fuSoonBody)
-    + sec('Upcoming Deadlines (Next 14 Days)', dlBody)
-    + sec('Closings in the Next 30 Days', txBody)
-    + '<div class="ftr">Properly CRM &nbsp;&middot;&nbsp; <a href="https://properly-crm.vercel.app">Open CRM</a></div>'
-    + '</div></body></html>';
+  await setSetting('drip_inbound_cursor', cursor);
+  health.lastInboundCheck = new Date().toISOString();
 }
 
+// ===================== DRIP: SENDING =====================
+async function getDefaultDripSender() {
+  const v = await getSetting('default_drip_sender');
+  return v && v.memberId ? String(v.memberId) : null;
+}
+
+async function resumePaused() {
+  const rows = await supaGet('enrollments?status=eq.paused&pausedUntil=lte.' + encodeURIComponent(new Date().toISOString()) + '&select=id,campaignId,nextSendAt&limit=500');
+  if (!Array.isArray(rows) || !rows.length) return;
+  const camps = await supaGet('campaigns?select=id,rules&limit=500');
+  const byId = {}; (Array.isArray(camps) ? camps : []).forEach(c => { byId[String(c.id)] = c; });
+  for (const e of rows) {
+    const rules = rulesOf(byId[String(e.campaignId)]);
+    const next = (!e.nextSendAt || Date.parse(e.nextSendAt) < Date.now()) ? nextSendAt(todayMtn(), 0, rules) : e.nextSendAt;
+    await supaPatch('enrollments?id=eq.' + e.id + '&status=eq.paused', { status: 'active', pausedUntil: null, reason: null, nextSendAt: next, updated_at: new Date().toISOString() });
+  }
+}
+
+async function processDrips(result, health) {
+  const R = result.drips;
+  await resumePaused();
+  const nowIso = new Date().toISOString();
+  const due = await supaGet('enrollments?status=eq.active&nextSendAt=lte.' + encodeURIComponent(nowIso) + '&order=nextSendAt.asc&limit=200');
+  if (!Array.isArray(due) || !due.length) return;
+
+  const camps = await supaGet('campaigns?select=id,name,live,rules,steps&limit=500');
+  const campById = {};
+  (Array.isArray(camps) ? camps : []).forEach(c => { c.steps = normSteps(c.steps); campById[String(c.id)] = c; });
+
+  const needMsg = {};
+  due.forEach(e => { const c = campById[String(e.campaignId)]; const s = c && c.steps[e.stepIndex]; if (s && s.type === 'email' && s.messageId != null) needMsg[String(s.messageId)] = true; });
+  const msgById = {};
+  if (Object.keys(needMsg).length) {
+    const msgs = await supaGet('drip_messages?id=in.' + inList(Object.keys(needMsg)) + '&select=id,name,subject,html,subject_es,html_es');
+    (Array.isArray(msgs) ? msgs : []).forEach(m => { msgById[String(m.id)] = m; });
+  }
+  const cids = Array.from(new Set(due.map(e => String(e.contactId))));
+  const cById = {};
+  for (let i = 0; i < cids.length; i += 150) {
+    const chunk = await supaGet('contacts?id=in.' + inList(cids.slice(i, i + 150)) + '&select=id,first,last,email,emails,lang,property,price');
+    (Array.isArray(chunk) ? chunk : []).forEach(c => { cById[String(c.id)] = c; });
+  }
+  const unsubs = await supaGet('drip_unsubs?select=contact_id&limit=10000');
+  const unsubSet = {}; (Array.isArray(unsubs) ? unsubs : []).forEach(u => { unsubSet[String(u.contact_id)] = true; });
+  const todayStartIso = new Date(mtnToUtcMs(todayMtn(), '00:00')).toISOString();
+  const sentRows = await supaGet('send_log?kind=eq.email&status=eq.sent&sentAt=gte.' + encodeURIComponent(todayStartIso) + '&select=contactId&limit=5000');
+  const sentToday = {}; (Array.isArray(sentRows) ? sentRows : []).forEach(r => { sentToday[String(r.contactId)] = true; });
+
+  const defaultSender = await getDefaultDripSender();
+  const tokenCache = {};
+  let sends = 0;
+  const today = todayMtn();
+
+  for (const enr of due) {
+    if (sends >= MAX_SENDS_PER_RUN) break;
+    const camp = campById[String(enr.campaignId)];
+    if (!camp) { await supaPatch('enrollments?id=eq.' + enr.id, { status: 'removed', nextSendAt: null, reason: 'Campaign was deleted' }); continue; }
+    if (!camp.live) { R.skipped++; continue; }           // Draft: wait, nothing sends
+    const rules = rulesOf(camp);
+    const step = camp.steps[enr.stepIndex];
+    if (!step) { await supaPatch('enrollments?id=eq.' + enr.id, { status: 'done', nextSendAt: null, updated_at: nowIso }); R.completed++; continue; }
+    R.checked++;
+    if (unsubSet[String(enr.contactId)]) {
+      await supaPatch('enrollments?id=eq.' + enr.id, { status: 'unsubscribed', nextSendAt: null, reason: 'Unsubscribed', updated_at: nowIso }); R.skipped++; continue;
+    }
+    const c = cById[String(enr.contactId)];
+    if (!c) { await supaPatch('enrollments?id=eq.' + enr.id, { status: 'removed', nextSendAt: null, reason: 'Contact was deleted' }); continue; }
+
+    // Claim this step so an overlapping run can't send it twice.
+    const claimed = await supaPatch('enrollments?id=eq.' + enr.id + '&status=eq.active&stepIndex=eq.' + enr.stepIndex + '&nextSendAt=lte.' + encodeURIComponent(nowIso),
+      { nextSendAt: new Date(Date.now() + 30 * 60000).toISOString() }, true);
+    if (!Array.isArray(claimed) || !claimed.length) continue;
+
+    const advance = async () => {
+      const ni = enr.stepIndex + 1;
+      if (ni >= camp.steps.length) { await supaPatch('enrollments?id=eq.' + enr.id, { stepIndex: ni, status: 'done', nextSendAt: null, updated_at: new Date().toISOString() }); R.completed++; }
+      else await supaPatch('enrollments?id=eq.' + enr.id, { stepIndex: ni, nextSendAt: nextSendAt(today, camp.steps[ni].wait, rules), updated_at: new Date().toISOString() });
+    };
+    const release = async (atIso) => supaPatch('enrollments?id=eq.' + enr.id, { nextSendAt: atIso });
+
+    if (step.type === 'task') {
+      const kindLbl = { Call: 'Call', Text: 'Text', Card: 'Send a handwritten card to', Other: 'Reach out to' }[step.kind] || step.kind;
+      await createTask(c.id, kindLbl + ' ' + cName(c) + ' (' + camp.name + ')', step.note || '', 'warn', step.who);
+      await logEvent({ kind: 'task', contactId: c.id, campaignId: camp.id, enrollmentId: enr.id, stepIndex: enr.stepIndex, subject: kindLbl + ' ' + cName(c), note: step.note || '' });
+      await advance();
+      R.tasks++;
+      continue;
+    }
+
+    if (rules.oneADay && sentToday[String(c.id)]) { await release(nextSendAt(today, 1, rules)); R.deferred++; continue; }
+
+    const to = contactEmails(c)[0] || '';
+    if (!to) {
+      await supaPatch('enrollments?id=eq.' + enr.id, { status: 'bounced', nextSendAt: null, reason: 'No email address on file', updated_at: nowIso });
+      R.failed++; continue;
+    }
+    const msg = step.messageId != null ? msgById[String(step.messageId)] : null;
+    if (!msg || !msg.html) {
+      await release(new Date(Date.now() + 6 * 3600000).toISOString());
+      health.problems.push('“' + camp.name + '” step ' + (enr.stepIndex + 1) + ' has no email design — sends are waiting');
+      R.failed++; continue;
+    }
+    const memberId = String(rules.fromMemberId || defaultSender || enr.fromMemberId || '');
+    if (!memberId) { await release(enr.nextSendAt); health.problems.push('No sending account is set for campaigns'); R.failed++; continue; }
+    if (!tokenCache[memberId]) tokenCache[memberId] = await getAccessToken(memberId);
+    const tok = tokenCache[memberId];
+    if (tok.error) {
+      await release(enr.nextSendAt);   // stays due; goes out on the first run after reconnecting
+      health.gmailOk = false; health.gmailError = tok.error; health.held++;
+      R.held++; continue;
+    }
+
+    const lang = (String(c.lang || '').toLowerCase() === 'es' && msg.html_es) ? 'es' : 'en';
+    const subject = mergeTags(lang === 'es' ? (msg.subject_es || msg.subject) : msg.subject, c);
+    const logId = newSmallId();
+    let html = mergeTags(lang === 'es' ? msg.html_es : msg.html, c);
+    html = trackLinks(applyUnsubscribe(html, c.id, lang), logId);
+
+    const sent = await gmailSend(tok.accessToken, to, subject, html);
+    if (sent.error) {
+      await logEvent({ id: logId, kind: 'email', status: 'failed', error: sent.error, enrollmentId: enr.id, campaignId: camp.id, contactId: c.id, stepIndex: enr.stepIndex, subject: subject, to: to, lang: lang, messageId: msg.id, fromEmail: tok.email });
+      await release(new Date(Date.now() + 2 * 3600000).toISOString());
+      health.lastError = sent.error; R.failed++; continue;
+    }
+    await logEvent({ id: logId, kind: 'email', status: 'sent', sentAt: new Date().toISOString(), enrollmentId: enr.id, campaignId: camp.id, contactId: c.id, stepIndex: enr.stepIndex, subject: subject, to: to, lang: lang, messageId: msg.id, threadId: sent.threadId, gmailId: sent.messageId, fromEmail: tok.email });
+    sentToday[String(c.id)] = true;
+    await advance();
+    sends++; R.sent++;
+  }
+  if (Object.keys(tokenCache).length && !Object.values(tokenCache).some(t => t.error)) { health.gmailOk = true; health.gmailError = ''; }
+}
+
+// ===================== AUTH + HANDLER =====================
 async function authorized(req) {
   const secret = process.env.CRON_SECRET;
-  const hdr = req.headers['x-cron-secret'];
+  const h = req.headers['x-cron-secret'];
   const auth = req.headers['authorization'] || '';
-  const qs = (req.query && req.query.secret) || '';   // cron-jobs.org passes ?secret=...
-
-  // 1. Vercel's scheduled cron, cron-jobs.org, or anything holding the secret. Accept the
-  //    secret as a query param, a raw Authorization header, a Bearer token, or x-cron-secret -
-  //    matching how /api/cron-briefing already validates it.
-  if (secret && (qs === secret || hdr === secret || auth === secret || auth === ('Bearer ' + secret))) return true;
-  if (!secret) return false;   // fail closed: no CRON_SECRET configured -> reject (was a public hole)
-
-  // 2. A signed-in CRM user. Lets the in-app "Send Reminders Now" button trigger a run
-  //    without CRON_SECRET ever reaching the browser. The anon key is NOT a user.
+  const qs = (req.query && req.query.secret) || '';
+  if (secret && (qs === secret || h === secret || auth === secret || auth === ('Bearer ' + secret))) return { ok: true, cron: true };
+  if (!secret) return { ok: false };
   const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
-  if (!token || token === SUPA_KEY) return false;
+  if (!token || token === SUPA_KEY) return { ok: false };
   try {
-    const r = await fetch(SUPA_URL + '/auth/v1/user', {
-      headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + token }
-    });
-    if (!r.ok) return false;
+    const r = await fetch(SUPA_URL + '/auth/v1/user', { headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + token } });
+    if (!r.ok) return { ok: false };
     const u = await r.json();
-    return !!(u && u.id);
-  } catch (e) { return false; }
+    return u && u.id ? { ok: true, email: u.email } : { ok: false };
+  } catch (e) { return { ok: false }; }
 }
-
-// Load the outbound controls from the settings row. Missing/failed -> everything OFF (safe default),
-// test mode ON so even an accidental enable can't reach a real client without a test address set.
 async function getSendControls() {
   const def = { master: false, reminders: false, drips: false, briefing: false, testMode: true, testEmail: '' };
-  try {
-    const rows = await supaGet('settings?key=eq.sending_controls&select=value');
-    if (Array.isArray(rows) && rows[0] && rows[0].value) return Object.assign(def, rows[0].value);
-  } catch (e) {}
+  try { const v = await getSetting('sending_controls'); if (v) return Object.assign(def, v); } catch (e) {}
   return def;
 }
-// The sending account to use for a drip when the enrollment didn't record one.
-async function getDefaultDripSender() {
-  try {
-    const rows = await supaGet('settings?key=eq.default_drip_sender&select=value');
-    if (Array.isArray(rows) && rows[0] && rows[0].value && rows[0].value.memberId) return String(rows[0].value.memberId);
-  } catch (e) {}
-  return null;
+function readBody(req) {
+  return new Promise(resolve => {
+    let d = '';
+    req.on('data', ch => { d += ch; if (d.length > 2e6) req.destroy(); });
+    req.on('end', () => { try { resolve(JSON.parse(d || '{}')); } catch (e) { resolve({}); } });
+    req.on('error', () => resolve({}));
+  });
+}
+
+// Send one email to the signed-in user so they can see exactly what contacts will get.
+async function sendTest(body, who) {
+  const to = who.email || body.to;
+  if (!to) return { error: 'No address to send the test to' };
+  const rows = await supaGet('drip_messages?id=eq.' + encodeURIComponent(body.messageId) + '&select=id,subject,html,subject_es,html_es');
+  const msg = Array.isArray(rows) && rows[0];
+  if (!msg) return { error: 'Email not found' };
+  const lang = body.lang === 'es' && msg.html_es ? 'es' : 'en';
+  const fake = { first: body.first || 'Randy', last: '', lang: lang };
+  const sender = String(body.fromMemberId || (await getDefaultDripSender()) || '');
+  if (!sender) return { error: 'No sending account is set' };
+  const tok = await getAccessToken(sender);
+  if (tok.error) return { error: tok.error };
+  SEND_CTRL = null;   // a test always goes to the requester
+  const sent = await gmailSend(tok.accessToken, to, '[TEST] ' + mergeTags(lang === 'es' ? (msg.subject_es || msg.subject) : msg.subject, fake),
+    applyUnsubscribe(mergeTags(lang === 'es' ? msg.html_es : msg.html, fake), null, lang));
+  return sent.error ? { error: sent.error } : { ok: true, to: to, from: tok.email, lang: lang };
 }
 
 export default async function handler(req, res) {
-  if (!(await authorized(req))) return res.status(401).json({ error: 'Unauthorized' });
-  // Outbound controls come from the CRM (Sending Controls panel), stored in the settings table.
-  // Everything defaults OFF, so nothing sends unless it's been explicitly turned on in the app.
+  const who = await authorized(req);
+  if (!who.ok) return res.status(401).json({ error: 'Unauthorized' });
+  const body = req.method === 'POST' ? await readBody(req) : {};
+  const action = (req.query && req.query.action) || body.action || 'run';
+  if (!CLIENT_ID || !CLIENT_SECRET) return res.status(500).json({ error: 'GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET not set' });
+
+  if (action === 'test') {
+    try { const r = await sendTest(body, who); return res.status(r.error ? 400 : 200).json(r); }
+    catch (e) { return res.status(500).json({ error: e.message }); }
+  }
+
   const CTRL = await getSendControls();
   SEND_CTRL = CTRL;
-  if (!CTRL.master) {
-    return res.status(200).json({ paused: true, reason: 'Outbound sending is off. Turn it on in the CRM → Sending Controls.' });
-  }
-  if (!CLIENT_ID || !CLIENT_SECRET) {
-    return res.status(500).json({ error: 'GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET not set' });
-  }
-
-  const nowIso = new Date().toISOString();
   const result = {
-    drips: { checked: 0, sent: 0, failed: 0, completed: 0, skipped: 0, errors: [] },
+    inbound: { checked: 0, replies: 0, autoreplies: 0, unsubscribed: 0, bounced: 0, paused: 0, conversations: 0, errors: [] },
+    drips: { checked: 0, sent: 0, failed: 0, completed: 0, skipped: 0, deferred: 0, held: 0, tasks: 0, errors: [] },
     reminders: { checked: 0, sent: 0, failed: 0, skipped: 0, errors: [] }
   };
+  const prev = (await getSetting('drip_health')) || {};
+  const health = { at: new Date().toISOString(), gmailOk: prev.gmailOk !== false, gmailError: prev.gmailError || '', held: 0, problems: [],
+    lastInboundCheck: prev.lastInboundCheck || null, lastSendRun: prev.lastSendRun || null, lastError: '',
+    sending: !!(CTRL.master && CTRL.drips), testMode: !!CTRL.testMode };
 
-  // 1. Process drip enrollments
-  try {
-    const due = CTRL.drips ? await supaGet(
-      'enrollments?status=eq.active&nextSendAt=lte.' + encodeURIComponent(nowIso) + '&order=nextSendAt.asc&limit=100'
-    ) : [];
+  // 1. Replies / bounces / personal emails — read-only, runs even when sending is off.
+  try { await processInbound(result, health); } catch (e) { result.inbound.errors.push('Inbound error: ' + e.message); }
 
-    if (Array.isArray(due) && due.length) {
-      const defaultSender = await getDefaultDripSender();   // used when an enrollment has no sender
-      const campaigns = await supaGet('campaigns?limit=500');
-      const campById = {};
-      (campaigns || []).forEach(c => {
-        if (typeof c.steps === 'string') { try { c.steps = JSON.parse(c.steps); } catch (e) { c.steps = []; } }
-        if (!Array.isArray(c.steps)) c.steps = [];
-        campById[String(c.id)] = c;
-      });
-
-      // Message Library: steps may reference a finished email by id instead of
-      // carrying inline subject/body. Preload them once.
-      const msgs = await supaGet('drip_messages?limit=500');
-      const msgById = {};
-      (Array.isArray(msgs) ? msgs : []).forEach(m => { msgById[String(m.id)] = m; });
-
-      // Opt-outs: contacts who clicked unsubscribe. Never email these again.
-      const unsubs = await supaGet('drip_unsubs?select=contact_id&limit=5000');
-      const unsubSet = {};
-      (Array.isArray(unsubs) ? unsubs : []).forEach(u => { unsubSet[String(u.contact_id)] = true; });
-
-      const tokenCache = {};
-
-      for (let i = 0; i < due.length; i++) {
-        const enr = due[i];
-        result.drips.checked++;
-        const camp = campById[String(enr.campaignId)];
-        if (!camp || !camp.steps.length) {
-          enr.status = 'stopped'; enr.nextSendAt = null;
-          await supaUpsert('enrollments', [enr]); result.drips.skipped++; continue;
-        }
-        const step = camp.steps[enr.stepIndex];
-        if (!step) {
-          enr.status = 'completed'; enr.nextSendAt = null;
-          await supaUpsert('enrollments', [enr]); result.drips.completed++; continue;
-        }
-
-        // Honor unsubscribes: stop the enrollment, send nothing.
-        if (unsubSet[String(enr.contactId)]) {
-          enr.status = 'stopped'; enr.nextSendAt = null;
-          await supaUpsert('enrollments', [enr]); result.drips.skipped++; continue;
-        }
-
-        const contacts = await supaGet('contacts?id=eq.' + encodeURIComponent(enr.contactId) + '&limit=1');
-        const c = (Array.isArray(contacts) && contacts[0]) ? contacts[0] : null;
-        const to = c && c.email ? c.email : '';
-
-        const logBase = {
-          id: Date.now() + Math.floor(Math.random() * 100000) + i,
-          enrollmentId: enr.id, campaignId: camp.id, contactId: enr.contactId,
-          stepIndex: enr.stepIndex, subject: '', to: to, status: 'pending',
-          sentAt: null, error: '', created_at: new Date().toISOString()
-        };
-
-        if (!to) {
-          logBase.status = 'failed'; logBase.error = 'No email on contact';
-          await supaUpsert('send_log', [logBase]);
-          enr.status = 'stopped'; enr.nextSendAt = null;
-          await supaUpsert('enrollments', [enr]); result.drips.failed++; continue;
-        }
-
-        const memberId = enr.fromMemberId || defaultSender;
-        if (!memberId) {
-          logBase.status = 'queued'; logBase.error = 'No sending account';
-          await supaUpsert('send_log', [logBase]);
-          enr.nextSendAt = new Date(Date.now() + 3600000).toISOString();
-          await supaUpsert('enrollments', [enr]); result.drips.skipped++; continue;
-        }
-
-        if (!tokenCache[memberId]) tokenCache[memberId] = await getAccessToken(memberId);
-        const tok = tokenCache[memberId];
-        if (tok.error) {
-          logBase.status = 'queued'; logBase.error = tok.error;
-          await supaUpsert('send_log', [logBase]);
-          enr.nextSendAt = new Date(Date.now() + 3600000).toISOString();
-          await supaUpsert('enrollments', [enr]); result.drips.skipped++;
-          result.drips.errors.push(tok.error); continue;
-        }
-
-        // A step either points at a Library message (finished HTML w/ graphics)
-        // or carries inline plain-text subject/body. Library wins when set.
-        let subject, htmlBody;
-        const libMsg = step.messageId != null ? msgById[String(step.messageId)] : null;
-        if (step.messageId != null && !libMsg) {
-          // The message was deleted after the campaign was built — don't send a
-          // blank email. Hold and surface it rather than advancing past it.
-          logBase.status = 'queued'; logBase.error = 'Library message ' + step.messageId + ' not found';
-          await supaUpsert('send_log', [logBase]);
-          enr.nextSendAt = new Date(Date.now() + 3600000).toISOString();
-          await supaUpsert('enrollments', [enr]); result.drips.skipped++;
-          result.drips.errors.push('Missing library message ' + step.messageId + ' for campaign ' + camp.id);
-          continue;
-        }
-        if (libMsg) {
-          subject = mergeTags(libMsg.subject, c);
-          htmlBody = mergeTags(libMsg.html || '', c);   // already HTML — no newline conversion
-        } else {
-          subject = mergeTags(step.subject, c);
-          htmlBody = mergeTags(step.body, c).replace(/\n/g, '<br>');
-        }
-        logBase.subject = subject;
-
-        // Every marketing email gets a working, per-recipient unsubscribe link.
-        htmlBody = applyUnsubscribe(htmlBody, enr.contactId);
-
-        const sent = await gmailSend(tok.accessToken, to, subject, htmlBody);
-        if (sent.error) {
-          logBase.status = 'failed'; logBase.error = sent.error;
-          await supaUpsert('send_log', [logBase]);
-          enr.nextSendAt = new Date(Date.now() + 3600000).toISOString();
-          await supaUpsert('enrollments', [enr]); result.drips.failed++;
-          result.drips.errors.push(sent.error); continue;
-        }
-
-        logBase.status = 'sent'; logBase.sentAt = new Date().toISOString();
-        await supaUpsert('send_log', [logBase]);
-        await supaUpsert('notes', [{
-          id: Date.now() + Math.floor(Math.random() * 100000),
-          contactId: enr.contactId,
-          text: 'Drip "' + camp.name + '" step ' + (enr.stepIndex + 1) + ' sent: ' + subject,
-          date: new Date().toISOString()
-        }]);
-
-        enr.stepIndex += 1;
-        if (enr.stepIndex >= camp.steps.length) {
-          enr.status = 'completed'; enr.nextSendAt = null; result.drips.completed++;
-        } else {
-          const nextDelay = parseInt(camp.steps[enr.stepIndex].delayDays) || 0;
-          enr.nextSendAt = nextSendIso(nextDelay);
-        }
-        await supaUpsert('enrollments', [enr]);
-        result.drips.sent++;
-      }
-    }
-  } catch (err) {
-    result.drips.errors.push('Drip error: ' + err.message);
+  // 2. Campaign sends.
+  if (CTRL.master && CTRL.drips) {
+    try {
+      // Check the sending account up front so the banner is right even when nothing is due.
+      const sender = await getDefaultDripSender();
+      if (sender) { const t = await getAccessToken(sender); health.senderEmail = t.email || ''; health.gmailOk = !t.error; health.gmailError = t.error || ''; }
+      await processDrips(result, health);
+      if (result.drips.sent || result.drips.failed || result.drips.tasks) health.lastSendRun = { at: new Date().toISOString(), sent: result.drips.sent, failed: result.drips.failed, tasks: result.drips.tasks };
+    } catch (e) { result.drips.errors.push('Drip error: ' + e.message); health.lastError = e.message; }
   }
 
-  // 2. Transaction deadline reminders (transactional - separate from drips)
-  try {
-    if (CTRL.reminders) await processReminders(result);
-  } catch (err) {
-    result.reminders.errors.push('Reminder error: ' + err.message);
-  }
+  // 3. Transaction reminders (separate from drips).
+  try { if (CTRL.master && CTRL.reminders) await processReminders(result); }
+  catch (e) { result.reminders.errors.push('Reminder error: ' + e.message); }
 
-  return res.status(200).json({ ok: true, result });
+  try { await setSetting('drip_health', health); } catch (e) {}
+  return res.status(200).json({ ok: true, sending: health.sending, result: result, health: health });
 }

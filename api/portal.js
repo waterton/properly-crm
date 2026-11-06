@@ -32,6 +32,32 @@ module.exports = async function (req, res) {
   // than its own function) to stay under the serverless-function limit. It uses
   // its OWN signed token (service key based), so it does not depend on the
   // portal's PORTAL_SECRET being configured.
+  // ── Click tracking for drip emails ────────────────────────────────────────
+  // Every link in a campaign email points here (see trackLinks in run-drips.js). We count the
+  // click on that email's send_log row, add a 'click' event for the contact's history, then
+  // redirect. The signature stops this from being used as an open redirect.
+  if ((req.query && req.query.action) === 'click') {
+    const logId = String(req.query.l || '');
+    const url = String(req.query.u || '');
+    const ok = /^https?:\/\//i.test(url) && logId && String(req.query.t || '') === clickToken(logId, url);
+    if (!ok) { res.setHeader('Content-Type', 'text/html; charset=utf-8'); return res.status(400).send(unsubPage('Link', 'This link is incomplete or has expired.')); }
+    try {
+      const rows = await supa('send_log?id=eq.' + encodeURIComponent(logId) + '&select=id,clicks,contactId,campaignId,enrollmentId,stepIndex,subject&limit=1');
+      const row = Array.isArray(rows) && rows[0];
+      if (row) {
+        await fetch(`${SUPA_URL}/rest/v1/send_log?id=eq.` + encodeURIComponent(logId), {
+          method: 'PATCH', headers: svcHeaders({ 'Prefer': 'return=minimal' }), body: JSON.stringify({ clicks: (row.clicks || 0) + 1 })
+        });
+        await fetch(`${SUPA_URL}/rest/v1/send_log`, {
+          method: 'POST', headers: svcHeaders({ 'Prefer': 'return=minimal' }),
+          body: JSON.stringify([{ id: Date.now() * 1000 + Math.floor(Math.random() * 1000), kind: 'click', status: 'ok', contactId: row.contactId, campaignId: row.campaignId,
+            enrollmentId: row.enrollmentId, stepIndex: row.stepIndex, subject: row.subject, note: url.slice(0, 500), created_at: new Date().toISOString() }])
+        });
+      }
+    } catch (e) {}
+    res.statusCode = 302; res.setHeader('Location', url); return res.end();
+  }
+
   if ((req.query && req.query.action) === 'unsubscribe') {
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     const cid = req.query.c != null ? String(req.query.c) : '';
@@ -50,10 +76,14 @@ module.exports = async function (req, res) {
         method: 'POST', headers: svcHeaders({ 'Prefer': 'resolution=merge-duplicates' }),
         body: JSON.stringify([{ contact_id: Number(cid) || cid, email: email, created_at: new Date().toISOString() }])
       });
-      await fetch(`${SUPA_URL}/rest/v1/enrollments?contactId=eq.` + encodeURIComponent(cid) + `&status=eq.active`, {
+      await fetch(`${SUPA_URL}/rest/v1/enrollments?contactId=eq.` + encodeURIComponent(cid) + `&status=in.(active,paused)`, {
         method: 'PATCH', headers: svcHeaders({ 'Prefer': 'return=minimal' }),
-        body: JSON.stringify({ status: 'stopped', nextSendAt: null })
+        body: JSON.stringify({ status: 'unsubscribed', nextSendAt: null, reason: 'Clicked unsubscribe', updated_at: new Date().toISOString() })
       });
+      await fetch(`${SUPA_URL}/rest/v1/send_log`, {
+        method: 'POST', headers: svcHeaders({ 'Prefer': 'return=minimal' }),
+        body: JSON.stringify([{ id: Date.now() * 1000 + Math.floor(Math.random() * 1000), kind: 'unsubscribe', status: 'ok', contactId: Number(cid) || null, note: 'Clicked the unsubscribe link', created_at: new Date().toISOString() }])
+      }).catch(function () {});
       return res.status(200).send(unsubPage('Unsubscribed',
         (email ? email.replace(/[<>&]/g, '') + ' ' : 'You ')
         + 'will no longer receive our marketing emails. If this was a mistake, reply to any of our emails and we\'ll add you back.',
@@ -205,6 +235,11 @@ function svcHeaders(extra) {
 function unsubToken(cid) {
   return crypto.createHmac('sha256', process.env.UNSUB_SECRET || SUPA_SERVICE_KEY)
     .update('unsub:' + String(cid)).digest('hex').slice(0, 32);
+}
+// Click token — MUST match clickToken in api/run-drips.js.
+function clickToken(logId, url) {
+  return crypto.createHmac('sha256', process.env.UNSUB_SECRET || SUPA_SERVICE_KEY)
+    .update('click:' + String(logId) + ':' + url).digest('hex').slice(0, 24);
 }
 function unsubPage(title, msg, heading) {
   return '<!DOCTYPE html><html><head><meta charset="utf-8">'

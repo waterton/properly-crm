@@ -10,7 +10,7 @@
 <link rel="manifest" href="site.webmanifest">
 <meta name="theme-color" content="#b8912f">
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260922b">
+    <link rel="stylesheet" href="styles.css?v=20261106a">
 <script>
 // Theme controller (Light / Dark / Auto). Runs before the body paints so there's no flash. Choice is
 // remembered per device in localStorage. "Auto" follows the device's light/dark setting live.
@@ -146,7 +146,7 @@
         <div id="globalSearchResults" style="display:none;position:fixed;top:52px;right:12px;width:min(460px,92vw);max-height:74vh;overflow:auto;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:0 10px 34px rgba(0,0,0,0.45);z-index:1200;padding:6px;"></div>
         <button class="btn btn-p" id="btnAdd" style="display:none;">+ Add</button>
         <button id="themeToggle" title="Theme" style="background:none;border:none;cursor:pointer;font-size:17px;line-height:1;padding:4px 6px;border-radius:6px;">☀️</button>
-        <div style="font-size:11px;color:var(--text3);margin-right:4px;">v21.2</div>
+        <div style="font-size:11px;color:var(--text3);margin-right:4px;">v22.0</div>
         <div class="topbar-user" id="topbarUser" title="Click to sign out" style="cursor:pointer;position:relative;" id="topbarUserBtn">RE</div>
       </div>
     </div>
@@ -929,44 +929,7 @@
         <div id="mlsResults"></div>
         <div id="mlsPagination" style="display:flex;justify-content:center;gap:8px;margin-top:20px;"></div>
       </div>
-      <div class="page" id="page-drips">
-        <div id="dripStatusBanner" style="background:rgba(201,168,76,0.1);border:1px solid var(--accent);border-radius:9px;padding:13px 18px;margin-bottom:18px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-          <svg width="16" height="16" fill="none" stroke="var(--accent)" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>
-          <div style="flex:1;font-size:16px;color:var(--text2);" id="dripStatusText">Automated email sequences. Enroll contacts manually or auto-enroll on pipeline stage changes.</div>
-          <button class="btn btn-g" id="btnRunDripsNow" style="padding:6px 14px;font-size:16px;">Run due steps now</button>
-        </div>
-        <div style="display:flex;gap:10px;margin-bottom:18px;border-bottom:1px solid var(--border);">
-          <button class="drip-tab active" id="dripTabCampaigns" data-drip-tab="campaigns" style="background:none;border:none;border-bottom:2px solid var(--accent);color:var(--accent);font-family:'DM Sans',sans-serif;font-size:16px;font-weight:600;padding:10px 14px;cursor:pointer;">Campaigns</button>
-          <button class="drip-tab" id="dripTabEnrollments" data-drip-tab="enrollments" style="background:none;border:none;border-bottom:2px solid transparent;color:var(--text3);font-family:'DM Sans',sans-serif;font-size:16px;font-weight:600;padding:10px 14px;cursor:pointer;">Active Enrollments<span class="nbadge" id="nbEnrollments" style="margin-left:6px;">0</span></button>
-          <button class="drip-tab" id="dripTabMessages" data-drip-tab="messages" style="background:none;border:none;border-bottom:2px solid transparent;color:var(--text3);font-family:'DM Sans',sans-serif;font-size:16px;font-weight:600;padding:10px 14px;cursor:pointer;">Message Library</button>
-          <button class="drip-tab" id="dripTabLog" data-drip-tab="log" style="background:none;border:none;border-bottom:2px solid transparent;color:var(--text3);font-family:'DM Sans',sans-serif;font-size:16px;font-weight:600;padding:10px 14px;cursor:pointer;">Send Log</button>
-        </div>
-        <div id="dripPaneCampaigns">
-          <div class="card">
-            <div class="card-hdr"><div class="card-title">Email Campaigns</div><button class="btn btn-p" id="btnNewCampaign">+ New Campaign</button></div>
-            <div id="dripCampaignList" style="padding:8px 16px 16px;"></div>
-          </div>
-        </div>
-        <div id="dripPaneEnrollments" style="display:none;">
-          <div class="card">
-            <div class="card-hdr"><div class="card-title">Active Enrollments</div></div>
-            <div id="dripEnrollmentList" style="padding:8px 16px 16px;"></div>
-          </div>
-        </div>
-        <div id="dripPaneMessages" style="display:none;">
-          <div class="card">
-            <div class="card-hdr"><div class="card-title">Message Library</div><button class="btn btn-p" id="btnNewMessage">+ New Message</button></div>
-            <div style="padding:0 16px 8px;font-size:15px;color:var(--text3);">Finished marketing emails (header, graphics, copy) live here. Campaign steps pick a message to send. Images are embedded so they display in any mail app.</div>
-            <div id="dripMessageList" style="padding:8px 16px 16px;"></div>
-          </div>
-        </div>
-        <div id="dripPaneLog" style="display:none;">
-          <div class="card">
-            <div class="card-hdr"><div class="card-title">Sent &amp; Scheduled</div></div>
-            <div id="dripLogList" style="padding:8px 16px 16px;"></div>
-          </div>
-        </div>
-      </div>
+      <div class="page" id="page-drips"><div id="dripRoot"></div></div>
       <div class="page" id="page-investments"><div id="invRoot"></div></div>
       <div class="page" id="page-hardmoney"><div id="hmRoot"></div></div>
       <div class="page" id="page-dealsheet"><div id="dsRoot"></div></div>
@@ -1055,54 +1018,10 @@
     </div>
   </div>
 </div>
-<div class="modal-ov" id="campaignModal">
-  <div class="modal" style="max-width:640px;">
-    <div class="mhdr"><div class="mtitle" id="campModalTitle">New Campaign</div><button class="mx" data-close="campaignModal">&#x2715;</button></div>
-    <div class="mbody">
-      <div class="frow">
-        <div class="fg" style="flex:2;"><label class="fl">Campaign Name</label><input class="fi" id="campName" placeholder="New Buyer Lead Nurture"></div>
-        <div class="fg"><label class="fl">Status</label><select class="fsel" id="campActive"><option value="true">Active</option><option value="false">Paused</option></select></div>
-      </div>
-      <div class="fg"><label class="fl">Auto-enroll trigger (optional)</label><select class="fsel" id="campTrigger"><option value="">None - manual enroll only</option><option value="stage:New Lead">When contact enters stage: New Lead</option><option value="stage:Contacted">When contact enters stage: Contacted</option><option value="stage:Showing">When contact enters stage: Showing</option><option value="stage:Under Contract">When contact enters stage: Under Contract</option><option value="stage:Closed">When contact enters stage: Closed</option></select></div>
-      <div style="display:flex;align-items:center;justify-content:space-between;margin:14px 0 8px;">
-        <label class="fl" style="margin:0;">Email Steps</label>
-        <button class="btn btn-g" id="btnAddStep" style="padding:5px 11px;font-size:16px;">+ Add Step</button>
-      </div>
-      <div id="campStepsWrap"></div>
-      <div style="font-size:14px;color:var(--text3);margin-top:10px;line-height:1.5;">Use the <b style="color:var(--accent);">Personalize</b> buttons under each step to drop in a contact's name, property, or price — those are filled in automatically with the real details when the email sends.</div>
-    </div>
-    <div class="mftr"><button class="btn btn-g" data-close="campaignModal">Cancel</button><button class="btn btn-p" id="btnSaveCampaign">Save Campaign</button></div>
-  </div>
-</div>
-<div class="modal-ov" id="enrollModal">
-  <div class="modal">
-    <div class="mhdr"><div class="mtitle">Enroll Contact</div><button class="mx" data-close="enrollModal">&#x2715;</button></div>
-    <div class="mbody">
-      <div class="fg"><label class="fl">Campaign</label><select class="fsel" id="enrollCampaign"></select></div>
-      <div class="fg"><label class="fl">Who to enroll</label>
-        <select class="fsel" id="enrollMode">
-          <option value="single">One contact</option>
-          <option value="category">Everyone in a category</option>
-        </select>
-      </div>
-      <div class="fg" id="enrollContactWrap"><label class="fl">Contact</label><div id="enrollContactPick"></div></div>
-      <div class="fg" id="enrollCategoryWrap" style="display:none;"><label class="fl">Category</label><select class="fsel" id="enrollCategory"></select>
-        <div id="enrollCategoryCount" style="font-size:14px;color:var(--text3);margin-top:6px;"></div>
-      </div>
-      <div class="fg"><label class="fl">Send from (Gmail account)</label><select class="fsel" id="enrollFrom"></select></div>
-      <div style="font-size:14px;color:var(--text3);line-height:1.5;">Each step goes out on the morning of its delay: the first email after the first step's delay (0 days = the next send run), then each later step after its own delay. For a 3-email sequence, build one campaign with 3 steps (not three separate campaigns).</div>
-    </div>
-    <div class="mftr"><button class="btn btn-g" data-close="enrollModal">Cancel</button><button class="btn btn-p" id="btnConfirmEnroll">Enroll</button></div>
-  </div>
-</div>
 <div class="modal-ov" id="messageModal">
   <div class="modal" style="max-width:860px;">
-    <div class="mhdr"><div class="mtitle" id="msgModalTitle">New Message</div><button class="mx" data-close="messageModal">&#x2715;</button></div>
+    <div class="mhdr"><div class="mtitle" id="msgModalTitle">Build an email</div><button class="mx" data-close="messageModal">&#x2715;</button></div>
     <div class="mbody">
-      <div class="frow">
-        <div class="fg" style="flex:2;"><label class="fl">Message name <span style="color:var(--text3);font-weight:400;">(internal label)</span></label><input class="fi" id="msgName" placeholder="Past-client check-in"></div>
-        <div class="fg"><label class="fl">Status</label><select class="fsel" id="msgActive"><option value="true">Active</option><option value="false">Archived</option></select></div>
-      </div>
       <div class="fg"><label class="fl">Subject line</label><input class="fi" id="msgSubject" placeholder="Subject line"></div>
 
       <!-- Visual builder (default). Stack image / text / button blocks; no HTML needed. -->
@@ -1133,7 +1052,7 @@
       <iframe id="msgPreview" style="width:100%;height:320px;border:1px solid var(--border);border-radius:8px;background:#fff;"></iframe>
       <div style="font-size:14px;color:var(--text3);margin-top:10px;line-height:1.5;">To personalize, type <b style="color:var(--accent);">{{first}}</b>, <b style="color:var(--accent);">{{last}}</b>, <b style="color:var(--accent);">{{property}}</b>, <b style="color:var(--accent);">{{price}}</b>, or <b style="color:var(--accent);">{{agent}}</b> in any text — it's replaced with the real details when the email sends. An unsubscribe link is added to the footer automatically.</div>
     </div>
-    <div class="mftr"><button class="btn btn-g" data-close="messageModal">Cancel</button><button class="btn btn-p" id="btnSaveMessage">Save Message</button></div>
+    <div class="mftr"><button class="btn btn-g" data-close="messageModal">Cancel</button><button class="btn btn-p" id="btnSaveMessage">Use this design</button></div>
   </div>
 </div>
 <div class="modal-ov" id="emailIntelModal">
@@ -1287,6 +1206,6 @@
 </div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="app.js?v=20261105a"></script>
+<script src="app.js?v=20261106a"></script>
 </body>
 </html>

@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Drip Campaigns – redesign mockup v2</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Bebas+Neue&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#FFFFFF;--surface:#FFFFFF;--surface2:#F4F4F2;--surface3:#ECECEA;--border:#E2E2E0;--accent:#1E4C84;--accent2:#2F6FB3;--text:#1A1A1A;--text2:#6A6A6A;--text3:#9A9A9A;--lead:#3d9a4e;--danger:#c94c4c;--warn:#E08A1E;--radius:10px;}
+[data-theme="dark"]{--bg:#0f1216;--surface:#171c23;--surface2:#1e242c;--surface3:#272e39;--border:#333b47;--accent:#5b93d6;--accent2:#7aabe4;--text:#e9ecf2;--text2:#aab2bf;--text3:#7f8896;--lead:#5ec272;--danger:#e06b6b;--warn:#e3a93c;}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'DM Sans',Segoe UI,sans-serif;background:var(--bg);color:var(--text);font-size:16px}
+.app{display:flex;height:100vh;overflow:hidden}
+.sidebar{width:220px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;overflow-y:auto}
+.logo{margin:12px 12px 10px;padding:14px 16px;background:#161210;border-radius:10px}
+.logo-text{font-family:'Bebas Neue',Impact,sans-serif;font-size:24px;letter-spacing:2px;color:#C9A84C}
+.logo-sub{font-size:12px;color:#A8915E;letter-spacing:3px;text-transform:uppercase}
+.nav{padding:10px 8px}
+.nav-sec{font-size:12px;font-weight:700;color:var(--accent);letter-spacing:2px;text-transform:uppercase;padding:10px 10px 5px}
+.ni{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 10px;border-radius:7px;font-size:15px;color:var(--text2);margin-bottom:2px;cursor:pointer}
+.ni:hover{background:var(--surface2)}
+.ni.active{background:var(--surface2);color:var(--accent);font-weight:600}
+.nbadge{font-size:11px;font-weight:700;background:var(--accent);color:#fff;border-radius:10px;padding:1px 7px}
+.nbadge.red{background:var(--danger)}
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 20px;height:56px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.ptitle{font-family:'Bebas Neue',Impact,sans-serif;font-size:26px;letter-spacing:1.5px}
+.content{flex:1;overflow-y:auto;padding:22px}
+.btn{display:inline-flex;align-items:center;gap:7px;padding:8px 15px;border-radius:7px;font-size:15px;font-family:inherit;font-weight:500;cursor:pointer;border:none;white-space:nowrap}
+.btn-p{background:var(--accent);color:#fff}.btn-p:hover{background:var(--accent2)}
+.btn-g{background:var(--surface2);color:var(--text);border:1px solid var(--border)}.btn-g:hover{border-color:var(--text3)}
+.btn-d{background:transparent;color:var(--danger);border:1px solid var(--border)}
+.btn-w{background:#fff;color:var(--danger);border:none;font-weight:700}
+.btn-sm{padding:5px 11px;font-size:14px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius)}
+.ccard{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px;cursor:pointer}
+.ccard:hover{border-color:var(--accent)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
+.badge{font-size:12px;font-weight:700;padding:3px 10px;border-radius:20px;letter-spacing:.5px;white-space:nowrap}
+.b-live{background:rgba(61,154,78,.14);color:var(--lead)}
+.b-draft{background:var(--surface3);color:var(--text2)}
+.b-warn{background:rgba(224,138,30,.15);color:var(--warn)}
+.b-red{background:rgba(201,76,76,.13);color:var(--danger)}
+.b-blue{background:rgba(30,76,132,.12);color:var(--accent)}
+.chip{font-size:11px;font-weight:700;padding:2px 7px;border-radius:5px;border:1px solid var(--border);color:var(--text2);letter-spacing:.5px}
+.chip.ok{border-color:rgba(61,154,78,.4);color:var(--lead)}
+.chip.miss{border-style:dashed;color:var(--text3)}
+.muted{color:var(--text2);font-size:14px}
+.row{display:flex;align-items:center;gap:10px}
+.between{justify-content:space-between}
+.wrap{flex-wrap:wrap}
+.stat{display:flex;gap:18px;margin-top:14px;padding-top:12px;border-top:1px solid var(--border)}
+.stat b{display:block;font-size:20px}
+.stat span{font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:1px}
+.back{color:var(--accent);cursor:pointer;font-size:15px;margin-bottom:14px;display:inline-block}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin:18px 0 16px}
+.tab{padding:10px 16px;font-size:15px;font-weight:600;color:var(--text3);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
+.tab.on{color:var(--accent);border-bottom-color:var(--accent)}
+.tl{max-width:780px}
+.em{display:flex;gap:14px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px;cursor:pointer;align-items:center}
+.em:hover{border-color:var(--accent)}
+.em.empty{border-style:dashed;cursor:default}
+.em.task{background:var(--surface2)}
+.thumb{width:92px;height:72px;border-radius:7px;overflow:hidden;border:1px solid var(--border);flex-shrink:0;background:#fff}
+.thumb.blank{display:flex;align-items:center;justify-content:center;color:var(--text3);font-size:12px;background:var(--surface2)}
+.ticon{width:92px;height:72px;border-radius:7px;flex-shrink:0;background:rgba(224,138,30,.12);display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--warn);font-weight:700;font-size:13px}
+.ticon b{font-size:24px}
+.num{width:30px;height:30px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0}
+.num.gray{background:var(--surface3);color:var(--text2)}
+.num.or{background:var(--warn)}
+.wait{margin:0 0 0 26px;border-left:2px dashed var(--border);padding:10px 0 10px 24px;display:flex;align-items:center;gap:8px;color:var(--text2);font-size:14px}
+select.sm{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:4px 6px;font-family:inherit;font-size:14px;color:var(--text)}
+.estats{display:flex;gap:14px;margin-top:6px;font-size:13px;color:var(--text2)}
+.estats b{color:var(--text)}
+.addrow{display:flex;gap:10px;margin-top:12px}
+.addem{flex:1;border:1px dashed var(--border);border-radius:12px;padding:14px;text-align:center;color:var(--accent);cursor:pointer;font-weight:600}
+.addem:hover{border-color:var(--accent)}
+table{width:100%;border-collapse:collapse}
+th{text-align:left;font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;padding:10px 12px;border-bottom:1px solid var(--border)}
+td{padding:12px;border-bottom:1px solid var(--border);font-size:15px;vertical-align:middle}
+.link{color:var(--accent);cursor:pointer;font-weight:600}
+.prog{display:flex;gap:4px}
+.dot{width:20px;height:6px;border-radius:3px;background:var(--surface3)}
+.dot.done{background:var(--lead)}.dot.cur{background:var(--accent)}
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;z-index:50;padding:20px}
+.ov.open{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:12px;width:100%;max-width:560px;max-height:92vh;overflow-y:auto}
+.modal.wide{max-width:960px}
+.mhdr{padding:18px 22px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.mtitle{font-family:'Bebas Neue',Impact,sans-serif;font-size:22px;letter-spacing:1px;color:var(--accent)}
+.mx{background:none;border:none;font-size:20px;color:var(--text3);cursor:pointer}
+.mbody{padding:20px 22px}
+.mftr{padding:14px 22px;border-top:1px solid var(--border);display:flex;gap:9px;justify-content:flex-end}
+.fl{display:block;font-size:13px;font-weight:600;color:var(--text2);margin-bottom:6px;text-transform:uppercase;letter-spacing:.8px}
+.fi{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:9px 11px;font-size:15px;color:var(--text);font-family:inherit;outline:none}
+.fg{margin-bottom:16px}
+.drop{border:2px dashed var(--border);border-radius:12px;padding:26px;text-align:center;color:var(--text2);cursor:pointer}
+.drop:hover{border-color:var(--accent);color:var(--accent)}
+.split{display:grid;grid-template-columns:1fr 1.15fr;gap:20px}
+.preview{border:1px solid var(--border);border-radius:10px;overflow:hidden;background:#f4f4f4;height:400px;overflow-y:auto}
+.tplg{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.tpl{border:1px solid var(--border);border-radius:10px;overflow:hidden;cursor:pointer}
+.tpl:hover{border-color:var(--accent)}
+.tpl .tt{height:110px;overflow:hidden;background:#fff}
+.tpl .tn{padding:8px 10px;font-size:14px;font-weight:600;border-top:1px solid var(--border)}
+.pick{display:flex;align-items:center;gap:10px;padding:10px 4px;border-bottom:1px solid var(--border);font-size:15px;cursor:pointer}
+.pick input{width:18px;height:18px;accent-color:var(--accent)}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1a1a1a;color:#fff;padding:12px 20px;border-radius:9px;font-size:15px;display:none;z-index:99}
+.seg{display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.seg div{padding:7px 14px;font-size:14px;font-weight:600;cursor:pointer;color:var(--text2);background:var(--surface2)}
+.seg div.on{background:var(--accent);color:#fff}
+.note{background:var(--surface2);border-radius:9px;padding:12px 14px;font-size:14px;color:var(--text2)}
+.mk{font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#fff;background:#E08A1E;padding:4px 10px;border-radius:5px;font-weight:700}
+.banner{border-radius:10px;padding:13px 16px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;font-size:15px}
+.banner.red{background:var(--danger);color:#fff}
+.banner.amber{background:rgba(224,138,30,.14);color:var(--text);border:1px solid rgba(224,138,30,.45)}
+.banner.ok{background:rgba(61,154,78,.1);color:var(--lead);border:1px solid rgba(61,154,78,.3);padding:9px 14px;font-weight:600}
+.dayh{font-size:13px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;margin:22px 0 8px}
+.obx{display:flex;align-items:center;gap:14px;padding:12px 14px;border:1px solid var(--border);border-radius:10px;margin-bottom:8px;background:var(--surface)}
+.obx.hold{opacity:.72}
+.obx .tm{width:62px;font-weight:700;font-size:14px;color:var(--text2)}
+.set{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;padding:16px 0;border-bottom:1px solid var(--border)}
+.set .t{font-weight:700}
+.sw{position:relative;width:44px;height:24px;flex-shrink:0;cursor:pointer}
+.sw input{display:none}
+.sw span{position:absolute;inset:0;background:var(--surface3);border-radius:12px;transition:.15s}
+.sw span:before{content:'';position:absolute;width:18px;height:18px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.15s}
+.sw input:checked+span{background:var(--accent)}
+.sw input:checked+span:before{left:23px}
+.hist{border-left:2px solid var(--border);margin-left:8px;padding-left:20px}
+.hi{position:relative;padding:0 0 18px}
+.hi:before{content:'';position:absolute;left:-27px;top:4px;width:12px;height:12px;border-radius:50%;background:var(--surface);border:2px solid var(--accent)}
+.hi.g:before{border-color:var(--lead);background:var(--lead)}
+.hi.o:before{border-color:var(--warn)}
+.hi.r:before{border-color:var(--danger)}
+.hi .d{font-size:13px;color:var(--text3)}
+.two{display:grid;grid-template-columns:1fr 1.3fr;gap:18px;align-items:start}
+.legend{font-size:13px;color:var(--text3)}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="sidebar">
+    <div class="logo"><div class="logo-text">PROPERLY</div><div class="logo-sub">Palacios Baker</div></div>
+    <div class="nav">
+      <div class="nav-sec">Main</div>
+      <div class="ni">Dashboard</div><div class="ni">Pipeline</div>
+      <div class="ni" id="n-contacts" onclick="showContact('Maria Lopez')">All Contacts</div>
+      <div class="ni">Transactions</div><div class="ni">Tasks <span class="nbadge">3</span></div>
+      <div class="nav-sec">Marketing</div>
+      <div class="ni active" id="n-list" onclick="go('list')">Drip Campaigns</div>
+      <div class="ni" id="n-outbox" onclick="go('outbox')">Outbox <span class="nbadge" id="obBadge"></span></div>
+      <div class="ni" id="n-templates" onclick="go('templates')">Email Templates</div>
+      <div class="nav-sec">Tools</div>
+      <div class="ni">Deal Sheet</div><div class="ni">Calendar</div><div class="ni">Team</div>
+    </div>
+  </div>
+  <div class="main">
+    <div class="topbar">
+      <div class="row"><div class="ptitle" id="ptitle">Drip Campaigns</div><span class="mk">Mockup</span></div>
+      <div class="row"><button class="btn btn-g btn-sm" onclick="resetHealth()" title="Bring the warnings back to see them again">Show warnings again</button><button class="btn btn-g btn-sm" onclick="toggleTheme()">Light / dark</button></div>
+    </div>
+    <div class="content" id="content"></div>
+  </div>
+</div>
+<div class="ov" id="ov"><div class="modal" id="modal"></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ---------- sample email designs (stand-ins for your real designed emails) ---------- */
+function design(o){
+  return '<div style="font-family:Arial,sans-serif;background:#f4f4f4;padding:14px"><div style="background:#fff;border-radius:8px;overflow:hidden;max-width:520px;margin:auto">'
+  +(o.img?'<div style="height:130px;background:'+o.img+';display:flex;align-items:center;justify-content:center;color:#1E4C84;font-weight:bold;font-size:15px">'+o.imgt+'</div>':'')
+  +'<div style="background:'+o.c+';color:#fff;padding:20px;text-align:center;font-size:21px;font-weight:bold">'+o.t+'</div>'
+  +'<div style="padding:18px;color:#333;font-size:14px;line-height:1.6">'+o.b+'</div>'
+  +(o.cta?'<div style="text-align:center;padding-bottom:20px"><span style="background:#C9A84C;color:#fff;padding:10px 22px;border-radius:6px;font-weight:bold;display:inline-block">'+o.cta+'</span></div>':'')
+  +'<div style="padding:12px;text-align:center;font-size:11px;color:#999;border-top:1px solid #eee">Palacios Baker Real Estate · <u>'+(o.es?'Cancelar suscripción':'Unsubscribe')+'</u></div></div></div>';
+}
+var IMG1='linear-gradient(#c9d6e6,#9fb6d1)', IMG2='linear-gradient(#e8dcc0,#c9a84c)';
+var DZ={
+ wEN:design({c:'#1E4C84',t:'Welcome, {first}!',img:IMG1,imgt:'[ home photo ]',b:'Hi {first}, thanks for letting us help with your home search. Over the next few weeks we will send you market updates and homes we think you will love.',cta:'See new listings'}),
+ wES:design({es:1,c:'#1E4C84',t:'¡Bienvenido, {first}!',img:IMG1,imgt:'[ foto de casa ]',b:'Hola {first}, gracias por permitirnos ayudarle a buscar su casa. En las próximas semanas le enviaremos reportes del mercado y casas que creemos que le encantarán.',cta:'Ver casas nuevas'}),
+ mEN:design({c:'#C9A84C',t:'Your market update',b:'Hi {first}, median price in your area is <b>$512k</b> and homes are selling in <b>18 days</b>. Here is what that means for you...',cta:'Read the full update'}),
+ mES:design({es:1,c:'#C9A84C',t:'Reporte del mercado',b:'Hola {first}, el precio medio en su área es <b>$512k</b> y las casas se venden en <b>18 días</b>. Esto es lo que significa para usted...',cta:'Leer el reporte'}),
+ lEN:design({c:'#2F6FB3',t:'Homes picked for you, {first}',img:IMG1,imgt:'[ 3 listing photos ]',b:'We pulled three homes that match what you told us. Want to see any of them this weekend?',cta:'View the homes'}),
+ oEN:design({c:'#8a6a1c',t:'Thanks for stopping by, {first}',img:IMG2,imgt:'OPEN HOUSE',b:'It was great meeting you at the open house. Here are a few similar homes nearby...',cta:'See similar homes'}),
+ oES:design({es:1,c:'#8a6a1c',t:'Gracias por visitarnos, {first}',img:IMG2,imgt:'CASA ABIERTA',b:'Fue un gusto conocerle en la casa abierta. Aquí tiene algunas casas similares cerca...',cta:'Ver casas similares'}),
+ aEN:design({c:'#2d6a4f',t:'Happy home anniversary, {first}!',b:'One year ago you got the keys. We hope the house has become home. Curious what it is worth today?',cta:'Get my home value'}),
+ aES:design({es:1,c:'#2d6a4f',t:'¡Feliz aniversario de su casa, {first}!',b:'Hace un año recibió las llaves. Esperamos que la casa ya sea su hogar. ¿Quiere saber cuánto vale hoy?',cta:'Ver el valor de mi casa'})
+};
+var TEMPLATES=[
+ {n:'Welcome new buyer',en:{s:'Welcome to your home search, {first}',h:DZ.wEN},es:{s:'Bienvenido a su búsqueda de casa, {first}',h:DZ.wES}},
+ {n:'Market update',en:{s:'Your market update',h:DZ.mEN},es:{s:'Su reporte del mercado',h:DZ.mES}},
+ {n:'Homes picked for you',en:{s:'3 homes picked for you',h:DZ.lEN},es:{s:'',h:''}},
+ {n:'Open house thank-you',en:{s:'Thanks for stopping by',h:DZ.oEN},es:{s:'Gracias por visitarnos',h:DZ.oES}},
+ {n:'Home anniversary',en:{s:'Happy home anniversary!',h:DZ.aEN},es:{s:'¡Feliz aniversario de su casa!',h:DZ.aES}}
+];
+function E(t,wait,stats){var x=TEMPLATES[t];return {type:'email',wait:wait,en:{s:x.en.s,h:x.en.h},es:{s:x.es.s,h:x.es.h},st:stats||{sent:0,clicked:0,replied:0,unsub:0}}}
+function T(kind,who,note,wait){return {type:'task',kind:kind,who:who,note:note,wait:wait}}
+
+/* ---------- campaigns + people ---------- */
+var camps=[
+ {id:1,name:'New buyer nurture',live:true,set:{reply:true,pause:true,pauseDays:10,weekends:true,time:'7:00 am',oneADay:true},
+  steps:[E(0,0,{sent:42,clicked:11,replied:4,unsub:1}),E(1,3,{sent:35,clicked:6,replied:2,unsub:0}),T('Call','Elda','Ask how the search is going. Offer a showing.',2),E(2,4,{sent:12,clicked:4,replied:1,unsub:0})],
+  people:[
+   {n:'Maria Lopez',e:'maria.lopez@gmail.com',lang:'EN',status:'active',step:4,next:'Mon Nov 9'},
+   {n:'Sofia Garcia',e:'sofia.garcia@gmail.com',lang:'ES',status:'active',step:2,next:'Mon Nov 9'},
+   {n:'James Park',e:'jpark@work.com',lang:'EN',status:'paused',step:2,next:'Mon Nov 16',why:'Randy emailed him Nov 6 — waiting 10 days so the campaign doesn’t interrupt'},
+   {n:'Ava Mitchell',e:'ava.mitchell@outlook.com',lang:'EN',status:'stopped',step:2,why:'Replied Nov 5: “Can we see the Elm St house Saturday?”'},
+   {n:'Diego Ramos',e:'dramos@gmial.com',lang:'ES',status:'bounced',step:1,why:'Email address doesn’t exist (typo?)'},
+   {n:'Kevin Ward',e:'kward@gmail.com',lang:'EN',status:'done',step:4}
+  ]},
+ {id:2,name:'Past client check-ins',live:false,set:{reply:true,pause:true,pauseDays:10,weekends:true,time:'7:00 am',oneADay:true},
+  steps:[E(4,0),{type:'email',wait:30,en:{s:'',h:''},es:{s:'',h:''},st:{sent:0,clicked:0,replied:0,unsub:0}}],people:[]},
+ {id:3,name:'Open house follow-up',live:true,set:{reply:true,pause:true,pauseDays:10,weekends:true,time:'7:00 am',oneADay:true},
+  steps:[E(3,0,{sent:18,clicked:5,replied:3,unsub:0}),E(1,2,{sent:14,clicked:2,replied:1,unsub:1}),T('Text','Randy','Quick text: any homes you want to see?',3)],
+  people:[{n:'Chris Hall',e:'chall@gmail.com',lang:'EN',status:'active',step:2,next:'Mon Nov 9'},{n:'Elena Cruz',e:'elena.cruz@gmail.com',lang:'ES',status:'active',step:2,next:'Tue Nov 10'}]}
+];
+var CONTACTS=['Ryan Nguyen','Linda Reyes','Marcus Thompson','Diane Foster','Sofia Garcia','Tom Becker','Elena Cruz','Kevin Ward'];
+var PREVIEW_PEOPLE=[{n:'Maria Lopez',lang:'EN'},{n:'Sofia Garcia',lang:'ES'},{n:'Chris Hall',lang:'EN'},{n:'Elena Cruz',lang:'ES'}];
+var H={gmail:false,bounce:true};
+
+/* ---------- outbox (next 7 days) ---------- */
+var DAYS=['Mon Nov 9','Tue Nov 10','Wed Nov 11','Thu Nov 12','Fri Nov 13','Mon Nov 16'];
+var OB=[
+ {d:0,t:'7:00',n:'Maria Lopez',lang:'EN',c:1,si:3,kind:'email'},
+ {d:0,t:'7:00',n:'Sofia Garcia',lang:'ES',c:1,si:1,kind:'email'},
+ {d:0,t:'7:00',n:'Chris Hall',lang:'EN',c:3,si:1,kind:'email'},
+ {d:0,t:'—',n:'Tom Becker',lang:'EN',c:1,si:2,kind:'task'},
+ {d:1,t:'7:00',n:'Elena Cruz',lang:'ES',c:3,si:1,kind:'email'},
+ {d:1,t:'7:00',n:'Diego Ramos',lang:'ES',c:1,si:0,kind:'email',bad:1},
+ {d:1,t:'—',n:'Chris Hall',lang:'EN',c:3,si:2,kind:'task'},
+ {d:2,t:'7:00',n:'Linda Reyes',lang:'EN',c:1,si:1,kind:'email'},
+ {d:2,t:'7:00',n:'Marcus Thompson',lang:'EN',c:1,si:3,kind:'email'},
+ {d:3,t:'7:00',n:'Diane Foster',lang:'EN',c:3,si:1,kind:'email'},
+ {d:3,t:'7:00',n:'Ryan Nguyen',lang:'EN',c:1,si:1,kind:'email'},
+ {d:4,t:'—',n:'Maria Lopez',lang:'EN',c:1,si:2,kind:'task'}
+];
+var obFilter='all';
+
+/* ---------- helpers ---------- */
+var cur=null,tab='steps';
+function $(id){return document.getElementById(id)}
+function C(id){return camps.find(function(c){return c.id===id})}
+function toast(t){var x=$('toast');x.textContent=t;x.style.display='block';clearTimeout(window._t);window._t=setTimeout(function(){x.style.display='none'},2800)}
+function toggleTheme(){var h=document.documentElement;h.dataset.theme=h.dataset.theme==='dark'?'':'dark'}
+function closeM(){$('ov').classList.remove('open')}
+function openM(html,wide){$('modal').className='modal'+(wide?' wide':'');$('modal').innerHTML=html;$('ov').classList.add('open')}
+$('ov').onclick=function(e){if(e.target===$('ov'))closeM()};
+function esc(s){return String(s||'').replace(/"/g,'&quot;')}
+function first(n){return n.split(' ')[0]}
+function merge(h,n){return (h||'').replace(/\{first\}/g,first(n))}
+function thumb(h){return h?'<div class="thumb"><div style="transform:scale(.18);transform-origin:0 0;width:555%">'+merge(h,'Maria')+'</div></div>':'<div class="thumb blank">No design</div>'}
+function stepLabel(c,i){var s=c.steps[i];if(s.type==='task')return 'Reminder: '+s.kind;var n=0;for(var k=0;k<=i;k++)if(c.steps[k].type==='email')n++;return 'Email '+n}
+function setNav(id){document.querySelectorAll('.ni').forEach(function(n){n.classList.remove('active')});if($(id))$(id).classList.add('active')}
+function pct(a,b){return b?Math.round(a*100/b)+'%':'—'}
+function updBadge(){var n=OB.filter(function(o){return o.kind==='email'}).length;$('obBadge').textContent=n;$('obBadge').className='nbadge'+(!H.gmail?' red':'')}
+
+/* ---------- 2. health banner ---------- */
+function healthHtml(){
+  var h='';
+  if(!H.gmail){var held=OB.filter(function(o){return o.kind==='email'}).length;
+    h+='<div class="banner red"><div><b>Sending is on hold.</b> Elda’s Gmail connection expired today at 11:40 am. Nothing is lost — '+held+' upcoming emails are waiting and will go out on schedule once it’s reconnected.</div><button class="btn btn-w btn-sm" onclick="fixGmail()">Reconnect Elda’s Gmail</button></div>';}
+  if(H.bounce)h+='<div class="banner amber"><div><b>1 email bounced.</b> Diego Ramos — <b>dramos@gmial.com</b> doesn’t exist (looks like a typo). His campaign emails are on hold.</div><div class="row"><button class="btn btn-g btn-sm" onclick="fixBounce()">Fix the address</button><button class="btn btn-g btn-sm" onclick="showContact(\'Diego Ramos\')">Open contact</button></div></div>';
+  if(H.gmail&&!H.bounce)h+='<div class="banner ok">✓ Everything is working. Last send: today 7:00 am — 6 emails sent, 0 failed.</div>';
+  return h;
+}
+function fixGmail(){H.gmail=true;toast('Elda’s Gmail reconnected — held emails will go out on schedule');rerender()}
+function fixBounce(){var v=prompt('Correct email for Diego Ramos:','dramos@gmail.com');if(!v)return;H.bounce=false;var p=C(1).people.find(function(x){return x.n==='Diego Ramos'});p.e=v;p.status='active';p.next='Tue Nov 10';delete p.why;OB.forEach(function(o){if(o.n==='Diego Ramos')o.bad=0});toast('Address fixed — Diego is back on schedule');rerender()}
+function resetHealth(){H.gmail=false;H.bounce=true;rerender();toast('Warnings restored for the demo')}
+var view='list';
+function rerender(){updBadge();if(view==='list')renderList();else if(view==='camp')renderCamp();else if(view==='outbox')renderOutbox();else if(view==='templates')renderTemplates();else if(view==='contact')showContact(window._cn)}
+
+function go(v){view=v;cur=null;setNav('n-'+v);rerender()}
+
+/* ---------- campaign list ---------- */
+function renderList(){
+  $('ptitle').textContent='Drip Campaigns';
+  var h=healthHtml()+'<div class="row between" style="margin:6px 0 18px"><div class="muted">Each campaign is a series of emails and reminders. Click one to open it.</div><button class="btn btn-p" onclick="newCamp()">+ New campaign</button></div><div class="grid">';
+  camps.forEach(function(c){
+    var em=c.steps.filter(function(s){return s.type==='email'}),missing=em.filter(function(e){return !e.en.h}).length,noES=em.filter(function(e){return e.en.h&&!e.es.h}).length;
+    var sent=0,cl=0,rp=0;em.forEach(function(e){sent+=e.st.sent;cl+=e.st.clicked;rp+=e.st.replied});
+    var act=c.people.filter(function(p){return p.status==='active'}).length;
+    h+='<div class="ccard" onclick="openCamp('+c.id+')"><div class="row between"><div style="font-size:18px;font-weight:700">'+c.name+'</div><span class="badge '+(c.live?'b-live':'b-draft')+'">'+(c.live?'LIVE':'DRAFT')+'</span></div>'
+     +'<div class="muted" style="margin-top:6px">'+em.length+' emails · '+(c.steps.length-em.length)+' reminder'+(c.steps.length-em.length===1?'':'s')+' · from elda@palaciosbaker.com</div>'
+     +(missing?'<div style="margin-top:8px;color:var(--warn);font-size:14px;font-weight:600">'+missing+' email'+(missing>1?'s need':' needs')+' a design</div>':'')
+     +(noES?'<div style="margin-top:6px;color:var(--text3);font-size:13px">'+noES+' email'+(noES>1?'s have':' has')+' no Spanish version yet</div>':'')
+     +'<div class="stat"><div><b>'+act+'</b><span>Active</span></div><div><b>'+sent+'</b><span>Sent</span></div><div><b>'+pct(cl,sent)+'</b><span>Clicked</span></div><div><b>'+rp+'</b><span>Replied</span></div></div></div>';
+  });
+  $('content').innerHTML=h+'</div>';
+}
+function openCamp(id){cur=C(id);tab='steps';view='camp';setNav('n-list');renderCamp()}
+
+/* ---------- campaign detail ---------- */
+function renderCamp(){
+  var c=cur;$('ptitle').textContent=c.name;
+  var h=healthHtml()+'<span class="back" onclick="go(\'list\')">‹ All campaigns</span>'
+   +'<div class="card" style="padding:18px"><div class="row between wrap" style="gap:14px"><div><div style="font-size:22px;font-weight:700">'+c.name+'</div><div class="muted" style="margin-top:4px">Sends from <b style="color:var(--text)">elda@palaciosbaker.com</b> · weekdays at '+c.set.time+' Mountain</div></div>'
+   +'<div class="row"><button class="btn btn-g" onclick="sendTest()">Send test to me</button><div class="seg"><div class="'+(!c.live?'on':'')+'" onclick="setLive(false)">Draft</div><div class="'+(c.live?'on':'')+'" onclick="setLive(true)">Live</div></div></div></div>'
+   +'<div class="note" style="margin-top:14px">'+(c.live?'<b style="color:var(--lead)">Live:</b> enrolled contacts get these on schedule. See exactly what’s going out in the <span class="link" onclick="go(\'outbox\')">Outbox</span>.':'<b>Draft:</b> nothing sends. Add your designs, send yourself a test, then switch to Live.')+'</div></div>'
+   +'<div class="tabs"><div class="tab '+(tab==='steps'?'on':'')+'" onclick="tab=\'steps\';renderCamp()">Steps ('+c.steps.length+')</div><div class="tab '+(tab==='people'?'on':'')+'" onclick="tab=\'people\';renderCamp()">Enrolled ('+c.people.length+')</div><div class="tab '+(tab==='settings'?'on':'')+'" onclick="tab=\'settings\';renderCamp()">Rules</div></div>';
+  h+= tab==='steps'?stepsHtml(c):tab==='people'?peopleHtml(c):settingsHtml(c);
+  $('content').innerHTML=h;
+}
+
+/* steps: 3. EN/ES chips, 5. reminders, 7. results */
+function stepsHtml(c){
+  var day=0,h='<div class="tl">';
+  if(c.live)h+='<div class="note" style="margin-bottom:14px">Editing a live campaign is safe: changes apply from each person’s <b>next</b> step. Nothing already sent is resent.</div>';
+  c.steps.forEach(function(s,i){
+    day+=s.wait;
+    if(i>0)h+='<div class="wait">Wait <select class="sm" onchange="cur.steps['+i+'].wait=+this.value;renderCamp()">'+[1,2,3,4,5,7,10,14,30,60,90].map(function(d){return '<option'+(d===s.wait?' selected':'')+'>'+d+'</option>'}).join('')+'</select> days, then</div>';
+    var when=i===0?'The day they’re added':'Day '+day;
+    if(s.type==='task'){
+      h+='<div class="em task" onclick="editTask('+i+')"><div class="num or">'+(i+1)+'</div><div class="ticon"><b>'+({Call:'☎',Text:'✉',Card:'✍',Other:'✓'}[s.kind]||'✓')+'</b>'+s.kind.toUpperCase()+'</div>'
+        +'<div style="flex:1;min-width:0"><div style="font-weight:700;font-size:16px">Reminder: '+s.kind+' them</div><div class="muted">'+when+' · goes on <b>'+s.who+'’s</b> task list — nothing is sent automatically</div><div class="muted" style="margin-top:4px;font-style:italic">“'+s.note+'”</div></div>'
+        +'<div class="row"><button class="btn btn-g btn-sm" onclick="event.stopPropagation();editTask('+i+')">Edit</button><button class="btn btn-d btn-sm" onclick="event.stopPropagation();delStep('+i+')">Remove</button></div></div>';
+      return;
+    }
+    var empty=!s.en.h;
+    h+='<div class="em'+(empty?' empty':'')+'" '+(empty?'':'onclick="editEmail('+i+')"')+'><div class="num'+(empty?' gray':'')+'">'+(i+1)+'</div>'+thumb(s.en.h)
+      +'<div style="flex:1;min-width:0"><div class="row" style="gap:8px"><div style="font-weight:700;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(s.en.s?s.en.s.replace('{first}','{first}'):stepLabel(c,i)+' – no design yet')+'</div></div>'
+      +'<div class="row" style="gap:6px;margin-top:4px"><span class="muted">'+when+'</span><span class="chip '+(s.en.h?'ok':'miss')+'">EN '+(s.en.h?'✓':'—')+'</span><span class="chip '+(s.es.h?'ok':'miss')+'" title="'+(s.es.h?'Spanish version ready':'No Spanish version — Spanish contacts get English')+'">ES '+(s.es.h?'✓':'—')+'</span></div>'
+      +(s.st.sent?'<div class="estats"><span><b>'+s.st.sent+'</b> sent</span><span><b>'+pct(s.st.clicked,s.st.sent)+'</b> clicked</span><span><b>'+s.st.replied+'</b> replied</span><span><b>'+s.st.unsub+'</b> unsubscribed</span></div>':'')
+      +(empty?'<div class="row wrap" style="margin-top:10px"><button class="btn btn-p btn-sm" onclick="editEmail('+i+',\'drop\')">Drop in a design</button><button class="btn btn-g btn-sm" onclick="editEmail('+i+',\'tpl\')">Choose a template</button></div>':'')
+      +'</div>'+(empty?'<button class="btn btn-d btn-sm" onclick="delStep('+i+')">Remove</button>':'<div class="row"><button class="btn btn-g btn-sm" onclick="event.stopPropagation();editEmail('+i+')">Edit</button><button class="btn btn-d btn-sm" onclick="event.stopPropagation();delStep('+i+')">Remove</button></div>')+'</div>';
+  });
+  h+='<div class="addrow"><div class="addem" onclick="addEmail()">+ Add an email</div><div class="addem" style="color:var(--warn)" onclick="addTask()">+ Add a reminder (call, text, card)</div></div>';
+  h+='<div class="legend" style="margin-top:14px">EN ✓ / ES ✓ = English and Spanish versions ready. Each contact automatically gets the version that matches their language. Clicks and replies are counted; opens aren’t shown because mail apps make them unreliable.</div>';
+  return h+'</div>';
+}
+
+/* 4. people statuses (stopped on reply, paused when emailed) */
+function statusHtml(p,c){
+  if(p.status==='active')return '<span class="badge b-blue">ACTIVE</span><div class="muted" style="margin-top:4px">Next: '+stepLabel(c,p.step-1)+' · '+p.next+'</div>';
+  if(p.status==='paused')return '<span class="badge b-warn">PAUSED until '+p.next.replace('Mon ','')+'</span><div class="muted" style="margin-top:4px">'+p.why+'</div>';
+  if(p.status==='stopped')return '<span class="badge b-live">REPLIED — STOPPED</span><div class="muted" style="margin-top:4px">'+p.why+'</div>';
+  if(p.status==='bounced')return '<span class="badge b-red">ON HOLD — BAD EMAIL</span><div class="muted" style="margin-top:4px">'+p.why+'</div>';
+  return '<span class="badge b-draft">FINISHED</span><div class="muted" style="margin-top:4px">Got every step</div>';
+}
+function peopleHtml(c){
+  var h='<div class="row between" style="margin-bottom:12px"><div class="muted">Everyone in this campaign and where they are. Nobody disappears from this list.</div><button class="btn btn-p" onclick="addPeople()">+ Add contacts</button></div>';
+  if(!c.people.length)return h+'<div class="card" style="padding:40px;text-align:center"><div style="font-size:18px;font-weight:700">No one enrolled yet</div><div class="muted" style="margin:6px 0 16px">Add contacts to start sending.</div><button class="btn btn-p" onclick="addPeople()">+ Add contacts</button></div>';
+  h+='<div class="card"><table><tr><th>Contact</th><th>Progress</th><th>Status</th><th></th></tr>';
+  c.people.forEach(function(p,i){
+    var dots='';for(var k=1;k<=c.steps.length;k++)dots+='<div class="dot '+(p.status==='done'||k<p.step?'done':(k===p.step&&p.status==='active'?'cur':''))+'"></div>';
+    var btns=p.status==='active'?'<button class="btn btn-g btn-sm" onclick="pauseP('+i+')">Pause</button> <button class="btn btn-d btn-sm" onclick="removeP('+i+')">Remove</button>'
+      :p.status==='paused'?'<button class="btn btn-g btn-sm" onclick="resumeP('+i+')">Resume now</button> <button class="btn btn-d btn-sm" onclick="removeP('+i+')">Remove</button>'
+      :p.status==='stopped'?'<button class="btn btn-g btn-sm" onclick="resumeP('+i+')">Restart where they left off</button>'
+      :p.status==='bounced'?'<button class="btn btn-g btn-sm" onclick="fixBounce()">Fix address</button>':'';
+    h+='<tr><td><span class="link" onclick="showContact(\''+p.n+'\')">'+p.n+'</span> <span class="chip">'+p.lang+'</span><div class="muted">'+p.e+'</div></td><td><div class="prog">'+dots+'</div><div class="muted" style="margin-top:5px">Step '+Math.min(p.step,c.steps.length)+' of '+c.steps.length+'</div></td><td>'+statusHtml(p,c)+'</td><td style="text-align:right;white-space:nowrap">'+btns+'</td></tr>';
+  });
+  return h+'</table></div>';
+}
+function pauseP(i){var p=cur.people[i];p.status='paused';p.next='Mon Nov 16';p.why='Paused by you';renderCamp();toast('Paused '+p.n)}
+function resumeP(i){var p=cur.people[i];p.status='active';p.next='Mon Nov 9';delete p.why;renderCamp();toast(p.n+' resumes Monday morning')}
+function removeP(i){if(confirm('Remove '+cur.people[i].n+' from this campaign? They won’t get any more steps. Their history stays on their contact page.')){cur.people.splice(i,1);renderCamp()}}
+
+/* 4. rules tab */
+function sw(on,fn){return '<label class="sw"><input type="checkbox"'+(on?' checked':'')+' onchange="'+fn+'"><span></span></label>'}
+function settingsHtml(c){
+  var s=c.set;
+  return '<div class="card" style="padding:4px 20px;max-width:780px">'
+   +'<div class="set"><div><div class="t">Stop when they reply</div><div class="muted">Any reply to a campaign email ends the campaign for that person, so they never get a canned email after a real answer. Replies are checked every 15 minutes. The reply shows on their contact page and a follow-up task goes to <b>everyone on the Team tab</b> — whoever handles it checks it off, and everyone sees who did.</div></div>'+sw(s.reply,'cur.set.reply=this.checked')+'</div>'
+   +'<div class="set"><div><div class="t">Pause when we email them personally</div><div class="muted">If Randy or Elda emails this person from Gmail, the campaign waits <select class="sm" onchange="cur.set.pauseDays=+this.value">'+[5,7,10,14,21].map(function(d){return '<option'+(d===s.pauseDays?' selected':'')+'>'+d+'</option>'}).join('')+'</select> days, then picks up where it left off.</div></div>'+sw(s.pause,'cur.set.pause=this.checked')+'</div>'
+   +'<div class="set"><div><div class="t">Skip weekends</div><div class="muted">Anything due on Saturday or Sunday goes out Monday morning instead.</div></div>'+sw(s.weekends,'cur.set.weekends=this.checked')+'</div>'
+   +'<div class="set"><div><div class="t">Send time</div><div class="muted">All campaign emails go out at this time, Mountain time.</div></div><select class="sm" onchange="cur.set.time=this.value;renderCamp()">'+['6:00 am','7:00 am','8:00 am','9:00 am','10:00 am','12:00 pm','5:00 pm'].map(function(t){return '<option'+(t===s.time?' selected':'')+'>'+t+'</option>'}).join('')+'</select></div>'
+   +'<div class="set"><div><div class="t">No more than one campaign email a day</div><div class="muted">If someone is in two campaigns and both are due the same day, the second one waits until the next day.</div></div>'+sw(s.oneADay,'cur.set.oneADay=this.checked')+'</div>'
+   +'<div class="set" style="border:none"><div><div class="t">Send from</div><div class="muted">Replies come back to this inbox.</div></div><select class="sm"><option>Elda Palacios — elda@palaciosbaker.com</option><option>Randy Baker — Gmail</option></select></div>'
+   +'</div><div class="row" style="margin-top:14px"><button class="btn btn-p" onclick="toast(\'Rules saved\')">Save rules</button></div>';
+}
+
+/* ---------- 3 + 8. email editor: EN/ES versions, preview as a real contact ---------- */
+function editEmail(i,mode){
+  var s=cur.steps[i];
+  window._ed={i:i,lang:'EN',mode:mode||(s.en.h?'design':'drop'),en:{s:s.en.s,h:s.en.h},es:{s:s.es.s,h:s.es.h},pv:'Maria Lopez'};
+  renderEditor();
+}
+function edV(){var e=window._ed;return e.lang==='EN'?e.en:e.es}
+function renderEditor(){
+  var e=window._ed,v=edV(),i=e.i;
+  var b='<div class="split"><div>'
+   +'<div class="row between" style="margin-bottom:14px"><div class="seg"><div class="'+(e.lang==='EN'?'on':'')+'" onclick="edLang(\'EN\')">English '+(e.en.h?'✓':'')+'</div><div class="'+(e.lang==='ES'?'on':'')+'" onclick="edLang(\'ES\')">Español '+(e.es.h?'✓':'')+'</div></div><span class="muted">Each contact gets their language</span></div>'
+   +'<div class="fg"><label class="fl">Subject line ('+e.lang+')</label><input class="fi" id="esub" value="'+esc(v.s)+'" placeholder="'+(e.lang==='EN'?'Hi {first}, a quick update':'Hola {first}, una actualización')+'" oninput="edV().s=this.value;edPrev()"></div>'
+   +'<label class="fl">Design ('+e.lang+')</label>';
+  if(v.h&&e.mode==='design'){
+    b+='<div class="note row between"><span>✓ Design added</span><span class="row"><button class="btn btn-g btn-sm" onclick="_ed.mode=\'drop\';renderEditor()">Replace</button><button class="btn btn-d btn-sm" onclick="edV().h=\'\';_ed.mode=\'drop\';renderEditor()">Remove</button></span></div>';
+  } else {
+    b+='<div class="seg" style="margin-bottom:12px"><div class="'+(e.mode!=='tpl'?'on':'')+'" onclick="_ed.mode=\'drop\';renderEditor()">Drop in</div><div class="'+(e.mode==='tpl'?'on':'')+'" onclick="_ed.mode=\'tpl\';renderEditor()">Templates</div></div>';
+    if(e.mode==='tpl')b+='<div class="tplg" style="grid-template-columns:1fr 1fr">'+TEMPLATES.map(function(t,k){var tv=e.lang==='EN'?t.en:t.es;return tv.h?'<div class="tpl" onclick="useTpl('+k+')"><div class="tt"><div style="transform:scale(.3);transform-origin:0 0;width:333%">'+tv.h+'</div></div><div class="tn">'+t.n+'</div></div>':''}).join('')+'</div>';
+    else b+='<div class="drop" onclick="fakeDrop()"><div style="font-size:28px">⬆</div><div style="font-weight:700;margin-top:6px">Drop your finished '+(e.lang==='EN'?'English':'Spanish')+' email here</div><div style="font-size:14px;margin-top:4px">HTML file, or a JPG/PNG flyer · or click to browse</div></div><div class="muted" style="margin-top:10px">Designed somewhere else? It goes in exactly as-is.</div>';
+  }
+  if(e.lang==='ES'&&!e.es.h)b+='<div class="note" style="margin-top:12px">No Spanish version yet. Until you add one, Spanish-speaking contacts get the English email.</div>';
+  b+='<div class="muted" style="margin-top:14px">Personal touches you can use: <b>{first}</b> first name · <b>{agent}</b> sender’s name</div>';
+  b+='</div><div><div class="row between" style="margin-bottom:6px"><label class="fl" style="margin:0">Preview as</label><select class="sm" onchange="_ed.pv=this.value;edPrev()">'+PREVIEW_PEOPLE.map(function(p){return '<option'+(p.n===e.pv?' selected':'')+' value="'+p.n+'">'+p.n+' ('+p.lang+')</option>'}).join('')+'</select></div><div id="pvnote" class="muted" style="margin-bottom:6px"></div><div class="preview" id="prev"></div></div></div>';
+  openM('<div class="mhdr"><div class="mtitle">'+stepLabel(cur,i)+' of “'+cur.name+'”</div><button class="mx" onclick="closeM()">✕</button></div><div class="mbody">'+b+'</div><div class="mftr"><button class="btn btn-g" onclick="sendTest()">Send test to me</button><button class="btn btn-g" onclick="closeM()">Cancel</button><button class="btn btn-p" onclick="saveEmail()">Save email</button></div>',true);
+  edPrev();
+}
+function edLang(l){var e=window._ed;e.lang=l;var v=edV();e.mode=v.h?'design':'drop';var m=PREVIEW_PEOPLE.find(function(p){return p.lang===l});if(m)e.pv=m.n;renderEditor()}
+function edPrev(){
+  var e=window._ed,p=PREVIEW_PEOPLE.find(function(x){return x.n===e.pv}),useES=p.lang==='ES'&&e.es.h,v=useES?e.es:e.en;
+  $('pvnote').innerHTML='<b>'+first(p.n)+'</b> will get the <b>'+(useES?'Spanish':'English')+'</b> version'+(p.lang==='ES'&&!e.es.h?' (no Spanish version yet)':'')+'<br>Subject: “'+merge(v.s||'(no subject yet)',p.n)+'”';
+  $('prev').innerHTML=v.h?merge(v.h,p.n):'<div style="padding:60px 20px;text-align:center;color:#999;font-family:Arial">Add a design and it shows here exactly as '+first(p.n)+' will see it.</div>';
+}
+function fakeDrop(){var e=window._ed,v=edV(),t=TEMPLATES[e.lang==='EN'?2:0];v.h=e.lang==='EN'?DZ.lEN:DZ.wES;if(!v.s)v.s=e.lang==='EN'?'3 homes picked for you, {first}':'Bienvenido, {first}';e.mode='design';toast((e.lang==='EN'?'listings-email.html':'bienvenida.html')+' added');renderEditor()}
+function useTpl(k){var e=window._ed,v=edV(),t=TEMPLATES[k][e.lang==='EN'?'en':'es'];v.h=t.h;if(!v.s)v.s=t.s;e.mode='design';renderEditor()}
+function saveEmail(){var e=window._ed,s=cur.steps[e.i];s.en=e.en;s.es=e.es;closeM();renderCamp();toast('Email saved')}
+function addEmail(){cur.steps.push({type:'email',wait:3,en:{s:'',h:''},es:{s:'',h:''},st:{sent:0,clicked:0,replied:0,unsub:0}});renderCamp()}
+function delStep(i){if(confirm('Remove this step? People already past it aren’t affected.')){cur.steps.splice(i,1);renderCamp()}}
+
+/* 5. reminder editor */
+function addTask(){cur.steps.push(T('Call','Elda','',3));editTask(cur.steps.length-1,true)}
+function editTask(i,isNew){
+  var s=cur.steps[i];window._ti=i;window._tnew=isNew;
+  openM('<div class="mhdr"><div class="mtitle">Reminder step</div><button class="mx" onclick="cancelTask()">✕</button></div><div class="mbody">'
+   +'<div class="fg"><label class="fl">What to do</label><div class="seg" id="tk">'+['Call','Text','Card','Other'].map(function(k){return '<div class="'+(k===s.kind?'on':'')+'" onclick="cur.steps['+i+'].kind=\''+k+'\';editTask('+i+','+(isNew?'true':'false')+')">'+({Call:'Call',Text:'Text',Card:'Handwritten card',Other:'Other'}[k])+'</div>'}).join('')+'</div></div>'
+   +'<div class="fg"><label class="fl">Who does it</label><select class="fi" id="twho"><option'+(s.who==='Elda'?' selected':'')+'>Elda</option><option'+(s.who==='Randy'?' selected':'')+'>Randy</option></select></div>'
+   +'<div class="fg"><label class="fl">Note for whoever does it</label><input class="fi" id="tnote" value="'+esc(s.note)+'" placeholder="Ask how the search is going"></div>'
+   +'<div class="note">On the scheduled day this shows up on their Tasks list with the contact’s name and phone. Nothing is sent automatically. When it’s checked off, the campaign moves on.</div></div>'
+   +'<div class="mftr"><button class="btn btn-g" onclick="cancelTask()">Cancel</button><button class="btn btn-p" onclick="saveTask()">Save reminder</button></div>');
+}
+function cancelTask(){if(window._tnew)cur.steps.splice(window._ti,1);closeM();renderCamp()}
+function saveTask(){var s=cur.steps[window._ti];s.who=$('twho').value;s.note=$('tnote').value||'Check in';closeM();renderCamp();toast('Reminder saved')}
+
+function setLive(v){if(v&&cur.steps.some(function(s){return s.type==='email'&&!s.en.h})){toast('Add a design to every email before going live');return}cur.live=v;renderCamp();toast(v?'Campaign is live':'Campaign set to draft — nothing will send')}
+function sendTest(){toast('Test sent to banff1997@gmail.com (both language versions)')}
+
+/* ---------- add contacts ---------- */
+function addPeople(){window._apm='pick';renderAdd()}
+function renderAdd(){
+  var m=window._apm,b='<div class="seg" style="margin-bottom:16px"><div class="'+(m==='pick'?'on':'')+'" onclick="_apm=\'pick\';renderAdd()">Pick contacts</div><div class="'+(m==='list'?'on':'')+'" onclick="_apm=\'list\';renderAdd()">A whole list</div><div class="'+(m==='cat'?'on':'')+'" onclick="_apm=\'cat\';renderAdd()">A category</div></div>';
+  if(m==='pick')b+='<input class="fi" placeholder="Search by name, email, or phone" style="margin-bottom:8px">'+CONTACTS.map(function(n){return '<label class="pick"><input type="checkbox" value="'+n+'">'+n+'</label>'}).join('');
+  if(m==='list')b+=['Christmas card list (212)','Active clients (14)','VIP (9)'].map(function(n,k){return '<label class="pick"><input type="radio" name="l"'+(k==0?' checked':'')+'>'+n+'</label>'}).join('');
+  if(m==='cat')b+=['Past Client (390)','Lead (29)','Contact (1,407)','Vendor (279)'].map(function(n,k){return '<label class="pick"><input type="radio" name="c"'+(k==0?' checked':'')+'>'+n+'</label>'}).join('');
+  b+='<div class="note" style="margin-top:14px">They start with step 1 on the next weekday send. Anyone already in this campaign, unsubscribed, or with a bad email is skipped — you’ll see a count before anything is added.</div>';
+  openM('<div class="mhdr"><div class="mtitle">Add contacts to “'+cur.name+'”</div><button class="mx" onclick="closeM()">✕</button></div><div class="mbody">'+b+'</div><div class="mftr"><button class="btn btn-g" onclick="closeM()">Cancel</button><button class="btn btn-p" onclick="doAdd()">Add to campaign</button></div>');
+}
+function doAdd(){
+  var added=0;
+  if(window._apm==='pick'){document.querySelectorAll('#modal input[type=checkbox]:checked').forEach(function(x){cur.people.push({n:x.value,e:x.value.toLowerCase().replace(' ','.')+'@gmail.com',lang:/Sofia|Elena|Linda/.test(x.value)?'ES':'EN',status:'active',step:1,next:'Mon Nov 9'});added++})}
+  else{added=window._apm==='list'?212:390;cur.people.push({n:'+ '+added+' more from your selection',e:'(listed individually in the real app)',lang:'—',status:'active',step:1,next:'Mon Nov 9'})}
+  if(!added){toast('Pick at least one contact');return}
+  closeM();tab='people';renderCamp();toast(added+' added — step 1 goes out Monday morning');
+}
+function newCamp(){openM('<div class="mhdr"><div class="mtitle">New campaign</div><button class="mx" onclick="closeM()">✕</button></div><div class="mbody"><div class="fg"><label class="fl">Campaign name</label><input class="fi" id="ncn" placeholder="Seller nurture"></div><div class="note">It starts as a Draft with one empty email and the standard rules (stop on reply, pause when emailed, skip weekends). Add designs, send yourself a test, then switch to Live.</div></div><div class="mftr"><button class="btn btn-g" onclick="closeM()">Cancel</button><button class="btn btn-p" onclick="createCamp()">Create campaign</button></div>')}
+function createCamp(){var n=$('ncn').value.trim()||'Untitled campaign';var c={id:Date.now(),name:n,live:false,set:{reply:true,pause:true,pauseDays:10,weekends:true,time:'7:00 am',oneADay:true},steps:[{type:'email',wait:0,en:{s:'',h:''},es:{s:'',h:''},st:{sent:0,clicked:0,replied:0,unsub:0}}],people:[]};camps.push(c);closeM();cur=c;tab='steps';view='camp';renderCamp()}
+
+/* ---------- 1. OUTBOX ---------- */
+function renderOutbox(){
+  view='outbox';$('ptitle').textContent='Outbox';setNav('n-outbox');
+  var em=OB.filter(function(o){return o.kind==='email'}).length,tk=OB.length-em;
+  var h=healthHtml()+'<div class="row between wrap" style="margin:6px 0 4px;gap:12px"><div><div style="font-size:20px;font-weight:700">Next 7 days: '+em+' emails, '+tk+' reminders</div><div class="muted">Everything the campaigns will do, before it happens. Skip or postpone anything.</div></div>'
+   +'<div class="seg"><div class="'+(obFilter==='all'?'on':'')+'" onclick="obFilter=\'all\';renderOutbox()">All</div><div class="'+(obFilter==='email'?'on':'')+'" onclick="obFilter=\'email\';renderOutbox()">Emails</div><div class="'+(obFilter==='task'?'on':'')+'" onclick="obFilter=\'task\';renderOutbox()">Reminders</div></div></div>';
+  h+='<div class="dayh">Today · Fri Nov 6</div><div class="obx"><div class="tm">7:00</div><div style="flex:1"><b style="color:var(--lead)">✓ 6 emails sent, 0 failed</b><div class="muted">Maria Lopez, Sofia Garcia, Chris Hall + 3 more</div></div><span class="link" onclick="toast(\'Opens the send log for today\')">See all</span></div>';
+  h+='<div class="dayh">Sat Nov 7 – Sun Nov 8</div><div class="muted" style="padding:4px 2px">No sends — “skip weekends” is on.</div>';
+  DAYS.forEach(function(d,di){
+    var items=OB.map(function(o,k){o.k=k;return o}).filter(function(o){return o.d===di&&(obFilter==='all'||o.kind===obFilter)});
+    if(!items.length)return;
+    h+='<div class="dayh">'+d+'</div>';
+    items.forEach(function(o){
+      var c=C(o.c),s=c.steps[o.si],hold=o.kind==='email'&&(!H.gmail||o.bad);
+      var title,sub;
+      if(o.kind==='task'){title='<span class="badge b-warn">'+s.kind.toUpperCase()+'</span> '+s.kind+' '+o.n;sub='Reminder for <b>'+s.who+'</b> · '+c.name+' › step '+(o.si+1);}
+      else{var useES=o.lang==='ES'&&s.es.h,v=useES?s.es:s.en;title=o.n+' <span class="chip">'+o.lang+'</span>';sub=c.name+' › '+stepLabel(c,o.si)+': “'+merge(v.s,o.n)+'”'+(o.lang==='ES'&&!s.es.h?' <i>(English — no Spanish version)</i>':'');}
+      h+='<div class="obx'+(hold?' hold':'')+'"><div class="tm">'+(o.kind==='task'?'Task':o.t)+'</div><div style="flex:1;min-width:0"><div style="font-weight:700">'+title+(hold?' <span class="badge b-red">'+(o.bad?'BAD EMAIL':'ON HOLD')+'</span>':'')+'</div><div class="muted" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+sub+'</div></div>'
+       +'<div class="row">'+(o.kind==='email'?'<button class="btn btn-g btn-sm" onclick="obPreview('+o.k+')">Preview</button>':'')+'<button class="btn btn-g btn-sm" onclick="obPost('+o.k+')">Postpone a day</button><button class="btn btn-d btn-sm" onclick="obSkip('+o.k+')">Skip</button></div></div>';
+    });
+  });
+  $('content').innerHTML=h;updBadge();
+}
+function obPreview(k){var o=OB[k],c=C(o.c),s=c.steps[o.si],useES=o.lang==='ES'&&s.es.h,v=useES?s.es:s.en;
+  openM('<div class="mhdr"><div class="mtitle">What '+first(o.n)+' will receive</div><button class="mx" onclick="closeM()">✕</button></div><div class="mbody"><div class="muted" style="margin-bottom:8px">'+DAYS[o.d]+' · 7:00 am · from elda@palaciosbaker.com<br>Subject: <b style="color:var(--text)">'+merge(v.s,o.n)+'</b></div><div class="preview">'+merge(v.h,o.n)+'</div></div><div class="mftr"><button class="btn btn-g" onclick="closeM();obSkip('+k+')">Skip this one</button><button class="btn btn-p" onclick="closeM()">Looks good</button></div>')}
+function obSkip(k){var o=OB[k];OB.splice(k,1);toast('Skipped — '+first(o.n)+' moves on to the next step');renderOutbox()}
+function obPost(k){var o=OB[k];o.d=Math.min(o.d+1,DAYS.length-1);toast('Moved to '+DAYS[o.d]);renderOutbox()}
+
+/* ---------- templates ---------- */
+function renderTemplates(){
+  view='templates';$('ptitle').textContent='Email Templates';setNav('n-templates');
+  var h='<div class="row between" style="margin-bottom:18px"><div class="muted">Your finished designs, in English and Spanish. Use any of them in a campaign.</div><button class="btn btn-p" onclick="toast(\'Upload a finished HTML email or image\')">+ Upload a design</button></div><div class="tplg" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr))">';
+  TEMPLATES.forEach(function(t){h+='<div class="tpl"><div class="tt" style="height:170px"><div style="transform:scale(.42);transform-origin:0 0;width:238%">'+merge(t.en.h,'Maria')+'</div></div><div class="tn row between"><span>'+t.n+'</span><span class="row" style="gap:4px"><span class="chip ok">EN</span><span class="chip '+(t.es.h?'ok':'miss')+'">ES</span></span></div></div>'});
+  $('content').innerHTML=h+'</div>';
+}
+
+/* ---------- 6. contact page with campaign history ---------- */
+var HIST={
+ 'Maria Lopez':[
+  {d:'Fri Nov 6 · 2:15 pm',c:'g',t:'<b>Elda</b> checked off reminder: Call Maria — “Wants to see homes near the park.”'},
+  {d:'Thu Nov 5 · 7:00 am',c:'',t:'Email 2 sent: “Your market update”',v:['mEN']},
+  {d:'Mon Nov 2 · 9:41 am',c:'g',t:'Clicked <b>“See new listings”</b> in Email 1'},
+  {d:'Mon Nov 2 · 7:00 am',c:'',t:'Email 1 sent: “Welcome to your home search, Maria”',v:['wEN']},
+  {d:'Sun Nov 1 · 4:30 pm',c:'',t:'Added to <b>New buyer nurture</b> by Randy'}],
+ 'Ava Mitchell':[
+  {d:'Thu Nov 5 · 10:40 am',c:'g',t:'<b>Randy</b> checked off the team task “Ava replied — follow up” — “Showing booked Sat 10am.”'},
+  {d:'Thu Nov 5 · 10:12 am',c:'g',t:'<b>Replied</b>: “Can we see the Elm St house Saturday?” → campaign stopped, follow-up task sent to the whole team'},
+  {d:'Thu Nov 5 · 7:00 am',c:'',t:'Email 2 sent: “Your market update”',v:['mEN']},
+  {d:'Mon Nov 2 · 7:00 am',c:'',t:'Email 1 sent: “Welcome to your home search, Ava”',v:['wEN']}],
+ 'James Park':[
+  {d:'Fri Nov 6 · 11:05 am',c:'o',t:'Randy emailed James from Gmail → campaign <b>paused until Mon Nov 16</b>'},
+  {d:'Mon Nov 2 · 7:00 am',c:'',t:'Email 1 sent: “Welcome to your home search, James”',v:['wEN']}],
+ 'Diego Ramos':[
+  {d:'Mon Nov 2 · 7:00 am',c:'r',t:'Email 1 <b>bounced</b> — dramos@gmial.com doesn’t exist. Campaign on hold.'},
+  {d:'Sun Nov 1 · 4:35 pm',c:'',t:'Added to <b>New buyer nurture</b> by Randy'}],
+ 'Sofia Garcia':[
+  {d:'Mon Nov 2 · 7:00 am',c:'',t:'Email 1 sent in <b>Spanish</b>: “Bienvenido a su búsqueda de casa, Sofia”',v:['wES']},
+  {d:'Sun Nov 1 · 4:30 pm',c:'',t:'Added to <b>New buyer nurture</b> by Elda'}]
+};
+function findPerson(n){for(var i=0;i<camps.length;i++){var p=camps[i].people.find(function(x){return x.n===n});if(p)return {p:p,c:camps[i]}}return null}
+function showContact(n){
+  view='contact';window._cn=n;setNav('n-contacts');$('ptitle').textContent='All Contacts';
+  var f=findPerson(n),p=f?f.p:{e:n.toLowerCase().replace(' ','.')+'@gmail.com',lang:'EN'};
+  var hist=HIST[n]||(f?[{d:'Sun Nov 1',c:'',t:'Added to <b>'+f.c.name+'</b>'}]:[]);
+  var h='<span class="back" onclick="go(\'list\')">‹ Drip Campaigns</span><div class="two"><div class="card" style="padding:20px"><div style="font-size:22px;font-weight:700">'+n+'</div><div class="muted">'+p.e+' · Buyer · Language: '+(p.lang==='ES'?'Spanish':'English')+'</div>'
+   +'<div style="margin-top:18px;border-top:1px solid var(--border);padding-top:14px"><div class="row between"><div class="fl" style="margin:0">Drip campaigns</div><button class="btn btn-p btn-sm" onclick="quickAdd()">+ Add to campaign</button></div><div id="qa" style="margin-top:12px">'
+   +(f?'<div class="row between"><b>'+f.c.name+'</b></div><div style="margin-top:6px">'+statusHtml(f.p,f.c)+'</div>':'<div class="muted">Not in any campaigns.</div>')+'</div></div></div>'
+   +'<div class="card" style="padding:20px"><div class="fl">Campaign history</div><div class="muted" style="margin-bottom:16px">Every email, click, reply and reminder — newest first.</div><div class="hist">'
+   +(hist.length?hist.map(function(x){return '<div class="hi '+x.c+'"><div class="d">'+x.d+'</div><div>'+x.t+(x.v?' · <span class="link" onclick="viewSent(\''+x.v[0]+'\',\''+n+'\')">View the exact email</span>':'')+'</div></div>'}).join(''):'<div class="muted">Nothing yet.</div>')
+   +'</div></div></div>';
+  $('content').innerHTML=h;
+}
+function viewSent(key,n){openM('<div class="mhdr"><div class="mtitle">Exactly what '+first(n)+' received</div><button class="mx" onclick="closeM()">✕</button></div><div class="mbody"><div class="preview">'+merge(DZ[key],n)+'</div></div><div class="mftr"><button class="btn btn-p" onclick="closeM()">Close</button></div>')}
+function quickAdd(){
+  openM('<div class="mhdr"><div class="mtitle">Add '+window._cn+' to a campaign</div><button class="mx" onclick="closeM()">✕</button></div><div class="mbody">'+camps.map(function(c,k){return '<label class="pick"><input type="radio" name="qc" value="'+k+'"'+(k==0?' checked':'')+'><div><b>'+c.name+'</b> <span class="badge '+(c.live?'b-live':'b-draft')+'">'+(c.live?'LIVE':'DRAFT')+'</span><div class="muted">'+c.steps.length+' steps</div></div></label>'}).join('')+'</div><div class="mftr"><button class="btn btn-g" onclick="closeM()">Cancel</button><button class="btn btn-p" onclick="doQuick()">Add</button></div>');
+}
+function doQuick(){var c=camps[+document.querySelector('input[name=qc]:checked').value];if(c.people.find(function(x){return x.n===window._cn})){closeM();toast('Already in '+c.name);return}c.people.push({n:window._cn,e:window._cn.toLowerCase().replace(' ','.')+'@gmail.com',lang:'EN',status:'active',step:1,next:'Mon Nov 9'});closeM();showContact(window._cn);toast('Added to '+c.name)}
+
+updBadge();renderList();
+</script>
+</body>
+</html>

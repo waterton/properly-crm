@@ -108,7 +108,7 @@ function sv(){
 var DB_COLS = {
   contacts: ['id','first','last','type','phone','email','property','stage','price','notes','added','closeDate','assignedTo','emails','phones','addresses','whatsapp','closedAt','lang','category','master_id'],
   notes: ['id','contactId','transactionId','text','date','category','textEs'],
-  followups: ['id','contactId','transactionId','label','date','pri','done','assignedTo'],
+  followups: ['id','contactId','transactionId','label','date','pri','done','assignedTo','notes','doneBy'],
   deadlines: ['id','contactId','transactionId','type','date','assignedTo','time','stepKey','owner'],
   transactions: ['id','contactId','type','category','address','price','mlsNum','lender','titleCo','notes','status','steps','details',
                  'contractDate','closingDate','earnestDate','dueDiligDate','financingDate','appraisalDate',
@@ -119,7 +119,7 @@ var DB_COLS = {
   campaigns: null,
   enrollments: null,
   send_log: null,
-  drip_messages: ['id','name','subject','html','blocks','active','created_at','updated_at'],
+  drip_messages: ['id','name','subject','html','blocks','subject_es','html_es','blocks_es','active','created_at','updated_at'],
   gmail_tokens: null,
   documents: ['id','contact_id','transaction_id','file_path','file_name','doc_type','summary','mime_type','size','created_at'],
   tx_changes: ['id','transactionId','contactId','field','oldValue','newValue','docType','addendumNo','effectiveDate','documentId','appliedAt'],
@@ -677,7 +677,8 @@ async function loadFromDB(light){
       fetchAllRows(base, 'transactions?order=created_at.asc,id.asc', headers),
       fetchAllRows(base, 'campaigns?order=created_at.asc,id.asc', headers).catch(function(){return [];}),
       fetchAllRows(base, 'enrollments?order=created_at.asc,id.asc', headers).catch(function(){return [];}),
-      fetchAllRows(base, 'send_log?order=created_at.asc,id.asc', headers).catch(function(){return []; }),
+      // Campaign history: last 180 days is plenty for the screens (older rows stay in the DB).
+      fetchAllRows(base, 'send_log?created_at=gte.'+encodeURIComponent(new Date(Date.now()-180*86400000).toISOString())+'&order=created_at.asc,id.asc', headers).catch(function(){return []; }),
       heavy(light ? null : fetchAllRows(base, 'documents?order=created_at.asc,id.asc', headers).catch(function(){return []; })),
       fetchAllRows(base, 'tx_changes?order=id.asc', headers).catch(function(){return []; }),
       fetchAllRows(base, 'reminder_settings?order=id.asc', headers).catch(function(){return []; }),
@@ -976,7 +977,7 @@ function _pollRefreshCurrent(ok){
     else if(curPage==='deadlines') rdl();
     else if(curPage==='briefing') rb();
     else if(curPage==='tc') renderTC();
-    else if(curPage==='drips'){ processDrips(); renderDrips(); }
+    else if(curPage==='drips'){ renderDrips(); }
   }
 }
 function subscribeRealtime(){
@@ -1120,7 +1121,7 @@ function sp(id, fromHistory){
     dlShowView(dlView);
   }
   else if(id==='tc')initTC();
-  else if(id==='drips'){ processDrips(); renderDrips(); }
+  else if(id==='drips'){ renderDrips(); dvLoadHealth().then(function(){ if(curPage==='drips') renderDrips(); }); }
   else if(id==='scanner')initScanner();
   else if(id==='cardscanner')initCardScanner();
   else if(id==='calendar')initCalendar();
@@ -1840,7 +1841,7 @@ function vc(id){
   
   var fb=mkBtn('btn btn-g','+ FU','font-size:18px;padding:5px 11px;');(function(cid){fb.addEventListener('click',function(){ofc(cid);});})(id);acts.appendChild(fb);
   var db=mkBtn('btn btn-g','+ DL','font-size:18px;padding:5px 11px;');(function(cid){db.addEventListener('click',function(){odc(cid);});})(id);acts.appendChild(db);
-  var camb=mkBtn('btn btn-g','+ Campaign','font-size:18px;padding:5px 11px;');(function(cid){camb.addEventListener('click',function(){ if(!CAMP.length){ alert('No campaigns yet. Create one in the Drip Campaigns tab first.'); return; } openEnrollModal(null, cid); });})(id);acts.appendChild(camb);
+  var camb=mkBtn('btn btn-g','+ Campaign','font-size:18px;padding:5px 11px;');(function(cid){camb.addEventListener('click',function(){ dvQuickAdd(cid); });})(id);acts.appendChild(camb);
   var delb=mkBtn('btn btn-d','Delete','font-size:18px;padding:5px 11px;margin-left:auto;');(function(cid){delb.addEventListener('click',function(){delc(cid);});})(id);acts.appendChild(delb);
   var body=ge('detBody');body.innerHTML='';
   var isec=mksec('Contact Info');
@@ -1894,7 +1895,7 @@ function vc(id){
       // clicking active stage clears it
       var newStage = ct.stage===stage ? '' : stage;
       ct.stage=newStage; updateContact(ct);
-      if(newStage) autoEnrollOnStage(ct,newStage);
+      
       vc(cid); rd(); if(curPage==='pipeline')rp();
     });})(id,s);
     sr.appendChild(b);
@@ -1944,42 +1945,8 @@ function vc(id){
     }
   }
   body.appendChild(txsec);
-  // Campaigns this contact is in. The Drips tab has a global list; this answers the question
-  // you actually ask - "is this person getting emails from us right now?"
-  var casec=mksec('Campaigns');
-  var cEnr=ENR.filter(function(e){ return String(e.contactId)===String(id); });
-  var actEnr=cEnr.filter(function(e){ return e.status==='active'; });
-  var pastEnr=cEnr.filter(function(e){ return e.status!=='active'; });
-  if(!cEnr.length) casec.appendChild(mkDiv('font-size:18px;color:var(--text3);padding:4px 0;','Not in any campaign.'));
-  else {
-    var enrRow=function(e, isActive){
-      var ecamp=CAMP.find(function(x){ return String(x.id)===String(e.campaignId); });
-      var etotal=(ecamp&&ecamp.steps)?ecamp.steps.length:0;
-      var er=document.createElement('div');
-      er.style.cssText='display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border);'+(isActive?'':'opacity:0.6;');
-      var einf=mkDiv('flex:1;');
-      einf.appendChild(mkDiv('font-size:18px;color:'+(isActive?'var(--accent)':'var(--text2)')+';', ecamp?ecamp.name:'(deleted campaign)'));
-      var esub = isActive
-        ? ('step '+(e.stepIndex+1)+' of '+etotal+'  -  next: '+(e.nextSendAt?fmtDripWhen(e.nextSendAt):'-'))
-        : (e.status+(e.stepIndex?(' after step '+e.stepIndex):''));
-      einf.appendChild(mkDiv('font-size:16px;color:var(--text3);margin-top:2px;', esub));
-      er.appendChild(einf);
-      if(isActive){
-        var esb=mkBtn('btn btn-g','Stop','font-size:15px;padding:4px 10px;color:var(--danger);');
-        (function(eid,cid2){ esb.addEventListener('click',function(){
-          if(!confirm('Stop this campaign for this contact? No further emails will be sent.')) return;
-          stopEnrollment(eid); vc(cid2);
-        }); })(e.id,id);
-        er.appendChild(esb);
-      }
-      return er;
-    };
-    actEnr.forEach(function(e){ casec.appendChild(enrRow(e,true)); });
-    if(pastEnr.length){
-      casec.appendChild(mkDiv('font-size:14px;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin:10px 0 2px;','Past ('+pastEnr.length+')'));
-      pastEnr.forEach(function(e){ casec.appendChild(enrRow(e,false)); });
-    }
-  }
+  // Drip campaigns this contact is in + everything campaigns did with them (sent, clicked, replied...).
+  var casec=dripContactSection(id);
   body.appendChild(casec);
   var docsec=mksec('Documents');
   var docab=mkBtn('','+ Upload','background:none;border:none;color:var(--accent);cursor:pointer;font-size:18px;margin-left:8px;');
@@ -2076,7 +2043,7 @@ function vc(id){
 function mksec(title){var s=mkRow('det-sec');var t=mkDiv('det-sec-title',title);t.className='det-sec-title';s.appendChild(t);return s;}
 function mkfld(lbl,val,href,style){var r=mkRow('det-field');var l=mkDiv('det-flbl',lbl);l.className='det-flbl';var v=mkDiv('det-fval','');v.className='det-fval';if(style)v.style.cssText=style;if(href){var a=document.createElement('a');a.href=href;a.textContent=val;v.appendChild(a);}else v.textContent=val;r.appendChild(l);r.appendChild(v);return r;}
 function cd(){ge('detOv').classList.remove('open');curDet=null;}
-function ss(id,stage){var c=gc(id);if(!c)return;c.stage=stage;if(stage==='Closed')c.closedAt=new Date().toISOString();updateContact(c);logActivity(id,'Pipeline update');autoEnrollOnStage(c,stage);rd();if(curPage==='pipeline')rp();if(curPage==='contacts')rc();}
+function ss(id,stage){var c=gc(id);if(!c)return;c.stage=stage;if(stage==='Closed')c.closedAt=new Date().toISOString();updateContact(c);logActivity(id,'Pipeline update');rd();if(curPage==='pipeline')rp();if(curPage==='contacts')rc();}
 function delc(id, silent){
   // Silent path (used by merge): immediate, no dialog. Unchanged behavior.
   if(silent){
@@ -2127,7 +2094,7 @@ function rfu(){
   var el=ge('fuList');el.innerHTML='';
   var sorted=F.slice().sort(function(a,b){return new Date(a.date)-new Date(b.date);});
   if(!sorted.length){el.innerHTML='<div class="empty">No follow-ups yet.</div>';return;}
-  sorted.forEach(function(f){var c=gc(f.contactId);var row=mkRow('fu-row');var chk=mkRow('chk'+(f.done?' done':''));if(f.done)chk.appendChild(ck());(function(id){chk.addEventListener('click',function(){tfu(id);rfu();});})(f.id);var info=mkDiv('flex:1;');info.appendChild(mkDiv('font-size:18px;',f.label));info.appendChild(mkDiv('font-size:18px;color:var(--text3);',(c?fn(c):'Unknown')+' - '+fd(f.date)));var right=mkDiv('display:flex;align-items:center;gap:7px;');right.appendChild(mkBadge(f.pri));var del=mkBtn('','\u00d7','background:none;border:none;color:var(--text3);cursor:pointer;font-size:18px;line-height:1;');// GCal sync for follow-up
+  sorted.forEach(function(f){var c=gc(f.contactId);var row=mkRow('fu-row');var chk=mkRow('chk'+(f.done?' done':''));if(f.done)chk.appendChild(ck());(function(id){chk.addEventListener('click',function(){tfu(id);rfu();});})(f.id);var info=mkDiv('flex:1;');info.appendChild(mkDiv('font-size:18px;',f.label));info.appendChild(mkDiv('font-size:18px;color:var(--text3);',(c?fn(c):'Unknown')+' - '+fd(f.date)+(f.assignedTo==null?' - Everyone':'')+(f.done&&f.doneBy?' - done by '+f.doneBy:'')));if(f.notes)info.appendChild(mkDiv('font-size:15px;color:var(--text2);margin-top:2px;',f.notes));var right=mkDiv('display:flex;align-items:center;gap:7px;');right.appendChild(mkBadge(f.pri));var del=mkBtn('','\u00d7','background:none;border:none;color:var(--text3);cursor:pointer;font-size:18px;line-height:1;');// GCal sync for follow-up
     var gcalFuBtn=document.createElement('button');
     gcalFuBtn.style.cssText='background:rgba(76,142,201,0.1);border:1px solid rgba(76,142,201,0.2);border-radius:5px;padding:3px 8px;cursor:pointer;font-size:14px;color:var(--buyer);font-family:DM Sans,sans-serif;';
     gcalFuBtn.textContent='+ GCal';
@@ -2151,7 +2118,7 @@ function rfu(){
     (function(id){del.addEventListener('click',function(){pausePoll(8000);F=F.filter(function(f){return f.id!==id;});sv();deleteFUfromDB(id);rfu();rd();});})(f.id);right.appendChild(del);row.appendChild(info);row.appendChild(right);el.appendChild(row);});
   ge('nbFollowups').textContent=F.filter(function(f){return !f.done;}).length;
 }
-function tfu(id){var f=F.find(function(x){return x.id===id;});if(f){f.done=!f.done;sv();if(supaReady) dbSave('followups',[f]);}}
+function tfu(id){var f=F.find(function(x){return x.id===id;});if(f){f.done=!f.done;f.doneBy=f.done?(typeof dvMe==='function'?dvMe():''):null;sv();if(supaReady) dbSave('followups',[f]);}}
 
 // ---- Notes tab state ----
 var _noteSearch='', _noteCat='all', _noteCollapsed={}, _noteAllCollapsed=true, _showArchivedNotes=false, _noteLang={};
@@ -11039,7 +11006,7 @@ async function saveSendingControls(){
   try{
     var headers = await getAuthHeaders({'Prefer':'resolution=merge-duplicates'});
     var r = await fetch(SUPA_URL+'/rest/v1/settings',{ method:'POST', headers: headers, body: JSON.stringify({ key:'sending_controls', value: val }) });
-    if(r.ok){ SCTRL = val; ge('sendingControlsStatus').textContent='Saved!'; setTimeout(function(){ ge('sendingControlsStatus').textContent=''; },3000); if(curPage==='drips') renderEnrollmentList(); }
+    if(r.ok){ SCTRL = val; ge('sendingControlsStatus').textContent='Saved!'; setTimeout(function(){ ge('sendingControlsStatus').textContent=''; },3000); if(curPage==='drips') renderDrips(); }
     else { alert('Save failed: '+(await r.text())); }
   }catch(e){ alert('Save failed: '+e.message); }
 }
@@ -11479,299 +11446,811 @@ document.querySelectorAll('.modal-ov').forEach(function(m){m.addEventListener('c
 document.querySelectorAll('.filter-btn').forEach(function(b){b.addEventListener('click',function(){curFilter=b.getAttribute('data-filter');document.querySelectorAll('.filter-btn').forEach(function(x){x.classList.remove('active');});b.classList.add('active');rc();});});
 
 startup();
-// ===================== DRIP CAMPAIGNS MODULE =====================
-// State model:
-//   CAMP:    [{id, name, active, trigger, steps:[{subject, body, delayDays}], created_at}]
-//   ENR:     [{id, campaignId, contactId, fromMemberId, stepIndex, status, nextSendAt, created_at}]
-//            status: 'active' | 'completed' | 'stopped'
-//   SENDLOG: [{id, enrollmentId, campaignId, contactId, stepIndex, subject, to, status, sentAt, error, created_at}]
+// ===================== DRIP CAMPAIGNS (v2) =====================
+// Data (Supabase):
+//   CAMP:    campaigns   {id, name, live, rules{reply,pause,pauseDays,weekends,time,oneADay,fromMemberId}, steps[], created_at, updated_at}
+//            steps: {type:'email', wait, messageId} | {type:'task', wait, kind, who('all'|memberId), note}
+//   ENR:     enrollments {id, campaignId, contactId, stepIndex, status, nextSendAt, pausedUntil, reason, addedBy, created_at, updated_at}
+//            status: active | paused | stopped (replied) | unsubscribed | bounced | done | removed
+//   SENDLOG: send_log    one row per event: kind = email | task | reply | autoreply | click | bounce | pause | conversation | unsubscribe | skipped
+//   DMSG:    drip_messages (Email Templates) {id, name, subject, html, blocks, subject_es, html_es, blocks_es}
+// The browser never sends campaign mail. api/run-drips.js does, every ~15 minutes (cron-job.org),
+// and also reads replies. This module only edits data and shows what will happen.
+var DRIP_HEALTH = null;           // settings.drip_health, written by every server run
+var DRIP_UNSUBS = null;           // contact ids that unsubscribed (loaded when adding contacts)
+var DV = { view:'list', campId:null, tab:'steps', obFilter:'all' };
+var DRIP_TZ = 'America/Denver';
+var DRIP_DEFAULT_RULES = { reply:true, pause:true, pauseDays:10, weekends:true, time:'07:00', oneADay:true, fromMemberId:null };
 
 function dripSave(table, rows){ sv(); if(supaReady) dbSave(table, rows); }
 function dripDel(table, id){ if(supaReady) dbDelete(table, id); }
+function dvEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+function dvCamp(id){ return CAMP.find(function(c){ return String(c.id)===String(id); }); }
+function dvMsg(id){ return id==null ? null : DMSG.find(function(m){ return String(m.id)===String(id); }); }
+function dripMsgById(id){ return dvMsg(id); }
+function mkBtnEl(cls, txt, style){ var b=document.createElement('button'); b.className=cls; b.textContent=txt; if(style)b.style.cssText=style; return b; }
+function dvToast(t){ var x=ge('dvToast'); if(!x){ x=document.createElement('div'); x.id='dvToast'; x.className='dv-toast'; document.body.appendChild(x); } x.textContent=t; x.style.display='block'; clearTimeout(x._t); x._t=setTimeout(function(){ x.style.display='none'; },3200); }
+function dvMe(){ var u=(typeof currentUser!=='undefined'&&currentUser)?currentUser:null; var m=u&&u.email?TM.find(function(t){ return t.email && t.email.toLowerCase()===u.email.toLowerCase(); }):null; return m?(m.first||fn(m)):(u&&u.email?u.email:'Someone'); }
 
-// ---- merge tags ----
+function dripRules(camp){
+  var r = Object.assign({}, DRIP_DEFAULT_RULES, (camp && camp.rules) || {});
+  if(!/^\d{1,2}:\d{2}$/.test(String(r.time))) r.time='07:00';
+  r.pauseDays = parseInt(r.pauseDays)||10;
+  return r;
+}
+function dripSteps(camp){
+  var s = camp ? camp.steps : [];
+  if(typeof s==='string'){ try{ s=JSON.parse(s); }catch(e){ s=[]; } }
+  if(!Array.isArray(s)) s=[];
+  return s.map(function(x){
+    x = x||{};
+    var wait = x.wait!=null ? (parseInt(x.wait)||0) : (parseInt(x.delayDays)||0);
+    if(x.type==='task') return { type:'task', wait:wait, kind:x.kind||'Call', who:(x.who==null?'all':x.who), note:x.note||'' };
+    return { type:'email', wait:wait, messageId:(x.messageId!=null?x.messageId:null) };
+  });
+}
+function dvNormCamps(){ CAMP.forEach(function(c){ c.steps = dripSteps(c); if(c.live==null) c.live=false; if(!c.rules) c.rules=Object.assign({}, DRIP_DEFAULT_RULES); }); }
+function dvSaveCamp(c){ c.updated_at=nowISO(); dripSave('campaigns',[JSON.parse(JSON.stringify(c))]); }
+function dvSaveEnr(e){ e.updated_at=nowISO(); dripSave('enrollments',[JSON.parse(JSON.stringify(e))]); }
+function dvLog(row){ var r=Object.assign({ id:Date.now()*1000+Math.floor(Math.random()*1000), status:'ok', created_at:nowISO() }, row); SENDLOG.push(r); dripSave('send_log',[r]); return r; }
+
+// ---- Mountain-time scheduling (mirrors api/run-drips.js) ----
+function dvToday(){ return new Date().toLocaleDateString('en-CA',{timeZone:DRIP_TZ}); }
+function dvAddDays(ds,n){ var d=new Date(ds+'T12:00:00Z'); d.setUTCDate(d.getUTCDate()+n); return d.toISOString().slice(0,10); }
+function dvDow(ds){ return new Date(ds+'T12:00:00Z').getUTCDay(); }
+function dvTzOff(ms){
+  var p={}; new Intl.DateTimeFormat('en-US',{timeZone:DRIP_TZ,hourCycle:'h23',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}).formatToParts(new Date(ms)).forEach(function(x){ p[x.type]=x.value; });
+  return Math.round((Date.UTC(+p.year,+p.month-1,+p.day,(+p.hour)%24,+p.minute)-ms)/60000);
+}
+function dvMtnMs(ds,hm){ var a=String(hm).split(':'); var g=Date.UTC(+ds.slice(0,4),+ds.slice(5,7)-1,+ds.slice(8,10),+a[0],+a[1]); var t=g-dvTzOff(g)*60000; return g-dvTzOff(t)*60000; }
+function dvDateOf(iso){ return new Date(iso).toLocaleDateString('en-CA',{timeZone:DRIP_TZ}); }
+function dripNextSend(fromDate, wait, rules, notBefore){
+  var ok=function(d){ return !(rules.weekends && (dvDow(d)===0||dvDow(d)===6)); };
+  var ds=dvAddDays(fromDate, parseInt(wait)||0); while(!ok(ds)) ds=dvAddDays(ds,1);
+  var t=dvMtnMs(ds,rules.time), floor=(notBefore!=null?notBefore:Date.now()-60000), g=0;
+  while(t<floor && g++<14){ ds=dvAddDays(ds,1); while(!ok(ds)) ds=dvAddDays(ds,1); t=dvMtnMs(ds,rules.time); }
+  return new Date(t).toISOString();
+}
+function dvWhen(iso, withTime){
+  if(!iso) return '—';
+  var o={timeZone:DRIP_TZ,weekday:'short',month:'short',day:'numeric'}; if(withTime){ o.hour='numeric'; o.minute='2-digit'; }
+  return new Date(iso).toLocaleString('en-US',o);
+}
+function dvDayLabel(ds){ var t=dvToday(); if(ds===t) return 'Today · '+dvWhen(dvMtnMs(ds,'12:00')); if(ds===dvAddDays(t,1)) return 'Tomorrow · '+dvWhen(dvMtnMs(ds,'12:00')); return dvWhen(dvMtnMs(ds,'12:00')); }
+function dvTimeLbl(hm){ var a=hm.split(':'), h=+a[0]; return (h%12||12)+':'+a[1]+(h<12?' am':' pm'); }
+
+// ---- merge tags (preview only; the server does the real merge) ----
 function dripMerge(text, c){
   if(!text) return '';
-  var agent = 'Randy Baker';
-  return text
-    .replace(/\{\{\s*first\s*\}\}/gi, (c&&c.first)||'there')
-    .replace(/\{\{\s*last\s*\}\}/gi, (c&&c.last)||'')
-    .replace(/\{\{\s*property\s*\}\}/gi, (c&&c.property)||'your property search')
-    .replace(/\{\{\s*price\s*\}\}/gi, (c&&c.price)||'')
-    .replace(/\{\{\s*agent\s*\}\}/gi, agent);
+  var t=function(n){ return new RegExp('\\{\\{?\\s*'+n+'\\s*\\}?\\}','gi'); };
+  return String(text).replace(t('first'),(c&&c.first)||'there').replace(t('last'),(c&&c.last)||'')
+    .replace(t('property'),(c&&c.property)||'').replace(t('price'),(c&&c.price)||'').replace(t('agent'),'Randy Baker');
 }
+function dvLangOf(c){ return (c && String(c.lang||'').toLowerCase()==='es') ? 'es' : 'en'; }
+function dvMsgFor(m, lang){ if(!m) return {subject:'',html:''}; if(lang==='es' && m.html_es) return {subject:m.subject_es||m.subject||'', html:m.html_es, lang:'es'}; return {subject:m.subject||'', html:m.html||'', lang:'en'}; }
 
-function dripDayMs(){ return 86400000; }
-function nowISO(){ return new Date().toISOString(); }
-// When should a step scheduled "delayDays" from today go out? Anchor to the
-// MOUNTAIN calendar date (today + delayDays) at 13:00 UTC (~7am Mountain), so a
-// delay lands on a predictable local morning N days out — never the same evening.
-// Matches nextSendIso() in api/run-drips.js so client + server agree.
-function dripNextSendIso(delayDays){
-  var todayMtn = new Date().toLocaleDateString('en-CA', { timeZone:'America/Denver' });
-  var base = new Date(todayMtn + 'T00:00:00Z');
-  var target = new Date(base.getTime() + (parseInt(delayDays)||0)*86400000);
-  var y=target.getUTCFullYear(), m=String(target.getUTCMonth()+1).padStart(2,'0'), d=String(target.getUTCDate()).padStart(2,'0');
-  return y+'-'+m+'-'+d+'T13:00:00.000Z';
+// ---- status helpers ----
+var DV_STATUS = {
+  active:{t:'ACTIVE',c:'dv-blue'}, paused:{t:'PAUSED',c:'dv-warn'}, stopped:{t:'REPLIED — STOPPED',c:'dv-green'},
+  unsubscribed:{t:'UNSUBSCRIBED',c:'dv-gray'}, bounced:{t:'ON HOLD — BAD EMAIL',c:'dv-red'}, done:{t:'FINISHED',c:'dv-gray'}, removed:{t:'REMOVED',c:'dv-gray'}
+};
+function dvStepLabel(camp, i){
+  var st=dripSteps(camp), s=st[i]; if(!s) return 'Finished';
+  if(s.type==='task') return 'Reminder: '+s.kind;
+  var n=0; for(var k=0;k<=i;k++) if(st[k].type==='email') n++;
+  return 'Email '+n;
 }
-
-// ---- enrollment creation ----
-function enrollContact(campaignId, contactId, fromMemberId){
-  var camp = CAMP.find(function(x){ return String(x.id)===String(campaignId); });
-  if(!camp || !camp.steps || !camp.steps.length) return null;
-  // avoid duplicate active enrollment in same campaign
-  var dup = ENR.find(function(e){ return String(e.campaignId)===String(campaignId) && String(e.contactId)===String(contactId) && e.status==='active'; });
-  if(dup) return dup;
-  var firstDelay = parseInt(camp.steps[0].delayDays)||0;
-  var enr = {
-    id: Date.now() + Math.floor(Math.random()*1000),
-    campaignId: campaignId,
-    contactId: contactId,
-    fromMemberId: fromMemberId || DRIP_SENDER_MEMBER || (typeof gmailState!=='undefined' ? gmailState.activeMemberId : null) || null,
-    stepIndex: 0,
-    status: 'active',
-    nextSendAt: dripNextSendIso(firstDelay),
-    created_at: nowISO()
-  };
-  ENR.push(enr);
-  dripSave('enrollments', [enr]);
-  return enr;
+function dvStatusHtml(e, camp){
+  var s=DV_STATUS[e.status]||{t:String(e.status||'').toUpperCase(),c:'dv-gray'};
+  var sub='';
+  if(e.status==='active') sub='Next: '+dvStepLabel(camp,e.stepIndex)+' · '+dvWhen(e.nextSendAt,true)+(camp&&!camp.live?' (campaign is a Draft)':'');
+  else if(e.status==='paused') sub=(e.reason||'Paused')+(e.pausedUntil&&!/until/.test(e.reason||'')?' — until '+dvWhen(e.pausedUntil):'');
+  else if(e.status==='done') sub='Got every step';
+  else sub=e.reason||'';
+  return '<span class="dv-pill '+s.c+'">'+s.t+'</span>'+(sub?'<div class="dv-muted" style="margin-top:4px;">'+dvEsc(sub)+'</div>':'');
 }
-
-// ---- auto-enroll on stage change ----
-function autoEnrollOnStage(c, stage){
-  if(!c) return;
-  CAMP.forEach(function(camp){
-    if(camp.active === false || camp.active === 'false') return;
-    if(camp.trigger === ('stage:' + stage)){
-      enrollContact(camp.id, c.id, null);
-    }
+function dvEnrolled(campId, includeRemoved){ return ENR.filter(function(e){ return String(e.campaignId)===String(campId) && (includeRemoved || e.status!=='removed'); }); }
+function dvStats(campId, stepIndex){
+  var r={sent:0,clicked:0,replied:0,unsub:0};
+  SENDLOG.forEach(function(l){
+    if(String(l.campaignId)!==String(campId)) return;
+    if(stepIndex!=null && l.kind!=='reply' && l.kind!=='unsubscribe' && Number(l.stepIndex)!==stepIndex) return;
+    if(l.kind==='email' && l.status==='sent'){ r.sent++; if(l.clicks>0) r.clicked++; }
   });
-  updateDripBadges();
-}
-
-// ---- badge/state refresh (called on open and 30s poll) ----
-// NOTE: the browser does NOT send drip emails. Sending happens ONLY in the
-// server cron (api/run-drips.js), which honors Sending Controls + test mode.
-// A client-side sender used to fire here on page-load/poll and bypassed the
-// kill switch entirely — that is why mail could go out with the drip control
-// unchecked. This now only refreshes the on-screen counts.
-function processDrips(){
-  updateDripBadges();
-}
-
-// Ask the server to run a drip pass now (respects Sending Controls + test mode).
-// Used by the "Run drips now" button. The server rejects the call unless the
-// caller is a signed-in CRM user, so CRON_SECRET never reaches the browser.
-function runDripsNow(){
-  var btn = ge('btnRunDripsNow');
-  if(btn){ btn.disabled = true; var _t = btn.textContent; btn.textContent = 'Running…'; btn.dataset._t = _t; }
-  postApi('/api/run-drips', {}).then(function(r){ return r.json().catch(function(){ return {}; }); })
-    .then(function(res){
-      if(res && res.paused){
-        alert('Nothing sent — outbound sending is off.\n\nTurn on Settings → Sending Controls (Master + Drips) and Save, then try again.');
-      } else if(res && res.result && res.result.drips){
-        var d = res.result.drips;
-        var msg = 'Drip run complete.\nSent: '+d.sent+'   Completed: '+d.completed+'   Failed: '+d.failed+'   Skipped: '+d.skipped;
-        if(d.errors && d.errors.length) msg += '\n\n'+d.errors.slice(0,5).join('\n');
-        alert(msg);
-      } else if(res && res.error){
-        alert('Could not run drips: '+res.error);
-      } else {
-        alert('Drip run finished.');
-      }
-    })
-    .catch(function(e){ alert('Could not run drips: '+(e&&e.message||e)); })
-    .then(function(){
-      if(supaReady) loadFromDB();   // pull the updated enrollments / send log the cron just wrote
-      if(btn){ btn.disabled = false; btn.textContent = btn.dataset._t || 'Run drips now'; }
-      renderDrips();
-    });
-}
-
-// DISABLED: the browser must never send drip mail directly — it bypassed the
-// Sending Controls kill switch. Sending now lives only in api/run-drips.js.
-// Kept as a guarded no-op so any stray caller routes to the controlled server
-// path instead of emailing a client.
-function dripFireStep(enr){
-  if(typeof console!=='undefined') console.warn('dripFireStep is disabled; drips send server-side via /api/run-drips');
-  return;
-}
-function _dripFireStep_DISABLED(enr){
-  var camp = CAMP.find(function(x){ return String(x.id)===String(enr.campaignId); });
-  var c = gc(typeof enr.contactId==='string' ? (parseInt(enr.contactId)||enr.contactId) : enr.contactId);
-  if(!camp || !c){ enr.status='stopped'; dripSave('enrollments',[enr]); return; }
-  var step = camp.steps[enr.stepIndex];
-  if(!step){ enr.status='completed'; dripSave('enrollments',[enr]); return; }
-
-  var subject = dripMerge(step.subject, c);
-  var body = dripMerge(step.body, c);
-  var to = c.email;
-
-  var logEntry = {
-    id: Date.now() + Math.floor(Math.random()*1000),
-    enrollmentId: enr.id, campaignId: camp.id, contactId: c.id,
-    stepIndex: enr.stepIndex, subject: subject, to: to||'',
-    status: 'pending', sentAt: null, error: '', created_at: nowISO()
-  };
-
-  function advance(){
-    enr.stepIndex += 1;
-    if(enr.stepIndex >= camp.steps.length){
-      enr.status = 'completed';
-      enr.nextSendAt = null;
-    }else{
-      var nextDelay = parseInt(camp.steps[enr.stepIndex].delayDays)||0;
-      enr.nextSendAt = new Date(Date.now() + nextDelay*dripDayMs()).toISOString();
-    }
-    dripSave('enrollments', [enr]);
-    if(curPage==='drips') renderDrips();
-    updateDripBadges();
+  if(stepIndex!=null){
+    // replies / unsubscribes are credited to the email whose thread they came in on
+    var sentRows=SENDLOG.filter(function(l){ return l.kind==='email'&&l.status==='sent'&&String(l.campaignId)===String(campId)&&Number(l.stepIndex)===stepIndex; });
+    var th={}; sentRows.forEach(function(l){ if(l.threadId) th[l.threadId]=1; });
+    SENDLOG.forEach(function(l){ if(l.threadId && th[l.threadId]){ if(l.kind==='reply') r.replied++; if(l.kind==='unsubscribe') r.unsub++; } });
+  } else {
+    SENDLOG.forEach(function(l){ if(String(l.campaignId)!==String(campId)) return; if(l.kind==='reply') r.replied++; if(l.kind==='unsubscribe') r.unsub++; });
   }
-
-  if(!to){
-    logEntry.status='failed'; logEntry.error='No email address on contact';
-    SENDLOG.push(logEntry); dripSave('send_log',[logEntry]);
-    enr.status='stopped'; dripSave('enrollments',[enr]); return;
-  }
-  var fromMember = enr.fromMemberId || (typeof gmailState!=='undefined' ? gmailState.activeMemberId : null);
-  if(!fromMember || typeof sendEmail!=='function'){
-    // Gmail not connected -> leave queued, do not advance
-    logEntry.status='queued'; logEntry.error='Gmail account not connected - will retry';
-    SENDLOG.push(logEntry); dripSave('send_log',[logEntry]);
-    // push nextSendAt forward slightly so we retry next cycle but don't spin
-    enr.nextSendAt = new Date(Date.now() + 60000).toISOString();
-    dripSave('enrollments',[enr]);
-    return;
-  }
-
-  sendEmail({ to: to, subject: subject, body: body, memberId: fromMember }, function(){
-    logEntry.status='sent'; logEntry.sentAt=nowISO();
-    SENDLOG.push(logEntry); dripSave('send_log',[logEntry]);
-    // log the touch on the contact's notes
-    var nn={id:Date.now(),contactId:c.id,text:'Drip "'+camp.name+'" step '+(enr.stepIndex+1)+' sent: '+subject,date:nowISO()};
-    N.push(nn); if(typeof saveNote==='function') saveNote(nn);
-    advance();
-  });
+  return r;
 }
+function dvPct(a,b){ return b?Math.round(a*100/b)+'%':'—'; }
 
-function stopEnrollment(id){
-  var e = ENR.find(function(x){ return String(x.id)===String(id); });
-  if(!e) return;
-  if(!confirm('Remove this enrollment? It will stop and drop off the list.')) return;
-  e.status='stopped'; e.nextSendAt=null;
-  dripSave('enrollments',[e]); renderDrips(); updateDripBadges();
-}
-
-// ---- enrollment management (edit a running enrollment) ----
-function _enrById(id){ return ENR.find(function(x){ return String(x.id)===String(id); }); }
-
-function restartEnrollment(id){
-  var e = _enrById(id); if(!e) return;
-  if(!confirm('Restart this enrollment from the first email?')) return;
-  e.stepIndex = 0; e.status = 'active'; e.nextSendAt = new Date().toISOString();
-  dripSave('enrollments',[e]); renderDrips(); updateDripBadges();
-}
-
-function setEnrollmentStep(id, idx){
-  var e = _enrById(id); if(!e) return;
-  var camp = CAMP.find(function(x){ return String(x.id)===String(e.campaignId); });
-  var total = (camp&&camp.steps)?camp.steps.length:0;
-  idx = parseInt(idx); if(isNaN(idx)||idx<0||idx>=total) return;
-  e.stepIndex = idx; e.status='active'; e.nextSendAt = new Date().toISOString();
-  dripSave('enrollments',[e]); renderDrips(); updateDripBadges();
-}
-
-function rescheduleEnrollment(id, dateStr){
-  var e = _enrById(id); if(!e || !dateStr) return;
-  // dateStr is YYYY-MM-DD from a date input; schedule for the start of that day.
-  e.nextSendAt = new Date(dateStr + 'T00:00:00').toISOString();
-  e.status = 'active';
-  dripSave('enrollments',[e]); renderDrips(); updateDripBadges();
-}
-
-function pauseEnrollment(id){
-  var e = _enrById(id); if(!e) return;
-  e.status = 'paused';
-  dripSave('enrollments',[e]); renderDrips(); updateDripBadges();
-}
-function resumeEnrollment(id){
-  var e = _enrById(id); if(!e) return;
-  e.status = 'active';
-  if(!e.nextSendAt) e.nextSendAt = new Date().toISOString();
-  dripSave('enrollments',[e]); renderDrips(); updateDripBadges();
-}
-
-function sendEnrollmentNow(id){
-  var e = _enrById(id); if(!e) return;
-  if(SCTRL && (!SCTRL.master || !SCTRL.drips)){
-    if(!confirm('Sending is turned off in Sending Controls, so nothing will go out.\n\nTurn it on first (Settings → Sending Controls), then use Send now. Continue anyway?')) return;
-  }
-  e.status='active'; e.nextSendAt = new Date().toISOString();
-  dripSave('enrollments',[e]);
-  if(typeof runDripsNow==='function') runDripsNow(); else renderDrips();
-}
-
-// ---- badges ----
+// ===================== PAGE SHELL =====================
+function processDrips(){ updateDripBadges(); }
 function updateDripBadges(){
-  var active = ENR.filter(function(e){ return e.status==='active'; }).length;
-  var nb = ge('nbDrips'); if(nb) nb.textContent = CAMP.filter(function(x){return x.active!==false&&x.active!=='false';}).length;
-  var ne = ge('nbEnrollments'); if(ne) ne.textContent = active;
+  var nb=ge('nbDrips'); if(!nb) return;
+  var problems = dvProblems().filter(function(p){ return p.level==='red'; }).length;
+  nb.textContent = problems ? '!' : ENR.filter(function(e){ return e.status==='active'; }).length;
+  nb.style.background = problems ? 'var(--danger)' : '';
 }
-
-// ---- tab switching ----
-function dripSwitchTab(tab){
-  ['campaigns','enrollments','messages','log'].forEach(function(t){
-    var btn = ge('dripTab'+t.charAt(0).toUpperCase()+t.slice(1));
-    var pane = ge('dripPane'+t.charAt(0).toUpperCase()+t.slice(1));
-    var on = (t===tab);
-    if(btn){ btn.style.borderBottomColor = on?'var(--accent)':'transparent'; btn.style.color = on?'var(--accent)':'var(--text3)'; btn.classList.toggle('active', on); }
-    if(pane){ pane.style.display = on?'block':'none'; }
-  });
-  renderDrips();
-}
-
-// ===================== RENDER =====================
 function renderDrips(){
-  renderCampaignList();
-  renderEnrollmentList();
-  renderMessageList();
-  renderSendLog();
+  dvNormCamps();
+  var root=ge('dripRoot'); if(!root) return;
+  if(DV.view==='camp' && !dvCamp(DV.campId)) DV.view='list';
+  var tabs='<div class="dv-tabs dv-top">'
+    +['list:Campaigns','outbox:Outbox','templates:Email Templates'].map(function(p){ var k=p.split(':'); var on=(DV.view===k[0]||(k[0]==='list'&&DV.view==='camp'));
+      return '<div class="dv-tab'+(on?' on':'')+'" onclick="dvGo(\''+k[0]+'\')">'+k[1]+(k[0]==='outbox'?' <span class="dv-count">'+dvOutboxItems().filter(function(x){return x.kind==='email';}).length+'</span>':'')+'</div>'; }).join('')
+    +'<div style="flex:1"></div><button class="btn btn-g" style="font-size:14px;padding:6px 12px;align-self:center;" onclick="dvRunNow(this)">Check &amp; send now</button></div>';
+  var body = DV.view==='outbox' ? dvOutboxHtml() : DV.view==='templates' ? dvTemplatesHtml() : DV.view==='camp' ? dvCampHtml(dvCamp(DV.campId)) : dvListHtml();
+  root.innerHTML = tabs + dvHealthHtml() + body;
   updateDripBadges();
 }
+function dvGo(v, campId){ DV.view=v; if(campId!=null){ DV.campId=campId; DV.tab='steps'; } renderDrips(); var c=ge('page-drips'); if(c&&c.scrollIntoView) try{ ge('dripRoot').scrollIntoView({block:'start'}); }catch(e){} }
 
-// ===================== MESSAGE LIBRARY =====================
-// Reusable, finished marketing emails. A campaign step points at one of these
-// by id; the server cron (api/run-drips.js) embeds its images and sends it.
-function dripMsgById(id){ return DMSG.find(function(m){ return String(m.id)===String(id); }); }
-
-function renderMessageList(){
-  var wrap = ge('dripMessageList'); if(!wrap) return;
-  wrap.textContent='';
-  var list = DMSG.slice().sort(function(a,b){ return String(b.updated_at||'').localeCompare(String(a.updated_at||'')); });
-  if(!list.length){
-    wrap.appendChild(mkDiv('color:var(--text3);font-size:15px;padding:12px 0;','No messages yet. Click "+ New Message" to add a finished marketing email to the library.'));
-    return;
+// ---- health banner ----
+function dvProblems(){
+  var out=[];
+  if(!SCTRL || !SCTRL.master || !SCTRL.drips) out.push({level:'red', html:'<b>Campaign emails are turned off.</b> Nothing will send until “Master” and “Drip-campaign emails” are on in Sending Controls. Replies are still being watched.', btn:'<button class="btn dv-btn-w" onclick="dvOpenSendingControls()">Open Sending Controls</button>'});
+  else if(SCTRL.testMode) out.push({level:'amber', html:'<b>Test mode is on.</b> Every campaign email goes to <b>'+dvEsc(SCTRL.testEmail||'the test address')+'</b> instead of the contact.', btn:'<button class="btn btn-g" onclick="dvOpenSendingControls()">Sending Controls</button>'});
+  var H=DRIP_HEALTH||{};
+  if(H.gmailOk===false){
+    var held=ENR.filter(function(e){ return e.status==='active' && e.nextSendAt && Date.parse(e.nextSendAt)<=Date.now(); }).length;
+    out.push({level:'red', html:'<b>Sending is on hold.</b> '+dvEsc(H.gmailError||'The sending Gmail account is disconnected.')+' Nothing is lost'+(held?' — '+held+' email'+(held===1?' is':'s are')+' waiting':'')+' and will go out on the next check after it’s reconnected.', btn:'<button class="btn dv-btn-w" onclick="sp(\'gmail\')">Reconnect Gmail</button>'});
   }
-  list.forEach(function(m){
-    var row = mkDiv('display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);');
-    var archived = (m.active===false || m.active==='false');
-    var info = mkDiv('flex:1;min-width:0;');
-    var title = mkDiv('font-size:16px;font-weight:700;color:'+(archived?'var(--text3)':'var(--text)')+';', (m.name||'(untitled)') + (archived?'  ·  archived':''));
-    var sub = mkDiv('font-size:14px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;', 'Subject: ' + (m.subject||'(none)'));
-    info.appendChild(title); info.appendChild(sub);
-    row.appendChild(info);
-    var bEdit = mkBtnEl('btn btn-g','Edit','padding:4px 10px;font-size:14px;');
-    bEdit.addEventListener('click', function(){ openMessageModal(m.id); });
-    var bDup = mkBtnEl('btn btn-g','Duplicate','padding:4px 10px;font-size:14px;');
-    bDup.addEventListener('click', function(){ duplicateMessage(m.id); });
-    var bDel = mkBtnEl('btn btn-g','Delete','padding:4px 10px;font-size:14px;color:var(--danger);');
-    bDel.addEventListener('click', function(){ deleteMessage(m.id); });
-    row.appendChild(bEdit); row.appendChild(bDup); row.appendChild(bDel);
-    wrap.appendChild(row);
-  });
+  var bounced=ENR.filter(function(e){ return e.status==='bounced'; });
+  if(bounced.length){
+    var names=bounced.slice(0,3).map(function(e){ var c=gc(e.contactId); return '<span class="dv-link" onclick="vc('+e.contactId+')">'+dvEsc(c?fn(c):'Unknown')+'</span>'; }).join(', ');
+    out.push({level:'amber', html:'<b>'+bounced.length+' contact'+(bounced.length===1?' has':'s have')+' a bad or missing email:</b> '+names+(bounced.length>3?' + '+(bounced.length-3)+' more':'')+'. Their campaign emails are on hold. Fix the address, then click Restart on the Enrolled tab.', btn:''});
+  }
+  (H.problems||[]).forEach(function(p){ out.push({level:'amber', html:dvEsc(p), btn:''}); });
+  var activeDue=ENR.some(function(e){ return e.status==='active'; });
+  if(activeDue && SCTRL && SCTRL.master && SCTRL.drips && (!H.at || Date.now()-Date.parse(H.at) > 50*60000)){
+    out.push({level:'amber', html:'<b>The automatic check hasn’t run'+(H.at?' since '+dvWhen(H.at,true):' yet')+'.</b> It should run every 15 minutes from cron-job.org (calling /api/run-drips). Until it runs, nothing sends and replies aren’t picked up.', btn:'<button class="btn btn-g" onclick="dvRunNow(this)">Run it now</button>'});
+  }
+  return out;
+}
+function dvHealthHtml(){
+  var p=dvProblems();
+  if(!p.length){
+    var H=DRIP_HEALTH||{}, ls=H.lastSendRun;
+    return '<div class="dv-banner ok">✓ Everything is working.'+(H.at?' Last check: '+dvWhen(H.at,true)+'.':'')+(ls?' Last send: '+dvWhen(ls.at,true)+' — '+ls.sent+' sent, '+ls.failed+' failed.':'')+'</div>';
+  }
+  return p.map(function(x){ return '<div class="dv-banner '+x.level+'"><div style="flex:1;min-width:240px;">'+x.html+'</div>'+x.btn+'</div>'; }).join('');
+}
+function dvOpenSendingControls(){ sp('dashboard'); setTimeout(function(){ var s=ge('sendingControlsSection'); if(s&&s.scrollIntoView) s.scrollIntoView({behavior:'smooth'}); },200); }
+async function dvLoadHealth(){
+  if(!supaReady) return;
+  try{
+    var h=await getAuthHeaders();
+    var r=await fetch(SUPA_URL+'/rest/v1/settings?key=eq.drip_health&select=value',{headers:h, cache:'no-store'});
+    var j=await r.json(); DRIP_HEALTH=(Array.isArray(j)&&j[0])?j[0].value:null;
+  }catch(e){}
+}
+function dvRunNow(btn){
+  if(btn){ btn.disabled=true; btn._t=btn.textContent; btn.textContent='Checking…'; }
+  postApi('/api/run-drips', {action:'run'}).then(function(r){ return r.json().catch(function(){ return {}; }); }).then(function(res){
+    if(res && res.health) DRIP_HEALTH=res.health;
+    if(res && res.result){
+      var d=res.result.drips||{}, i=res.result.inbound||{};
+      var parts=[];
+      parts.push(res.sending ? (d.sent+' sent') : 'sending is off');
+      if(d.tasks) parts.push(d.tasks+' reminder task'+(d.tasks===1?'':'s'));
+      if(i.replies) parts.push(i.replies+' repl'+(i.replies===1?'y':'ies')+' found');
+      if(d.failed) parts.push(d.failed+' failed');
+      dvToast('Check done: '+parts.join(' · '));
+    } else dvToast('Could not run the check'+(res&&res.error?': '+res.error:''));
+  }).catch(function(e){ dvToast('Could not run the check: '+(e&&e.message||e)); })
+  .then(function(){ if(supaReady) return loadFromDB(true); }).then(function(){ if(btn){ btn.disabled=false; btn.textContent=btn._t; } if(curPage==='drips') renderDrips(); });
 }
 
+// ===================== CAMPAIGN LIST =====================
+function dvListHtml(){
+  var h='<div class="dv-row dv-between" style="margin:4px 0 16px;"><div class="dv-muted">Each campaign is a series of emails and reminders. You add people by hand; nothing enrolls on its own.</div><button class="btn btn-p" onclick="dvNewCamp()">+ New campaign</button></div>';
+  if(!CAMP.length) return h+'<div class="card" style="padding:40px;text-align:center;"><div style="font-size:18px;font-weight:700;">No campaigns yet</div><div class="dv-muted" style="margin:6px 0 16px;">Create one, drop in your designed emails, then add contacts.</div><button class="btn btn-p" onclick="dvNewCamp()">+ New campaign</button></div>';
+  h+='<div class="dv-grid">';
+  CAMP.slice().sort(function(a,b){ return (b.live?1:0)-(a.live?1:0) || String(a.name).localeCompare(String(b.name)); }).forEach(function(c){
+    var st=dripSteps(c), em=st.filter(function(s){ return s.type==='email'; });
+    var missing=em.filter(function(s){ var m=dvMsg(s.messageId); return !m||!m.html; }).length;
+    var noES=em.filter(function(s){ var m=dvMsg(s.messageId); return m&&m.html&&!m.html_es; }).length;
+    var S=dvStats(c.id), act=dvEnrolled(c.id).filter(function(e){ return e.status==='active'; }).length;
+    h+='<div class="dv-ccard" onclick="dvGo(\'camp\','+c.id+')"><div class="dv-row dv-between"><div style="font-size:18px;font-weight:700;">'+dvEsc(c.name)+'</div><span class="dv-pill '+(c.live?'dv-green':'dv-gray')+'">'+(c.live?'LIVE':'DRAFT')+'</span></div>'
+      +'<div class="dv-muted" style="margin-top:6px;">'+em.length+' email'+(em.length===1?'':'s')+' · '+(st.length-em.length)+' reminder'+(st.length-em.length===1?'':'s')+'</div>'
+      +(missing?'<div style="margin-top:8px;color:var(--warn);font-size:14px;font-weight:600;">'+missing+' email'+(missing>1?'s need':' needs')+' a design</div>':'')
+      +(noES?'<div style="margin-top:6px;color:var(--text3);font-size:13px;">'+noES+' email'+(noES>1?'s have':' has')+' no Spanish version yet</div>':'')
+      +'<div class="dv-stat"><div><b>'+act+'</b><span>Active</span></div><div><b>'+S.sent+'</b><span>Sent</span></div><div><b>'+dvPct(S.clicked,S.sent)+'</b><span>Clicked</span></div><div><b>'+S.replied+'</b><span>Replied</span></div></div></div>';
+  });
+  return h+'</div>';
+}
+function dvNewCamp(){
+  dvModal('New campaign','<div class="fg"><label class="fl">Campaign name</label><input class="fi" id="dvNcName" placeholder="New buyer nurture"></div><div class="dv-note">It starts as a Draft with one empty email and the standard rules (stop on reply, pause when you email them, skip weekends, 7:00 am). Add your designs, send yourself a test, then switch it to Live.</div>',
+    '<button class="btn btn-g" onclick="dvClose()">Cancel</button><button class="btn btn-p" onclick="dvCreateCamp()">Create campaign</button>');
+  setTimeout(function(){ var i=ge('dvNcName'); if(i) i.focus(); },50);
+}
+function dvCreateCamp(){
+  var n=(ge('dvNcName').value||'').trim(); if(!n){ alert('Give the campaign a name.'); return; }
+  var c={ id:Date.now(), name:n, live:false, active:false, trigger:'', rules:Object.assign({}, DRIP_DEFAULT_RULES, {fromMemberId:DRIP_SENDER_MEMBER||null}), steps:[{type:'email',wait:0,messageId:null}], created_at:nowISO() };
+  CAMP.push(c); dvSaveCamp(c); dvClose(); dvGo('camp', c.id);
+}
+
+// ===================== ONE CAMPAIGN =====================
+function dvCampHtml(c){
+  var r=dripRules(c), sender=dvSenderLabel(r.fromMemberId);
+  var people=dvEnrolled(c.id);
+  var h='<span class="dv-back" onclick="dvGo(\'list\')">‹ All campaigns</span>'
+    +'<div class="card" style="padding:18px;"><div class="dv-row dv-between dv-wrap" style="gap:14px;"><div><div class="dv-row" style="gap:8px;"><div style="font-size:22px;font-weight:700;">'+dvEsc(c.name)+'</div><span class="dv-link" style="font-size:14px;" onclick="dvRenameCamp('+c.id+')">Rename</span></div>'
+    +'<div class="dv-muted" style="margin-top:4px;">Sends from <b style="color:var(--text);">'+dvEsc(sender)+'</b> · '+(r.weekends?'weekdays':'every day')+' at '+dvTimeLbl(r.time)+' Mountain</div></div>'
+    +'<div class="dv-row"><div class="dv-seg"><div class="'+(!c.live?'on':'')+'" onclick="dvSetLive('+c.id+',false)">Draft</div><div class="'+(c.live?'on':'')+'" onclick="dvSetLive('+c.id+',true)">Live</div></div></div></div>'
+    +'<div class="dv-note" style="margin-top:14px;">'+(c.live?'<b style="color:var(--lead);">Live:</b> enrolled contacts get these on schedule. See exactly what’s going out in the <span class="dv-link" onclick="dvGo(\'outbox\')">Outbox</span>.':'<b>Draft:</b> nothing sends. Add your designs, send yourself a test from each email, then switch to Live.')+'</div></div>'
+    +'<div class="dv-tabs"><div class="dv-tab'+(DV.tab==='steps'?' on':'')+'" onclick="DV.tab=\'steps\';renderDrips()">Steps ('+dripSteps(c).length+')</div><div class="dv-tab'+(DV.tab==='people'?' on':'')+'" onclick="DV.tab=\'people\';renderDrips()">Enrolled ('+people.length+')</div><div class="dv-tab'+(DV.tab==='rules'?' on':'')+'" onclick="DV.tab=\'rules\';renderDrips()">Rules</div>'
+    +'<div style="flex:1"></div><span class="dv-link" style="align-self:center;font-size:14px;color:var(--danger);" onclick="dvDeleteCamp('+c.id+')">Delete campaign</span></div>';
+  return h + (DV.tab==='people' ? dvPeopleHtml(c) : DV.tab==='rules' ? dvRulesHtml(c) : dvStepsHtml(c));
+}
+function dvSenderLabel(mid){
+  var id=mid||DRIP_SENDER_MEMBER; var m=id?TM.find(function(t){ return String(t.id)===String(id); }):null;
+  return m ? (m.email||fn(m)) : 'the default sender';
+}
+function dvRenameCamp(id){ var c=dvCamp(id); var n=prompt('Campaign name:', c.name); if(!n||!n.trim()) return; c.name=n.trim(); dvSaveCamp(c); renderDrips(); }
+function dvDeleteCamp(id){
+  var c=dvCamp(id), act=dvEnrolled(id).filter(function(e){ return e.status==='active'||e.status==='paused'; }).length;
+  if(!confirm('Delete “'+c.name+'”?'+(act?'\n\n'+act+' contact'+(act===1?' is':'s are')+' still in it and will get no more emails.':'')+'\n\nTheir history stays on each contact’s page. Your email templates are kept.')) return;
+  ENR.forEach(function(e){ if(String(e.campaignId)===String(id) && (e.status==='active'||e.status==='paused')){ e.status='removed'; e.nextSendAt=null; e.reason='Campaign deleted'; dvSaveEnr(e); } });
+  CAMP=CAMP.filter(function(x){ return String(x.id)!==String(id); }); dripDel('campaigns', id); sv(); dvGo('list');
+}
+function dvSetLive(id, live){
+  var c=dvCamp(id);
+  if(live){
+    var st=dripSteps(c);
+    if(!st.length){ alert('Add at least one step first.'); return; }
+    var bad=st.map(function(s,i){ return s.type==='email' && !(dvMsg(s.messageId)&&dvMsg(s.messageId).html) ? dvStepLabel(c,i) : null; }).filter(Boolean);
+    if(bad.length){ alert('Add a design to every email before going live.\n\nMissing: '+bad.join(', ')); return; }
+    var n=dvEnrolled(id).filter(function(e){ return e.status==='active' && e.nextSendAt && Date.parse(e.nextSendAt)<=Date.now(); }).length;
+    if(!confirm('Make “'+c.name+'” live?'+(n?'\n\n'+n+' email'+(n===1?' is':'s are')+' already due and will go out on the next check (within 15 minutes).':'')+(SCTRL&&SCTRL.testMode?'\n\nTest mode is on, so emails go to '+(SCTRL.testEmail||'the test address')+'.':''))) return;
+  }
+  c.live=!!live; c.active=!!live; dvSaveCamp(c); renderDrips(); dvToast(live?'Campaign is live':'Campaign set to Draft — nothing will send');
+}
+
+// ---- steps tab ----
+function dvStepsHtml(c){
+  var st=dripSteps(c), day=0, h='<div class="dv-tl">';
+  if(c.live) h+='<div class="dv-note" style="margin-bottom:14px;">Editing a live campaign is safe: changes apply from each person’s <b>next</b> step. Nothing already sent is resent. Editing an email’s design changes it everywhere that template is used.</div>';
+  st.forEach(function(s,i){
+    day+=s.wait;
+    if(i>0) h+='<div class="dv-wait">Wait <select class="dv-sel" onchange="dvSetWait('+c.id+','+i+',this.value)">'+[1,2,3,4,5,6,7,10,14,21,30,45,60,90,180,365].concat([s.wait]).filter(function(v,k,a){ return a.indexOf(v)===k; }).sort(function(a,b){return a-b;}).map(function(d){ return '<option'+(d===s.wait?' selected':'')+' value="'+d+'">'+d+'</option>'; }).join('')+'</select> days, then</div>';
+    var when = i===0 ? (s.wait?'Day '+s.wait+' after they’re added':'The first send after they’re added') : 'Day '+day;
+    var mv='<div class="dv-mv">'+(i>0?'<span title="Move up" onclick="event.stopPropagation();dvMoveStep('+c.id+','+i+',-1)">▲</span>':'')+(i<st.length-1?'<span title="Move down" onclick="event.stopPropagation();dvMoveStep('+c.id+','+i+',1)">▼</span>':'')+'</div>';
+    if(s.type==='task'){
+      var who = s.who==='all' ? 'everyone on the team' : (function(){ var m=TM.find(function(t){ return String(t.id)===String(s.who); }); return m?fn(m):'a team member'; })();
+      h+='<div class="dv-em dv-task" onclick="dvEditTask('+c.id+','+i+')"><div class="dv-num or">'+(i+1)+'</div><div class="dv-ticon"><b>'+({Call:'☎',Text:'✉',Card:'✍',Other:'✓'}[s.kind]||'✓')+'</b>'+dvEsc(String(s.kind).toUpperCase())+'</div>'
+        +'<div style="flex:1;min-width:0;"><div style="font-weight:700;font-size:16px;">Reminder: '+dvEsc(s.kind==='Card'?'send a handwritten card':s.kind+' them')+'</div><div class="dv-muted">'+when+' · a task for <b>'+dvEsc(who)+'</b> — nothing is sent to the contact</div>'+(s.note?'<div class="dv-muted" style="margin-top:4px;font-style:italic;">“'+dvEsc(s.note)+'”</div>':'')+'</div>'
+        +mv+'<div class="dv-row"><button class="btn btn-g dv-sm" onclick="event.stopPropagation();dvEditTask('+c.id+','+i+')">Edit</button><button class="btn btn-d dv-sm" onclick="event.stopPropagation();dvDelStep('+c.id+','+i+')">Remove</button></div></div>';
+      return;
+    }
+    var m=dvMsg(s.messageId), empty=!(m&&m.html), S=dvStats(c.id,i);
+    h+='<div class="dv-em'+(empty?' empty':'')+'" onclick="dvEditEmail('+c.id+','+i+')"><div class="dv-num'+(empty?' gray':'')+'">'+(i+1)+'</div>'+dvThumb(m&&m.html)
+      +'<div style="flex:1;min-width:0;"><div style="font-weight:700;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+(m&&m.subject?dvEsc(m.subject):dvStepLabel(c,i)+' — no design yet')+'</div>'
+      +'<div class="dv-row" style="gap:6px;margin-top:4px;flex-wrap:wrap;"><span class="dv-muted">'+when+'</span><span class="dv-chip '+(m&&m.html?'ok':'miss')+'">EN '+(m&&m.html?'✓':'—')+'</span><span class="dv-chip '+(m&&m.html_es?'ok':'miss')+'" title="'+(m&&m.html_es?'Spanish version ready':'No Spanish version — Spanish-speaking contacts get English')+'">ES '+(m&&m.html_es?'✓':'—')+'</span>'+(m?'<span class="dv-muted" style="font-size:13px;">Template: '+dvEsc(m.name||'')+'</span>':'')+'</div>'
+      +(S.sent?'<div class="dv-estats"><span><b>'+S.sent+'</b> sent</span><span><b>'+dvPct(S.clicked,S.sent)+'</b> clicked</span><span><b>'+S.replied+'</b> replied</span><span><b>'+S.unsub+'</b> unsubscribed</span></div>':'')
+      +(empty?'<div class="dv-row dv-wrap" style="margin-top:10px;"><button class="btn btn-p dv-sm" onclick="event.stopPropagation();dvEditEmail('+c.id+','+i+',\'drop\')">Drop in a design</button><button class="btn btn-g dv-sm" onclick="event.stopPropagation();dvEditEmail('+c.id+','+i+',\'tpl\')">Choose a template</button></div>':'')
+      +'</div>'+mv+'<div class="dv-row">'+(empty?'':'<button class="btn btn-g dv-sm" onclick="event.stopPropagation();dvEditEmail('+c.id+','+i+')">Edit</button>')+'<button class="btn btn-d dv-sm" onclick="event.stopPropagation();dvDelStep('+c.id+','+i+')">Remove</button></div></div>';
+  });
+  h+='<div class="dv-addrow"><div class="dv-addem" onclick="dvAddEmail('+c.id+')">+ Add an email</div><div class="dv-addem" style="color:var(--warn);" onclick="dvAddTask('+c.id+')">+ Add a reminder (call, text, card)</div></div>';
+  h+='<div class="dv-muted" style="margin-top:14px;font-size:13px;">EN ✓ / ES ✓ = English and Spanish versions ready. Each contact gets the version that matches the language on their contact record. Clicks and replies are counted; opens aren’t, because mail apps make them unreliable.</div>';
+  return h+'</div>';
+}
+function dvThumb(html){
+  if(!html) return '<div class="dv-thumb blank">No design</div>';
+  return '<div class="dv-thumb"><iframe tabindex="-1" sandbox="" srcdoc="'+dvEsc(html)+'"></iframe></div>';
+}
+function dvSetWait(cid,i,v){ var c=dvCamp(cid); c.steps=dripSteps(c); c.steps[i].wait=parseInt(v)||0; dvSaveCamp(c); renderDrips(); }
+function dvMoveStep(cid,i,d){ var c=dvCamp(cid); c.steps=dripSteps(c); var j=i+d; if(j<0||j>=c.steps.length) return; var t=c.steps[i]; c.steps[i]=c.steps[j]; c.steps[j]=t; dvSaveCamp(c); renderDrips(); }
+function dvDelStep(cid,i){
+  var c=dvCamp(cid); c.steps=dripSteps(c);
+  var at=dvEnrolled(cid).filter(function(e){ return e.status==='active' && e.stepIndex===i; }).length;
+  if(!confirm('Remove '+dvStepLabel(c,i)+'?'+(at?'\n\n'+at+' contact'+(at===1?' is':'s are')+' waiting on this step; they’ll move on to the next one.':'')+'\nPeople already past it aren’t affected. (The email template itself is kept.)')) return;
+  c.steps.splice(i,1);
+  ENR.forEach(function(e){ if(String(e.campaignId)===String(cid) && e.stepIndex>i && (e.status==='active'||e.status==='paused')){ e.stepIndex--; dvSaveEnr(e); } });
+  dvSaveCamp(c); renderDrips();
+}
+function dvAddEmail(cid){ var c=dvCamp(cid); c.steps=dripSteps(c); c.steps.push({type:'email', wait:c.steps.length?3:0, messageId:null}); dvSaveCamp(c); renderDrips(); }
+
+// ---- reminder (task) steps ----
+function dvAddTask(cid){ dvEditTask(cid, -1); }
+function dvEditTask(cid, i){
+  var c=dvCamp(cid), st=dripSteps(c), s = i>=0 ? st[i] : {type:'task', wait:st.length?2:0, kind:'Call', who:'all', note:''};
+  window._dvTask={cid:cid, i:i, s:JSON.parse(JSON.stringify(s))};
+  dvRenderTask();
+}
+function dvRenderTask(){
+  var T=window._dvTask, s=T.s;
+  var kinds=[['Call','Call'],['Text','Text'],['Card','Handwritten card'],['Other','Other']];
+  var b='<div class="fg"><label class="fl">What to do</label><div class="dv-seg">'+kinds.map(function(k){ return '<div class="'+(s.kind===k[0]?'on':'')+'" onclick="_dvTask.s.kind=\''+k[0]+'\';dvRenderTask()">'+k[1]+'</div>'; }).join('')+'</div></div>'
+    +'<div class="fg"><label class="fl">Who does it</label><select class="fsel" id="dvTaskWho"><option value="all"'+(s.who==='all'?' selected':'')+'>Everyone on the team</option>'+TM.map(function(m){ return '<option value="'+m.id+'"'+(String(s.who)===String(m.id)?' selected':'')+'>'+dvEsc(fn(m))+'</option>'; }).join('')+'</select></div>'
+    +'<div class="fg"><label class="fl">Note for whoever does it</label><input class="fi" id="dvTaskNote" value="'+dvEsc(s.note)+'" placeholder="Ask how the search is going"></div>'
+    +'<div class="dv-note">On the scheduled day this shows up in Follow-ups with the contact’s name. Nothing is sent to the contact. The campaign then continues on schedule.</div>';
+  dvModal('Reminder step', b, '<button class="btn btn-g" onclick="dvClose()">Cancel</button><button class="btn btn-p" onclick="dvSaveTask()">Save reminder</button>');
+}
+function dvSaveTask(){
+  var T=window._dvTask, c=dvCamp(T.cid); c.steps=dripSteps(c);
+  T.s.who=ge('dvTaskWho').value; T.s.note=(ge('dvTaskNote').value||'').trim();
+  if(T.i>=0) c.steps[T.i]=T.s; else c.steps.push(T.s);
+  dvSaveCamp(c); dvClose(); renderDrips(); dvToast('Reminder saved');
+}
+
+// ---- enrolled tab ----
+function dvPeopleHtml(c){
+  var list=dvEnrolled(c.id), st=dripSteps(c);
+  var h='<div class="dv-row dv-between" style="margin-bottom:12px;"><div class="dv-muted">Everyone in this campaign and where they are. Nobody disappears from this list unless you remove them.</div><button class="btn btn-p" onclick="dvAddPeople('+c.id+')">+ Add contacts</button></div>';
+  if(!list.length) return h+'<div class="card" style="padding:40px;text-align:center;"><div style="font-size:18px;font-weight:700;">No one enrolled yet</div><div class="dv-muted" style="margin:6px 0 16px;">Add contacts to start sending.</div><button class="btn btn-p" onclick="dvAddPeople('+c.id+')">+ Add contacts</button></div>';
+  var order={bounced:0,active:1,paused:2,stopped:3,unsubscribed:4,done:5};
+  list.sort(function(a,b){ return (order[a.status]||9)-(order[b.status]||9) || String(a.nextSendAt||'').localeCompare(String(b.nextSendAt||'')); });
+  h+='<div class="card" style="overflow-x:auto;"><table class="dv-table"><tr><th>Contact</th><th>Progress</th><th>Status</th><th></th></tr>';
+  list.forEach(function(e){
+    var ct=gc(e.contactId), dots='';
+    for(var k=0;k<st.length;k++) dots+='<div class="dv-dot '+(e.status==='done'||k<e.stepIndex?'done':(k===e.stepIndex&&e.status==='active'?'cur':''))+'"></div>';
+    var btns = e.status==='active' ? '<button class="btn btn-g dv-sm" onclick="dvPause('+e.id+')">Pause</button> <button class="btn btn-d dv-sm" onclick="dvRemove('+e.id+')">Remove</button>'
+      : e.status==='paused' ? '<button class="btn btn-g dv-sm" onclick="dvResume('+e.id+')">Resume now</button> <button class="btn btn-d dv-sm" onclick="dvRemove('+e.id+')">Remove</button>'
+      : (e.status==='stopped'||e.status==='bounced') ? '<button class="btn btn-g dv-sm" onclick="dvResume('+e.id+')">Restart where they left off</button> <button class="btn btn-d dv-sm" onclick="dvRemove('+e.id+')">Remove</button>'
+      : e.status==='done' ? '<button class="btn btn-g dv-sm" onclick="dvRestartFromTop('+e.id+')">Start over</button>' : '';
+    var em=ct?(ct.email||''):'';
+    h+='<tr><td><span class="dv-link" onclick="vc('+e.contactId+')">'+dvEsc(ct?fn(ct):'(deleted contact)')+'</span> <span class="dv-chip">'+dvLangOf(ct).toUpperCase()+'</span><div class="dv-muted">'+(em?dvEsc(em):'<span style="color:var(--danger);">no email</span>')+'</div></td>'
+      +'<td><div class="dv-prog">'+dots+'</div><div class="dv-muted" style="margin-top:5px;">'+(e.status==='done'?'All '+st.length+' steps':'Step '+Math.min(e.stepIndex+1,st.length)+' of '+st.length)+'</div></td>'
+      +'<td>'+dvStatusHtml(e,c)+'</td><td style="text-align:right;white-space:nowrap;">'+btns+'</td></tr>';
+  });
+  return h+'</table></div>';
+}
+function dvEnr(id){ return ENR.find(function(e){ return String(e.id)===String(id); }); }
+function dvPause(id){ var e=dvEnr(id); e.status='paused'; e.pausedUntil=null; e.reason='Paused by '+dvMe()+' on '+dvWhen(nowISO()); dvSaveEnr(e); renderDrips(); dvToast('Paused — click Resume when you’re ready'); }
+function dvResume(id){
+  var e=dvEnr(id), c=dvCamp(e.campaignId), r=dripRules(c);
+  if(e.status==='bounced'){ var ct=gc(e.contactId); if(!ct||!ct.email){ alert('This contact still has no email address. Add one on their contact page first.'); return; } }
+  if(e.stepIndex>=dripSteps(c).length){ e.status='done'; dvSaveEnr(e); renderDrips(); return; }
+  e.status='active'; e.pausedUntil=null; e.reason=null;
+  if(!e.nextSendAt || Date.parse(e.nextSendAt)<Date.now()) e.nextSendAt=dripNextSend(dvToday(),0,r);
+  dvSaveEnr(e); dvLog({kind:'resumed', contactId:e.contactId, campaignId:e.campaignId, enrollmentId:e.id, note:'Resumed by '+dvMe()});
+  renderDrips(); dvToast('Back on — next step '+dvWhen(e.nextSendAt,true));
+}
+function dvRestartFromTop(id){ var e=dvEnr(id), c=dvCamp(e.campaignId); if(!confirm('Start this campaign over from the first step for this contact?')) return; e.stepIndex=0; e.status='active'; e.reason=null; e.nextSendAt=dripNextSend(dvToday(),dripSteps(c)[0].wait,dripRules(c)); dvSaveEnr(e); renderDrips(); }
+function dvRemove(id){ var e=dvEnr(id), ct=gc(e.contactId); if(!confirm('Remove '+(ct?fn(ct):'this contact')+' from this campaign? They won’t get any more steps. Their history stays on their contact page.')) return; e.status='removed'; e.nextSendAt=null; e.reason='Removed by '+dvMe(); dvSaveEnr(e); renderDrips(); if(curDet && String(curDet)===String(e.contactId)) try{ vc(e.contactId); }catch(_){} }
+
+// ---- adding people ----
+async function dvLoadUnsubs(){
+  if(!supaReady){ DRIP_UNSUBS={}; return; }
+  try{ var h=await getAuthHeaders(); var r=await fetch(SUPA_URL+'/rest/v1/drip_unsubs?select=contact_id&limit=10000',{headers:h, cache:'no-store'}); var j=await r.json(); DRIP_UNSUBS={}; (Array.isArray(j)?j:[]).forEach(function(u){ DRIP_UNSUBS[String(u.contact_id)]=1; }); }catch(e){ DRIP_UNSUBS={}; }
+}
+async function dvAddPeople(cid){
+  window._dvAdd={cid:cid, mode:'pick', picked:{}, q:'', cat:''};
+  await dvLoadUnsubs();
+  dvRenderAdd();
+}
+function dvCats(){ var m={}; C.forEach(function(c){ var k=(c.category||'').trim(); if(k) m[k]=(m[k]||0)+1; }); return Object.keys(m).sort().map(function(k){ return [k,m[k]]; }); }
+function dvRenderAdd(){
+  var A=window._dvAdd, c=dvCamp(A.cid);
+  var b='<div class="dv-seg" style="margin-bottom:16px;"><div class="'+(A.mode==='pick'?'on':'')+'" onclick="_dvAdd.mode=\'pick\';dvRenderAdd()">Pick contacts</div><div class="'+(A.mode==='cat'?'on':'')+'" onclick="_dvAdd.mode=\'cat\';dvRenderAdd()">A whole category</div></div>';
+  if(A.mode==='pick'){
+    b+='<input class="fi" id="dvAddQ" placeholder="Search by name, email, or phone" value="'+dvEsc(A.q)+'" oninput="_dvAdd.q=this.value;dvRenderAddList()" style="margin-bottom:8px;"><div id="dvAddList" class="dv-picklist"></div>';
+  } else {
+    var cats=dvCats();
+    b+='<select class="fsel" id="dvAddCat" onchange="_dvAdd.cat=this.value;dvRenderAddCount()"><option value="">Choose a category…</option>'+cats.map(function(k){ return '<option value="'+dvEsc(k[0])+'"'+(A.cat===k[0]?' selected':'')+'>'+dvEsc(k[0])+' ('+k[1]+')</option>'; }).join('')+'</select><div id="dvAddCount" class="dv-muted" style="margin-top:8px;"></div>';
+  }
+  b+='<div class="dv-note" style="margin-top:14px;">They start with step 1 on the next send ('+dvWhen(dripNextSend(dvToday(),dripSteps(c)[0]?dripSteps(c)[0].wait:0,dripRules(c)),true)+'). Anyone already in this campaign, unsubscribed, or without an email address is skipped.'+(c.live?'':' <b>This campaign is a Draft</b>, so nothing sends until you make it Live.')+'</div>';
+  dvModal('Add contacts to “'+c.name+'”', b, '<span id="dvAddSel" class="dv-muted" style="margin-right:auto;align-self:center;"></span><button class="btn btn-g" onclick="dvClose()">Cancel</button><button class="btn btn-p" onclick="dvDoAdd()">Add to campaign</button>');
+  if(A.mode==='pick'){ dvRenderAddList(); var q=ge('dvAddQ'); if(q){ q.focus(); q.setSelectionRange(q.value.length,q.value.length); } } else dvRenderAddCount();
+}
+function dvSkipReason(ct, cid){
+  if(!ct.email) return 'no email';
+  if(DRIP_UNSUBS && DRIP_UNSUBS[String(ct.id)]) return 'unsubscribed';
+  var ex=ENR.find(function(e){ return String(e.campaignId)===String(cid) && String(e.contactId)===String(ct.id) && (e.status==='active'||e.status==='paused'||e.status==='bounced'); });
+  return ex ? 'already in it' : '';
+}
+function dvRenderAddList(){
+  var A=window._dvAdd, el=ge('dvAddList'); if(!el) return;
+  var q=(A.q||'').toLowerCase().trim();
+  var list=C.filter(function(ct){ if(!q) return true; return (fn(ct)+' '+(ct.email||'')+' '+(ct.phone||'')+' '+(ct.category||'')).toLowerCase().indexOf(q)>=0; });
+  list.sort(function(a,b){ return fn(a).localeCompare(fn(b)); });
+  var shown=list.slice(0,60);
+  el.innerHTML = shown.map(function(ct){ var why=dvSkipReason(ct,A.cid);
+    return '<label class="dv-pick'+(why?' off':'')+'"><input type="checkbox" '+(why?'disabled':'')+(A.picked[ct.id]?' checked':'')+' onchange="dvTogglePick('+ct.id+',this.checked)"><div style="flex:1;min-width:0;"><b>'+dvEsc(fn(ct))+'</b> <span class="dv-chip">'+dvLangOf(ct).toUpperCase()+'</span><div class="dv-muted">'+dvEsc(ct.email||'')+(ct.category?' · '+dvEsc(ct.category):'')+'</div></div>'+(why?'<span class="dv-muted">'+why+'</span>':'')+'</label>';
+  }).join('') + (list.length>shown.length?'<div class="dv-muted" style="padding:10px 4px;">'+(list.length-shown.length)+' more — type to narrow the list.</div>':'') + (!list.length?'<div class="dv-muted" style="padding:10px 4px;">No contacts match.</div>':'');
+  dvAddSelCount();
+}
+function dvTogglePick(id,on){ if(on) _dvAdd.picked[id]=1; else delete _dvAdd.picked[id]; dvAddSelCount(); }
+function dvAddSelCount(){ var n=Object.keys(_dvAdd.picked).length; var s=ge('dvAddSel'); if(s) s.textContent=n?n+' selected':''; }
+function dvRenderAddCount(){
+  var A=window._dvAdd, el=ge('dvAddCount'); if(!el) return;
+  if(!A.cat){ el.textContent=''; return; }
+  var all=C.filter(function(ct){ return (ct.category||'').trim()===A.cat; }), ok=all.filter(function(ct){ return !dvSkipReason(ct,A.cid); });
+  el.innerHTML='<b>'+ok.length+'</b> will be added'+(all.length-ok.length?' · '+(all.length-ok.length)+' skipped (no email, unsubscribed, or already in it)':'');
+}
+function dvDoAdd(){
+  var A=window._dvAdd, c=dvCamp(A.cid), r=dripRules(c), st=dripSteps(c);
+  if(!st.length){ alert('This campaign has no steps yet.'); return; }
+  var ids = A.mode==='pick' ? Object.keys(A.picked) : C.filter(function(ct){ return A.cat && (ct.category||'').trim()===A.cat; }).map(function(ct){ return String(ct.id); });
+  var targets = ids.map(function(id){ return gc(isNaN(+id)?id:+id); }).filter(function(ct){ return ct && !dvSkipReason(ct,A.cid); });
+  if(!targets.length){ alert(A.mode==='pick'?'Pick at least one contact.':'Nobody in that category can be added.'); return; }
+  if(targets.length>25 && !confirm('Add '+targets.length+' contacts to “'+c.name+'”?')) return;
+  var first=dripNextSend(dvToday(), st[0].wait, r), me=dvMe(), batch=[], base=Date.now();
+  targets.forEach(function(ct,k){
+    var old=ENR.find(function(e){ return String(e.campaignId)===String(c.id) && String(e.contactId)===String(ct.id); });
+    var e = old || { id: base+k, campaignId:c.id, contactId:ct.id, created_at:nowISO() };
+    e.stepIndex=0; e.status='active'; e.nextSendAt=first; e.pausedUntil=null; e.reason=null; e.addedBy=me; e.fromMemberId=null; e.updated_at=nowISO();
+    if(!old) ENR.push(e);
+    batch.push(JSON.parse(JSON.stringify(e)));
+  });
+  try{ pausePoll(60000); }catch(e){}
+  dripSave('enrollments', batch);
+  dvClose(); DV.tab='people'; renderDrips();
+  dvToast(targets.length+' added — step 1 goes out '+dvWhen(first,true)+(c.live?'':' (once the campaign is Live)'));
+}
+
+// ---- rules tab ----
+function dvSw(on, fnc){ return '<label class="dv-sw"><input type="checkbox"'+(on?' checked':'')+' onchange="'+fnc+'"><span></span></label>'; }
+function dvRulesHtml(c){
+  var r=dripRules(c), id=c.id;
+  var times=['06:00','06:30','07:00','07:30','08:00','08:30','09:00','10:00','11:00','12:00','13:00','15:00','17:00','18:00','19:00'];
+  if(times.indexOf(r.time)<0) times.push(r.time);
+  var senders=TM.filter(function(m){ return m.email; });
+  return '<div class="card" style="padding:4px 20px;max-width:820px;">'
+    +'<div class="dv-set"><div><div class="t">Stop when they reply</div><div class="dv-muted">A reply to any campaign email ends this campaign for that person, so they never get a canned email after a real answer. Replies are checked every 15 minutes. The reply shows on their contact page, and a follow-up task goes to <b>everyone on the Team tab</b>.</div></div>'+dvSw(r.reply,'dvSetRule('+id+',\'reply\',this.checked)')+'</div>'
+    +'<div class="dv-set"><div><div class="t">Pause when we email them personally</div><div class="dv-muted">If anyone on the team emails this person from a connected Gmail account, or they email us first, the campaign waits <select class="dv-sel" onchange="dvSetRule('+id+',\'pauseDays\',+this.value)">'+[3,5,7,10,14,21,30].map(function(d){ return '<option'+(d===r.pauseDays?' selected':'')+'>'+d+'</option>'; }).join('')+'</select> days, then picks up where it left off.</div></div>'+dvSw(r.pause,'dvSetRule('+id+',\'pause\',this.checked)')+'</div>'
+    +'<div class="dv-set"><div><div class="t">Skip weekends</div><div class="dv-muted">Anything due on Saturday or Sunday goes out Monday instead.</div></div>'+dvSw(r.weekends,'dvSetRule('+id+',\'weekends\',this.checked)')+'</div>'
+    +'<div class="dv-set"><div><div class="t">Send time</div><div class="dv-muted">Campaign emails go out at this time, Mountain time (within 15 minutes).</div></div><select class="dv-sel" onchange="dvSetRule('+id+',\'time\',this.value)">'+times.sort().map(function(t){ return '<option value="'+t+'"'+(t===r.time?' selected':'')+'>'+dvTimeLbl(t)+'</option>'; }).join('')+'</select></div>'
+    +'<div class="dv-set"><div><div class="t">No more than one campaign email a day</div><div class="dv-muted">If someone is in two campaigns and both are due the same day, the second waits until the next day.</div></div>'+dvSw(r.oneADay,'dvSetRule('+id+',\'oneADay\',this.checked)')+'</div>'
+    +'<div class="dv-set" style="border:none;"><div><div class="t">Send from</div><div class="dv-muted">The Gmail account these emails come from. Replies come back to this inbox. It must be connected on the Gmail tab.</div></div><select class="dv-sel" onchange="dvSetRule('+id+',\'fromMemberId\',this.value||null)"><option value="">Default ('+dvEsc(dvSenderLabel(null))+')</option>'+senders.map(function(m){ return '<option value="'+m.id+'"'+(String(r.fromMemberId)===String(m.id)?' selected':'')+'>'+dvEsc(fn(m)+' — '+m.email)+'</option>'; }).join('')+'</select></div>'
+    +'</div>';
+}
+function dvSetRule(id,k,v){
+  var c=dvCamp(id), r=dripRules(c); r[k]=v; c.rules=r; dvSaveCamp(c);
+  if(k==='time'||k==='weekends'){   // re-time everyone's next step to the new schedule
+    ENR.forEach(function(e){ if(String(e.campaignId)===String(id) && e.status==='active' && e.nextSendAt){ e.nextSendAt=dripNextSend(dvDateOf(e.nextSendAt),0,r, Date.now()-60000); dvSaveEnr(e); } });
+  }
+  renderDrips(); dvToast('Saved');
+}
+
+// ===================== EMAIL EDITOR (step email or template) =====================
+// One editor for both: opened from a campaign step (cid+idx) or from Email Templates (cid=null).
+function dvEditEmail(cid, idx, mode){
+  var c=cid!=null?dvCamp(cid):null, s=c?dripSteps(c)[idx]:null, m=s?dvMsg(s.messageId):null;
+  dvOpenEditor({cid:cid, idx:idx, msg:m, mode:mode});
+}
+function dvEditTemplate(id){ dvOpenEditor({cid:null, idx:null, msg:dvMsg(id)}); }
+function dvOpenEditor(o){
+  var m=o.msg;
+  window._dvEd = {
+    cid:o.cid, idx:o.idx, lang:'en', dirty:false,
+    id: m?m.id:null,
+    name: m?(m.name||''):(o.cid!=null?(dvCamp(o.cid).name+' — '+dvStepLabel(dvCamp(o.cid),o.idx)):''),
+    en:{ subject:m?(m.subject||''):'', html:m?(m.html||''):'', blocks:m&&m.blocks?JSON.parse(JSON.stringify(m.blocks)):null },
+    es:{ subject:m?(m.subject_es||''):'', html:m?(m.html_es||''):'', blocks:m&&m.blocks_es?JSON.parse(JSON.stringify(m.blocks_es)):null },
+    mode: o.mode || ((m&&m.html)?'design':'drop'),
+    pv: null
+  };
+  var pv=dvPreviewPeople(); window._dvEd.pv = pv.length ? String(pv[0].id) : '';
+  dvRenderEditor();
+}
+function dvPreviewPeople(){
+  var E=window._dvEd, ids={}, out=[];
+  if(E && E.cid!=null) dvEnrolled(E.cid).forEach(function(e){ ids[String(e.contactId)]=1; });
+  Object.keys(ids).forEach(function(id){ var ct=gc(+id); if(ct) out.push(ct); });
+  if(out.length<8){ var es=C.filter(function(ct){ return dvLangOf(ct)==='es' && !ids[String(ct.id)]; }).slice(0,2), en=C.filter(function(ct){ return dvLangOf(ct)==='en' && ct.first && !ids[String(ct.id)]; }).slice(0,3); out=out.concat(en,es); }
+  return out.slice(0,40);
+}
+function dvEdV(){ var E=window._dvEd; return E[E.lang]; }
+function dvRenderEditor(){
+  var E=window._dvEd, v=dvEdV(), L=E.lang==='en'?'English':'Spanish';
+  var used = E.id!=null ? CAMP.filter(function(c){ return dripSteps(c).some(function(s){ return String(s.messageId)===String(E.id); }) && !(E.cid!=null && String(c.id)===String(E.cid)); }) : [];
+  var b='<div class="dv-split"><div>'
+    +'<div class="fg"><label class="fl">Template name <span style="font-weight:400;text-transform:none;color:var(--text3);">(only you see this)</span></label><input class="fi" id="dvEdName" value="'+dvEsc(E.name)+'" oninput="_dvEd.name=this.value;_dvEd.dirty=true"></div>'
+    +'<div class="dv-row dv-between" style="margin-bottom:14px;"><div class="dv-seg"><div class="'+(E.lang==='en'?'on':'')+'" onclick="dvEdLang(\'en\')">English '+(E.en.html?'✓':'')+'</div><div class="'+(E.lang==='es'?'on':'')+'" onclick="dvEdLang(\'es\')">Español '+(E.es.html?'✓':'')+'</div></div><span class="dv-muted">Each contact gets their language</span></div>'
+    +'<div class="fg"><label class="fl">Subject line ('+L+')</label><input class="fi" id="dvEdSubj" value="'+dvEsc(v.subject)+'" placeholder="'+(E.lang==='en'?'Hi {first}, a quick update':'Hola {first}, una actualización')+'" oninput="dvEdV().subject=this.value;_dvEd.dirty=true;dvEdPreview()"></div>'
+    +'<label class="fl">Design ('+L+')</label>';
+  if(v.html && E.mode==='design'){
+    b+='<div class="dv-note dv-row dv-between dv-wrap"><span>✓ Design added</span><span class="dv-row"><button class="btn btn-g dv-sm" onclick="dvEdBuild()">Edit in builder</button><button class="btn btn-g dv-sm" onclick="_dvEd.mode=\'drop\';dvRenderEditor()">Replace</button><button class="btn btn-d dv-sm" onclick="dvEdV().html=\'\';dvEdV().blocks=null;_dvEd.dirty=true;_dvEd.mode=\'drop\';dvRenderEditor()">Remove</button></span></div>';
+  } else {
+    b+='<div class="dv-seg" style="margin-bottom:12px;"><div class="'+(E.mode!=='tpl'&&E.mode!=='paste'?'on':'')+'" onclick="_dvEd.mode=\'drop\';dvRenderEditor()">Drop in</div><div class="'+(E.mode==='paste'?'on':'')+'" onclick="_dvEd.mode=\'paste\';dvRenderEditor()">Paste HTML</div><div onclick="dvEdBuild()">Build one</div>'+(E.cid!=null?'<div class="'+(E.mode==='tpl'?'on':'')+'" onclick="_dvEd.mode=\'tpl\';dvRenderEditor()">Templates</div>':'')+'</div>';
+    if(E.mode==='tpl'){
+      var tl=DMSG.filter(function(m){ return m.html; });
+      b+= tl.length ? '<div class="dv-tplg">'+tl.map(function(m){ return '<div class="dv-tpl" onclick="dvEdUseTpl('+m.id+')"><div class="tt">'+dvThumb(m.html)+'</div><div class="tn">'+dvEsc(m.name||'(untitled)')+' <span class="dv-chip ok">EN</span>'+(m.html_es?' <span class="dv-chip ok">ES</span>':'')+'</div></div>'; }).join('')+'</div><div class="dv-muted" style="margin-top:8px;">Picking a template uses it for this step (both languages).</div>' : '<div class="dv-muted">No templates yet. Drop in a design instead — it’s saved as a template automatically.</div>';
+    } else if(E.mode==='paste'){
+      b+='<textarea class="fi" id="dvEdPaste" rows="8" style="font-family:ui-monospace,Consolas,monospace;font-size:13px;" placeholder="Paste the finished '+L+' email HTML here…"></textarea><div class="dv-row" style="margin-top:8px;"><button class="btn btn-p dv-sm" onclick="dvEdPasteApply()">Use this HTML</button></div>';
+    } else {
+      b+='<label class="dv-drop" id="dvDrop" ondragover="event.preventDefault();this.classList.add(\'over\')" ondragleave="this.classList.remove(\'over\')" ondrop="event.preventDefault();this.classList.remove(\'over\');dvEdFile(event.dataTransfer.files[0])"><input type="file" accept=".html,.htm,image/png,image/jpeg,image/gif" style="display:none" onchange="dvEdFile(this.files[0])"><div style="font-size:28px;">⬆</div><div style="font-weight:700;margin-top:6px;">Drop your finished '+L+' email here</div><div style="font-size:14px;margin-top:4px;">HTML file, or a JPG/PNG flyer · or click to browse</div></label>'
+        +'<div class="dv-muted" style="margin-top:10px;">Designed somewhere else? It goes in exactly as-is. A flyer image becomes a full-width email.</div>';
+    }
+  }
+  if(E.lang==='es' && !E.es.html) b+='<div class="dv-note" style="margin-top:12px;">No Spanish version yet. Until you add one, Spanish-speaking contacts get the English email.</div>';
+  if(used.length) b+='<div class="dv-note" style="margin-top:12px;">This template is also used in: <b>'+used.map(function(c){ return dvEsc(c.name); }).join(', ')+'</b>. Changes apply there too.</div>';
+  b+='<div class="dv-muted" style="margin-top:14px;font-size:13px;">Personal touches: <b>{first}</b> first name · <b>{last}</b> · <b>{property}</b> · <b>{agent}</b>. An unsubscribe link is added automatically.</div>';
+  var pp=dvPreviewPeople();
+  b+='</div><div><div class="dv-row dv-between" style="margin-bottom:6px;"><label class="fl" style="margin:0;">Preview as</label><select class="dv-sel" onchange="_dvEd.pv=this.value;dvEdPreview()">'+pp.map(function(ct){ return '<option value="'+ct.id+'"'+(String(ct.id)===String(E.pv)?' selected':'')+'>'+dvEsc(fn(ct))+' ('+dvLangOf(ct).toUpperCase()+')</option>'; }).join('')+'<option value=""'+(!E.pv?' selected':'')+'>Sample contact</option></select></div><div id="dvPvNote" class="dv-muted" style="margin-bottom:6px;"></div><iframe id="dvPv" class="dv-preview" sandbox=""></iframe></div></div>';
+  var title = E.cid!=null ? dvStepLabel(dvCamp(E.cid),E.idx)+' of “'+dvCamp(E.cid).name+'”' : (E.id?'Edit template':'New template');
+  dvModal(title, b, '<button class="btn btn-g" onclick="dvEdTest()">Send test to me</button><button class="btn btn-g" onclick="dvEdCancel()">Cancel</button><button class="btn btn-p" onclick="dvEdSave()">Save</button>', true);
+  dvEdPreview();
+}
+function dvEdCancel(){ if(window._dvEd && window._dvEd.dirty && !confirm('Discard your changes?')) return; dvClose(); }
+function dvEdLang(l){ var E=window._dvEd; E.lang=l; E.mode=dvEdV().html?'design':'drop'; var pp=dvPreviewPeople(); var m=pp.find(function(ct){ return dvLangOf(ct)===l; }); if(m) E.pv=String(m.id); dvRenderEditor(); }
+function dvEdPreview(){
+  var E=window._dvEd, ct=E.pv?gc(+E.pv):null, sample={first:'Maria',last:'Lopez',lang:E.lang};
+  var who=ct||sample, wl=dvLangOf(who), useEs=(wl==='es'&&E.es.html), v=useEs?E.es:E.en;
+  var showing = (!ct) ? E[E.lang] : v;   // sample contact follows the language tab
+  var note=ge('dvPvNote'), fr=ge('dvPv');
+  if(note) note.innerHTML='<b>'+dvEsc(who.first||'They')+'</b> will get the <b>'+((!ct?E.lang==='es':useEs)?'Spanish':'English')+'</b> version'+(ct&&wl==='es'&&!E.es.html?' (no Spanish version yet)':'')+'<br>Subject: “'+dvEsc(dripMerge(showing.subject||'(no subject yet)',who))+'”';
+  var html = showing.html ? dripMerge(showing.html, who) : '<div style="padding:60px 20px;text-align:center;color:#999;font-family:Arial">Add a design and it shows here exactly as '+dvEsc(who.first||'they')+' will see it.</div>';
+  if(fr) fr.srcdoc=html;
+}
+function dvEdFile(f){
+  if(!f) return;
+  var E=window._dvEd, v=dvEdV();
+  if(/\.html?$/i.test(f.name) || f.type==='text/html'){
+    var rd=new FileReader(); rd.onload=function(ev){
+      var html=String(ev.target.result||'');
+      var rel=(html.match(/<img[^>]+src\s*=\s*["'](?!https?:|data:|cid:)[^"']+/gi)||[]).length;
+      v.html=html; v.blocks=null; E.dirty=true; E.mode='design';
+      if(!E.name) E.name=f.name.replace(/\.html?$/i,'');
+      if(!v.subject){ var t=html.match(/<title[^>]*>([^<]*)<\/title>/i); if(t&&t[1].trim()) v.subject=t[1].trim(); }
+      dvRenderEditor();
+      dvToast(f.name+' added'+(rel?' — '+rel+' image'+(rel===1?'':'s')+' use a file path and won’t show; images must be online links or embedded':''));
+    }; rd.readAsText(f); return;
+  }
+  if(/^image\//.test(f.type)){
+    _msgCompressImage(f, function(url){
+      v.blocks=[{type:'image', src:url, link:''}]; v.html=_msgGenHtml(v.blocks); E.dirty=true; E.mode='design';
+      if(!E.name) E.name=f.name.replace(/\.[a-z]+$/i,'');
+      dvRenderEditor(); dvToast(f.name+' added');
+    }); return;
+  }
+  alert('Drop an .html email file or a JPG/PNG image.');
+}
+function dvEdPasteApply(){ var t=(ge('dvEdPaste').value||'').trim(); if(!t){ alert('Paste the HTML first.'); return; } var E=window._dvEd, v=dvEdV(); v.html=t; v.blocks=null; E.dirty=true; E.mode='design'; dvRenderEditor(); }
+function dvEdUseTpl(id){
+  var m=dvMsg(id), E=window._dvEd; if(!m) return;
+  E.id=m.id; E.name=m.name||''; E.en={subject:m.subject||'',html:m.html||'',blocks:m.blocks||null}; E.es={subject:m.subject_es||'',html:m.html_es||'',blocks:m.blocks_es||null};
+  E.mode='design'; E.dirty=true; E.picked=true; dvRenderEditor();
+}
+// "Build one" / "Edit in builder": the block builder (image / text / button) for the current language.
+function dvEdBuild(){
+  var E=window._dvEd, v=dvEdV();
+  if(v.html && !(v.blocks&&v.blocks.length) && !confirm('This design was dropped in or pasted, so it can’t be edited block by block. Start a new design in the builder instead? (Your current design is replaced only if you save.)')) return;
+  openMessageModal({ title:'Build the '+(E.lang==='en'?'English':'Spanish')+' email', subject:v.subject, blocks:(v.blocks&&v.blocks.length)?v.blocks:[{type:'text',html:''}],
+    onSave:function(subject, html, blocks){ v.subject=subject; v.html=html; v.blocks=blocks; E.dirty=true; E.mode='design'; dvRenderEditor(); } });
+}
+function dvEdCommit(){
+  var E=window._dvEd;
+  if(!E.en.html){ alert('Add the English design first — it’s the version everyone gets unless they have a Spanish one.'); return null; }
+  if(!(E.en.subject||'').trim()){ E.lang='en'; dvRenderEditor(); alert('Add an English subject line.'); return null; }
+  if(E.es.html && !(E.es.subject||'').trim()){ E.lang='es'; dvRenderEditor(); alert('Add a Spanish subject line (or remove the Spanish design).'); return null; }
+  var name=(E.name||'').trim()||E.en.subject;
+  var m = E.id!=null ? dvMsg(E.id) : null;
+  if(!m){ m={ id:Date.now(), active:true, created_at:nowISO() }; DMSG.unshift(m); E.id=m.id; }
+  m.name=name; m.subject=E.en.subject.trim(); m.html=E.en.html; m.blocks=E.en.blocks||null;
+  m.subject_es=(E.es.subject||'').trim()||null; m.html_es=E.es.html||null; m.blocks_es=E.es.blocks||null; m.updated_at=nowISO();
+  dripSave('drip_messages',[JSON.parse(JSON.stringify(m))]);
+  if(E.cid!=null){ var c=dvCamp(E.cid); c.steps=dripSteps(c); if(c.steps[E.idx] && String(c.steps[E.idx].messageId)!==String(m.id)){ c.steps[E.idx].messageId=m.id; dvSaveCamp(c); } }
+  E.dirty=false;
+  return m;
+}
+function dvEdSave(){ var m=dvEdCommit(); if(!m) return; dvClose(); renderDrips(); dvToast('Saved'); }
+function dvEdTest(){
+  var E=window._dvEd, m=dvEdCommit(); if(!m) return;
+  var ct=E.pv?gc(+E.pv):null, lang=E.lang==='es'&&m.html_es?'es':'en';
+  var from = E.cid!=null ? dripRules(dvCamp(E.cid)).fromMemberId : null;
+  dvToast('Sending test…');
+  postApi('/api/run-drips',{action:'test', messageId:m.id, lang:lang, first:ct?ct.first:'Maria', fromMemberId:from}).then(function(r){ return r.json(); }).then(function(res){
+    if(res && res.ok) dvToast('Test ('+(res.lang==='es'?'Spanish':'English')+') sent to '+res.to+' from '+res.from);
+    else alert('Test not sent: '+((res&&res.error)||'unknown error'));
+  }).catch(function(e){ alert('Test not sent: '+e.message); });
+  dvRenderEditor();
+}
+
+// ---- the block builder modal (#messageModal), reused as a sub-editor ----
+var _msgOnSave=null;
+function openMessageModal(o){
+  o=o||{};
+  _msgOnSave=o.onSave||null;
+  ge('msgModalTitle').textContent=o.title||'Build an email';
+  ge('msgSubject').value=o.subject||'';
+  _msgBlocks=JSON.parse(JSON.stringify(o.blocks||[{type:'text',html:''}]));
+  ge('msgHtml').value='';
+  msgSetMode(false); renderMsgBuilder();
+  ge('messageModal').style.zIndex='1100';
+  om('messageModal'); _msgPreviewRender();
+}
+function saveMessage(){
+  var subject=(ge('msgSubject').value||'').trim(), html, blocks;
+  if(_msgRaw){ html=ge('msgHtml').value||''; blocks=null; if(!html.trim()){ alert('Paste the email HTML, or switch to the visual builder.'); return; } }
+  else{
+    var has=_msgBlocks.some(function(b){ return (b.type==='image'&&b.src)||(b.type==='text'&&(b.html||'').replace(/<[^>]*>/g,'').trim())||(b.type==='button'&&(b.label||b.url)); });
+    if(!has){ alert('Add an image or some text first.'); return; }
+    blocks=JSON.parse(JSON.stringify(_msgBlocks)); html=_msgGenHtml(_msgBlocks);
+  }
+  cm('messageModal');
+  if(_msgOnSave) _msgOnSave(subject, html, blocks);
+}
+
+// ===================== EMAIL TEMPLATES =====================
+function dvTemplatesHtml(){
+  var h='<div class="dv-row dv-between" style="margin:4px 0 16px;"><div class="dv-muted">Your finished email designs, in English and Spanish. Any of them can be used in a campaign step.</div><button class="btn btn-p" onclick="dvOpenEditor({cid:null,idx:null,msg:null})">+ New template</button></div>';
+  if(!DMSG.length) return h+'<div class="card" style="padding:40px;text-align:center;" class="dv-muted">No templates yet. Click “+ New template” and drop in a design.</div>';
+  return h+'<div class="dv-tplg big">'+DMSG.slice().sort(function(a,b){ return String(b.updated_at||'').localeCompare(String(a.updated_at||'')); }).map(function(m){
+    var used=CAMP.filter(function(c){ return dripSteps(c).some(function(s){ return String(s.messageId)===String(m.id); }); });
+    return '<div class="dv-tpl"><div class="tt" onclick="dvEditTemplate('+m.id+')">'+dvThumb(m.html)+'</div><div class="tn"><div style="font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+dvEsc(m.name||'(untitled)')+'</div>'
+      +'<div class="dv-row" style="gap:5px;margin-top:4px;"><span class="dv-chip '+(m.html?'ok':'miss')+'">EN</span><span class="dv-chip '+(m.html_es?'ok':'miss')+'">ES</span><span class="dv-muted" style="font-size:12px;">'+(used.length?'In '+used.length+' campaign'+(used.length===1?'':'s'):'Not used')+'</span></div>'
+      +'<div class="dv-row" style="gap:6px;margin-top:8px;"><button class="btn btn-g dv-sm" onclick="dvEditTemplate('+m.id+')">Edit</button><button class="btn btn-g dv-sm" onclick="dvDupTemplate('+m.id+')">Duplicate</button><button class="btn btn-d dv-sm" onclick="dvDelTemplate('+m.id+')">Delete</button></div></div></div>';
+  }).join('')+'</div>';
+}
+function dvDupTemplate(id){
+  var m=dvMsg(id); if(!m) return;
+  var c=JSON.parse(JSON.stringify(m)); c.id=Date.now(); c.name=(m.name||'Template')+' (copy)'; c.created_at=nowISO(); c.updated_at=nowISO();
+  DMSG.unshift(c); dripSave('drip_messages',[c]); renderDrips();
+}
+function dvDelTemplate(id){
+  var m=dvMsg(id); if(!m) return;
+  var used=CAMP.filter(function(c){ return dripSteps(c).some(function(s){ return String(s.messageId)===String(id); }); });
+  if(used.length){ alert('“'+(m.name||'This template')+'” is used in: '+used.map(function(c){ return c.name; }).join(', ')+'.\n\nPick a different design for those steps (or remove the steps) before deleting it.'); return; }
+  if(!confirm('Delete the template “'+(m.name||'')+'”?')) return;
+  DMSG=DMSG.filter(function(x){ return String(x.id)!==String(id); }); dripDel('drip_messages', id); renderDrips();
+}
+
+// ===================== OUTBOX =====================
+// Everything campaigns will do in the next 7 days, worked out from each active enrollment.
+function dvOutboxItems(){
+  var items=[], until=Date.now()+7*86400000;
+  ENR.forEach(function(e){
+    if(e.status!=='active' || !e.nextSendAt) return;
+    var c=dvCamp(e.campaignId); if(!c || !c.live) return;
+    var st=dripSteps(c), r=dripRules(c), at=Date.parse(e.nextSendAt), i=e.stepIndex, first=true, guard=0;
+    while(st[i] && at<=until && guard++<20){
+      items.push({ e:e, c:c, si:i, at:at, kind:st[i].type, current:first });
+      var nx=i+1; if(!st[nx]) break;
+      at=Date.parse(dripNextSend(dvDateOf(new Date(Math.max(at,Date.now())).toISOString()), st[nx].wait, r, at+1));
+      i=nx; first=false;
+    }
+  });
+  items.sort(function(a,b){ return a.at-b.at; });
+  return items;
+}
+function dvOutboxHtml(){
+  var all=dvOutboxItems(), items=all.filter(function(x){ return DV.obFilter==='all'||x.kind===DV.obFilter; });
+  var em=all.filter(function(x){ return x.kind==='email'; }).length, tk=all.length-em;
+  var held = (DRIP_HEALTH&&DRIP_HEALTH.gmailOk===false) || !SCTRL || !SCTRL.master || !SCTRL.drips;
+  var h='<div class="dv-row dv-between dv-wrap" style="margin:4px 0 6px;gap:12px;"><div><div style="font-size:20px;font-weight:700;">Next 7 days: '+em+' email'+(em===1?'':'s')+', '+tk+' reminder'+(tk===1?'':'s')+'</div><div class="dv-muted">Everything the live campaigns will do, before it happens. Skip or postpone anything.</div></div>'
+    +'<div class="dv-seg">'+[['all','All'],['email','Emails'],['task','Reminders']].map(function(f){ return '<div class="'+(DV.obFilter===f[0]?'on':'')+'" onclick="DV.obFilter=\''+f[0]+'\';renderDrips()">'+f[1]+'</div>'; }).join('')+'</div></div>';
+  // today so far
+  var t0=dvMtnMs(dvToday(),'00:00');
+  var sentToday=SENDLOG.filter(function(l){ return l.kind==='email' && Date.parse(l.sentAt||l.created_at)>=t0; });
+  var ok=sentToday.filter(function(l){ return l.status==='sent'; }), bad=sentToday.filter(function(l){ return l.status!=='sent'; });
+  h+='<div class="dv-dayh">Sent today</div>';
+  h+= sentToday.length ? '<div class="dv-obx"><div style="flex:1;"><b style="color:'+(bad.length?'var(--danger)':'var(--lead)')+';">'+(bad.length?'⚠ ':'✓ ')+ok.length+' sent, '+bad.length+' failed</b><div class="dv-muted">'+ok.slice(0,5).map(function(l){ var ct=gc(l.contactId); return dvEsc(ct?fn(ct):l.to); }).join(', ')+(ok.length>5?' + '+(ok.length-5)+' more':'')+(bad.length?' · Failed: '+bad.slice(0,3).map(function(l){ var ct=gc(l.contactId); return dvEsc((ct?fn(ct):l.to)+' ('+(l.error||'error')+')'); }).join(', '):'')+'</div></div></div>' : '<div class="dv-muted" style="padding:4px 2px;">Nothing sent yet today.</div>';
+  var drafts=ENR.filter(function(e){ var c=dvCamp(e.campaignId); return e.status==='active' && c && !c.live; }).length;
+  if(drafts) h+='<div class="dv-note" style="margin-top:12px;">'+drafts+' contact'+(drafts===1?' is':'s are')+' waiting in Draft campaigns — nothing goes to them until the campaign is Live.</div>';
+  if(!items.length) return h+'<div class="card" style="padding:30px;text-align:center;margin-top:16px;" ><div class="dv-muted">Nothing scheduled in the next 7 days.</div></div>';
+  var lastDay='';
+  items.forEach(function(x){
+    var ds=dvDateOf(new Date(x.at).toISOString());
+    if(ds!==lastDay){ h+='<div class="dv-dayh">'+dvDayLabel(ds)+'</div>'; lastDay=ds; }
+    var ct=gc(x.e.contactId), s=dripSteps(x.c)[x.si], name=ct?fn(ct):'(deleted contact)', title, sub;
+    var overdue = x.at < Date.now();
+    if(x.kind==='task'){
+      var who=s.who==='all'?'everyone':(function(){ var m=TM.find(function(t){ return String(t.id)===String(s.who); }); return m?m.first||fn(m):'a team member'; })();
+      title='<span class="dv-pill dv-warn">'+dvEsc(String(s.kind).toUpperCase())+'</span> '+dvEsc(s.kind==='Card'?'Card for':s.kind)+' '+dvEsc(name);
+      sub='Task for <b>'+dvEsc(who)+'</b> · '+dvEsc(x.c.name)+' › step '+(x.si+1);
+    } else {
+      var m=dvMsg(s.messageId), lang=dvLangOf(ct), v=dvMsgFor(m,lang);
+      title=dvEsc(name)+' <span class="dv-chip">'+lang.toUpperCase()+'</span>';
+      sub=dvEsc(x.c.name)+' › '+dvStepLabel(x.c,x.si)+': “'+dvEsc(dripMerge(v.subject,ct))+'”'+(lang==='es'&&m&&!m.html_es?' <i>(English — no Spanish version)</i>':'');
+    }
+    var flag = x.kind==='email' && held ? ' <span class="dv-pill dv-red">ON HOLD</span>' : (overdue?' <span class="dv-pill dv-blue">NEXT CHECK</span>':'');
+    h+='<div class="dv-obx'+(x.kind==='email'&&held?' hold':'')+'"><div class="dv-tm">'+(x.kind==='task'?'Task':new Date(x.at).toLocaleTimeString('en-US',{timeZone:DRIP_TZ,hour:'numeric',minute:'2-digit'}))+'</div><div style="flex:1;min-width:0;"><div style="font-weight:700;">'+title+flag+'</div><div class="dv-muted" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+sub+'</div></div>'
+      +'<div class="dv-row">'+(x.kind==='email'?'<button class="btn btn-g dv-sm" onclick="dvObPreview('+x.e.id+','+x.si+')">Preview</button>':'')
+      +(x.current?'<button class="btn btn-g dv-sm" onclick="dvObPostpone('+x.e.id+')">Postpone a day</button><button class="btn btn-d dv-sm" onclick="dvObSkip('+x.e.id+')">Skip</button>':'<span class="dv-muted" style="font-size:12px;">after the step above</span>')+'</div></div>';
+  });
+  return h;
+}
+function dvObPreview(eid, si){
+  var e=dvEnr(eid), c=dvCamp(e.campaignId), ct=gc(e.contactId), s=dripSteps(c)[si], m=dvMsg(s.messageId), v=dvMsgFor(m,dvLangOf(ct));
+  dvModal('What '+dvEsc(ct?ct.first||fn(ct):'they')+' will receive','<div class="dv-muted" style="margin-bottom:8px;">'+dvEsc(c.name)+' › '+dvStepLabel(c,si)+' · from '+dvEsc(dvSenderLabel(dripRules(c).fromMemberId))+'<br>Subject: <b style="color:var(--text);">'+dvEsc(dripMerge(v.subject,ct))+'</b>'+(v.lang==='es'?' · Spanish version':'')+'</div><iframe class="dv-preview" sandbox="" srcdoc="'+dvEsc(dripMerge(v.html,ct))+'"></iframe>',
+    (si===e.stepIndex?'<button class="btn btn-g" onclick="dvClose();dvObSkip('+eid+')">Skip this one</button>':'')+'<button class="btn btn-p" onclick="dvClose()">Looks good</button>', true);
+}
+function dvObSkip(eid){
+  var e=dvEnr(eid), c=dvCamp(e.campaignId), st=dripSteps(c), ct=gc(e.contactId);
+  if(!confirm('Skip '+dvStepLabel(c,e.stepIndex)+' for '+(ct?fn(ct):'this contact')+'? They move on to the next step.')) return;
+  dvLog({kind:'skipped', contactId:e.contactId, campaignId:c.id, enrollmentId:e.id, stepIndex:e.stepIndex, note:dvStepLabel(c,e.stepIndex)+' skipped by '+dvMe()});
+  e.stepIndex++;
+  if(e.stepIndex>=st.length){ e.status='done'; e.nextSendAt=null; }
+  else e.nextSendAt=dripNextSend(dvToday(), st[e.stepIndex].wait, dripRules(c));
+  dvSaveEnr(e); renderDrips(); dvToast(e.status==='done'?'Skipped — that was the last step':'Skipped — next step '+dvWhen(e.nextSendAt,true));
+}
+function dvObPostpone(eid){
+  var e=dvEnr(eid), c=dvCamp(e.campaignId);
+  var from = e.nextSendAt && Date.parse(e.nextSendAt)>Date.now() ? dvDateOf(e.nextSendAt) : dvToday();
+  e.nextSendAt=dripNextSend(from, 1, dripRules(c));
+  dvSaveEnr(e); renderDrips(); dvToast('Moved to '+dvWhen(e.nextSendAt,true));
+}
+
+// ===================== CONTACT PAGE: campaigns + history =====================
+var DV_KIND = {
+  email:{i:'✉',c:''}, task:{i:'☑',c:'o'}, reply:{i:'↩',c:'g'}, autoreply:{i:'⏱',c:''}, click:{i:'➚',c:'g'}, bounce:{i:'⚠',c:'r'},
+  pause:{i:'⏸',c:'o'}, conversation:{i:'✉',c:'o'}, unsubscribe:{i:'⛔',c:'r'}, skipped:{i:'⤼',c:''}, resumed:{i:'▶',c:'g'}
+};
+function dripContactSection(cid){
+  var sec=mksec('Drip campaigns');
+  var add=mkBtn('','+ Add to campaign','background:none;border:none;color:var(--accent);cursor:pointer;font-size:16px;margin-left:8px;');
+  add.addEventListener('click',function(){ dvQuickAdd(cid); });
+  var hdr=sec.firstChild; if(hdr && hdr.appendChild) hdr.appendChild(add); else sec.appendChild(add);
+  var wrap=document.createElement('div');
+  var mine=ENR.filter(function(e){ return String(e.contactId)===String(cid) && e.status!=='removed'; });
+  var h='';
+  if(!mine.length) h+='<div class="dv-muted" style="padding:4px 0;font-size:16px;">Not in any campaigns.</div>';
+  mine.forEach(function(e){
+    var c=dvCamp(e.campaignId);
+    var btn = e.status==='active' ? '<button class="btn btn-g dv-sm" onclick="dvPause('+e.id+');vc('+cid+')">Pause</button> <button class="btn btn-d dv-sm" onclick="dvRemove('+e.id+');vc('+cid+')">Remove</button>'
+      : (e.status==='paused'||e.status==='stopped'||e.status==='bounced') ? '<button class="btn btn-g dv-sm" onclick="dvResume('+e.id+');vc('+cid+')">'+(e.status==='paused'?'Resume':'Restart')+'</button>' : '';
+    h+='<div style="display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--border);"><div style="flex:1;min-width:0;"><div style="font-size:17px;font-weight:600;">'+(c?'<span class="dv-link" onclick="sp(\'drips\');dvGo(\'camp\','+c.id+')">'+dvEsc(c.name)+'</span>':'(deleted campaign)')+(c&&!c.live?' <span class="dv-pill dv-gray">DRAFT</span>':'')+'</div><div style="margin-top:4px;">'+dvStatusHtml(e,c)+'</div></div><div style="white-space:nowrap;">'+btn+'</div></div>';
+  });
+  var hist=SENDLOG.filter(function(l){ return String(l.contactId)===String(cid); }).sort(function(a,b){ return Date.parse(b.sentAt||b.created_at)-Date.parse(a.sentAt||a.created_at); });
+  if(hist.length){
+    h+='<div style="font-size:14px;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin:14px 0 10px;">Campaign history</div><div class="dv-hist">';
+    hist.slice(0,40).forEach(function(l){
+      var k=DV_KIND[l.kind]||{i:'•',c:''}, c=dvCamp(l.campaignId), cn=c?' · '+dvEsc(c.name):'', t;
+      if(l.kind==='email') t = l.status==='sent' ? 'Email sent'+(l.lang==='es'?' in Spanish':'')+': “'+dvEsc(l.subject||'')+'”'+cn+(l.clicks?' · <b>clicked'+(l.clicks>1?' '+l.clicks+'×':'')+'</b>':'')+(l.messageId?' · <span class="dv-link" onclick="dvViewSent('+l.id+')">View email</span>':'') : '<span style="color:var(--danger);">Email failed</span>: '+dvEsc(l.error||'')+cn;
+      else if(l.kind==='reply') t='<b>Replied</b>: “'+dvEsc(l.note||'')+'”'+cn+' → campaign stopped, follow-up task for the team';
+      else if(l.kind==='click') t='Clicked a link in “'+dvEsc(l.subject||'')+'”'+(l.note?' <span class="dv-muted">('+dvEsc(String(l.note).replace(/^https?:\/\//,'').slice(0,50))+')</span>':'');
+      else if(l.kind==='task') t='Reminder task created: '+dvEsc(l.subject||'')+cn;
+      else if(l.kind==='autoreply') t='Automatic reply (out of office) — campaign continued';
+      else if(l.kind==='bounce') t='<b>Email bounced</b> — address may be wrong'+cn;
+      else if(l.kind==='pause') t=dvEsc(l.note||'Campaigns paused');
+      else if(l.kind==='conversation') t='They emailed us: “'+dvEsc(l.subject||l.note||'')+'” → campaigns paused';
+      else if(l.kind==='unsubscribe') t='<b>Unsubscribed</b>'+(l.note?' — '+dvEsc(l.note):'');
+      else t=dvEsc(l.note||l.kind);
+      h+='<div class="dv-hi '+k.c+'"><div class="d">'+dvWhen(l.sentAt||l.created_at,true)+'</div><div>'+t+'</div></div>';
+    });
+    h+='</div>';
+  }
+  wrap.innerHTML=h; sec.appendChild(wrap);
+  return sec;
+}
+function dvViewSent(logId){
+  var l=SENDLOG.find(function(x){ return String(x.id)===String(logId); }); if(!l) return;
+  var m=dvMsg(l.messageId), ct=gc(l.contactId), v=dvMsgFor(m,l.lang==='es'?'es':'en');
+  dvModal('Email sent to '+dvEsc(ct?fn(ct):l.to),'<div class="dv-muted" style="margin-bottom:8px;">'+dvWhen(l.sentAt||l.created_at,true)+' · to '+dvEsc(l.to||'')+' · from '+dvEsc(l.fromEmail||'')+'<br>Subject: <b style="color:var(--text);">'+dvEsc(l.subject||'')+'</b>'+(m&&m.updated_at&&Date.parse(m.updated_at)>Date.parse(l.sentAt||l.created_at)?'<br><i>The template was edited after this was sent, so the design below may differ slightly.</i>':'')+'</div>'+(m?'<iframe class="dv-preview" sandbox="" srcdoc="'+dvEsc(dripMerge(v.html,ct))+'"></iframe>':'<div class="dv-muted">That template was deleted.</div>'),
+    '<button class="btn btn-p" onclick="dvClose()">Close</button>', true);
+}
+async function dvQuickAdd(cid){
+  var ct=gc(cid); if(!ct) return;
+  if(!CAMP.length){ alert('No campaigns yet. Create one in Drip Campaigns first.'); return; }
+  await dvLoadUnsubs();
+  var b=CAMP.map(function(c,k){ var why=dvSkipReason(ct,c.id); return '<label class="dv-pick'+(why?' off':'')+'"><input type="radio" name="dvQc" value="'+c.id+'"'+(why?' disabled':'')+'><div style="flex:1;"><b>'+dvEsc(c.name)+'</b> <span class="dv-pill '+(c.live?'dv-green':'dv-gray')+'">'+(c.live?'LIVE':'DRAFT')+'</span><div class="dv-muted">'+dripSteps(c).length+' steps</div></div>'+(why?'<span class="dv-muted">'+why+'</span>':'')+'</label>'; }).join('');
+  dvModal('Add '+dvEsc(fn(ct))+' to a campaign', b, '<button class="btn btn-g" onclick="dvClose()">Cancel</button><button class="btn btn-p" onclick="dvDoQuick('+cid+')">Add</button>');
+}
+function dvDoQuick(cid){
+  var r=document.querySelector('input[name=dvQc]:checked'); if(!r){ alert('Pick a campaign.'); return; }
+  window._dvAdd={cid:+r.value, mode:'pick', picked:{}, q:'', cat:''}; window._dvAdd.picked[cid]=1;
+  dvDoAdd(); vc(cid);
+}
+
+// ===================== generic modal =====================
+function dvModal(title, body, footer, wide){
+  var ov=ge('dvModal');
+  if(!ov){ ov=document.createElement('div'); ov.className='modal-ov'; ov.id='dvModal'; ov.innerHTML='<div class="modal" id="dvModalBox"></div>'; document.body.appendChild(ov);
+    ov.addEventListener('mousedown',function(e){ if(e.target===ov){ if(window._dvEd) dvEdCancel(); else dvClose(); } }); }
+  ge('dvModalBox').style.maxWidth = wide ? '980px' : '580px';
+  ge('dvModalBox').innerHTML='<div class="mhdr"><div class="mtitle">'+title+'</div><button class="mx" onclick="'+(/dvEd/.test(footer)?'dvEdCancel()':'dvClose()')+'">&#x2715;</button></div><div class="mbody">'+body+'</div><div class="mftr">'+footer+'</div>';
+  ov.classList.add('open');
+}
+function dvClose(){ var ov=ge('dvModal'); if(ov) ov.classList.remove('open'); window._dvEd=null; }
+
+(function(){
+  ge('btnSaveMessage') && ge('btnSaveMessage').addEventListener('click', saveMessage);
+  ge('btnAddImage') && ge('btnAddImage').addEventListener('click', function(){ msgAddBlock('image'); });
+  ge('btnAddText') && ge('btnAddText').addEventListener('click', function(){ msgAddBlock('text'); });
+  ge('btnAddButton') && ge('btnAddButton').addEventListener('click', function(){ msgAddBlock('button'); });
+  ge('btnMsgPreview') && ge('btnMsgPreview').addEventListener('click', _msgPreviewRender);
+  ge('btnMsgMode') && ge('btnMsgMode').addEventListener('click', function(){ msgSetMode(!_msgRaw); });
+})();
+setTimeout(function(){ try{ dvLoadHealth().then(updateDripBadges); }catch(e){} }, 4000);
 // ===== Visual email builder (no HTML required) =====
 // A message is a stack of blocks (image / text / button). We keep the blocks as
 // the editable source of truth and generate email-safe HTML from them on save,
@@ -11940,568 +12419,9 @@ function msgSetMode(raw){
   }
   _msgPreviewRender();
 }
+(function(){ var mm=ge('messageModal'); if(mm) mm.addEventListener('click', function(e){ if(e.target===mm) cm('messageModal'); }); })();
+// ===================== END DRIP CAMPAIGNS =====================
 
-function openMessageModal(id){
-  ge('btnSaveMessage').setAttribute('data-edit-id', id||'');
-  _msgBlocks = [];
-  if(id){
-    var m = dripMsgById(id);
-    ge('msgModalTitle').textContent='Edit Message';
-    ge('msgName').value = m.name||'';
-    ge('msgSubject').value = m.subject||'';
-    ge('msgActive').value = (m.active===false||m.active==='false') ? 'false' : 'true';
-    if(Array.isArray(m.blocks) && m.blocks.length){
-      _msgBlocks = JSON.parse(JSON.stringify(m.blocks));
-      ge('msgHtml').value = '';
-      msgSetMode(false);
-    }else{
-      // No blocks -> it's a raw-HTML message (pasted / from a designer).
-      ge('msgHtml').value = m.html||'';
-      msgSetMode(true);
-    }
-  }else{
-    ge('msgModalTitle').textContent='New Message';
-    ge('msgName').value=''; ge('msgSubject').value=''; ge('msgHtml').value=''; ge('msgActive').value='true';
-    _msgBlocks = [{type:'text', html:''}];
-    msgSetMode(false);
-  }
-  renderMsgBuilder();
-  om('messageModal');
-  _msgPreviewRender();
-}
-
-function saveMessage(){
-  var name = (ge('msgName').value||'').trim();
-  var subject = (ge('msgSubject').value||'').trim();
-  if(!name){ alert('Give the message a name so you can find it later.'); return; }
-  if(!subject){ alert('Add a subject line.'); return; }
-
-  var html, blocks;
-  if(_msgRaw){
-    html = ge('msgHtml').value||'';
-    blocks = null;
-    if(!html.trim()){ alert('Paste the email HTML, or switch to the visual builder.'); return; }
-  }else{
-    // require some real content
-    var hasContent = _msgBlocks.some(function(b){
-      return (b.type==='image'&&b.src) || (b.type==='text'&&(b.html||'').replace(/<[^>]*>/g,'').trim()) || (b.type==='button'&&(b.label||b.url));
-    });
-    if(!hasContent){ alert('Add an image or some text first.'); return; }
-    blocks = _msgBlocks;
-    html = _msgGenHtml(_msgBlocks);
-  }
-
-  var editId = ge('btnSaveMessage').getAttribute('data-edit-id');
-  var m;
-  if(editId){
-    m = dripMsgById(editId);
-    m.name=name; m.subject=subject; m.html=html; m.blocks=blocks; m.active=(ge('msgActive').value==='true'); m.updated_at=nowISO();
-  }else{
-    m = { id: Date.now(), name:name, subject:subject, html:html, blocks:blocks, active:(ge('msgActive').value==='true'), created_at:nowISO(), updated_at:nowISO() };
-    DMSG.push(m);
-  }
-  dripSave('drip_messages', [JSON.parse(JSON.stringify(m))]);
-  cm('messageModal');
-  renderMessageList();
-}
-
-function duplicateMessage(id){
-  var m = dripMsgById(id); if(!m) return;
-  var copy = { id: Date.now(), name:(m.name||'Message')+' (copy)', subject:m.subject||'', html:m.html||'', blocks:(m.blocks?JSON.parse(JSON.stringify(m.blocks)):null), active:true, created_at:nowISO(), updated_at:nowISO() };
-  DMSG.push(copy);
-  dripSave('drip_messages', [JSON.parse(JSON.stringify(copy))]);
-  renderMessageList();
-}
-
-function deleteMessage(id){
-  var m = dripMsgById(id); if(!m) return;
-  // Warn if any active campaign step still points at this message.
-  var used = CAMP.filter(function(c){ return (c.steps||[]).some(function(s){ return String(s.messageId)===String(id); }); });
-  var warn = 'Delete message "'+(m.name||'')+'"?';
-  if(used.length) warn += '\n\nIt is used by '+used.length+' campaign'+(used.length>1?'s':'')+'. Those steps will have no message to send until you pick another.';
-  if(!confirm(warn)) return;
-  DMSG = DMSG.filter(function(x){ return String(x.id)!==String(id); });
-  dripDel('drip_messages', id);
-  renderMessageList();
-}
-
-function mkBtnEl(cls, txt, style){ var b=document.createElement('button'); b.className=cls; b.textContent=txt; if(style)b.style.cssText=style; return b; }
-
-function renderCampaignList(){
-  var wrap = ge('dripCampaignList'); if(!wrap) return;
-  wrap.textContent='';
-  if(!CAMP.length){
-    wrap.appendChild(mkDiv('font-size:16px;color:var(--text3);padding:20px;text-align:center;','No campaigns yet. Create one to start automating follow-up emails.'));
-    return;
-  }
-  CAMP.forEach(function(camp){
-    var enrolled = ENR.filter(function(e){ return String(e.campaignId)===String(camp.id) && e.status==='active'; }).length;
-    var isActive = camp.active!==false && camp.active!=='false';
-    var row = mkRow('li'); row.style.cssText='align-items:flex-start;gap:12px;padding:14px 0;border-bottom:1px solid var(--border);';
-
-    var left = mkDiv('flex:1;');
-    var titleRow = mkDiv('display:flex;align-items:center;gap:10px;flex-wrap:wrap;');
-    titleRow.appendChild(mkDiv('font-size:18px;font-weight:700;color:var(--text);', camp.name));
-    var badge = mkDiv('font-size:13px;font-weight:600;padding:2px 9px;border-radius:20px;'+(isActive?'background:rgba(107,201,122,0.15);color:var(--lead);':'background:var(--surface2);color:var(--text3);'), isActive?'ACTIVE':'PAUSED');
-    titleRow.appendChild(badge);
-    left.appendChild(titleRow);
-    var meta = (camp.steps?camp.steps.length:0)+' step'+((camp.steps&&camp.steps.length===1)?'':'s')+'  -  '+enrolled+' active enrolled';
-    if(camp.trigger){ meta += '  -  auto: '+camp.trigger.replace('stage:','stage = '); }
-    left.appendChild(mkDiv('font-size:15px;color:var(--text3);margin-top:4px;', meta));
-    row.appendChild(left);
-
-    var acts = mkDiv('display:flex;gap:7px;flex-wrap:wrap;');
-    var bEnroll = mkBtnEl('btn btn-p','Enroll','padding:5px 11px;font-size:15px;');
-    (function(id){ bEnroll.addEventListener('click', function(){ openEnrollModal(id); }); })(camp.id);
-    var bEdit = mkBtnEl('btn btn-g','Edit','padding:5px 11px;font-size:15px;');
-    (function(id){ bEdit.addEventListener('click', function(){ openCampaignModal(id); }); })(camp.id);
-    var bToggle = mkBtnEl('btn btn-g', isActive?'Pause':'Resume','padding:5px 11px;font-size:15px;');
-    (function(id){ bToggle.addEventListener('click', function(){ toggleCampaign(id); }); })(camp.id);
-    var bDel = mkBtnEl('btn btn-g','Delete','padding:5px 11px;font-size:15px;color:var(--danger);');
-    (function(id){ bDel.addEventListener('click', function(){ deleteCampaign(id); }); })(camp.id);
-    acts.appendChild(bEnroll); acts.appendChild(bEdit); acts.appendChild(bToggle); acts.appendChild(bDel);
-    row.appendChild(acts);
-    wrap.appendChild(row);
-  });
-}
-
-// Explain, in plain language, whether a drip will actually send right now -
-// and if not, why. Returns {text, color} or null when everything's clear.
-function enrollmentSendNote(e){
-  if(e.status==='paused') return { text:'Paused by you — won\'t send until you resume', color:'var(--accent)' };
-  if(SCTRL){
-    if(!SCTRL.master) return { text:'Sending is turned OFF (master switch) — nothing will send. Turn it on in Settings → Sending Controls.', color:'var(--danger)' };
-    if(!SCTRL.drips)  return { text:'Drip sending is turned OFF — turn on "Drips" in Settings → Sending Controls.', color:'var(--danger)' };
-    if(SCTRL.testMode) return { text:'Test mode is ON — this will go to your test address ('+(SCTRL.testEmail||'not set')+'), not the real contact.', color:'var(--accent)' };
-  }
-  return null;
-}
-
-function renderEnrollmentList(){
-  var wrap = ge('dripEnrollmentList'); if(!wrap) return;
-  wrap.textContent='';
-  // Show both active and paused so a paused one can be resumed.
-  var list = ENR.filter(function(e){ return e.status==='active' || e.status==='paused'; });
-  if(!list.length){
-    wrap.appendChild(mkDiv('font-size:16px;color:var(--text3);padding:20px;text-align:center;','No active enrollments.'));
-    return;
-  }
-  list.sort(function(a,b){ return new Date(a.nextSendAt||0)-new Date(b.nextSendAt||0); });
-  list.forEach(function(e){
-    var camp = CAMP.find(function(x){ return String(x.id)===String(e.campaignId); });
-    var c = gc(typeof e.contactId==='string'?(parseInt(e.contactId)||e.contactId):e.contactId);
-    var total = camp&&camp.steps?camp.steps.length:0;
-
-    var row = mkDiv('padding:14px 0;border-bottom:1px solid var(--border);');
-
-    // Line 1: name + campaign/step/next
-    var top = mkDiv('display:flex;align-items:center;gap:12px;');
-    var info = mkDiv('flex:1;min-width:0;');
-    info.appendChild(mkDiv('font-size:17px;font-weight:600;color:var(--text);', (c?fn(c):'Unknown contact')+(e.status==='paused'?'  ·  paused':'')));
-    var when = e.nextSendAt ? fmtDripWhen(e.nextSendAt) : '-';
-    info.appendChild(mkDiv('font-size:15px;color:var(--text3);margin-top:3px;', (camp?camp.name:'(deleted campaign)')+'  ·  step '+(e.stepIndex+1)+' of '+total+'  ·  next: '+when));
-    top.appendChild(info);
-    row.appendChild(top);
-
-    // Line 2: honest "why it is / isn't sending" note
-    var note = enrollmentSendNote(e);
-    if(note) row.appendChild(mkDiv('font-size:14px;margin-top:6px;color:'+note.color+';', note.text));
-
-    // Line 3: management controls
-    var ctrls = mkDiv('display:flex;flex-wrap:wrap;gap:7px;align-items:center;margin-top:10px;');
-
-    // Jump to step
-    if(total>1){
-      var sel = document.createElement('select'); sel.className='fsel'; sel.style.cssText='width:auto;padding:4px 8px;font-size:14px;';
-      for(var i=0;i<total;i++){ var o=document.createElement('option'); o.value=String(i); o.textContent='Step '+(i+1); if(i===e.stepIndex)o.selected=true; sel.appendChild(o); }
-      (function(id){ sel.addEventListener('change', function(){ setEnrollmentStep(id, this.value); }); })(e.id);
-      var jumpWrap = mkDiv('display:flex;align-items:center;gap:5px;'); jumpWrap.appendChild(mkDiv('font-size:13px;color:var(--text3);','Jump to:')); jumpWrap.appendChild(sel);
-      ctrls.appendChild(jumpWrap);
-    }
-
-    // Reschedule next send
-    var dateInp = document.createElement('input'); dateInp.type='date'; dateInp.className='fi'; dateInp.style.cssText='width:auto;padding:4px 8px;font-size:14px;';
-    if(e.nextSendAt){ try{ dateInp.value = new Date(e.nextSendAt).toISOString().slice(0,10); }catch(x){} }
-    (function(id){ dateInp.addEventListener('change', function(){ rescheduleEnrollment(id, this.value); }); })(e.id);
-    var dWrap = mkDiv('display:flex;align-items:center;gap:5px;'); dWrap.appendChild(mkDiv('font-size:13px;color:var(--text3);','Next:')); dWrap.appendChild(dateInp);
-    ctrls.appendChild(dWrap);
-
-    var bSend = mkBtnEl('btn btn-p','Send now','padding:5px 11px;font-size:14px;');
-    (function(id){ bSend.addEventListener('click', function(){ sendEnrollmentNow(id); }); })(e.id);
-    ctrls.appendChild(bSend);
-
-    var bRestart = mkBtnEl('btn btn-g','Restart','padding:5px 11px;font-size:14px;');
-    (function(id){ bRestart.addEventListener('click', function(){ restartEnrollment(id); }); })(e.id);
-    ctrls.appendChild(bRestart);
-
-    if(e.status==='paused'){
-      var bResume = mkBtnEl('btn btn-g','Resume','padding:5px 11px;font-size:14px;');
-      (function(id){ bResume.addEventListener('click', function(){ resumeEnrollment(id); }); })(e.id);
-      ctrls.appendChild(bResume);
-    } else {
-      var bPause = mkBtnEl('btn btn-g','Pause','padding:5px 11px;font-size:14px;');
-      (function(id){ bPause.addEventListener('click', function(){ pauseEnrollment(id); }); })(e.id);
-      ctrls.appendChild(bPause);
-    }
-
-    var bRemove = mkBtnEl('btn btn-g','Remove','padding:5px 11px;font-size:14px;color:var(--danger);');
-    (function(id){ bRemove.addEventListener('click', function(){ stopEnrollment(id); }); })(e.id);
-    ctrls.appendChild(bRemove);
-
-    row.appendChild(ctrls);
-    wrap.appendChild(row);
-  });
-}
-
-function renderSendLog(){
-  var wrap = ge('dripLogList'); if(!wrap) return;
-  wrap.textContent='';
-  if(!SENDLOG.length){
-    wrap.appendChild(mkDiv('font-size:16px;color:var(--text3);padding:20px;text-align:center;','Nothing sent yet.'));
-    return;
-  }
-  var rows = SENDLOG.slice().sort(function(a,b){ return new Date(b.created_at||0)-new Date(a.created_at||0); }).slice(0,100);
-  rows.forEach(function(l){
-    var c = gc(typeof l.contactId==='string'?(parseInt(l.contactId)||l.contactId):l.contactId);
-    var camp = CAMP.find(function(x){ return String(x.id)===String(l.campaignId); });
-    var row = mkRow('li'); row.style.cssText='align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--border);';
-    var dot = mkDiv('width:8px;height:8px;border-radius:50%;flex-shrink:0;'+(l.status==='sent'?'background:var(--lead);':l.status==='failed'?'background:var(--danger);':'background:var(--accent);'),'');
-    row.appendChild(dot);
-    var info = mkDiv('flex:1;');
-    info.appendChild(mkDiv('font-size:16px;font-weight:600;color:var(--text);', l.subject||'(no subject)'));
-    var sub = (c?fn(c):'?')+'  -  '+(camp?camp.name:'?')+'  -  '+(l.status==='sent'?('sent '+fmtDripWhen(l.sentAt||l.created_at)):l.status)+(l.error?(' ('+l.error+')'):'');
-    info.appendChild(mkDiv('font-size:14px;color:var(--text3);margin-top:3px;', sub));
-    row.appendChild(info);
-    wrap.appendChild(row);
-  });
-}
-
-function fmtDripWhen(iso){
-  if(!iso) return '-';
-  var d = new Date(iso); var now = new Date();
-  var diff = d - now;
-  var days = Math.round(diff/dripDayMs());
-  var dateStr = d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
-  if(diff < 0) return dateStr+' (overdue)';
-  if(days===0) return dateStr+' (today)';
-  if(days===1) return dateStr+' (tomorrow)';
-  return dateStr+' (in '+days+'d)';
-}
-
-// ===================== CAMPAIGN EDITOR =====================
-function buildStepRow(step, idx){
-  step = step || {subject:'',body:'',delayDays:idx===0?0:3};
-  var box = document.createElement('div');
-  box.className='drip-step-box';
-  box.style.cssText='border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px;background:var(--surface2);';
-  var hdr = mkDiv('display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;');
-  hdr.appendChild(mkDiv('font-size:15px;font-weight:700;color:var(--accent);','Step '+(idx+1)));
-  var del = mkBtnEl('btn btn-g','Remove','padding:3px 9px;font-size:14px;color:var(--danger);');
-  del.addEventListener('click', function(){ box.parentNode.removeChild(box); renumberSteps(); });
-  hdr.appendChild(del);
-  box.appendChild(hdr);
-
-  var delayFg = mkDiv('margin-bottom:8px;');
-  var delayLbl = document.createElement('label'); delayLbl.className='fl'; delayLbl.textContent = idx===0 ? 'Send delay (days after enrollment)' : 'Wait (days after previous step)';
-  var delayInp = document.createElement('input'); delayInp.className='fi drip-step-delay'; delayInp.type='number'; delayInp.min='0'; delayInp.value=(step.delayDays!=null?step.delayDays:(idx===0?0:3)); delayInp.style.cssText='width:120px;';
-  delayFg.appendChild(delayLbl); delayFg.appendChild(delayInp); box.appendChild(delayFg);
-
-  // Library message selector. Picking one means this step sends that finished
-  // email (with its embedded graphics); the custom subject/body below are then
-  // ignored. Leave as "Write custom below" to type a plain-text email inline.
-  var msgFg = mkDiv('margin-bottom:8px;');
-  var msgLbl = document.createElement('label'); msgLbl.className='fl'; msgLbl.textContent='Email to send';
-  var msgSel = document.createElement('select'); msgSel.className='fsel drip-step-message';
-  var optCustom = document.createElement('option'); optCustom.value=''; optCustom.textContent='— Write custom below —'; msgSel.appendChild(optCustom);
-  DMSG.filter(function(m){ return !(m.active===false||m.active==='false'); })
-      .sort(function(a,b){ return String(a.name||'').localeCompare(String(b.name||'')); })
-      .forEach(function(m){ var o=document.createElement('option'); o.value=String(m.id); o.textContent='📧 '+(m.name||'(untitled)'); if(String(step.messageId)===String(m.id)) o.selected=true; msgSel.appendChild(o); });
-  msgFg.appendChild(msgLbl); msgFg.appendChild(msgSel); box.appendChild(msgFg);
-
-  var subjFg = mkDiv('margin-bottom:8px;');
-  var subjLbl = document.createElement('label'); subjLbl.className='fl'; subjLbl.textContent='Subject';
-  var subjInp = document.createElement('input'); subjInp.className='fi drip-step-subject'; subjInp.placeholder='Subject line'; subjInp.value=step.subject||'';
-  subjFg.appendChild(subjLbl); subjFg.appendChild(subjInp); box.appendChild(subjFg);
-
-  var bodyFg = mkDiv('');
-  var bodyLbl = document.createElement('label'); bodyLbl.className='fl'; bodyLbl.textContent='Message';
-  var bodyTA = document.createElement('textarea'); bodyTA.className='fi drip-step-body'; bodyTA.rows=5; bodyTA.placeholder='Write your email here…'; bodyTA.value=step.body||'';
-  bodyFg.appendChild(bodyLbl); bodyFg.appendChild(bodyTA); box.appendChild(bodyFg);
-
-  // Personalize helper: plain-language buttons that drop a merge field into
-  // whichever box (subject or message) you last clicked in. No need to know the
-  // {{...}} syntax. The field is replaced with the contact's real details when sent.
-  var lastField = bodyTA;
-  subjInp.addEventListener('focus', function(){ lastField = subjInp; });
-  bodyTA.addEventListener('focus', function(){ lastField = bodyTA; });
-  function insertField(tag){
-    var el = lastField || bodyTA;
-    if(el.disabled) return;
-    var s = el.selectionStart!=null ? el.selectionStart : el.value.length;
-    var e = el.selectionEnd!=null ? el.selectionEnd : el.value.length;
-    el.value = el.value.slice(0,s) + tag + el.value.slice(e);
-    var pos = s + tag.length; el.focus(); try{ el.setSelectionRange(pos,pos); }catch(x){}
-  }
-  var pz = mkDiv('display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:8px;');
-  pz.appendChild(mkDiv('font-size:13px;color:var(--text3);','Personalize:'));
-  [['First name','{{first}}'],['Last name','{{last}}'],['Property','{{property}}'],['Price','{{price}}'],['Your name','{{agent}}']].forEach(function(pair){
-    var b = mkBtnEl('btn btn-g','+ '+pair[0],'padding:3px 9px;font-size:13px;');
-    b.type='button';
-    b.addEventListener('click', function(){ insertField(pair[1]); });
-    pz.appendChild(b);
-  });
-  box.appendChild(pz);
-
-  // When a library message is chosen, grey out the custom fields so it's clear
-  // they won't be used.
-  function syncCustomState(){
-    var usingLib = !!msgSel.value;
-    subjFg.style.opacity = usingLib ? '0.4' : '1';
-    bodyFg.style.opacity = usingLib ? '0.4' : '1';
-    pz.style.display = usingLib ? 'none' : 'flex';
-    subjInp.disabled = usingLib; bodyTA.disabled = usingLib;
-    subjLbl.textContent = usingLib ? 'Subject (from library message)' : 'Subject';
-  }
-  msgSel.addEventListener('change', syncCustomState);
-  syncCustomState();
-
-  return box;
-}
-
-function renumberSteps(){
-  var boxes = ge('campStepsWrap').querySelectorAll('.drip-step-box');
-  for(var i=0;i<boxes.length;i++){
-    boxes[i].querySelector('div > div').textContent = 'Step '+(i+1);
-    var lbl = boxes[i].querySelector('label.fl');
-    if(lbl) lbl.textContent = i===0 ? 'Send delay (days after enrollment)' : 'Wait (days after previous step)';
-  }
-}
-
-function openCampaignModal(id){
-  var wrap = ge('campStepsWrap'); wrap.textContent='';
-  if(id){
-    var camp = CAMP.find(function(x){ return String(x.id)===String(id); });
-    ge('campModalTitle').textContent='Edit Campaign';
-    ge('btnSaveCampaign').setAttribute('data-edit-id', id);
-    ge('campName').value = camp.name||'';
-    ge('campActive').value = (camp.active!==false && camp.active!=='false') ? 'true' : 'false';
-    ge('campTrigger').value = camp.trigger||'';
-    (camp.steps||[]).forEach(function(s,i){ wrap.appendChild(buildStepRow(s,i)); });
-    if(!camp.steps || !camp.steps.length) wrap.appendChild(buildStepRow(null,0));
-  }else{
-    ge('campModalTitle').textContent='New Campaign';
-    ge('btnSaveCampaign').setAttribute('data-edit-id','');
-    ge('campName').value=''; ge('campActive').value='true'; ge('campTrigger').value='';
-    wrap.appendChild(buildStepRow(null,0));
-  }
-  om('campaignModal');
-}
-
-function addCampaignStep(){
-  var wrap = ge('campStepsWrap');
-  var idx = wrap.querySelectorAll('.drip-step-box').length;
-  wrap.appendChild(buildStepRow(null, idx));
-}
-
-function saveCampaign(){
-  var name = ge('campName').value.trim();
-  if(!name){ alert('Please enter a campaign name.'); return; }
-  var boxes = ge('campStepsWrap').querySelectorAll('.drip-step-box');
-  var steps = [];
-  for(var i=0;i<boxes.length;i++){
-    var subj = boxes[i].querySelector('.drip-step-subject').value.trim();
-    var body = boxes[i].querySelector('.drip-step-body').value.trim();
-    var delay = parseInt(boxes[i].querySelector('.drip-step-delay').value)||0;
-    var mSel = boxes[i].querySelector('.drip-step-message');
-    var messageId = (mSel && mSel.value) ? (parseInt(mSel.value)||mSel.value) : null;
-    // A step is valid if it points at a library message OR has custom subject/body.
-    if(!messageId && !subj && !body) continue;
-    var st = {subject:subj, body:body, delayDays:delay};
-    if(messageId) st.messageId = messageId;
-    steps.push(st);
-  }
-  if(!steps.length){ alert('Add at least one email step with a subject or body.'); return; }
-  var editId = ge('btnSaveCampaign').getAttribute('data-edit-id');
-  var camp;
-  if(editId){
-    camp = CAMP.find(function(x){ return String(x.id)===String(editId); });
-    camp.name=name; camp.active=(ge('campActive').value==='true'); camp.trigger=ge('campTrigger').value; camp.steps=steps;
-  }else{
-    camp = { id: Date.now(), name:name, active:(ge('campActive').value==='true'), trigger:ge('campTrigger').value, steps:steps, created_at:nowISO() };
-    CAMP.push(camp);
-  }
-  // Supabase stores steps as jsonb; send a copy with steps serialized for safety
-  var toSave = JSON.parse(JSON.stringify(camp));
-  dripSave('campaigns', [toSave]);
-  cm('campaignModal');
-  renderDrips();
-}
-
-function toggleCampaign(id){
-  var camp = CAMP.find(function(x){ return String(x.id)===String(id); });
-  if(!camp) return;
-  camp.active = !(camp.active!==false && camp.active!=='false');
-  dripSave('campaigns', [JSON.parse(JSON.stringify(camp))]);
-  renderDrips();
-}
-
-function deleteCampaign(id){
-  if(!confirm('Delete this campaign? Active enrollments will be stopped.')) return;
-  ENR.forEach(function(e){ if(String(e.campaignId)===String(id) && e.status==='active'){ e.status='stopped'; e.nextSendAt=null; dripSave('enrollments',[e]); } });
-  CAMP = CAMP.filter(function(x){ return String(x.id)!==String(id); });
-  dripDel('campaigns', id);
-  sv();
-  renderDrips();
-}
-
-// ===================== ENROLL MODAL =====================
-async function openEnrollModal(presetCampaignId, presetContactId){
-  // Connected Gmail accounts are only loaded by initGmail(), which only runs when you visit
-  // the Gmail tab. Without this, enrolling from anywhere else says "No Gmail connected".
-  if(typeof gmailState !== 'undefined' && !Object.keys(gmailState.connectedAccounts || {}).length){
-    try{ await checkConnectedAccounts(); }catch(e){}
-  }
-  var cs = ge('enrollCampaign'); cs.textContent='';
-  CAMP.filter(function(x){ return x.active!==false && x.active!=='false'; }).forEach(function(camp){
-    var o=document.createElement('option'); o.value=camp.id; o.textContent=camp.name; cs.appendChild(o);
-  });
-  if(presetCampaignId) cs.value = presetCampaignId;
-
-  var enCP = ge('enrollContactPick'); enCP.innerHTML='';
-  var enPick = buildContactPicker(enCP, 'enrollContact', 'Search contact by name, email, phone...');
-  if(presetContactId){ var _pc = gc(presetContactId); if(_pc) enPick.setContact(_pc); }
-
-  // Category options (distinct categories present on contacts, with counts).
-  var catSel = ge('enrollCategory');
-  if(catSel){
-    catSel.textContent='';
-    var cats={}; C.forEach(function(x){ var k=(x.category||'').trim(); if(k) cats[k]=(cats[k]||0)+1; });
-    var keysC=Object.keys(cats).sort();
-    if(!keysC.length){ var o0=document.createElement('option'); o0.value=''; o0.textContent='(no categories on contacts yet)'; catSel.appendChild(o0); }
-    keysC.forEach(function(k){ var o=document.createElement('option'); o.value=k; o.textContent=k+' ('+cats[k]+')'; catSel.appendChild(o); });
-  }
-  if(ge('enrollMode')) ge('enrollMode').value='single';
-  enrollModeChange();
-
-  var fs = ge('enrollFrom'); fs.textContent='';
-  var accts = (typeof gmailState!=='undefined' && gmailState.connectedAccounts) ? gmailState.connectedAccounts : {};
-  var keys = Object.keys(accts);
-  if(!keys.length){
-    var o=document.createElement('option'); o.value=''; o.textContent='No Gmail connected (will queue)'; fs.appendChild(o);
-  }else{
-    keys.forEach(function(k){ var o=document.createElement('option'); o.value=k; o.textContent=(accts[k].email||accts[k].name||k); fs.appendChild(o); });
-    // Default to the configured drip sender (Workspace account) when it's connected.
-    if(DRIP_SENDER_MEMBER && accts[DRIP_SENDER_MEMBER]) fs.value=DRIP_SENDER_MEMBER;
-    else if(gmailState.activeMemberId) fs.value=gmailState.activeMemberId;
-  }
-  om('enrollModal');
-}
-
-function enrollModeChange(){
-  var m = ge('enrollMode') ? ge('enrollMode').value : 'single';
-  if(ge('enrollContactWrap')) ge('enrollContactWrap').style.display = (m==='category') ? 'none' : 'block';
-  if(ge('enrollCategoryWrap')) ge('enrollCategoryWrap').style.display = (m==='category') ? 'block' : 'none';
-  if(m==='category') updateEnrollCategoryCount();
-}
-function updateEnrollCategoryCount(){
-  var el=ge('enrollCategoryCount'); if(!el) return;
-  var cat = ge('enrollCategory') ? ge('enrollCategory').value : '';
-  var matches = C.filter(function(x){ return String((x.category||'').trim())===String(cat); });
-  var noEmail = matches.filter(function(x){ return !x.email; }).length;
-  el.textContent = matches.length
-    ? (matches.length+' contact'+(matches.length===1?'':'s')+' will be enrolled'+(noEmail?'  ·  '+noEmail+' have no email (those steps will fail until one is added)':''))
-    : 'No contacts in this category.';
-}
-
-// Enroll every contact in a category into a campaign (batched save).
-function enrollByCategory(campaignId, cat, fromMember){
-  var camp = CAMP.find(function(x){ return String(x.id)===String(campaignId); });
-  if(!camp || !camp.steps || !camp.steps.length) return {error:'no steps'};
-  var firstDelay = parseInt(camp.steps[0].delayDays)||0;
-  var matches = C.filter(function(x){ return String((x.category||'').trim())===String(cat); });
-  var batch=[], created=0, already=0, noEmail=0;
-  matches.forEach(function(x){
-    if(!x.email) noEmail++;
-    var dup = ENR.find(function(e){ return String(e.campaignId)===String(campaignId) && String(e.contactId)===String(x.id) && e.status==='active'; });
-    if(dup){ already++; return; }
-    var enr = {
-      id: Date.now() + Math.floor(Math.random()*1000000) + created,
-      campaignId: campaignId, contactId: x.id,
-      fromMemberId: fromMember || DRIP_SENDER_MEMBER || (typeof gmailState!=='undefined' ? gmailState.activeMemberId : null) || null,
-      stepIndex: 0, status: 'active',
-      nextSendAt: dripNextSendIso(firstDelay),
-      created_at: nowISO()
-    };
-    ENR.push(enr); batch.push(enr); created++;
-  });
-  if(batch.length){ try{ pausePoll(60000); }catch(e){} dripSave('enrollments', batch); }
-  return {total:matches.length, created:created, already:already, noEmail:noEmail};
-}
-
-function confirmEnroll(){
-  var campaignId = ge('enrollCampaign').value;
-  var fromMember = ge('enrollFrom').value || null;
-  if(!campaignId){ alert('Select a campaign.'); return; }
-
-  // Bulk: enroll an entire category.
-  if(ge('enrollMode') && ge('enrollMode').value==='category'){
-    var cat = ge('enrollCategory') ? ge('enrollCategory').value : '';
-    if(!cat){ alert('Pick a category.'); return; }
-    var count = C.filter(function(x){ return String((x.category||'').trim())===String(cat); }).length;
-    if(!count){ alert('No contacts in that category.'); return; }
-    if(!confirm('Enroll all '+count+' contact'+(count===1?'':'s')+' in "'+cat+'" into this campaign?')) return;
-    var res = enrollByCategory(campaignId, cat, fromMember);
-    if(res.error){ alert('Could not enroll — that campaign has no steps.'); return; }
-    cm('enrollModal'); renderDrips(); updateDripBadges();
-    alert('Enrolled '+res.created+' contact'+(res.created===1?'':'s')+' in "'+cat+'".'
-      + (res.already?'\n'+res.already+' were already enrolled (skipped).':'')
-      + (res.noEmail?'\n'+res.noEmail+' have no email — those will fail until an email is added.':''));
-    return;
-  }
-
-  var contactId = ge('enrollContact').value;
-  if(!contactId){ alert('Select a contact.'); return; }
-  var cid = parseInt(contactId)||contactId;
-  var c = gc(cid);
-  if(c && !c.email){ if(!confirm('This contact has no email address. Enroll anyway? Steps will fail until an email is added.')){ return; } }
-  var enr = enrollContact(campaignId, cid, fromMember);
-  if(!enr){ alert('Could not enroll - campaign has no steps.'); return; }
-  cm('enrollModal');
-  processDrips();
-  renderDrips();
-}
-
-// ===================== WIRING =====================
-ge('nav-drips') && (function(){
-  ge('btnNewCampaign') && ge('btnNewCampaign').addEventListener('click', function(){ openCampaignModal(null); });
-  ge('btnAddStep') && ge('btnAddStep').addEventListener('click', addCampaignStep);
-  ge('btnSaveCampaign') && ge('btnSaveCampaign').addEventListener('click', saveCampaign);
-  ge('btnConfirmEnroll') && ge('btnConfirmEnroll').addEventListener('click', confirmEnroll);
-  ge('enrollMode') && ge('enrollMode').addEventListener('change', enrollModeChange);
-  ge('enrollCategory') && ge('enrollCategory').addEventListener('change', updateEnrollCategoryCount);
-  ge('btnRunDripsNow') && ge('btnRunDripsNow').addEventListener('click', function(){ runDripsNow(); });
-  ge('btnNewMessage') && ge('btnNewMessage').addEventListener('click', function(){ openMessageModal(null); });
-  ge('btnSaveMessage') && ge('btnSaveMessage').addEventListener('click', saveMessage);
-  ge('btnMsgPreview') && ge('btnMsgPreview').addEventListener('click', _msgPreviewRender);
-  ge('btnAddImage') && ge('btnAddImage').addEventListener('click', function(){ msgAddBlock('image'); });
-  ge('btnAddText') && ge('btnAddText').addEventListener('click', function(){ msgAddBlock('text'); });
-  ge('btnAddButton') && ge('btnAddButton').addEventListener('click', function(){ msgAddBlock('button'); });
-  ge('btnMsgMode') && ge('btnMsgMode').addEventListener('click', function(){ msgSetMode(!_msgRaw); });
-  (function(){ var mm=ge('messageModal'); if(mm) mm.addEventListener('click', function(e){ if(e.target===mm) cm('messageModal'); }); })();
-  ['campaigns','enrollments','messages','log'].forEach(function(t){
-    var btn = ge('dripTab'+t.charAt(0).toUpperCase()+t.slice(1));
-    if(btn) btn.addEventListener('click', function(){ dripSwitchTab(t); });
-  });
-  // close handlers for new modals reuse existing data-close convention; ensure overlay click closes
-  ['campaignModal','enrollModal'].forEach(function(mid){
-    var m = ge(mid);
-    if(m) m.addEventListener('click', function(e){ if(e.target===m) cm(mid); });
-  });
-})();
-
-// Run a processing pass shortly after load and on the existing poll cycle
-setTimeout(function(){ try{ processDrips(); updateDripBadges(); }catch(e){ console.log('drip init', e); } }, 4000);
-// ===================== END DRIP CAMPAIGNS MODULE =====================
 
 // ============================================================================
 // INVESTMENTS — rental / investment property tracking
