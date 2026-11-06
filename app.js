@@ -11820,7 +11820,28 @@ function dvRemove(id){ var e=dvEnr(id), ct=gc(e.contactId); if(!confirm('Remove 
 // ---- adding people ----
 async function dvLoadUnsubs(){
   if(!supaReady){ DRIP_UNSUBS={}; return; }
-  try{ var h=await getAuthHeaders(); var r=await fetch(SUPA_URL+'/rest/v1/drip_unsubs?select=contact_id&limit=10000',{headers:h, cache:'no-store'}); var j=await r.json(); DRIP_UNSUBS={}; (Array.isArray(j)?j:[]).forEach(function(u){ DRIP_UNSUBS[String(u.contact_id)]=1; }); }catch(e){ DRIP_UNSUBS={}; }
+  try{ var h=await getAuthHeaders(); var r=await fetch(SUPA_URL+'/rest/v1/drip_unsubs?select=contact_id,created_at&limit=10000',{headers:h, cache:'no-store'}); var j=await r.json(); DRIP_UNSUBS={}; (Array.isArray(j)?j:[]).forEach(function(u){ DRIP_UNSUBS[String(u.contact_id)]=u.created_at||1; }); }catch(e){ DRIP_UNSUBS={}; }
+}
+// Contact page: show when someone is unsubscribed, with a way to put them back on.
+function dvFillUnsubBox(cid){
+  var box=ge('dvUnsubBox'); if(!box || String(box.getAttribute('data-cid'))!==String(cid)) return;
+  var when=DRIP_UNSUBS && DRIP_UNSUBS[String(cid)];
+  if(!when){ box.innerHTML=''; return; }
+  box.innerHTML='<div class="dv-banner amber" style="margin:4px 0 10px;"><div style="flex:1;min-width:200px;"><b>Unsubscribed</b> from campaign emails'+(typeof when==='string'?' on '+dvWhen(when):'')+'. No campaign email will go to them.</div><button class="btn btn-g dv-sm" onclick="dvResubscribe('+cid+')">Resubscribe</button></div>';
+}
+async function dvResubscribe(cid){
+  var ct=gc(cid); if(!ct) return;
+  if(!confirm('Resubscribe '+fn(ct)+' to campaign emails?\n\nOnly do this if they asked to get your emails again. After this you can add them to a campaign.')) return;
+  try{
+    var h=await getAuthHeaders({'Prefer':'return=representation'});
+    var r=await fetch(SUPA_URL+'/rest/v1/drip_unsubs?contact_id=eq.'+encodeURIComponent(cid),{method:'DELETE',headers:h});
+    var rows=r.ok?await r.json():null;
+    if(!r.ok || !Array.isArray(rows)){ alert('Could not resubscribe: '+(r.ok?'unexpected response':(await r.text()).slice(0,160))); return; }
+    if(DRIP_UNSUBS) delete DRIP_UNSUBS[String(cid)];
+    dvLog({kind:'resubscribed', contactId:cid, note:'Resubscribed by '+dvMe()});
+    dvToast(fn(ct)+' is resubscribed — add them to a campaign when you’re ready');
+    try{ vc(cid); }catch(e){}
+  }catch(e){ alert('Could not resubscribe: '+e.message); }
 }
 async function dvAddPeople(cid){
   window._dvAdd={cid:cid, mode:'pick', picked:{}, q:'', cat:''};
@@ -11843,7 +11864,7 @@ function dvRenderAdd(){
 }
 function dvSkipReason(ct, cid){
   if(!ct.email) return 'no email';
-  if(DRIP_UNSUBS && DRIP_UNSUBS[String(ct.id)]) return 'unsubscribed';
+  if(DRIP_UNSUBS && DRIP_UNSUBS[String(ct.id)]) return 'unsubscribed (resubscribe on their contact page)';
   var ex=ENR.find(function(e){ return String(e.campaignId)===String(cid) && String(e.contactId)===String(ct.id) && (e.status==='active'||e.status==='paused'||e.status==='bounced'); });
   return ex ? 'already in it' : '';
 }
@@ -12174,7 +12195,7 @@ function dvObPostpone(eid){
 // ===================== CONTACT PAGE: campaigns + history =====================
 var DV_KIND = {
   email:{i:'✉',c:''}, task:{i:'☑',c:'o'}, reply:{i:'↩',c:'g'}, autoreply:{i:'⏱',c:''}, click:{i:'➚',c:'g'}, bounce:{i:'⚠',c:'r'},
-  pause:{i:'⏸',c:'o'}, conversation:{i:'✉',c:'o'}, unsubscribe:{i:'⛔',c:'r'}, skipped:{i:'⤼',c:''}, resumed:{i:'▶',c:'g'}
+  pause:{i:'⏸',c:'o'}, conversation:{i:'✉',c:'o'}, unsubscribe:{i:'⛔',c:'r'}, skipped:{i:'⤼',c:''}, resumed:{i:'▶',c:'g'}, resubscribed:{i:'▶',c:'g'}
 };
 function dripContactSection(cid){
   var sec=mksec('Drip campaigns');
@@ -12183,7 +12204,7 @@ function dripContactSection(cid){
   var hdr=sec.firstChild; if(hdr && hdr.appendChild) hdr.appendChild(add); else sec.appendChild(add);
   var wrap=document.createElement('div');
   var mine=ENR.filter(function(e){ return String(e.contactId)===String(cid) && e.status!=='removed'; });
-  var h='';
+  var h='<div id="dvUnsubBox" data-cid="'+cid+'"></div>';
   if(!mine.length) h+='<div class="dv-muted" style="padding:4px 0;font-size:16px;">Not in any campaigns.</div>';
   mine.forEach(function(e){
     var c=dvCamp(e.campaignId);
@@ -12205,12 +12226,16 @@ function dripContactSection(cid){
       else if(l.kind==='pause') t=dvEsc(l.note||'Campaigns paused');
       else if(l.kind==='conversation') t='They emailed us: “'+dvEsc(l.subject||l.note||'')+'” → campaigns paused';
       else if(l.kind==='unsubscribe') t='<b>Unsubscribed</b>'+(l.note?' — '+dvEsc(l.note):'');
+      else if(l.kind==='resubscribed') t='<b>Resubscribed</b>'+(l.note?' — '+dvEsc(l.note):'');
       else t=dvEsc(l.note||l.kind);
       h+='<div class="dv-hi '+k.c+'"><div class="d">'+dvWhen(l.sentAt||l.created_at,true)+'</div><div>'+t+'</div></div>';
     });
     h+='</div>';
   }
   wrap.innerHTML=h; sec.appendChild(wrap);
+  // unsubscribe status needs a small lookup; fill it in once it arrives
+  if(DRIP_UNSUBS) setTimeout(function(){ dvFillUnsubBox(cid); },0);
+  else dvLoadUnsubs().then(function(){ dvFillUnsubBox(cid); });
   return sec;
 }
 function dvViewSent(logId){
@@ -12424,7 +12449,7 @@ function msgSetMode(raw){
 // The app runs inside one closure, so the inline onclick="..." handlers in the drip screens can't
 // see these functions unless they're put on window.
 window.DV = DV;
-Object.assign(window, {ge:ge, _msgCompressImage:_msgCompressImage, _msgCurrentHtml:_msgCurrentHtml, _msgEsc:_msgEsc, _msgExec:_msgExec, _msgGenHtml:_msgGenHtml, _msgPreviewRender:_msgPreviewRender, dripContactSection:dripContactSection, dripDel:dripDel, dripMerge:dripMerge, dripMsgById:dripMsgById, dripNextSend:dripNextSend, dripRules:dripRules, dripSave:dripSave, dripSteps:dripSteps, dvAddDays:dvAddDays, dvAddEmail:dvAddEmail, dvAddPeople:dvAddPeople, dvAddSelCount:dvAddSelCount, dvAddTask:dvAddTask, dvCamp:dvCamp, dvCampHtml:dvCampHtml, dvCats:dvCats, dvClose:dvClose, dvCreateCamp:dvCreateCamp, dvDateOf:dvDateOf, dvDayLabel:dvDayLabel, dvDelStep:dvDelStep, dvDelTemplate:dvDelTemplate, dvDeleteCamp:dvDeleteCamp, dvDoAdd:dvDoAdd, dvDoQuick:dvDoQuick, dvDow:dvDow, dvDupTemplate:dvDupTemplate, dvEdBuild:dvEdBuild, dvEdCancel:dvEdCancel, dvEdCommit:dvEdCommit, dvEdFile:dvEdFile, dvEdLang:dvEdLang, dvEdPasteApply:dvEdPasteApply, dvEdPreview:dvEdPreview, dvEdSave:dvEdSave, dvEdTest:dvEdTest, dvEdUseTpl:dvEdUseTpl, dvEdV:dvEdV, dvEditEmail:dvEditEmail, dvEditTask:dvEditTask, dvEditTemplate:dvEditTemplate, dvEnr:dvEnr, dvEnrolled:dvEnrolled, dvEsc:dvEsc, dvGo:dvGo, dvHealthHtml:dvHealthHtml, dvLangOf:dvLangOf, dvListHtml:dvListHtml, dvLoadHealth:dvLoadHealth, dvLoadUnsubs:dvLoadUnsubs, dvLog:dvLog, dvMe:dvMe, dvModal:dvModal, dvMoveStep:dvMoveStep, dvMsg:dvMsg, dvMsgFor:dvMsgFor, dvMtnMs:dvMtnMs, dvNewCamp:dvNewCamp, dvNormCamps:dvNormCamps, dvObPostpone:dvObPostpone, dvObPreview:dvObPreview, dvObSkip:dvObSkip, dvOpenEditor:dvOpenEditor, dvOpenSendingControls:dvOpenSendingControls, dvOutboxHtml:dvOutboxHtml, dvOutboxItems:dvOutboxItems, dvPause:dvPause, dvPct:dvPct, dvPeopleHtml:dvPeopleHtml, dvPreviewPeople:dvPreviewPeople, dvProblems:dvProblems, dvQuickAdd:dvQuickAdd, dvRemove:dvRemove, dvRenameCamp:dvRenameCamp, dvRenderAdd:dvRenderAdd, dvRenderAddCount:dvRenderAddCount, dvRenderAddList:dvRenderAddList, dvRenderEditor:dvRenderEditor, dvRenderTask:dvRenderTask, dvRestartFromTop:dvRestartFromTop, dvResume:dvResume, dvRulesHtml:dvRulesHtml, dvRunNow:dvRunNow, dvSaveCamp:dvSaveCamp, dvSaveEnr:dvSaveEnr, dvSaveTask:dvSaveTask, dvSenderLabel:dvSenderLabel, dvSetLive:dvSetLive, dvSetRule:dvSetRule, dvSetWait:dvSetWait, dvSkipReason:dvSkipReason, dvStats:dvStats, dvStatusHtml:dvStatusHtml, dvStepLabel:dvStepLabel, dvStepsHtml:dvStepsHtml, dvSw:dvSw, dvTemplatesHtml:dvTemplatesHtml, dvThumb:dvThumb, dvTimeLbl:dvTimeLbl, dvToast:dvToast, dvToday:dvToday, dvTogglePick:dvTogglePick, dvTzOff:dvTzOff, dvViewSent:dvViewSent, dvWhen:dvWhen, mkBtnEl:mkBtnEl, msgAddBlock:msgAddBlock, msgDeleteBlock:msgDeleteBlock, msgMoveBlock:msgMoveBlock, msgSetMode:msgSetMode, openMessageModal:openMessageModal, processDrips:processDrips, renderDrips:renderDrips, renderMsgBuilder:renderMsgBuilder, saveMessage:saveMessage, updateDripBadges:updateDripBadges, vc:vc, sp:sp});
+Object.assign(window, {ge:ge, dvResubscribe:dvResubscribe, dvFillUnsubBox:dvFillUnsubBox, _msgCompressImage:_msgCompressImage, _msgCurrentHtml:_msgCurrentHtml, _msgEsc:_msgEsc, _msgExec:_msgExec, _msgGenHtml:_msgGenHtml, _msgPreviewRender:_msgPreviewRender, dripContactSection:dripContactSection, dripDel:dripDel, dripMerge:dripMerge, dripMsgById:dripMsgById, dripNextSend:dripNextSend, dripRules:dripRules, dripSave:dripSave, dripSteps:dripSteps, dvAddDays:dvAddDays, dvAddEmail:dvAddEmail, dvAddPeople:dvAddPeople, dvAddSelCount:dvAddSelCount, dvAddTask:dvAddTask, dvCamp:dvCamp, dvCampHtml:dvCampHtml, dvCats:dvCats, dvClose:dvClose, dvCreateCamp:dvCreateCamp, dvDateOf:dvDateOf, dvDayLabel:dvDayLabel, dvDelStep:dvDelStep, dvDelTemplate:dvDelTemplate, dvDeleteCamp:dvDeleteCamp, dvDoAdd:dvDoAdd, dvDoQuick:dvDoQuick, dvDow:dvDow, dvDupTemplate:dvDupTemplate, dvEdBuild:dvEdBuild, dvEdCancel:dvEdCancel, dvEdCommit:dvEdCommit, dvEdFile:dvEdFile, dvEdLang:dvEdLang, dvEdPasteApply:dvEdPasteApply, dvEdPreview:dvEdPreview, dvEdSave:dvEdSave, dvEdTest:dvEdTest, dvEdUseTpl:dvEdUseTpl, dvEdV:dvEdV, dvEditEmail:dvEditEmail, dvEditTask:dvEditTask, dvEditTemplate:dvEditTemplate, dvEnr:dvEnr, dvEnrolled:dvEnrolled, dvEsc:dvEsc, dvGo:dvGo, dvHealthHtml:dvHealthHtml, dvLangOf:dvLangOf, dvListHtml:dvListHtml, dvLoadHealth:dvLoadHealth, dvLoadUnsubs:dvLoadUnsubs, dvLog:dvLog, dvMe:dvMe, dvModal:dvModal, dvMoveStep:dvMoveStep, dvMsg:dvMsg, dvMsgFor:dvMsgFor, dvMtnMs:dvMtnMs, dvNewCamp:dvNewCamp, dvNormCamps:dvNormCamps, dvObPostpone:dvObPostpone, dvObPreview:dvObPreview, dvObSkip:dvObSkip, dvOpenEditor:dvOpenEditor, dvOpenSendingControls:dvOpenSendingControls, dvOutboxHtml:dvOutboxHtml, dvOutboxItems:dvOutboxItems, dvPause:dvPause, dvPct:dvPct, dvPeopleHtml:dvPeopleHtml, dvPreviewPeople:dvPreviewPeople, dvProblems:dvProblems, dvQuickAdd:dvQuickAdd, dvRemove:dvRemove, dvRenameCamp:dvRenameCamp, dvRenderAdd:dvRenderAdd, dvRenderAddCount:dvRenderAddCount, dvRenderAddList:dvRenderAddList, dvRenderEditor:dvRenderEditor, dvRenderTask:dvRenderTask, dvRestartFromTop:dvRestartFromTop, dvResume:dvResume, dvRulesHtml:dvRulesHtml, dvRunNow:dvRunNow, dvSaveCamp:dvSaveCamp, dvSaveEnr:dvSaveEnr, dvSaveTask:dvSaveTask, dvSenderLabel:dvSenderLabel, dvSetLive:dvSetLive, dvSetRule:dvSetRule, dvSetWait:dvSetWait, dvSkipReason:dvSkipReason, dvStats:dvStats, dvStatusHtml:dvStatusHtml, dvStepLabel:dvStepLabel, dvStepsHtml:dvStepsHtml, dvSw:dvSw, dvTemplatesHtml:dvTemplatesHtml, dvThumb:dvThumb, dvTimeLbl:dvTimeLbl, dvToast:dvToast, dvToday:dvToday, dvTogglePick:dvTogglePick, dvTzOff:dvTzOff, dvViewSent:dvViewSent, dvWhen:dvWhen, mkBtnEl:mkBtnEl, msgAddBlock:msgAddBlock, msgDeleteBlock:msgDeleteBlock, msgMoveBlock:msgMoveBlock, msgSetMode:msgSetMode, openMessageModal:openMessageModal, processDrips:processDrips, renderDrips:renderDrips, renderMsgBuilder:renderMsgBuilder, saveMessage:saveMessage, updateDripBadges:updateDripBadges, vc:vc, sp:sp});
 // ===================== END DRIP CAMPAIGNS =====================
 
 
