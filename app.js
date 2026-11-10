@@ -11108,7 +11108,7 @@ ge('btnContactAdd').addEventListener('click',function(){
 ge('fPhonesAdd') && ge('fPhonesAdd').addEventListener('click',function(){mvAddRow('fPhones','','');});
 ge('fEmailsAdd') && ge('fEmailsAdd').addEventListener('click',function(){mvAddRow('fEmails','','');});
 ge('fAddressesAdd') && ge('fAddressesAdd').addEventListener('click',function(){mvAddRow('fAddresses','','');});
-ge('btnAddFU').addEventListener('click',function(){ge('btnSaveFU')&&ge('btnSaveFU').setAttribute('data-edit-id','');ge('fuLabel').value='';fs('fuContact');fsDeals('fuDeal',ge('fuContact').value,'');ge('fuDate').value=tod();om('fuModal');});
+ge('btnAddFU').addEventListener('click',function(){ge('btnSaveFU')&&ge('btnSaveFU').setAttribute('data-edit-id','');ge('fuLabel').value='';fs('fuContact');fsDeals('fuDeal',ge('fuContact').value,'');ge('fuDate').value=tod();populateAssignDropdowns();if(ge('fuAssign'))ge('fuAssign').value='';om('fuModal');});
 ge('btnAddNote').addEventListener('click',function(){ge('btnSaveNote')&&ge('btnSaveNote').setAttribute('data-edit-id','');ge('nText').value='';if(ge('nCategory'))ge('nCategory').value='General';var _np=ensureNotePicker();if(_np)_np.setContact(null);fsDeals('nDeal','','');om('noteModal');});
 // Notes tab: search, category chips, collapse-all
 (function(){

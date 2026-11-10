@@ -831,6 +831,54 @@ async function processDrips(result, health) {
   if (Object.keys(tokenCache).length && !Object.values(tokenCache).some(t => t.error)) { health.gmailOk = true; health.gmailError = ''; }
 }
 
+
+// ===================== FOLLOW-UP REMINDERS (internal) =====================
+// A follow-up (task) emails a reminder to the person it's assigned to — or to everyone on the team
+// if it's unassigned — once, at 7:00 am Mountain on its due date. Never to the client.
+// Deduped through reminder_log (deadlineType 'Follow-up', daysBefore = -YYYYMMDD of the due date), so
+// it sends once per due date, and again if the follow-up is moved to a new date.
+async function processFollowupReminders(result) {
+  if (nowHmMtn() < '07:00') return;
+  const today = todayMtn();
+  const due = await supaGet('followups?done=eq.false&date=eq.' + today + '&limit=200');
+  if (!Array.isArray(due) || !due.length) return;
+  const team = await supaGet('team?select=id,first,last,email&limit=50');
+  const byId = {}; const all = [];
+  (Array.isArray(team) ? team : []).forEach(t => { if (t.email) { byId[String(t.id)] = t; all.push(t.email); } });
+  const sender = (await getDefaultDripSender()) || (((await supaGet('gmail_tokens?select=member_id&limit=1')) || [])[0] || {}).member_id;
+  if (!sender) { result.reminders.errors.push('No sending account for follow-up reminders'); return; }
+  let tok = null;
+  for (let i = 0; i < due.length; i++) {
+    const f = due[i];
+    result.reminders.checked++;
+    const m = f.assignedTo != null ? byId[String(f.assignedTo)] : null;
+    const to = m ? m.email : all.join(', ');
+    if (!to) { result.reminders.skipped++; continue; }
+    const row = { id: newSmallId(), deadlineId: f.id, transactionId: f.transactionId || null, contactId: f.contactId || null, deadlineType: 'Follow-up',
+      deadlineDate: f.date, daysBefore: -parseInt(String(f.date).replace(/-/g, '')), sentTo: to, status: 'pending', error: '', sentAt: new Date().toISOString() };
+    const claim = await supaUpsert('reminder_log', [row]);
+    if (!claim.ok) { result.reminders.skipped++; continue; }    // already sent for this date
+    if (!tok) tok = await getAccessToken(sender);
+    if (tok.error) { row.status = 'failed'; row.error = tok.error; await supaUpsert('reminder_log', [row]); result.reminders.failed++; result.reminders.errors.push(tok.error); continue; }
+    let c = null, tx = null;
+    if (f.contactId != null) { const cs = await supaGet('contacts?id=eq.' + encodeURIComponent(f.contactId) + '&select=first,last,email,phone&limit=1'); c = Array.isArray(cs) && cs[0]; }
+    if (f.transactionId != null) { const ts = await supaGet('transactions?id=eq.' + encodeURIComponent(f.transactionId) + '&select=address&limit=1'); tx = Array.isArray(ts) && ts[0]; }
+    const e = (x) => String(x == null ? '' : x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const line = (k, v) => v ? '<tr><td style="padding:4px 12px 4px 0;color:#777;">' + k + '</td><td style="padding:4px 0;">' + e(v) + '</td></tr>' : '';
+    const html = '<div style="font-family:Arial,sans-serif;font-size:15px;color:#222;">'
+      + '<p>' + (m ? 'Hi ' + e(m.first) + ', this' : 'This') + ' follow-up is due today:</p>'
+      + '<p style="font-size:18px;font-weight:bold;margin:10px 0;">' + e(f.label) + '</p>'
+      + '<table style="font-size:15px;border-collapse:collapse;">' + line('Contact', c ? cName(c) : '') + line('Phone', c && c.phone) + line('Email', c && c.email)
+      + line('Deal', tx && tx.address) + line('Notes', f.notes) + line('Assigned to', m ? ((m.first || '') + ' ' + (m.last || '')).trim() : 'Everyone') + '</table>'
+      + '<p style="margin-top:16px;"><a href="' + SITE_URL + '" style="color:#1E4C84;">Open Properly CRM</a> to check it off.</p></div>';
+    const sent = await gmailSend(tok.accessToken, to, 'Follow-up due today: ' + f.label + (c ? ' (' + cName(c) + ')' : ''), html);
+    row.status = sent.error ? 'failed' : 'sent'; row.error = sent.error || '';
+    await supaUpsert('reminder_log', [row]);
+    if (sent.error) { result.reminders.failed++; result.reminders.errors.push(sent.error); }
+    else { result.reminders.sent++; await supaPatch('followups?id=eq.' + f.id, { remindedAt: new Date().toISOString() }); }
+  }
+}
+
 // ===================== AUTH + HANDLER =====================
 async function authorized(req) {
   const secret = process.env.CRON_SECRET;
@@ -920,7 +968,7 @@ export default async function handler(req, res) {
   }
 
   // 3. Transaction reminders (separate from drips).
-  try { if (CTRL.master && CTRL.reminders) await processReminders(result); }
+  try { if (CTRL.master && CTRL.reminders) { await processReminders(result); await processFollowupReminders(result); } }
   catch (e) { result.reminders.errors.push('Reminder error: ' + e.message); }
 
   try { await setSetting('drip_health', health); } catch (e) {}
