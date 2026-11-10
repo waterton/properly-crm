@@ -1185,8 +1185,9 @@ function rb(){
 }
 
 function rd(){
-  ge('sBuyers').textContent=C.filter(function(c){return ctypes(c).indexOf('buyer')>=0;}).length;
-  ge('sSellers').textContent=C.filter(function(c){return ctypes(c).indexOf('seller')>=0;}).length;
+  // "Active" = not closed. A buyer/seller whose deal closed (stage Closed) drops off these counts.
+  ge('sBuyers').textContent=C.filter(function(c){return ctypes(c).indexOf('buyer')>=0 && c.stage!=='Closed';}).length;
+  ge('sSellers').textContent=C.filter(function(c){return ctypes(c).indexOf('seller')>=0 && c.stage!=='Closed';}).length;
   ge('sLeads').textContent=C.filter(function(c){var t=ctypes(c);return t.indexOf('prospect')>=0||t.indexOf('lead')>=0;}).length;
   ge('sClosing').textContent=TX.filter(function(t){return t.status!=='closed';}).length;
   var rEl=ge('dRecent');rEl.innerHTML='';
@@ -1710,11 +1711,13 @@ async function deleteSelectedContacts(){
 }
 
 function rc(){
-  var filter = curFilter==='all' ? null : curFilter;
+  // "buyer-active" / "seller-active" come from the dashboard tiles: same type filter, closed contacts left out.
+  var activeOnly = /-active$/.test(curFilter);
+  var filter = curFilter==='all' ? null : curFilter.replace(/-active$/,'');
   var list = filter
     ? C.filter(function(c){
         var ts = ctypes(c).map(function(t){ return t==='lead'?'prospect':t; });
-        return ts.indexOf(filter) >= 0;
+        return ts.indexOf(filter) >= 0 && !(activeOnly && c.stage==='Closed');
       })
     : C.slice();
   var q=ge('searchBox').value.toLowerCase();
@@ -11077,7 +11080,7 @@ ge('nav-notes').addEventListener('click',function(){sp('notes');});
 ge('nav-deadlines').addEventListener('click',function(){sp('deadlines');});
 // --- Dashboard stat tiles: clickable drill-downs ---
 function dashToContacts(f){
-  curFilter=f;
+  curFilter = (f==='buyer'||f==='seller') ? f+'-active' : f;   // the Active Buyers/Sellers tiles skip closed contacts
   document.querySelectorAll('.filter-btn[data-filter]').forEach(function(b){
     b.classList.toggle('active', b.getAttribute('data-filter')===f);
   });
