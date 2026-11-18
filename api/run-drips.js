@@ -744,6 +744,8 @@ async function resumePaused() {
   }
 }
 
+// FORCE_ENR: an enrollment someone clicked "Send now" on — it skips the one-email-a-day rule.
+let FORCE_ENR = null;
 async function processDrips(result, health) {
   const R = result.drips;
   await resumePaused();
@@ -815,7 +817,7 @@ async function processDrips(result, health) {
       continue;
     }
 
-    if (rules.oneADay && sentToday[String(c.id)]) { await release(nextSendAt(today, 1, rules)); R.deferred++; continue; }
+    if (rules.oneADay && sentToday[String(c.id)] && String(enr.id) !== String(FORCE_ENR)) { await release(nextSendAt(today, 1, rules)); R.deferred++; continue; }
 
     const to = contactEmails(c)[0] || '';
     if (!to) {
@@ -961,6 +963,7 @@ export default async function handler(req, res) {
   if (!who.ok) return res.status(401).json({ error: 'Unauthorized' });
   const body = req.method === 'POST' ? await readBody(req) : {};
   const action = (req.query && req.query.action) || body.action || 'run';
+  FORCE_ENR = body.sendNow || null;
   if (!CLIENT_ID || !CLIENT_SECRET) return res.status(500).json({ error: 'GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET not set' });
 
   if (action === 'test') {
