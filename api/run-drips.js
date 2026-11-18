@@ -172,10 +172,35 @@ function extractInlineImages(html) {
 function wrap76(s) { return s.replace(/.{1,76}/g, '$&\r\n').trim(); }
 
 let SEND_CTRL = null;
-async function gmailSend(accessToken, to, subject, htmlBody, cc) {
+// Client-facing mail goes out "as" a shared address (e.g. info@palaciosbaker.com) — a Google Workspace
+// alias of the sending account. Stored in settings.default_drip_sender {memberId, fromEmail, fromName}.
+// It's only used when the alias is a verified "Send mail as" address on that account (checked each run);
+// otherwise Gmail would silently rewrite it, so we fall back to the account's own address.
+let SEND_AS = null;
+function fromFor(memberId) {
+  if (!SEND_AS || !SEND_AS.ok || !SEND_AS.fromEmail || String(memberId) !== String(SEND_AS.memberId)) return '';
+  const name = String(SEND_AS.fromName || '').replace(/["\r\n]/g, '');
+  return name ? '"' + name + '" <' + SEND_AS.fromEmail + '>' : SEND_AS.fromEmail;
+}
+async function loadSendAs() {
+  SEND_AS = null;
+  const v = await getSetting('default_drip_sender');
+  if (!v || !v.memberId || !v.fromEmail) return null;
+  SEND_AS = { memberId: String(v.memberId), fromEmail: String(v.fromEmail).toLowerCase(), fromName: v.fromName || '', ok: false };
+  const tok = await getAccessToken(SEND_AS.memberId);
+  if (tok.error) { SEND_AS.problem = tok.error; return SEND_AS; }
+  const list = await gmailGet(tok.accessToken, 'settings/sendAs');
+  const hit = (list && list.sendAs || []).find(x => String(x.sendAsEmail).toLowerCase() === SEND_AS.fromEmail);
+  if (hit && (hit.isPrimary || !hit.verificationStatus || hit.verificationStatus === 'accepted')) SEND_AS.ok = true;
+  else SEND_AS.problem = SEND_AS.fromEmail + ' is not set up as a "Send mail as" address in ' + (tok.email || 'the sending') + ' Gmail, so emails are going out as ' + (tok.email || 'that account') + ' instead. In that Gmail: Settings → See all settings → Accounts → "Send mail as" → Add another email address.';
+  return SEND_AS;
+}
+async function gmailSend(accessToken, to, subject, htmlBody, cc, from) {
   if (SEND_CTRL && SEND_CTRL.testMode) { to = SEND_CTRL.testEmail || to; cc = undefined; subject = '[TEST] ' + subject; }
   const { html, images } = extractInlineImages(htmlBody || '');
-  const headerLines = ['To: ' + to];
+  const headerLines = [];
+  if (from) headerLines.push('From: ' + from, 'Reply-To: ' + from);
+  headerLines.push('To: ' + to);
   if (cc) headerLines.push('Cc: ' + cc);
   headerLines.push('Subject: ' + encodeSubject(subject), 'MIME-Version: 1.0');
   let mime;
@@ -491,7 +516,8 @@ async function processReminders(result) {
     }
     if (!to) { result.reminders.skipped++; continue; }
 
-    const senderId = dl.assignedTo || (tx && tx.assignedTo) || defaultSender;
+    // Client reminders come from the shared address (info@) when it's set up; otherwise the assigned agent.
+    const senderId = (SEND_AS && SEND_AS.ok && SEND_AS.memberId) || dl.assignedTo || (tx && tx.assignedTo) || defaultSender;
     if (!senderId) { result.reminders.errors.push('No sending account for deadline ' + dl.id); continue; }
     if (!tokenCache[senderId]) tokenCache[senderId] = await getAccessToken(senderId);
     const tok = tokenCache[senderId];
@@ -526,7 +552,7 @@ async function processReminders(result) {
       if (!claim.ok) { result.reminders.skipped++; continue; }  // another run just claimed it
     }
 
-    const sent = await gmailSend(tok.accessToken, to, msg.subject, msg.body, cc);
+    const sent = await gmailSend(tok.accessToken, to, msg.subject, msg.body, cc, fromFor(senderId));
     logRow.status = sent.error ? 'failed' : 'sent';
     logRow.error = sent.error || '';
     await supaUpsert('reminder_log', [logRow]);
@@ -579,6 +605,7 @@ async function processInbound(result, health) {
   const teamEmails = {};
   (Array.isArray(team) ? team : []).forEach(t => { if (t.email) teamEmails[t.email.toLowerCase()] = t; });
   (Array.isArray(tokens) ? tokens : []).forEach(t => { if (t.email) teamEmails[t.email.toLowerCase()] = teamEmails[t.email.toLowerCase()] || { first: t.name || t.email }; });
+  if (SEND_AS && SEND_AS.fromEmail) teamEmails[SEND_AS.fromEmail] = teamEmails[SEND_AS.fromEmail] || { first: 'Palacios Baker' };
 
   const today = todayMtn();
   const pauseContact = async (cid, why, exceptEnrId) => {
@@ -817,13 +844,13 @@ async function processDrips(result, health) {
     let html = mergeTags(lang === 'es' ? msg.html_es : msg.html, c);
     html = trackLinks(applyUnsubscribe(html, c.id, lang), logId);
 
-    const sent = await gmailSend(tok.accessToken, to, subject, html);
+    const sent = await gmailSend(tok.accessToken, to, subject, html, undefined, fromFor(memberId));
     if (sent.error) {
       await logEvent({ id: logId, kind: 'email', status: 'failed', error: sent.error, enrollmentId: enr.id, campaignId: camp.id, contactId: c.id, stepIndex: enr.stepIndex, subject: subject, to: to, lang: lang, messageId: msg.id, fromEmail: tok.email });
       await release(new Date(Date.now() + 2 * 3600000).toISOString());
       health.lastError = sent.error; R.failed++; continue;
     }
-    await logEvent({ id: logId, kind: 'email', status: 'sent', sentAt: new Date().toISOString(), enrollmentId: enr.id, campaignId: camp.id, contactId: c.id, stepIndex: enr.stepIndex, subject: subject, to: to, lang: lang, messageId: msg.id, threadId: sent.threadId, gmailId: sent.messageId, fromEmail: tok.email });
+    await logEvent({ id: logId, kind: 'email', status: 'sent', sentAt: new Date().toISOString(), enrollmentId: enr.id, campaignId: camp.id, contactId: c.id, stepIndex: enr.stepIndex, subject: subject, to: to, lang: lang, messageId: msg.id, threadId: sent.threadId, gmailId: sent.messageId, fromEmail: fromFor(memberId) ? SEND_AS.fromEmail : tok.email });
     sentToday[String(c.id)] = true;
     await advance();
     sends++; R.sent++;
@@ -871,7 +898,7 @@ async function processFollowupReminders(result) {
       + '<table style="font-size:15px;border-collapse:collapse;">' + line('Contact', c ? cName(c) : '') + line('Phone', c && c.phone) + line('Email', c && c.email)
       + line('Deal', tx && tx.address) + line('Notes', f.notes) + line('Assigned to', m ? ((m.first || '') + ' ' + (m.last || '')).trim() : 'Everyone') + '</table>'
       + '<p style="margin-top:16px;"><a href="' + SITE_URL + '" style="color:#1E4C84;">Open Properly CRM</a> to check it off.</p></div>';
-    const sent = await gmailSend(tok.accessToken, to, 'Follow-up due today: ' + f.label + (c ? ' (' + cName(c) + ')' : ''), html);
+    const sent = await gmailSend(tok.accessToken, to, 'Follow-up due today: ' + f.label + (c ? ' (' + cName(c) + ')' : ''), html, undefined, fromFor(sender));
     row.status = sent.error ? 'failed' : 'sent'; row.error = sent.error || '';
     await supaUpsert('reminder_log', [row]);
     if (sent.error) { result.reminders.failed++; result.reminders.errors.push(sent.error); }
@@ -925,8 +952,8 @@ async function sendTest(body, who) {
   if (tok.error) return { error: tok.error };
   SEND_CTRL = null;   // a test always goes to the requester
   const sent = await gmailSend(tok.accessToken, to, '[TEST] ' + mergeTags(lang === 'es' ? (msg.subject_es || msg.subject) : msg.subject, fake),
-    applyUnsubscribe(mergeTags(lang === 'es' ? msg.html_es : msg.html, fake), null, lang));
-  return sent.error ? { error: sent.error } : { ok: true, to: to, from: tok.email, lang: lang };
+    applyUnsubscribe(mergeTags(lang === 'es' ? msg.html_es : msg.html, fake), null, lang), undefined, fromFor(sender));
+  return sent.error ? { error: sent.error } : { ok: true, to: to, from: fromFor(sender) ? SEND_AS.fromEmail : tok.email, lang: lang };
 }
 
 export default async function handler(req, res) {
@@ -937,12 +964,14 @@ export default async function handler(req, res) {
   if (!CLIENT_ID || !CLIENT_SECRET) return res.status(500).json({ error: 'GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET not set' });
 
   if (action === 'test') {
+    try { await loadSendAs(); } catch (e) { SEND_AS = null; }
     try { const r = await sendTest(body, who); return res.status(r.error ? 400 : 200).json(r); }
     catch (e) { return res.status(500).json({ error: e.message }); }
   }
 
   const CTRL = await getSendControls();
   SEND_CTRL = CTRL;
+  try { await loadSendAs(); } catch (e) { SEND_AS = null; }
   const result = {
     inbound: { checked: 0, replies: 0, autoreplies: 0, unsubscribed: 0, bounced: 0, paused: 0, conversations: 0, errors: [] },
     drips: { checked: 0, sent: 0, failed: 0, completed: 0, skipped: 0, deferred: 0, held: 0, tasks: 0, errors: [] },
@@ -961,7 +990,8 @@ export default async function handler(req, res) {
     try {
       // Check the sending account up front so the banner is right even when nothing is due.
       const sender = await getDefaultDripSender();
-      if (sender) { const t = await getAccessToken(sender); health.senderEmail = t.email || ''; health.gmailOk = !t.error; health.gmailError = t.error || ''; }
+      if (sender) { const t = await getAccessToken(sender); health.senderEmail = (SEND_AS && SEND_AS.ok) ? SEND_AS.fromEmail : (t.email || ''); health.gmailOk = !t.error; health.gmailError = t.error || ''; }
+      if (SEND_AS && SEND_AS.problem && !SEND_AS.ok) health.problems.push(SEND_AS.problem);
       await processDrips(result, health);
       if (result.drips.sent || result.drips.failed || result.drips.tasks) health.lastSendRun = { at: new Date().toISOString(), sent: result.drips.sent, failed: result.drips.failed, tasks: result.drips.tasks };
     } catch (e) { result.drips.errors.push('Drip error: ' + e.message); health.lastError = e.message; }

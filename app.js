@@ -67,7 +67,7 @@ var C=[],N=[],F=[],D=[],TX=[],TM=[],A=[],curDet=null,curFilter='all',curPage='da
 var CAMP=[],ENR=[],SENDLOG=[],DOCS=[];
 var DMSG=[]; // drip_messages: reusable, fully-designed marketing emails (subject + HTML w/ embedded images)
 var SCTRL=null; // in-memory copy of Sending Controls (settings.sending_controls) so the UI can explain why a drip is/ isn't sending
-var DRIP_SENDER_MEMBER=null; // default "send from" account (member id) for drips, from settings.default_drip_sender
+var DRIP_SENDER_MEMBER=null, DRIP_SENDER_ALIAS=''; // default "send from" account (member id) for drips, from settings.default_drip_sender
 var CH=[]; // tx_changes: audit trail of field changes applied from scanned documents
 var RS=[]; // reminder_settings: how many days before each deadline type to remind (cron reads these)
 var RL=[]; // reminder_log: which reminders the cron has already sent (used to hide sent personal reminders)
@@ -10982,7 +10982,7 @@ async function loadSendingControls(){
     try{
       var dr = await fetch(SUPA_URL+'/rest/v1/settings?key=eq.default_drip_sender&select=value',{ headers: headers });
       var dt = await dr.text();
-      if(dt){ var drows = JSON.parse(dt); if(drows.length && drows[0].value && drows[0].value.memberId) DRIP_SENDER_MEMBER = String(drows[0].value.memberId); }
+      if(dt){ var drows = JSON.parse(dt); if(drows.length && drows[0].value && drows[0].value.memberId){ DRIP_SENDER_MEMBER = String(drows[0].value.memberId); DRIP_SENDER_ALIAS = drows[0].value.fromEmail || ''; } }
     }catch(e){}
     var r = await fetch(SUPA_URL+'/rest/v1/settings?key=eq.sending_controls&select=value',{ headers: headers });
     var text = await r.text(); if(!text){ SCTRL = { master:false, drips:false, reminders:false, briefing:false, testMode:true, testEmail:'' }; return; }
@@ -11694,7 +11694,9 @@ function dvCampHtml(c){
   return h + (DV.tab==='people' ? dvPeopleHtml(c) : DV.tab==='rules' ? dvRulesHtml(c) : dvStepsHtml(c));
 }
 function dvSenderLabel(mid){
-  var id=mid||DRIP_SENDER_MEMBER; var m=id?TM.find(function(t){ return String(t.id)===String(id); }):null;
+  var id=mid||DRIP_SENDER_MEMBER;
+  if(DRIP_SENDER_ALIAS && String(id)===String(DRIP_SENDER_MEMBER)) return DRIP_SENDER_ALIAS;   // shared address (e.g. info@) on the sending account
+  var m=id?TM.find(function(t){ return String(t.id)===String(id); }):null;
   return m ? (m.email||fn(m)) : 'the default sender';
 }
 function dvRenameCamp(id){ var c=dvCamp(id); var n=prompt('Campaign name:', c.name); if(!n||!n.trim()) return; c.name=n.trim(); dvSaveCamp(c); renderDrips(); }
